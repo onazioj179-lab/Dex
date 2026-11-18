@@ -29,6 +29,7 @@ import { exportDiagnostics, resetSettingsToDefaults } from '../services/ErrorBou
 import { buildDexCommands, resolveShortcut } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { DexSearchInput } from '../styles/components';
+import { dexConfirm } from './dexConfirm';
 
 /** Real window fullscreen in the app (DOM fullscreen only fills the window). */
 function toggleWindowFullscreen(): void {
@@ -308,7 +309,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { id: 'open-keyboard', title: 'Keyboard Shortcuts', subtitle: 'View all shortcuts', icon: Icons.calculator, category: 'settings', action: () => { window.dispatchEvent(new Event('dex-show-shortcuts')); }, keywords: ['hotkey', 'keybind', 'shortcut'], shortcut: `${_M}+/` },
     { id: 'open-privacy', title: 'Privacy Settings', subtitle: 'Security and privacy options', icon: Icons.password, category: 'settings', action: () => { openApp('settings'); }, keywords: ['security', 'privacy', 'encryption'] },
     { id: 'uki-permissions', title: 'UKI Permissions', subtitle: 'Control what UKI can access (screen, files, shell, mic…)', icon: Icons.password, category: 'settings', action: () => window.dispatchEvent(new CustomEvent('dex-permission-center')), keywords: ['permission', 'permissions', 'capability', 'grant', 'revoke', 'access', 'security', 'uki', 'privacy'] },
-    { id: 'reset-settings', title: 'Reset Appearance & Settings', subtitle: 'Restore UI preferences to defaults (your data is kept)', icon: Icons.theme, category: 'settings', action: () => { if (window.confirm('Reset appearance and UI settings to defaults?\n\nYour notes, tasks, files, and projects are NOT affected.')) { resetSettingsToDefaults(); window.location.reload(); } }, keywords: ['reset', 'defaults', 'settings', 'recover', 'fix', 'corrupt', 'restore', 'broken'] },
+    { id: 'reset-settings', title: 'Reset Appearance & Settings', subtitle: 'Restore UI preferences to defaults (your data is kept)', icon: Icons.theme, category: 'settings', action: async () => { if (await dexConfirm({ title: 'Reset appearance and UI settings to defaults?', message: 'Your notes, tasks, files and projects are not affected.', confirmLabel: 'Reset' })) { resetSettingsToDefaults(); window.location.reload(); } }, keywords: ['reset', 'defaults', 'settings', 'recover', 'fix', 'corrupt', 'restore', 'broken'] },
 
     // DEX catalog action commands not covered above (tile/maximize/uki/compact/nav),
     // run through the one executor + command bus.

@@ -323,6 +323,7 @@ const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 
 // Seconds -> clock via the shared canonical; keep the empty-string guard for images.
 import { formatClock } from '../../shared/format/units';
 import { keyEventForApp } from '../shell/input/appKeyScope';
+import { dexConfirm } from '../components/dexConfirm';
 const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
@@ -743,11 +744,11 @@ export const Gallery: React.FC = () => {
     }
   }, [selectedItems]);
 
-  const batchExport = useCallback(() => {
+  const batchExport = useCallback(async () => {
     if (selectedItems.size === 0) return;
     const toExport = media.filter(m => selectedItems.has(m.id) && m.src);
     if (toExport.length === 0) { toast.error('No exportable files selected'); return; }
-    if (toExport.length > 20 && !confirm(`Export ${toExport.length} files? This may take a moment.`)) return;
+    if (toExport.length > 20 && !(await dexConfirm({ title: `Export ${toExport.length} files?`, message: 'This may take a moment.', confirmLabel: 'Export' }))) return;
     let failed = 0;
     toExport.forEach((m, i) => {
       setTimeout(async () => {

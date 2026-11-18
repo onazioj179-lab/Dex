@@ -43,6 +43,7 @@ import { useRunningApps } from '../store/runningApps';
 import { normalizeAddress } from '../services/browserAddress';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../services/appIntents';
+import { dexConfirm } from '../components/dexConfirm';
 
 // ===========================================================================
 // TYPES
@@ -2455,7 +2456,7 @@ ${text}
                 key={f.id}
                 style={{ ...styles.clearBtn, fontWeight: activeBookmarkFolder === f.id ? 600 : 400, textDecoration: activeBookmarkFolder === f.id ? 'underline' : 'none' }}
                 onClick={() => setActiveBookmarkFolder(f.id)}
-                onContextMenu={e => { e.preventDefault(); if (confirm(`Delete folder "${f.name}"?`)) deleteBookmarkFolder(f.id); }}
+                onContextMenu={async e => { e.preventDefault(); if (await dexConfirm({ title: `Delete folder "${f.name}"?`, message: 'Its bookmarks are kept and move out of the folder.', confirmLabel: 'Delete', tone: 'destructive' })) deleteBookmarkFolder(f.id); }}
               >{f.name}</button>
             ))}
           </div>
@@ -2781,7 +2782,7 @@ ${text}
                       <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>{p.username}</div>
                     </div>
                     <button
-                      onClick={() => { if (window.confirm(`Delete the saved password for ${p.username || 'this account'} on ${p.domain}? This cannot be undone.`)) deletePassword(p.id); }}
+                      onClick={async () => { if (await dexConfirm({ title: `Delete the saved password for ${p.username || 'this account'} on ${p.domain}?`, message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'destructive' })) deletePassword(p.id); }}
                       style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px' }}
                       aria-label="Delete password"
                     >{Icon.close}</button>
@@ -2838,7 +2839,7 @@ ${text}
                       <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>{c.name} — exp {c.expiry}</div>
                     </div>
                     <button
-                      onClick={() => { if (window.confirm(`Delete the saved card "${c.label}"? This cannot be undone.`)) deleteCard(c.id); }}
+                      onClick={async () => { if (await dexConfirm({ title: `Delete the saved card "${c.label}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'destructive' })) deleteCard(c.id); }}
                       style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', padding: '4px' }}
                       aria-label="Delete card"
                     >{Icon.close}</button>

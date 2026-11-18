@@ -133,6 +133,7 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 
 import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
 import { setStudioMode } from './creativeStudio/studioMode';
+import { dexConfirm } from '../../components/dexConfirm';
 
 /** True when a drawing layer has any painted pixel (checked only on demand). */
 function hasInk(c: HTMLCanvasElement): boolean {
@@ -506,7 +507,7 @@ const Canvas: React.FC = () => {
     const idx = boardsRef.current;
     if (!idx) return;
     const current = idx.boards.find(b => b.id === idx.activeId);
-    if (!current || !window.confirm(`Delete board "${current.name}"? This can't be undone.`)) return;
+    if (!current || !(await dexConfirm({ title: `Delete board "${current.name}"?`, message: "This can't be undone.", confirmLabel: 'Delete', tone: 'destructive' }))) return;
     let next = removeBoard(idx, current.id);
     if (next.boards.length === 0) next = addBoard(next, 'My canvas');
     boardsRef.current = next;

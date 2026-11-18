@@ -21,6 +21,7 @@ import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { dexConfirm } from '../../components/dexConfirm';
 
 interface EnvBridge {
   listSystem: () => Promise<Array<{ name: string; value: string }>>;
@@ -350,9 +351,9 @@ export default function EnvManager(): React.ReactElement {
     toast('success', `Duplicated to "${copy.name}"`);
   }, [activeProfile, profiles, updateProfiles]);
 
-  const deleteProfile = useCallback(() => {
+  const deleteProfile = useCallback(async () => {
     if (!activeProfile) return;
-    try { if (!window.confirm(`Delete profile "${activeProfile.name}"? This cannot be undone.`)) return; } catch { /* proceed */ }
+    if (!(await dexConfirm({ title: `Delete profile "${activeProfile.name}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'destructive' }))) return;
     const next = profiles.filter(p => p.id !== activeProfile.id);
     updateProfiles(next);
     setScope('system');

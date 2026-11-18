@@ -67,6 +67,7 @@ import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
+import { dexConfirm } from '../components/dexConfirm';
 
 // ===========================================================================
 // TYPES
@@ -1474,7 +1475,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleClear = async () => {
-    if (!confirm('Clear all compressed memory archives? This removes the warm/cold history but keeps the rolling window.')) return;
+    if (!(await dexConfirm({ title: 'Clear all compressed memory archives?', message: 'This removes the warm and cold history but keeps the rolling window.', confirmLabel: 'Clear', tone: 'destructive' }))) return;
     setBusy(true);
     try {
       const mod = await import('../uki/compressedMemory');
