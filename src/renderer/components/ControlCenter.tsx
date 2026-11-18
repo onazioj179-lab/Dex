@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { CollapsibleSection } from './CollapsibleSection';
 import { isReduceMotion } from '../utils/MotionController';
 import { useNetworkStore, NETWORK_MODE_LABELS, type NetworkMode } from '../store/networkStore';
@@ -438,15 +439,13 @@ const ControlCenter: React.FC = () => {
     setTier(getStoredTier());
     setTierManual(isManualOverride());
     const id = window.setTimeout(() => searchRef.current?.focus(), reduceMotion ? 0 : 180);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.clearTimeout(id);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.clearTimeout(id);
   }, [open, refreshNetwork, reduceMotion]);
+
+  // Escape through the shared overlay stack: a dropdown or dialog opened from
+  // Control Center closes first, Control Center stays.
+  const closeCC = useCallback(() => setOpen(false), []);
+  useOverlay(open, closeCC, { dismissOnOutside: false });
 
   const toggleSection = useCallback((id: SectionId) => {
     setCollapsed((prev) => {
@@ -639,7 +638,7 @@ const ControlCenter: React.FC = () => {
             options={ALL_TIERS.map((t) => ({ id: t, label: getTierLabel(t) }))}
           />
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            {tier ? `Tier: ${getTierLabel(tier)}` : 'Auto-detecting'}
+            {tier ? `Mode: ${getTierLabel(tier)}` : 'Auto-detecting'}
             {tierManual ? ' (manual)' : ' (auto)'}
           </span>
         </CollapsibleSection>

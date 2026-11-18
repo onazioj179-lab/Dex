@@ -107,6 +107,18 @@ export default function Games(): React.ReactElement {
   const [last, setLast] = useState('');
   const [query, setQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  // Favorites: local, persisted; a star on each card and a Favorites filter.
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('dex-games-favorites') || '[]')); } catch { return new Set(); }
+  });
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem('dex-games-favorites', JSON.stringify([...next])); } catch { /* storage full */ }
+      return next;
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -130,9 +142,9 @@ export default function Games(): React.ReactElement {
     const q = query.trim().toLowerCase();
     return [...games]
       .sort((a, b) => a.title.localeCompare(b.title))
-      .filter(game => sourceFilter === 'all' || game.source === sourceFilter)
+      .filter(game => sourceFilter === 'all' || (sourceFilter === '__fav' ? favorites.has(game.id) : game.source === sourceFilter))
       .filter(game => !q || game.title.toLowerCase().includes(q) || game.id.toLowerCase().includes(q) || game.source.toLowerCase().includes(q));
-  }, [games, query, sourceFilter]);
+  }, [games, query, sourceFilter, favorites]);
 
   // "Continue playing" rail: games with real playtime, most-recent first.
   const recentlyPlayed = useMemo(() => {
@@ -225,6 +237,16 @@ export default function Games(): React.ReactElement {
       >
         <div className="dex-game-cover" style={{ background: coverGradient(g.title) }}>
           <span className="dex-game-badge" style={{ background: `${meta.color}E6` }}>{meta.label}</span>
+          <button
+            type="button"
+            aria-label={favorites.has(g.id) ? `Remove ${g.title} from Favorites` : `Add ${g.title} to Favorites`}
+            aria-pressed={favorites.has(g.id)}
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(g.id); }}
+            onKeyDown={(e) => e.stopPropagation()}
+            style={{ position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: 9999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', color: favorites.has(g.id) ? '#FFD60A' : 'rgba(255,255,255,0.75)' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={favorites.has(g.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+          </button>
           <span className="dex-game-initial">{g.title.charAt(0).toUpperCase()}</span>
           <span className="dex-game-play" aria-hidden="true">
             {launching
@@ -296,8 +318,8 @@ export default function Games(): React.ReactElement {
               background: G_PANEL, border: `1px solid ${G_BORDER}`,
             }}>
               <div>
-                <div style={{ fontSize: 11, color: G_DIM, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Total playtime</div>
-                <div style={{ fontSize: 30, fontWeight: 800, marginTop: 4, letterSpacing: '-0.02em' }}>{formatHours(totalPlaySec)}</div>
+                <div style={{ fontSize: 11, color: G_DIM, textTransform: 'none', letterSpacing: '0.01em', fontWeight: 700 }}>Total playtime</div>
+                <div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, letterSpacing: '-0.02em' }}>{formatHours(totalPlaySec)}</div>
                 <div style={{ fontSize: 12, color: G_DIM, marginTop: 2 }}>{games.length} games · {playedCount} played</div>
               </div>
               {topGames.length > 0 && (
@@ -310,9 +332,9 @@ export default function Games(): React.ReactElement {
                       <div style={{
                         width: 36, height: 36, borderRadius: 10, margin: '0 auto 8px',
                         background: coverGradient(g.title), display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontSize: 15,
+                        fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontSize: 15,
                       }}>{g.title.charAt(0).toUpperCase()}</div>
-                      <div style={{ fontSize: 14, fontWeight: 800 }}>{formatHours(sec)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{formatHours(sec)}</div>
                       <div style={{ fontSize: 10, color: G_DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 76 }}>{g.title}</div>
                     </div>
                   ))}
@@ -324,6 +346,9 @@ export default function Games(): React.ReactElement {
           {availableSources.length > 1 && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
               <button className="dex-game-chip" aria-pressed={sourceFilter === 'all'} onClick={() => setSourceFilter('all')}>All ({games.length})</button>
+              {favorites.size > 0 && (
+                <button className="dex-game-chip" aria-pressed={sourceFilter === '__fav'} onClick={() => setSourceFilter('__fav')}>Favorites ({games.filter(g => favorites.has(g.id)).length})</button>
+              )}
               {availableSources.map(s => (
                 <button key={s} className="dex-game-chip" aria-pressed={sourceFilter === s} onClick={() => setSourceFilter(s)}>
                   {sourceMeta(s).label} ({games.filter(g => g.source === s).length})

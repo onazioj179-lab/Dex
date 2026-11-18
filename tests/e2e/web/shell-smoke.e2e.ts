@@ -16,7 +16,9 @@ const CRASH = /stopped unexpectedly|DEX hit a problem|Something went wrong in th
 /** App ids, read from the store source so a new app is covered without editing this file. */
 function appIds(): string[] {
   const src = readFileSync(join(__dirname, '../../../src/renderer/store/runningApps.ts'), 'utf8');
-  const a = src.indexOf('export const APP_DEFINITIONS');
+  // The literal app table (APP_DEFINITIONS wraps it to resolve window ids like 'notes~2').
+  const a = src.search(/const APP_DEFINITIONS(_RAW)?\b[^=]*= \{/);
+  expect(a).toBeGreaterThan(-1);
   const body = src.slice(a, src.indexOf('\n};', a));
   return [...body.matchAll(/^\s+['"]?([a-z0-9-]+)['"]?:\s*\{/gm)].map((m) => m[1]);
 }

@@ -979,7 +979,7 @@ const Calendar: React.FC = () => {
                     key={day}
                     style={{ ...styles.weekDayPill, ...(idx === todayDow ? styles.weekDayPillToday : {}) }}
                   >
-                    {day.toUpperCase()}
+                    {day}
                   </div>
                 ))}
               </div>
@@ -1402,7 +1402,7 @@ const Calendar: React.FC = () => {
                     </button>
                     {current && (
                       <>
-                        <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event" title="Duplicate">Duplicate</button>
+                        <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event">Duplicate</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 1); closeModal(); }} aria-label="Move to tomorrow" title="Reschedule +1 day">+1 Day</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 7); closeModal(); }} aria-label="Move to next week" title="Reschedule +1 week">+1 Week</button>
                         <button style={styles.cancelBtn} onClick={() => exportEventICS(current)} aria-label="Export this event" title="Export this event (.ics)">Export</button>
@@ -1464,7 +1464,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     letterSpacing: '0.3px',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   navBtns: {
     display: 'flex',
@@ -1550,7 +1550,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     letterSpacing: '0.3px',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   viewBtnActive: {
     background: 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)',
@@ -1608,7 +1608,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '9px',
     color: 'var(--color-text-muted)',
     fontWeight: 600,
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   miniGrid: {
     display: 'grid',
@@ -1679,7 +1679,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     letterSpacing: '0.3px',
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   eventsList: {
     display: 'flex',
@@ -1770,61 +1770,55 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 'var(--space-4)',
     marginLeft: 'var(--space-3)',
   },
+  // Month view is one hairline grid (1px gaps over the border colour), not a
+  // wall of separately boxed day cards; weekday names are plain labels.
   weekHeader: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
-    gap: '6px',
-    marginBottom: '8px',
+    marginBottom: '6px',
   },
   weekDayPill: {
     textAlign: 'center',
-    fontSize: '10px',
-    color: 'var(--color-text-muted)',
+    fontSize: '11px',
+    color: 'var(--color-text-tertiary)',
     fontWeight: 600,
-    padding: '6px 0',
-    borderRadius: '10px',
-    letterSpacing: '0.6px',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
+    padding: '4px 0',
+    letterSpacing: '0.4px',
   },
   weekDayPillToday: {
     color: 'var(--color-text-primary)',
-    background: 'var(--color-bg-hover)',
   },
   calendarGrid: {
     flex: 1,
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
     gridAutoRows: '1fr',
-    gap: '6px',
-    background: 'transparent',
+    gap: '1px',
+    background: 'var(--color-border-subtle)',
+    border: '1px solid var(--color-border-subtle)',
+    borderRadius: '10px',
     overflow: 'hidden',
   },
   dayCell: {
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '6px',
+    background: 'var(--color-bg-base)',
     padding: '8px 10px',
     minHeight: '60px',
     cursor: 'pointer',
-    transition: 'background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+    transition: 'background 0.12s ease',
   },
   dayCellEmpty: {
-    background: 'transparent',
+    background: 'var(--color-bg-base)',
+    opacity: 0.6,
   },
   dayCellWeekend: {
-    background: 'color-mix(in srgb, var(--color-text-muted) 5%, var(--color-bg-surface))',
+    background: 'color-mix(in srgb, var(--color-text-muted) 3%, var(--color-bg-base))',
   },
-  dayCellToday: {
-    borderColor: 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border-default))',
-    background: 'color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-surface))',
-  },
+  dayCellToday: {},
   dayCellSelected: {
-    boxShadow: 'inset 0 0 0 1.5px var(--color-accent)',
-    borderColor: 'transparent',
+    background: 'color-mix(in srgb, var(--color-text-primary) 6%, var(--color-bg-base))',
   },
   cellTopRow: {
     display: 'flex',
@@ -1921,8 +1915,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
   },
   weekViewDayNum: {
     fontSize: '18px',
@@ -1964,7 +1958,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '9px',
     fontWeight: 600,
     color: 'var(--color-text-muted)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
     letterSpacing: '0.3px',
     whiteSpace: 'nowrap' as const,
   },
@@ -2052,7 +2046,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
     letterSpacing: '0.4px',
     padding: '4px 2px',
     position: 'sticky' as const,

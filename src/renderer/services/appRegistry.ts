@@ -15,6 +15,7 @@
 // two stay in step.
 
 import { APP_DEFINITIONS } from '../store/runningApps';
+import { byAppId } from './appWindows';
 
 export type AppCategory = 'system' | 'productivity' | 'creative' | 'media' | 'utility';
 
@@ -52,7 +53,7 @@ export interface AppEntry {
 }
 
 /** Default floating window sizes per app (used on restore/detach). */
-export const APP_WINDOW_SIZES: Record<string, AppWindowConfig> = {
+const APP_WINDOW_SIZES_RAW: Record<string, AppWindowConfig> = {
   // New launches open in the full inner workspace; these sizes are used when
   // users explicitly restore/detach.
   browser: { w: 900, h: 600 },
@@ -109,6 +110,8 @@ export const APP_WINDOW_SIZES: Record<string, AppWindowConfig> = {
   ssh: { w: 760, h: 640 },
   backup: { w: 760, h: 700 },
 };
+/** Window sizes per app; a window id ('calculator~2') answers with its app's size. */
+export const APP_WINDOW_SIZES: Record<string, AppWindowConfig> = byAppId(APP_WINDOW_SIZES_RAW);
 
 // Last size the user gave each app's floating window, so it reopens the same.
 const SIZE_KEY = 'dex-app-window-sizes';

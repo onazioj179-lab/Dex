@@ -15,7 +15,8 @@
  * appears on its own.
  */
 
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { getLearnContent, GLOBAL_LEARN_TIPS, type LearnSection } from '../services/learnRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 
@@ -57,12 +58,9 @@ export const LearnOverlay: React.FC = () => {
     return () => window.removeEventListener('dex-open-learn', onOpen as EventListener);
   }, []);
 
-  useEffect(() => {
-    if (!appId) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); setAppId(null); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [appId]);
+  // Escape through the shared overlay stack (top-only).
+  const closeLearn = useCallback(() => setAppId(null), []);
+  useOverlay(!!appId, closeLearn, { dismissOnOutside: false });
 
   if (!appId) return null;
 
@@ -80,7 +78,7 @@ export const LearnOverlay: React.FC = () => {
     body: { padding: 'var(--space-4)', overflow: 'auto' },
     overview: { fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--space-4)' },
     section: { marginBottom: 'var(--space-4)' },
-    heading: { fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' },
+    heading: { fontSize: '11px', fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' },
     item: { display: 'flex', gap: 'var(--space-2)', fontSize: '13px', color: 'var(--color-text-primary)', lineHeight: 1.5, padding: '3px 0' },
     bullet: { color: accent, flexShrink: 0 },
     hint: { padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border)', fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center' },

@@ -133,7 +133,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
 
       <div style={{ overflow: 'auto', padding: 'var(--space-4)' }}>
         <section style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>
             Summary
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 'var(--space-3)' }}>
@@ -144,7 +144,7 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({ open = true, initialPolicy 
 
         {active === 'privacy' && (
           <section style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--pg-text-tertiary, #94a3b8)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>
               Data Categories
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 'var(--space-2)' }}>

@@ -7318,7 +7318,7 @@ const Imosion: React.FC = () => {
           {/* Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 14px', background: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--color-bg-tertiary)', borderRadius: '4px', border: '1px solid var(--color-border-subtle)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '2px', background: 'var(--color-bg-tertiary)', borderRadius: 9999 }}>
                 <button aria-label="Zoom In" onClick={() => setZoom(z => Math.min(200, z * 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }}>{Icon.zoomIn}</button>
                 <button aria-label="Zoom Out" onClick={() => setZoom(z => Math.max(10, z / 1.15))} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px' }}>{Icon.zoomOut}</button>
                 <button aria-label="Reset Zoom" onClick={() => setZoom(40)} className="btn btn-icon" style={{ background: 'transparent', border: 'none', width: '26px', height: '24px', fontSize: '9px', color: 'var(--color-text-muted)' }}>1:1</button>

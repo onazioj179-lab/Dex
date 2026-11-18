@@ -8,11 +8,15 @@ import { sanitizeDockPrefs, dockReserve, DOCK_RESERVE, DOCK_THICKNESS } from '..
 import { dockLayout, dropIndex, moveTo, DOCK_MOTION } from '../../src/renderer/components/dock/dockLayout';
 
 describe('Dock prefs', () => {
-  it('defaults to the Morphing Dock at the bottom, open, no padding', () => {
-    expect(sanitizeDockPrefs(null)).toEqual({ style: 'morphing', edge: 'bottom', autoCollapse: false, expanded: true, workspacePadding: 0 });
+  it('defaults to the Morphing Dock at the bottom, folded with auto-collapse on (owner 2026-11-17), no padding', () => {
+    expect(sanitizeDockPrefs(null)).toEqual({ style: 'morphing', edge: 'bottom', autoCollapse: true, expanded: false, workspacePadding: 0 });
+  });
+  it('old saved prefs take the new auto-collapse default once; marked prefs keep the user choice', () => {
+    expect(sanitizeDockPrefs({ autoCollapse: false, expanded: true }).autoCollapse).toBe(true);
+    expect(sanitizeDockPrefs({ autoCollapse: false, expanded: true, acV2: true })).toMatchObject({ autoCollapse: false, expanded: true });
   });
   it('rejects junk from storage', () => {
-    expect(sanitizeDockPrefs({ style: 'x', edge: 'top', autoCollapse: 'yes', workspacePadding: 500 }))
+    expect(sanitizeDockPrefs({ style: 'x', edge: 'top', autoCollapse: 'yes', workspacePadding: 500, acV2: true }))
       .toEqual({ style: 'morphing', edge: 'bottom', autoCollapse: false, expanded: true, workspacePadding: 48 });
   });
   it('the classic DEX Bar and fullscreen keep no strip', () => {

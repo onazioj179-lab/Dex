@@ -32,3 +32,15 @@ describe('Spotlight ranking', () => {
     expect(r.some(x => x.title === 'Background Tint')).toBe(true);
   });
 });
+
+describe('spotlight: no scattered-letter noise (2026-11-17)', () => {
+  it('a long keyword string does not match a query whose letters are far apart', async () => {
+    const { spotlightEngine } = await import('../../src/renderer/shell/SpotlightEngine');
+    spotlightEngine.registerAction({ id: 'zz-noise', label: 'Password Vault', keywords: ['credentials', 'secret', 'login', 'keychain'], action: () => {} });
+    spotlightEngine.registerAction({ id: 'zz-real', label: 'Night Shift', keywords: ['dark', 'warm', 'blue light'], action: () => {} });
+    await new Promise(r => setTimeout(r, 0));
+    const titles = spotlightEngine.search('dark').map(r => r.title);
+    expect(titles).toContain('Night Shift');
+    expect(titles).not.toContain('Password Vault');
+  });
+});

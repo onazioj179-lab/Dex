@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useAppWindowId } from '../../services/appWindows';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 
 // ---------------------------------------------------------------------------
@@ -192,6 +193,7 @@ export const SuggestionBar: React.FC<SuggestionBarProps> = memo(({
   visible,
   position,
 }) => {
+  const winId = useAppWindowId('notes'); // this window ('notes' or 'notes~2', ...)
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -201,7 +203,7 @@ export const SuggestionBar: React.FC<SuggestionBarProps> = memo(({
   useEffect(() => {
     if (!visible) return;
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'notes')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex(i => Math.min(i + 1, suggestions.length - 1));

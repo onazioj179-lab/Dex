@@ -354,6 +354,9 @@ interface VinxState {
   createCompoundClip: (clipIds: string[], name: string) => void;
   // New: Proxy workflow
   setProxySettings: (settings: Partial<ProxySettings>) => void;
+  /** True while an export renders: the Viewer plays originals, never proxies. Runtime only. */
+  exportingOriginals: boolean;
+  setExportingOriginals: (on: boolean) => void;
 
   // =====================================================================
   // NEW PRO FEATURE ACTIONS
@@ -1424,6 +1427,8 @@ export const useVinxStore = create<VinxState>((set, get) => {
     }),
 
     // Proxy workflow
+    exportingOriginals: false,
+    setExportingOriginals: (on) => set({ exportingOriginals: on }),
     setProxySettings: (settings) => set(s => ({
       project: { ...s.project, proxySettings: { ...(s.project.proxySettings || { enabled: false, resolution: '1/2' as const, codec: 'h264' as const, autoGenerate: false }), ...settings } },
       isDirty: true,

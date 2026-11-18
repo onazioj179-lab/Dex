@@ -39,8 +39,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
+    textTransform: 'none',
+    letterSpacing: '0.01em',
     marginBottom: 'var(--space-3)',
   },
   inputRow: {

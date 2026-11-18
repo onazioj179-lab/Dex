@@ -2092,7 +2092,7 @@ const styles: Record<string, React.CSSProperties> = {
   sidebarCount: { marginLeft: 'auto', fontSize: '12px', color: 'var(--color-text-muted)' },
   sectionLabel: {
     fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)',
-    textTransform: 'uppercase', padding: 'var(--space-4) var(--space-3) var(--space-2)', letterSpacing: '0.5px',
+    textTransform: 'none', padding: 'var(--space-4) var(--space-3) var(--space-2)', letterSpacing: '0.01em',
   },
   main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {

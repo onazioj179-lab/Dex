@@ -17,6 +17,9 @@ mod browser_block;
 mod paths;
 mod ledger_ctl;
 mod download_ctl;
+mod onboarding;
+mod uki_terminal;
+mod proc_classify;
 mod webview2;
 mod storage_ctl;
 mod secrets_ctl;
@@ -204,6 +207,7 @@ mod read_later;
 mod recycle_bin;
 mod rewind;
 mod terminal;
+mod speech_ctl;
 mod workflows;
 mod security;
 mod relationship_graph;
@@ -478,18 +482,65 @@ fn files_organize_by_type(dir: &str) -> Value {
 /// 0% CPU. The structured `cpu`/`memory`/`disk`/`network`/`uptime` fields are
 /// what the Task Manager reads; the flat `memory*MB`/`uptimeSec` fields are kept
 /// for the older power/diagnostics consumers that still read them.
-fn system_status() -> Value {
-    use std::time::Instant;
+/// One long-lived sampler for Task Manager / Nexus polling. Each call used to
+/// build a fresh `System::new_all()` (every process, disk and component), sleep,
+/// then `refresh_all()` again: two full process scans per second just to read
+/// global CPU and memory — measured at 12-18% of a core with Task Manager open.
+/// Now CPU and memory refresh alone against the previous sample (no sleep after
+/// the first call), network rates use the previous refresh, disks every 30 s.
+struct StatusSampler {
+    sys: sysinfo::System,
+    networks: sysinfo::Networks,
+    disks: sysinfo::Disks,
+    last_cpu: std::time::Instant,
+    last_net: std::time::Instant,
+    disks_at: std::time::Instant,
+}
 
-    let mut sys = sysinfo::System::new_all();
-    // Baseline network counters; received()/transmitted() then report the bytes
-    // moved since this point, which we divide by the elapsed time for a rate.
-    let mut networks = sysinfo::Networks::new_with_refreshed_list();
-    let t0 = Instant::now();
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
-    networks.refresh();
-    let elapsed = t0.elapsed().as_secs_f64().max(0.001);
+fn status_sampler() -> &'static std::sync::Mutex<StatusSampler> {
+    static S: std::sync::OnceLock<std::sync::Mutex<StatusSampler>> = std::sync::OnceLock::new();
+    S.get_or_init(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_cpu();
+        sys.refresh_memory();
+        let now = std::time::Instant::now();
+        std::sync::Mutex::new(StatusSampler {
+            sys,
+            networks: sysinfo::Networks::new_with_refreshed_list(),
+            disks: sysinfo::Disks::new_with_refreshed_list(),
+            last_cpu: now,
+            last_net: now,
+            disks_at: now,
+        })
+    })
+}
+
+/// Wait out the rest of sysinfo's minimum CPU interval since `last` (usually 0).
+fn wait_cpu_interval(last: std::time::Instant) {
+    let min = sysinfo::MINIMUM_CPU_UPDATE_INTERVAL;
+    let since = last.elapsed();
+    if since < min { std::thread::sleep(min - since); }
+}
+
+fn system_status() -> Value {
+    use crate::util::LockSafe;
+    use std::time::{Duration, Instant};
+
+    let mut guard = status_sampler().lock_safe();
+    let st = &mut *guard;
+    wait_cpu_interval(st.last_cpu);
+    st.sys.refresh_cpu();
+    st.sys.refresh_memory();
+    st.last_cpu = Instant::now();
+    st.networks.refresh();
+    let elapsed = st.last_net.elapsed().as_secs_f64().max(0.001);
+    st.last_net = Instant::now();
+    if st.disks_at.elapsed() > Duration::from_secs(30) {
+        st.disks.refresh();
+        st.disks_at = Instant::now();
+    }
+    let sys = &st.sys;
+    let networks = &st.networks;
 
     let cpu_usage = sys.global_cpu_info().cpu_usage();
     let cores = sys.cpus().len() as u64;
@@ -501,7 +552,7 @@ fn system_status() -> Value {
     let (swap_used, swap_total) = (sys.used_swap(), sys.total_swap());
 
     let (mut rx, mut tx, mut iface_count) = (0u64, 0u64, 0u64);
-    for (_iface, data) in &networks {
+    for (_iface, data) in networks {
         rx += data.received();
         tx += data.transmitted();
         iface_count += 1;
@@ -509,9 +560,8 @@ fn system_status() -> Value {
     let rx_bps = (rx as f64 / elapsed) as u64;
     let tx_bps = (tx as f64 / elapsed) as u64;
 
-    let disks = sysinfo::Disks::new_with_refreshed_list();
     let (mut disk_total, mut disk_avail) = (0u64, 0u64);
-    for d in &disks {
+    for d in &st.disks {
         disk_total += d.total_space();
         disk_avail += d.available_space();
     }
@@ -551,7 +601,9 @@ struct ProcInfo {
 
 /// Number of processes returned to the UI. A task list wants the resource hogs,
 /// not an unsorted dump of every PID on the machine.
-const PROCESS_LIMIT: usize = 60;
+// Enough for every process on a normal PC, so Task Manager's category counts are
+// true (the list is virtualized in the renderer).
+const PROCESS_LIMIT: usize = 500;
 
 /// Rank by resource pressure — CPU% descending, memory as the tiebreaker — and
 /// keep the top `limit`. Pure and deterministic.
@@ -572,11 +624,20 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
 /// UKI) and `global.d.ts` expect `any[]`; the old `{ success, processes }`
 /// wrapper made all of them show an empty list.
 fn system_processes() -> Value {
-    let mut sys = sysinfo::System::new_all();
-    // Per-process CPU% is a delta between two samples; without the sleep every
-    // process reads 0% and the ranking collapses to memory only.
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
+    use crate::util::LockSafe;
+    // One persistent process table: per-process CPU% is the delta since the
+    // previous refresh (the previous poll), so no second scan or sleep per call
+    // except the very first (and only processes are refreshed, not everything).
+    static P: std::sync::OnceLock<std::sync::Mutex<(sysinfo::System, std::time::Instant)>> = std::sync::OnceLock::new();
+    let mut guard = P.get_or_init(|| {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes();
+        std::sync::Mutex::new((sys, std::time::Instant::now()))
+    }).lock_safe();
+    wait_cpu_interval(guard.1);
+    guard.0.refresh_processes();
+    guard.1 = std::time::Instant::now();
+    let sys = &guard.0;
     let all: Vec<ProcInfo> = sys
         .processes()
         .iter()
@@ -587,6 +648,11 @@ fn system_processes() -> Value {
             memory_mb: p.memory() / (1024 * 1024),
         })
         .collect();
+    // Categories (proc_classify.rs): DEX's own tree, apps with a window, background.
+    let parents: std::collections::HashMap<u32, u32> = sys.processes().iter()
+        .filter_map(|(pid, p)| p.parent().map(|pp| (pid.as_u32(), pp.as_u32()))).collect();
+    let pids: Vec<u32> = all.iter().map(|p| p.pid).collect();
+    let kinds = proc_classify::categorize(&pids, &parents, &proc_classify::windowed_pids(), std::process::id());
     let procs: Vec<Value> = rank_processes(all, PROCESS_LIMIT)
         .iter()
         .map(|p| {
@@ -595,6 +661,8 @@ fn system_processes() -> Value {
                 "name": p.name,
                 "cpu": p.cpu,
                 "memory": p.memory_mb,
+                "parent": parents.get(&p.pid),
+                "kind": kinds.get(&p.pid).copied().unwrap_or("background"),
             })
         })
         .collect();
@@ -2293,6 +2361,39 @@ fn fit_main_webview(app: &tauri::AppHandle) {
 /// degrades gracefully (same as the browser preview) instead of crashing.
 #[tauri::command]
 async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::Webview, channel: String, args: Value) -> Value {
+    // Onboarding decisions are recorded only by DEX's own window, never by a
+    // child webview (a browser tab) — a web page cannot accept terms for the user.
+    if channel.starts_with("onboarding:") {
+        let own_webview = webview.label() == webview.window().label() && !webview.label().starts_with("dexbrowser-");
+        if !own_webview {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || onboarding::dispatch(&app, &channel, &args))
+            .await
+            .unwrap_or(Value::Null);
+    }
+    // Protected functionality (sends data off this PC, or runs commands for
+    // UKI) waits for the required onboarding decision, checked here in Rust —
+    // a renderer flag cannot unlock it.
+    if !onboarding::allows(&app, &channel) {
+        return json!({
+            "ok": false, "success": false, "error": "onboarding-required",
+            "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        });
+    }
+    // UKI's terminal broker: only DEX's own window, never a web page in a tab.
+    if channel.starts_with("ukiterm:") {
+        let own_webview = webview.label() == webview.window().label() && !webview.label().starts_with("dexbrowser-");
+        if !own_webview {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        return tauri::async_runtime::spawn_blocking(move || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| uki_terminal::dispatch(&app, &channel, &args)))
+                .unwrap_or_else(|_| json!({ "ok": false, "error": "the command broker hit an internal error" }))
+        })
+        .await
+        .unwrap_or(Value::Null);
+    }
     // DEX Ledger holds financial data: only a DEX window's own webview (the
     // main shell or a detached DEX app window, both loading the local bundle)
     // may reach it — never a child webview such as a browser tab.
@@ -2436,6 +2537,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("prerender:") { return prerender_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("privacy:") { return privacy_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("pty:") { return terminal::dispatch(&app, &channel, &args); }
+    if channel.starts_with("speech:") { return speech_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("quickactions:") { return quickactions_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("recovery:") { return recovery_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("reliability:") { return reliability_ctl::dispatch(&app, &channel, &args); }
@@ -2551,6 +2653,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "log:renderer" | "render-error:report" | "renderer:memory-critical" => renderer_log::dispatch(&channel, &args),
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
+        "system:getStartupItems" => proc_classify::startup_items(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
         "system:getLaunchAtLogin" => launch_at_login_get(),
         "system:setLaunchAtLogin" => launch_at_login_set(args.get(0).and_then(|v| v.as_bool()).unwrap_or(false)),
@@ -2990,6 +3093,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // Piped-stdio shell sessions; output streams back as pty:data/pty:exit
         // events. Needs the AppHandle (for emit + managed session state).
         ch if ch.starts_with("pty:") => terminal::dispatch(&app, ch, &args),
+        // UKI voice: Windows online dictation (speech:start/stop/status).
+        ch if ch.starts_with("speech:") => speech_ctl::dispatch(&app, ch, &args),
 
         // --- HTTP file transfer (LAN QR/link share) ------------------------
         // Self-contained HTTP server for download/upload over the LAN (the DTP

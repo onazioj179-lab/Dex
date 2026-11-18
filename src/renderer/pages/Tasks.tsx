@@ -2180,8 +2180,8 @@ const styles: Record<string, React.CSSProperties> = {
   sectionLabel: {
     fontSize: '10px',
     fontWeight: 700,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
+    letterSpacing: '0.01em',
+    textTransform: 'none',
     color: 'var(--color-text-tertiary)',
     padding: '4px var(--space-3) 2px',
   },

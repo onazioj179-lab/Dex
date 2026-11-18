@@ -210,7 +210,7 @@ const ScheduledTasksPanel: React.FC = () => {
                 <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
                 <button onClick={() => setEnabled(t.id, !t.enabled, Date.now())}
                   aria-label={t.enabled ? `Pause ${t.title}` : `Resume ${t.title}`}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase',
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, textTransform: 'none',
                     color: t.enabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
                   {t.enabled ? 'On' : 'Off'}
                 </button>

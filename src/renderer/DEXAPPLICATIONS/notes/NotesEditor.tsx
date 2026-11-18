@@ -12,6 +12,7 @@
 // ==========================================================================
 
 import React, { useRef, useCallback, useEffect, useState, memo } from 'react';
+import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import DOMPurify from 'dompurify';
 import { platform } from '../../utils';
 import {
@@ -165,20 +166,29 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     height: '100%',
     background: 'transparent',
+    position: 'relative',
   },
+  // Floating formatting toolbar (DEX Floating Surface System): a frosted pill
+  // over the writing canvas; the note scrolls beneath it (content-under-glass,
+  // see .dex-under-glass on the scroller). One row; scrolls sideways if narrow.
   toolbar: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    right: 0,
+    margin: '0 auto',
+    width: 'fit-content',
+    maxWidth: 'calc(100% - 24px)',
+    zIndex: 5,
     display: 'flex',
     alignItems: 'center',
     gap: 2,
-    padding: '6px var(--space-3)',
-    borderBottom: '1px solid var(--color-bg-hover)',
-    background: 'var(--color-bg-inset, rgba(0,0,0,0.15))',
-    // One row (Apple Notes); scrolls sideways instead of wrapping to two rows.
+    padding: '0 6px',
+    height: 40,
+    borderRadius: 9999,
     flexWrap: 'nowrap',
     overflowX: 'auto',
     scrollbarWidth: 'none',
-    minHeight: 38,
-    flexShrink: 0,
   },
   toolbarGroup: {
     display: 'flex',
@@ -195,7 +205,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 4,
+    borderRadius: 9999,
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
@@ -340,6 +350,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   onWikiLinkClick,
   onDropFiles,
 }) => {
+  const winId = useAppWindowId('notes');
   const editorRef = useRef<HTMLDivElement>(null);
   const undoMgr = useRef(new UndoManager(200));
   const lastContent = useRef(content);
@@ -416,6 +427,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // a title + the live selection) so the assistant is aware of the active note.
   // Reads live DOM at call time, so a one-time registration is enough.
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('notes', () => {
       const text = (editorRef.current?.textContent || '').trim();
       if (!text) return undefined;
@@ -473,7 +485,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       unregisterUkiAppAction('notes.search');
       unregisterUkiAppAction('notes.enhance');
     };
-  }, []);
+  }, [winId]);
 
   // Initial render: set editor HTML
   useEffect(() => {
@@ -1157,7 +1169,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       )}
       {/* Toolbar */}
       {!readOnly && editorMode !== 'preview' && (
-        <div style={styles.toolbar}>
+        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Formatting">
           {TOOLBAR_GROUPS.map((group, gi) => (
             <React.Fragment key={gi}>
               <div style={styles.toolbarGroup}>
@@ -1225,7 +1237,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         onDrop={handleDrop}
       >
         {showEditor && (
-          <div className="dex-scroll-fade-y" style={styles.editorArea}>
+          <div className={`dex-scroll-fade-y${!readOnly ? ' dex-under-glass' : ''}`} style={{ ...styles.editorArea, ['--dex-glass-top' as string]: '58px' } as React.CSSProperties}>
             <div style={{ position: 'relative' }}>
               {isEmpty && !readOnly && (
                 <div style={styles.placeholder}>{placeholder}</div>
@@ -1300,7 +1312,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none',
               color: 'var(--color-text-tertiary, #8a8a8a)',
             }}>
               <span>Outline</span>

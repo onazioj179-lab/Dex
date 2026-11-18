@@ -745,7 +745,9 @@ fn process_video(app: &tauri::AppHandle, path: &str, opts: &Value) -> Value {
 // ---------------------------------------------------------------------------
 // video:transcode — change container/codec via ffmpeg.
 // opts: { format?: "mp4"|"webm"|"mkv"|..., videoCodec?, audioCodec?,
-//         crf?, preset? }
+//         crf?, preset?, scale?: "1/2"|"1/4"|"1/8" }
+// `scale` makes an editing proxy: frame size divided by 2/4/8 (even
+// dimensions, aspect kept).
 // Emits "video:transcode-progress" / "video:transcode-done" events.
 // ---------------------------------------------------------------------------
 
@@ -775,12 +777,17 @@ fn transcode_video(app: &tauri::AppHandle, path: &str, opts: &Value) -> Value {
         .map(|s| s.to_string());
     let crf = opts.get("crf").and_then(|v| v.as_i64());
     let preset = opts.get("preset").and_then(|v| v.as_str());
+    let scale = opts.get("scale").and_then(|v| v.as_str()).and_then(proxy_scale_filter);
 
     let id = crate::util::pseudo_uuid_v4();
     let out_path = out_dir(app).join(format!("xcode-{id}.{format}"));
     let out_str = out_path.to_string_lossy().to_string();
 
     let mut args: Vec<String> = vec!["-y".into(), "-i".into(), path.to_string()];
+    if let Some(vf) = &scale {
+        args.push("-vf".into());
+        args.push(vf.clone());
+    }
     if let Some(vc) = &vcodec {
         args.push("-c:v".into());
         args.push(vc.clone());
@@ -824,6 +831,29 @@ fn transcode_video(app: &tauri::AppHandle, path: &str, opts: &Value) -> Value {
 
     crate::native_ops::emit_event(app, "video:transcode-done", &result);
     result
+}
+
+/// ffmpeg filter for a proxy scale ("1/2" | "1/4" | "1/8"): width and height
+/// divided, rounded down to even numbers (H.264 needs even sizes). None for
+/// anything else, so an unknown value never reaches ffmpeg.
+pub(crate) fn proxy_scale_filter(scale: &str) -> Option<String> {
+    let d = match scale { "1/2" => 2, "1/4" => 4, "1/8" => 8, _ => return None };
+    Some(format!("scale=trunc(iw/{d}/2)*2:trunc(ih/{d}/2)*2"))
+}
+
+#[cfg(test)]
+mod proxy_scale_tests {
+    use super::proxy_scale_filter;
+    #[test]
+    fn known_scales_map_to_even_size_filters() {
+        assert_eq!(proxy_scale_filter("1/2").as_deref(), Some("scale=trunc(iw/2/2)*2:trunc(ih/2/2)*2"));
+        assert_eq!(proxy_scale_filter("1/8").as_deref(), Some("scale=trunc(iw/8/2)*2:trunc(ih/8/2)*2"));
+    }
+    #[test]
+    fn unknown_scales_are_rejected() {
+        assert!(proxy_scale_filter("2").is_none());
+        assert!(proxy_scale_filter("1/3;rm").is_none());
+    }
 }
 
 // ---------------------------------------------------------------------------

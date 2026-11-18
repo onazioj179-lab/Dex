@@ -10,6 +10,7 @@
  */
 
 import { useBackHandler } from '../services/backNavigation';
+import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
@@ -28,6 +29,11 @@ import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { NativeWebview } from '../components/NativeWebview';
+import ContextMenu, { useContextMenu } from '../components/ContextMenu';
+import { TabSearch } from '../components/browser/TabSearch';
+import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
+import { useBackgroundTasks } from '../services/backgroundTasks';
+import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
@@ -46,6 +52,7 @@ interface Tab {
   loading: boolean;
   background?: boolean;  // Run in background
   pinned?: boolean;      // Pinned tab
+  keepAwake?: boolean;   // User asked this tab never to sleep
   navHistory: string[];  // Navigation history stack
   navIndex: number;      // Current position in history
 }
@@ -151,8 +158,9 @@ const filterBtn: React.CSSProperties = {
 // ENTERPRISE SCALE CONSTANTS - Supports 1B+ users
 // ===========================================================================
 
-const MAX_TABS = 100; // Maximum tabs per session
-const TAB_MEMORY_LIMIT = 40; // Unload background tabs after this many are open
+// Saved tabs are metadata only; live pages are bounded by tabResidency.ts,
+// so a large session costs one page plus the live budget, not 500 pages.
+const MAX_TABS = 500;
 const HISTORY_LIMIT = 2000; // Max history entries — auto-trims beyond this
 const BOOKMARK_LIMIT = 5000; // Max bookmarks
 const KEYCHAIN_STORAGE_KEY = 'dex-browser-keychain';
@@ -217,6 +225,7 @@ const loadSession = (): { tabs: Tab[]; activeTab: string } => {
         url: typeof t.url === 'string' ? t.url : '',
         loading: false,
         pinned: t.pinned === true ? true : undefined,
+        keepAwake: t.keepAwake === true ? true : undefined,
         navHistory: typeof t.url === 'string' && t.url ? [t.url] : [],
         navIndex: typeof t.url === 'string' && t.url ? 0 : -1,
       }));
@@ -224,7 +233,8 @@ const loadSession = (): { tabs: Tab[]; activeTab: string } => {
     const activeTab = typeof parsed.activeTab === 'string' && tabs.some(t => t.id === parsed.activeTab)
       ? parsed.activeTab
       : tabs[0].id;
-    return { tabs, activeTab };
+    // Restored tabs sleep until selected: a large session opens one page.
+    return { tabs: tabs.map(t => (t.id === activeTab || !t.url ? t : { ...t, background: true })), activeTab };
   } catch {
     return fallback;
   }
@@ -274,16 +284,37 @@ interface DownloadItem {
   url: string;
   fileName: string;
   progress: number;
-  status: 'downloading' | 'completed' | 'error';
+  status: 'downloading' | 'completed' | 'error' | 'cancelled';
   size?: number;
   path?: string;
+  received?: number;
+  total?: number | null;
+  error?: string;
+  finishedAt?: number;
 }
+
+// Finished downloads (not in-flight ones) survive a restart; newest 100.
+const DOWNLOADS_KEY = 'dex-browser-downloads';
+const loadDownloadHistory = (): DownloadItem[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(DOWNLOADS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((d) => d && typeof d.id === 'string' && d.status !== 'downloading').slice(0, 100) : [];
+  } catch { return []; }
+};
+const formatBytes = (n?: number | null): string => {
+  if (!n || n < 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(2)} GB`;
+};
 
 // ===============================================================================
 // COMPONENT
 // ===============================================================================
 
 export const Browser: React.FC = () => {
+  const winId = useAppWindowId('browser'); // this window ('browser' or 'browser~2', ...)
   // ===== PATTERN LEARNING =====
   useAppTracking('browser');
   const toast = useToastHelpers();
@@ -292,7 +323,15 @@ export const Browser: React.FC = () => {
   // to a single blank tab when no valid session is saved. Computed once so the
   // tabs and activeTab initializers stay in sync.
   const initialSessionRef = useRef<{ tabs: Tab[]; activeTab: string }>();
-  if (!initialSessionRef.current) initialSessionRef.current = loadSession();
+  // An extra Browser window starts with its own blank tab (tab ids are native
+  // view ids, so they must not repeat across windows) and leaves the saved
+  // session to the first window.
+  if (!initialSessionRef.current) {
+    const fresh = `${winId}_tab_${Date.now().toString(36)}`;
+    initialSessionRef.current = isExtraWindow(winId)
+      ? { tabs: [{ ...makeDefaultTabs()[0], id: fresh }], activeTab: fresh }
+      : loadSession();
+  }
   const [tabs, setTabs] = useState<Tab[]>(() => initialSessionRef.current!.tabs);
   const [activeTab, setActiveTab] = useState(() => initialSessionRef.current!.activeTab);
   const [urlInput, setUrlInput] = useState(() => {
@@ -308,6 +347,7 @@ export const Browser: React.FC = () => {
   const ukiCtxRef = useRef({ tabs, activeTab });
   useEffect(() => { ukiCtxRef.current = { tabs, activeTab }; });
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('browser', () => {
       const c = ukiCtxRef.current;
       const tab = c.tabs.find(t => t.id === c.activeTab);
@@ -366,7 +406,7 @@ export const Browser: React.FC = () => {
       unregisterUkiAppAction('browser.listTabs');
       unregisterUkiAppAction('browser.openUrl');
     };
-  }, []);
+  }, [winId]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try {
       const saved = localStorage.getItem('dex-browser-bookmarks');
@@ -401,7 +441,7 @@ export const Browser: React.FC = () => {
     () => ({ blockTrackers, blockAds, forceHttps, defaultSearchEngine }),
     [blockTrackers, blockAds, forceHttps, defaultSearchEngine],
   );
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [downloads, setDownloads] = useState<DownloadItem[]>(loadDownloadHistory);
   const [showDownloads, setShowDownloads] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showTabMenu, setShowTabMenu] = useState(false);
@@ -522,53 +562,52 @@ export const Browser: React.FC = () => {
     };
   }, []);
 
-  // Keep the active and pinned tabs resident; unload older background tabs once
-  // the tab count exceeds the memory budget so the browser stays responsive.
+  // Tab residency (services/browser/tabResidency.ts): the active tab, protected
+  // tabs (audible media, edited fields, Keep awake) and the most recently used
+  // tabs up to the tier budget keep a live page; every other tab sleeps (no
+  // WebView2 page, no timers). Before a tab sleeps its page is asked whether it
+  // is playing sound or holds edited fields; if so it stays awake.
+  const tabMenu = useContextMenu();
+  const [showTabSearch, setShowTabSearch] = useState(false);
+  const toggleKeepAwake = useCallback((id: string) => {
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, keepAwake: t.keepAwake ? undefined : true, ...(t.keepAwake ? {} : { background: false }) } : t));
+  }, []);
+  const lastActiveRef = useRef<Map<string, number>>(new Map());
+  const busyTabsRef = useRef<Set<string>>(new Set());
+  const liveTabSetting = useDexSetting<'auto' | number>('browser.liveTabs', 'auto');
   useEffect(() => {
-    setTabs(prev => {
-      let changed = false;
-
-      if (prev.length <= TAB_MEMORY_LIMIT) {
-        const restored = prev.map(tab => {
-          if (tab.background && (tab.id === activeTab || !tab.url || tab.pinned)) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        });
-        return changed ? restored : prev;
+    lastActiveRef.current.set(activeTab, Date.now());
+    let cancelled = false;
+    void (async () => {
+      const cur = tabsRef.current;
+      const ids = new Set(cur.map(t => t.id));
+      for (const id of [...lastActiveRef.current.keys()]) if (!ids.has(id)) lastActiveRef.current.delete(id);
+      const budget = liveTabBudget(getStoredTier(), liveTabSetting);
+      const base = { tabs: cur, activeId: activeTab, lastActiveAt: lastActiveRef.current, budget };
+      // Live now, over budget without protection: ask those pages first.
+      const wouldSleep = computeLiveTabs({ ...base, busy: new Set() });
+      for (const t of cur) {
+        if (t.background || !t.url || wouldSleep.has(t.id)) { busyTabsRef.current.delete(t.id); continue; }
+        const wv = webviewRefs.current.get(t.id);
+        let busy = false;
+        try { const b = parseBusyCheck(await wv?.executeJavaScript?.(PAGE_BUSY_CHECK)); busy = b.media || b.edited; } catch { /* page gone or navigating */ }
+        if (busy) busyTabsRef.current.add(t.id); else busyTabsRef.current.delete(t.id);
       }
-
-      let remainingToUnload = prev.length - TAB_MEMORY_LIMIT;
-      const next = prev.map(tab => {
-        const shouldKeepLoaded = tab.id === activeTab || tab.pinned || !tab.url;
-        if (shouldKeepLoaded) {
-          if (tab.background) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        }
-
-        if (remainingToUnload > 0) {
-          remainingToUnload -= 1;
-          if (!tab.background) {
-            changed = true;
-            return { ...tab, background: true };
-          }
-          return tab;
-        }
-
-        if (tab.background) {
+      if (cancelled) return;
+      const live = computeLiveTabs({ ...base, busy: busyTabsRef.current });
+      setTabs(prev => {
+        let changed = false;
+        const next = prev.map(tab => {
+          const sleep = !!tab.url && !live.has(tab.id) && tab.id !== activeTab;
+          if (!!tab.background === sleep) return tab;
           changed = true;
-          return { ...tab, background: false };
-        }
-        return tab;
+          return { ...tab, background: sleep };
+        });
+        return changed ? next : prev;
       });
-
-      return changed ? next : prev;
-    });
-  }, [activeTab, tabs.length]);
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, tabs.length, liveTabSetting]);
 
   // Find-in-page
   const [showFindBar, setShowFindBar] = useState(false);
@@ -783,7 +822,12 @@ export const Browser: React.FC = () => {
   // Keyboard shortcuts (Ctrl+F find, Ctrl+Shift+I devtools)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'browser')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setShowTabSearch(true);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowFindBar(true);
@@ -888,6 +932,7 @@ export const Browser: React.FC = () => {
   // (debounced). Only durable fields are stored — transient loading/background/
   // nav state is dropped and rebuilt on restore.
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // the first window owns the saved session
     if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
     sessionSaveRef.current = setTimeout(() => {
       try {
@@ -897,6 +942,7 @@ export const Browser: React.FC = () => {
             title: t.title,
             url: t.url,
             ...(t.pinned ? { pinned: true } : {}),
+            ...(t.keepAwake ? { keepAwake: true } : {}),
           })),
           activeTab,
         };
@@ -1215,20 +1261,7 @@ export const Browser: React.FC = () => {
       // Detect downloadable extensions — trigger IPC download directly
       const isDownload = /\.(exe|msi|zip|tar|gz|7z|pdf|dmg|pkg|deb|rpm|iso|bin|apk|mp3|mp4|wav|flac|avi|mkv|mov|epub|docx|xlsx|pptx|csv)(\?.*)?$/i.test(url);
       if (isDownload) {
-        const fileName = url.split('/').pop()?.split('?')[0] || 'download';
-        setDownloads(prev => [...prev, { id: Date.now().toString(), url, fileName, progress: 0, status: 'downloading' }]);
-        setShowDownloads(true);
-        window.dex?.invoke?.('download:start', url).then((result: any) => {
-          if (result?.success) {
-            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'completed', progress: 100, path: result.path } : d));
-          } else {
-            // No answer or a refusal used to leave the row "downloading" forever.
-            setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
-            window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
-          }
-        }).catch(() => {
-          setDownloads(prev => prev.map(d => d.url === url ? { ...d, status: 'error' } : d));
-        });
+        void startDownloadRef.current?.(url);
       } else if (url.startsWith('http://') || url.startsWith('https://')) {
         // target=_blank / window.open -> a new foreground tab.
         if (tabsRef.current.length >= MAX_TABS) return;
@@ -1331,15 +1364,26 @@ export const Browser: React.FC = () => {
     }
   }, [attachWebviewEvents, detachWebviewEvents]);
 
-  // Listen for download progress
+  // Live progress from the native downloader (download_ctl.rs), by id.
   useEffect(() => {
     const handleProgress = (data: any) => {
-      if (!data?.url) return;
-      setDownloads(prev => prev.map(d => 
-        d.url === data.url 
-          ? { ...d, progress: data.percent, fileName: data.fileName }
-          : d
-      ));
+      if (!data?.id || typeof data.id !== 'string') return;
+      if (data.state === 'failed') {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${data.error || 'no response'}` } }));
+      }
+      setDownloads(prev => prev.map(d => {
+        if (d.id !== data.id) return d;
+        if (data.state === 'progressing') {
+          return { ...d, received: data.received, total: data.total, progress: typeof data.percent === 'number' ? data.percent : d.progress };
+        }
+        const status: DownloadItem['status'] = data.state === 'completed' ? 'completed' : data.state === 'cancelled' ? 'cancelled' : 'error';
+        return {
+          ...d, status, finishedAt: Date.now(),
+          progress: status === 'completed' ? 100 : d.progress,
+          path: data.path ?? d.path, size: data.size ?? d.size,
+          fileName: data.fileName || d.fileName, error: status === 'error' ? String(data.error || 'failed') : undefined,
+        };
+      }));
     };
     window.dex?.on?.('download:progress', handleProgress);
     return () => {
@@ -1381,11 +1425,38 @@ export const Browser: React.FC = () => {
     });
   }, [downloads]);
 
-  // Fast download function
+  // Mirror downloads into the shared background-task list (Task Manager › Background).
+  useEffect(() => {
+    const bg = useBackgroundTasks.getState();
+    for (const d of downloads) {
+      bg.upsert({
+        id: `download:${d.id}`, kind: 'download', title: d.fileName, detail: d.url,
+        status: d.status === 'downloading' ? 'running' : d.status === 'error' ? 'failed' : d.status,
+        progress: d.progress, startedAt: Number(d.id.split('_')[1] ? parseInt(d.id.split('_')[1], 36) : 0) || d.finishedAt || Date.now(),
+        endedAt: d.finishedAt, error: d.error,
+        cancel: d.status === 'downloading' ? () => { void window.dex?.invoke?.('download:cancel', d.id); } : undefined,
+      });
+    }
+  }, [downloads]);
+
+  // Persist finished downloads (history), newest first.
+  useEffect(() => {
+    try {
+      const done = downloads.filter(d => d.status !== 'downloading').slice(-100).reverse();
+      localStorage.setItem(DOWNLOADS_KEY, JSON.stringify(done));
+    } catch { /* storage full or blocked */ }
+  }, [downloads]);
+
+  const cancelDownload = useCallback((id: string) => {
+    void window.dex?.invoke?.('download:cancel', id);
+  }, []);
+
+  // Downloads run natively in the background and report progress by id.
+  const startDownloadRef = useRef<((url: string) => Promise<void>) | null>(null);
   const startDownload = useCallback(async (url: string) => {
-    const id = Date.now().toString();
-    const fileName = url.split('/').pop() || 'download';
-    
+    const id = `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const fileName = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop() || '') || 'download';
+
     setDownloads(prev => [...prev, {
       id,
       url,
@@ -1396,7 +1467,8 @@ export const Browser: React.FC = () => {
     setShowDownloads(true);
     
     try {
-      const result = await window.dex?.invoke?.('download:start', url);
+      const result = await window.dex?.invoke?.('download:start', url, id);
+      if (result?.success && result.started) return; // progress + completion arrive as events
       if (result?.success) {
         setDownloads(prev => prev.map(d => 
           d.id === id 
@@ -1405,6 +1477,7 @@ export const Browser: React.FC = () => {
         ));
       } else {
         setDownloads(prev => prev.map(d => d.id === id ? { ...d, status: 'error' } : d));
+        setDownloads(prev => prev.map(d => d.id === id ? { ...d, error: String(result?.error || 'no response') } : d));
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: `Download failed: ${result?.error || 'no response'}` } }));
       }
     } catch (err) {
@@ -1413,6 +1486,8 @@ export const Browser: React.FC = () => {
       ));
     }
   }, []);
+
+  startDownloadRef.current = startDownload;
 
   const currentTab = useMemo(() => tabs.find(t => t.id === activeTab), [tabs, activeTab]);
 
@@ -2005,9 +2080,11 @@ export const Browser: React.FC = () => {
           </div>
         )}
 
+        {tabMenu.menuState && <ContextMenu items={tabMenu.menuState.items} position={tabMenu.menuState.position} onClose={tabMenu.close} />}
         {/* Tab strip */}
-        <div style={styles.tabStrip} ref={tabContainerRef}>
+        <div style={styles.tabStrip} ref={tabContainerRef} role="tablist" aria-label="Tabs">
           {tabs.map((tab) => {
+            const sleeping = !!tab.background && tab.id !== activeTab && !!tab.url;
             const tabGroup = Array.from(tabGroups.entries()).find(([_, g]) => g.tabIds.includes(tab.id));
             return (
             <div
@@ -2025,15 +2102,38 @@ export const Browser: React.FC = () => {
                 ...(draggingTab === tab.id ? { opacity: 0.5 } : {}),
                 ...(dragOverTab === tab.id ? { borderLeft: '2px solid var(--color-accent)' } : {}),
               }}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              data-tab-id={tab.id}
+              data-tab-state={tab.id === activeTab ? 'active' : sleeping ? 'sleeping' : 'live'}
               onClick={() => {
                 setActiveTab(tab.id);
                 setUrlInput(tab.url);
                 setTabErrors(prev => ({ ...prev, [tab.id]: null }));
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(tab.id); setUrlInput(tab.url); return; }
+                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+                e.preventDefault();
+                const i = tabs.findIndex(t => t.id === tab.id);
+                const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+                if (n) {
+                  setActiveTab(n.id);
+                  setUrlInput(n.url);
+                  (tabContainerRef.current?.querySelector(`[data-tab-id="${n.id}"]`) as HTMLElement | null)?.focus();
+                }
+              }}
+              onContextMenu={(e) => tabMenu.show(e, [
+                { label: tab.keepAwake ? 'Let this tab sleep' : 'Keep awake', onClick: () => toggleKeepAwake(tab.id) },
+                { label: 'Sleep now', disabled: tab.id === activeTab || sleeping || !tab.url || !!tab.keepAwake, onClick: () => { lastActiveRef.current.delete(tab.id); moveTabToBackground(tab.id); } },
+                { label: tab.pinned ? 'Unpin tab' : 'Pin tab', onClick: () => pinTab(tab.id), dividerAfter: true },
+                { label: 'Close tab', disabled: !!tab.pinned, onClick: () => closeTab(tab.id) },
+              ])}
               onDoubleClick={() => pinTab(tab.id)}
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}
-              title={`${tab.title}\n${tab.url}${tabGroup ? `\nGroup: ${tabGroup[1].name}` : ''}`}
+              title={`${tab.title}\n${tab.url}${tabGroup ? `\nGroup: ${tabGroup[1].name}` : ''}${sleeping ? '\nSleeping: loads again when selected' : ''}${tab.keepAwake ? '\nKept awake' : ''}`}
             >
               {tab.pinned && <span style={styles.pinDot} />}
               {tab.loading ? (
@@ -2045,7 +2145,7 @@ export const Browser: React.FC = () => {
                   <span style={styles.tabGlobe}>{Icon.globe}</span>
                 ) : null
               )}
-              <span style={styles.tabLabel}>{tab.title || 'New Tab'}</span>
+              <span style={{ ...styles.tabLabel, ...(sleeping ? { opacity: 0.55 } : {}) }}>{tab.title || 'New Tab'}</span>
               {!tab.pinned && (activeTab === tab.id || hoveredTab === tab.id) && (
                 <button
                   style={{...styles.tabCloseBtn, opacity: 0.7}}
@@ -2066,7 +2166,23 @@ export const Browser: React.FC = () => {
           >
             {Icon.plus}
           </button>
+          <button
+            style={styles.newTabBtn}
+            onClick={() => setShowTabSearch(v => !v)}
+            title="Search tabs (Ctrl+Shift+A)"
+            aria-label="Search tabs"
+            aria-expanded={showTabSearch}
+          >
+            {Icon.search}
+          </button>
         </div>
+        {showTabSearch && (
+          <TabSearch
+            tabs={tabs.map(t => ({ id: t.id, title: t.title, url: t.url, pinned: t.pinned, active: t.id === activeTab, sleeping: !!t.background && t.id !== activeTab && !!t.url }))}
+            onPick={(id) => { const t = tabs.find(x => x.id === id); setActiveTab(id); if (t) setUrlInput(t.url); }}
+            onClose={() => setShowTabSearch(false)}
+          />
+        )}
 
         {/* Right actions */}
         <div style={styles.rightActions}>
@@ -2358,11 +2474,29 @@ export const Browser: React.FC = () => {
                   <div style={{
                     ...styles.downloadBar,
                     width: `${d.progress}%`,
-                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-success)' : 'var(--color-accent-fill)',
+                    background: d.status === 'error' ? 'var(--color-error)' : d.status === 'completed' ? 'var(--color-text-tertiary)' : 'var(--color-accent-fill)',
                   }} />
                 </div>
-                <span style={styles.downloadStatus}>
-                  {d.status === 'downloading' ? `${d.progress}%` : d.status}
+                <span style={styles.downloadStatus} title={d.error || undefined}>
+                  {d.status === 'downloading'
+                    ? (d.total ? `${d.progress}% · ${formatBytes(d.received)} of ${formatBytes(d.total)}` : d.received ? formatBytes(d.received) : 'Starting…')
+                    : d.status === 'completed' ? (formatBytes(d.size) || 'Done')
+                    : d.status === 'cancelled' ? 'Cancelled'
+                    : `Failed${d.error ? `: ${d.error}` : ''}`}
+                </span>
+                <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  {d.status === 'downloading' && (
+                    <button style={styles.downloadBtn} onClick={() => cancelDownload(d.id)} aria-label={`Cancel download of ${d.fileName}`}>Cancel</button>
+                  )}
+                  {d.status === 'completed' && d.path && (
+                    <>
+                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:openPath', d.path); }} aria-label={`Open ${d.fileName}`}>Open</button>
+                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:showItemInFolder', d.path); }} aria-label={`Show ${d.fileName} in folder`}>Show</button>
+                    </>
+                  )}
+                  {(d.status === 'error' || d.status === 'cancelled') && (
+                    <button style={styles.downloadBtn} onClick={() => { setDownloads(prev => prev.filter(x => x.id !== d.id)); void startDownload(d.url); }} aria-label={`Retry download of ${d.fileName}`}>Retry</button>
+                  )}
                 </span>
               </div>
             ))
@@ -3051,13 +3185,15 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '6px',
     background: 'var(--color-bg-hover)',
-    borderRadius: '10px',
-    padding: '4px 10px',
+    borderRadius: 9999,
+    padding: '5px 14px',
+    minHeight: 30,
     transition: 'box-shadow 0.15s, background 0.15s',
-    border: '1px solid var(--color-bg-hover)',
+    border: '1px solid transparent',
   },
   lockSmall: {
-    color: 'var(--color-success)',
+    // Secure is the normal state: a quiet lock, not a green badge.
+    color: 'var(--color-text-tertiary)',
     display: 'flex',
     flexShrink: 0,
   },
@@ -3476,6 +3612,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
     transition: 'filter 0.12s',
+  },
+  downloadBtn: {
+    padding: '2px 8px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
+    borderRadius: 6, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
   },
   errorBtnAlt: {
     padding: 'var(--space-2) 18px',

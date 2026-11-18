@@ -1,5 +1,27 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-17) — Owner mandate "Performance, multi-window, Browser, system-wide UI/UX, UKI" (7.0.2, 16 batches).**
+> Rule: measure in the release exe on an isolated profile before and after (`scripts/perf/packaged-probe.mjs`; results in
+> `docs/reports/perf/`). Nothing estimated. Status:
+> - **Batch 1 baseline: DONE.** i7-8665U / 16 GB / Windows 26300, release exe 2026-11-17 11:11: desktop usable 2.3 s cold,
+>   1.1 s warm; idle 4.6% of a core (7 processes, ~490 MB private); **20.6% of a core idle with 10 apps open** (open lead).
+>   Old Browser: every tab mounted a page host (250 ms timer each), visited tabs stayed live up to 40, a 500-tab session
+>   restored only 100 tabs. Not done: low-end/high-end hardware (one machine here), memory-pressure runs.
+> - **Batch 2 multi-window: SHIPPED (first slice, #328).** `services/appWindows.ts`: window ids `notes~2` resolve to their
+>   app in every shell map, each window mounts its own app copy (own document/navigation/scroll), shared stores stay
+>   shared. Files, Terminal, Calculator, Ledger, DEX Code, Browser (Notes excluded until its selection is per window); "New Window" in the app menu. Not done: window
+>   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
+> - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
+>   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.
+> - **Open:** Resource Coordinator (batch 3), app passes (8–12), stress set (15), release (16).
+>
+> **Part 22 (2026-11-17, security-first) status:** onboarding integrity in Rust (#330), UKI terminal broker with
+> risk classes and the "Run shell commands" grant (#331), Background tasks view (#332), native background
+> downloads (#333), DEX Capsule notifications (#334), tooltip audit (#335), idle-CPU fixes (#329). Packaged
+> security run: `scripts/perf/packaged-security.mjs` → `docs/reports/perf/2026-11-17-security.json`.
+> Not done: 90/120 Hz frame-time measurement on real high-refresh hardware (this PC is 60 Hz), C++ review
+> (owner decision #75/#143), ToS legal review (#19), signing (#30).
+
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
 > Rust backend (`src-tauri` + `core/*`), **userspace** is everything that calls it over `dex_ipc` channels
@@ -38,6 +60,10 @@
 >   any edge; refraction + specular glass on dock/orb/notifications; green/warning pills and Notes stripes removed; Ctrl+A
 >   no longer selects the shell; the global orange [role=alert] stripe is gone; Trophies points tiers fixed; Terminal chrome
 >   sharpened. Not yet run in the packaged app.
+> - **Desktop fit follow-ups (2026-11-17, #300–#304, PR #151):** the Dock is an overlay (windows get no strip; maximized
+>   and tabs fill from the top bar to the bottom edge), centred on its edge open and collapsed; Dock search also finds
+>   Settings, files, notes and commands without an AI provider; VINX makes real editing proxies; Trophies repair.
+>   Packaged smoke at 225%: no strip, top bar clear, pins survive restart, 8 resize handles, Escape closes search.
 > - **B012 animation principles: partial.** Settings › Reduce Motion now reaches JS-driven motion too (it only changed
 >   CSS tokens before; #209). Banner swipe has follow-through + rubber band + flick (#210). No pass across all 20 yet.
 >   Pass 2 (`claude/v702-pass2`): fake Gallery face groups removed (#208), palette opens the shortcut sheet (#211),

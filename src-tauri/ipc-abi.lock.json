@@ -429,6 +429,7 @@
     "documents:preview",
     "documents:removeTemplate",
     "documents:selectOutputDir",
+    "download:cancel",
     "download:start",
     "dtp:approveDevice",
     "dtp:cancelReceive",
@@ -1145,6 +1146,10 @@
     "observability:trace:end",
     "observability:trace:start",
     "ollama:request",
+    "onboarding:accept",
+    "onboarding:complete",
+    "onboarding:decline",
+    "onboarding:preferencesDone",
     "operations:execute",
     "operations:getLogs",
     "operations:undo",
@@ -1527,6 +1532,9 @@
     "softero:scan-file",
     "softero:toggle-realtime",
     "softero:update-config",
+    "speech:start",
+    "speech:status",
+    "speech:stop",
     "split:cross-drop",
     "splitview:apply",
     "splitview:apply-preset",
@@ -1607,6 +1615,7 @@
     "system:getInfo",
     "system:getLaunchAtLogin",
     "system:getProcesses",
+    "system:getStartupItems",
     "system:getStatus",
     "system:getUserInfo",
     "system:killProcess",
@@ -1736,6 +1745,12 @@
     "uki:stopListening",
     "uki:toggle",
     "uki:updateConfig",
+    "ukiterm:cancel",
+    "ukiterm:classify",
+    "ukiterm:clearHistory",
+    "ukiterm:get",
+    "ukiterm:list",
+    "ukiterm:run",
     "undo:canRedo",
     "undo:canUndo",
     "undo:redo",
@@ -1925,7 +1940,5 @@
     "xenon:systemSample",
     "xenon:throttle"
   ],
-  "unhandledRendererCalls": [
-    "screencapture:getSources"
-  ]
+  "unhandledRendererCalls": []
 }

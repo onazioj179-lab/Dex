@@ -1,0 +1,412 @@
+{
+  "label": "after-30sites",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/after-exe/dex-tauri.exe",
+  "at": "2026-11-17T21:50:57.802Z",
+  "machine": {
+    "os": "Windows 10.0.26300",
+    "cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+    "logicalCores": 8,
+    "ramGB": 16
+  },
+  "method": "release exe, isolated DEX_DATA_DIR + WebView2 profile, driven over CDP; timings are wall clock from process spawn",
+  "cold": {
+    "spawnToCdpMs": 579,
+    "spawnToDesktopUsableMs": 1119,
+    "domContentLoadedMs": 352,
+    "loadMs": 355,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 161
+  },
+  "idleShell": {
+    "cpuPctOfOneCore": 2.9,
+    "processes": 7,
+    "workingSetMB": 716,
+    "privateMB": 389,
+    "perProcess": [
+      {
+        "type": "renderer",
+        "pid": 15532,
+        "cpuPct": 1.6,
+        "privateMB": 57
+      },
+      {
+        "type": "browser",
+        "pid": 24856,
+        "cpuPct": 0.6,
+        "privateMB": 41
+      },
+      {
+        "type": "gpu-process",
+        "pid": 11916,
+        "cpuPct": 0.6,
+        "privateMB": 240
+      },
+      {
+        "type": "crashpad-handler",
+        "pid": 6424,
+        "cpuPct": 0.1,
+        "privateMB": 3
+      },
+      {
+        "type": "dex-tauri",
+        "pid": 13672,
+        "cpuPct": 0,
+        "privateMB": 27
+      },
+      {
+        "type": "utility",
+        "pid": 19416,
+        "cpuPct": 0,
+        "privateMB": 12
+      },
+      {
+        "type": "utility",
+        "pid": 27088,
+        "cpuPct": 0,
+        "privateMB": 8
+      }
+    ]
+  },
+  "appLaunchMs": {
+    "notes": 26,
+    "files": 40,
+    "settings": 38,
+    "ledger": 80,
+    "calendar": 42,
+    "tasks": 26,
+    "dexcode": 39,
+    "taskmanager": 38,
+    "games": 33,
+    "calculator": null
+  },
+  "idleWithApps": {
+    "apps": 10,
+    "cpuPctOfOneCore": 18.9,
+    "processes": 7,
+    "workingSetMB": 582,
+    "privateMB": 295,
+    "perProcess": [
+      {
+        "type": "dex-tauri",
+        "pid": 13672,
+        "cpuPct": 15.8,
+        "privateMB": 45
+      },
+      {
+        "type": "renderer",
+        "pid": 15532,
+        "cpuPct": 1.9,
+        "privateMB": 76
+      },
+      {
+        "type": "gpu-process",
+        "pid": 11916,
+        "cpuPct": 0.7,
+        "privateMB": 109
+      },
+      {
+        "type": "browser",
+        "pid": 24856,
+        "cpuPct": 0.5,
+        "privateMB": 42
+      },
+      {
+        "type": "crashpad-handler",
+        "pid": 6424,
+        "cpuPct": 0,
+        "privateMB": 3
+      },
+      {
+        "type": "utility",
+        "pid": 19416,
+        "cpuPct": 0,
+        "privateMB": 12
+      },
+      {
+        "type": "utility",
+        "pid": 27088,
+        "cpuPct": 0,
+        "privateMB": 9
+      }
+    ]
+  },
+  "idleProfile": {
+    "busyMsIn10s": 42,
+    "topSelfTime": [
+      [
+        "ge app-standalone-nexus-BAr1GrEv.js:1:1611",
+        7
+      ],
+      [
+        "Ps react-vendor-BbBaDjqq.js:37:7515",
+        6
+      ],
+      [
+        "Xa react-vendor-BbBaDjqq.js:40:12469",
+        4
+      ],
+      [
+        "fs react-vendor-BbBaDjqq.js:17:239",
+        4
+      ],
+      [
+        "Cd react-vendor-BbBaDjqq.js:40:14621",
+        3
+      ],
+      [
+        "g react-vendor-BbBaDjqq.js:38:8910",
+        2
+      ],
+      [
+        "(anon) :1:1",
+        2
+      ],
+      [
+        "(garbage collector) :0:0",
+        2
+      ],
+      [
+        "M5 dex-app-core-B5d6UoBY.js:232:2300",
+        1
+      ],
+      [
+        "xe react-vendor-BbBaDjqq.js:25:1828",
+        1
+      ],
+      [
+        "su react-vendor-BbBaDjqq.js:37:8177",
+        1
+      ],
+      [
+        "(anon) app-standalone-nexus-BAr1GrEv.js:2:7154",
+        1
+      ],
+      [
+        "k react-vendor-BbBaDjqq.js:38:10307",
+        1
+      ],
+      [
+        "xd react-vendor-BbBaDjqq.js:40:21544",
+        1
+      ],
+      [
+        "ba react-vendor-BbBaDjqq.js:40:27432",
+        1
+      ]
+    ],
+    "scheduled": {
+      "raf": [
+        [
+          "at g (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:232:8751)",
+          61
+        ],
+        [
+          "at mC (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:579:5722)",
+          60
+        ],
+        [
+          "at http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:14884",
+          3
+        ],
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:31657)",
+          2
+        ],
+        [
+          "at l (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:232:8855)",
+          2
+        ],
+        [
+          "at Cw (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:579:5954)",
+          1
+        ]
+      ],
+      "timeout": [
+        [
+          "at n (http://tauri.localhost/assets/dex-app-core-B5d6UoBY.js:577:14865)",
+          3
+        ]
+      ],
+      "interval": []
+    }
+  },
+  "warm": {
+    "spawnToCdpMs": 593,
+    "spawnToDesktopUsableMs": 1087,
+    "domContentLoadedMs": 360,
+    "loadMs": 362,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 134
+  },
+  "browser": {
+    "savedTabs": 30,
+    "tabsKeptAfterRestore": 30,
+    "openMs": 25,
+    "livePageTargets": 1,
+    "mountedWebviewHosts": 1,
+    "settleMs": 10051,
+    "cpuPctOfOneCore": 0.6,
+    "processes": 8,
+    "workingSetMB": 875,
+    "privateMB": 529,
+    "perProcess": [
+      {
+        "type": "renderer",
+        "pid": 1196,
+        "cpuPct": 0.4,
+        "privateMB": 81
+      },
+      {
+        "type": "dex-tauri",
+        "pid": 16736,
+        "cpuPct": 0.1,
+        "privateMB": 23
+      },
+      {
+        "type": "browser",
+        "pid": 22292,
+        "cpuPct": 0,
+        "privateMB": 39
+      },
+      {
+        "type": "crashpad-handler",
+        "pid": 23316,
+        "cpuPct": 0,
+        "privateMB": 3
+      },
+      {
+        "type": "gpu-process",
+        "pid": 11568,
+        "cpuPct": 0,
+        "privateMB": 295
+      },
+      {
+        "type": "utility",
+        "pid": 23208,
+        "cpuPct": 0,
+        "privateMB": 12
+      },
+      {
+        "type": "utility",
+        "pid": 14992,
+        "cpuPct": 0,
+        "privateMB": 8
+      },
+      {
+        "type": "renderer",
+        "pid": 5244,
+        "cpuPct": 0,
+        "privateMB": 69
+      }
+    ]
+  },
+  "browserAfterVisits": {
+    "visited": 20,
+    "livePageTargets": 9,
+    "mountedWebviewHosts": 9,
+    "cpuPctOfOneCore": 5.5,
+    "processes": 16,
+    "workingSetMB": 1781,
+    "privateMB": 1201,
+    "perProcess": [
+      {
+        "type": "browser",
+        "pid": 22292,
+        "cpuPct": 2.3,
+        "privateMB": 55
+      },
+      {
+        "type": "renderer",
+        "pid": 1196,
+        "cpuPct": 2,
+        "privateMB": 71
+      },
+      {
+        "type": "dex-tauri",
+        "pid": 16736,
+        "cpuPct": 0.6,
+        "privateMB": 23
+      },
+      {
+        "type": "gpu-process",
+        "pid": 11568,
+        "cpuPct": 0.3,
+        "privateMB": 396
+      },
+      {
+        "type": "crashpad-handler",
+        "pid": 23316,
+        "cpuPct": 0.1,
+        "privateMB": 3
+      },
+      {
+        "type": "renderer",
+        "pid": 3628,
+        "cpuPct": 0.1,
+        "privateMB": 69
+      },
+      {
+        "type": "utility",
+        "pid": 23208,
+        "cpuPct": 0,
+        "privateMB": 13
+      },
+      {
+        "type": "utility",
+        "pid": 14992,
+        "cpuPct": 0,
+        "privateMB": 8
+      },
+      {
+        "type": "renderer",
+        "pid": 13668,
+        "cpuPct": 0,
+        "privateMB": 70
+      },
+      {
+        "type": "renderer",
+        "pid": 21368,
+        "cpuPct": 0,
+        "privateMB": 70
+      },
+      {
+        "type": "renderer",
+        "pid": 10760,
+        "cpuPct": 0,
+        "privateMB": 70
+      },
+      {
+        "type": "renderer",
+        "pid": 13440,
+        "cpuPct": 0,
+        "privateMB": 70
+      },
+      {
+        "type": "renderer",
+        "pid": 28212,
+        "cpuPct": 0,
+        "privateMB": 72
+      },
+      {
+        "type": "renderer",
+        "pid": 15212,
+        "cpuPct": 0,
+        "privateMB": 70
+      },
+      {
+        "type": "renderer",
+        "pid": 14868,
+        "cpuPct": 0,
+        "privateMB": 73
+      },
+      {
+        "type": "renderer",
+        "pid": 17676,
+        "cpuPct": 0,
+        "privateMB": 70
+      }
+    ]
+  }
+}

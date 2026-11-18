@@ -13,6 +13,7 @@
 // ==========================================================================
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
+import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import { useNotesStore, type NoteListItem } from '../../store/notesStore';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
@@ -147,8 +148,8 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
     borderBottom: '1px solid var(--color-bg-hover)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.6px',
+    textTransform: 'none' as const,
+    letterSpacing: '0.01em',
   },
 };
 
@@ -218,6 +219,7 @@ function useResizer(
 // ---------------------------------------------------------------------------
 
 const DexNotes: React.FC = () => {
+  const winId = useAppWindowId('notes'); // this window ('notes' or 'notes~2', ...)
   // -- Store ------------------------------------------------------------
 
   const store = useNotesStore();
@@ -234,6 +236,7 @@ const DexNotes: React.FC = () => {
   const notesCreateRef = useRef({ store, selectedFolderId });
   notesCreateRef.current = { store, selectedFolderId };
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppAction('notes', {
       id: 'notes.createNote',
       description: 'create a new note with the given title.',
@@ -249,7 +252,7 @@ const DexNotes: React.FC = () => {
       return `Created note "${title}".`;
     });
     return () => unregisterUkiAppAction('notes.createNote');
-  }, []);
+  }, [winId]);
 
   // App Menu / search quick actions (registered in services/appRegistry.ts).
   useEffect(() => registerAppIntentHandler('notes', (action) => {
@@ -460,7 +463,7 @@ const DexNotes: React.FC = () => {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'notes')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       const ctrl = e.ctrlKey || e.metaKey;
 
       // New note: Ctrl+N

@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { usePerformanceOptimization } from './PerformanceOptimization';
+import { userRecentlyActive } from './userActivity';
 
 type ThermalLevel = 'cool' | 'warm' | 'hot' | 'critical';
 
@@ -102,7 +103,9 @@ function tick(now: number): void {
 }
 
 function startBurst(): void {
-  if (rafHandle || document.hidden) return;
+  // No input for 15 s: nothing interactive to measure; skip the frame burst
+  // (each sampled frame wakes the compositor and GPU process at idle).
+  if (rafHandle || document.hidden || !userRecentlyActive()) return;
   frameTimes = [];
   lastFrameTs = 0;
   rafHandle = requestAnimationFrame(tick);

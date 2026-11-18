@@ -25,7 +25,8 @@
  * Styling stays deliberately neutral (DEX tokens, hairline chrome, no brand
  * color noise) -- the map itself is the only saturated surface.
  */
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { isReduceMotion } from '../../utils/MotionController';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DexIcon from '../../components/DexIcon';
@@ -85,6 +86,26 @@ interface SavedPlace {
 
 const RECENT_KEY = 'dex.maps.recent';
 const SAVED_KEY = 'dex.maps.saved';
+
+// -- Last view: the map reopens where you left it (centre, zoom, rotation,
+//    tilt, basemap). Pure parse so a corrupt value falls back cleanly.
+const VIEW_KEY = 'dex-maps-view';
+export interface MapView { center: [number, number]; zoom: number; bearing: number; pitch: number; style?: string }
+export function parseMapView(raw: string | null): MapView | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw);
+    const [lng, lat] = Array.isArray(v?.center) ? v.center : [];
+    if (![lng, lat, v?.zoom].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    return {
+      center: [lng, lat], zoom: Math.min(22, Math.max(0, v.zoom)),
+      bearing: Number.isFinite(v.bearing) ? v.bearing : 0,
+      pitch: Number.isFinite(v.pitch) ? Math.min(85, Math.max(0, v.pitch)) : 0,
+      style: typeof v.style === 'string' ? v.style : undefined,
+    };
+  } catch { return null; }
+}
 
 // -- localStorage helpers (guarded) ------------------------------------------
 function loadList<T>(key: string): T[] {
@@ -160,9 +181,11 @@ export function locationErrorMessage(code: number): string {
   return 'Your location is not available right now.';
 }
 
+// Map controls sit on the shared frosted material (.dex-mat-frosted on their
+// group), so the buttons themselves are transparent.
 const ctrlBtn: React.CSSProperties = {
   width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
+  background: 'transparent', border: '1px solid transparent',
   color: 'var(--color-text-primary)', cursor: 'pointer', padding: 0,
   transition: 'background 0.12s ease, color 0.12s ease',
 };
@@ -213,7 +236,12 @@ const DexMaps: React.FC = () => {
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const measureMarkersRef = useRef<maplibregl.Marker[]>([]);
   const measureLineId = 'dex-measure-line';
-  const [styleKey, setStyleKey] = useState<StyleKey>('liberty');
+  const savedView = useMemo(() => { try { return parseMapView(localStorage.getItem(VIEW_KEY)); } catch { return null; } }, []);
+  const [styleKey, setStyleKey] = useState<StyleKey>(() => (savedView?.style && savedView.style in MAP_STYLES ? savedView.style as StyleKey : 'liberty'));
+  const styleKeyRef = useRef(styleKey);
+  styleKeyRef.current = styleKey;
+  const [bearing, setBearing] = useState(savedView?.bearing ?? 0);
+  const [pitch, setPitch] = useState(savedView?.pitch ?? 0);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -356,8 +384,10 @@ const DexMaps: React.FC = () => {
       map = new maplibregl.Map({
         container: containerRef.current,
         style: MAP_STYLES[styleKey].style as any,
-        center: [-122.4194, 37.7749],
-        zoom: 11,
+        center: savedView?.center ?? [-122.4194, 37.7749],
+        zoom: savedView?.zoom ?? 11,
+        bearing: savedView?.bearing ?? 0,
+        pitch: savedView?.pitch ?? 0,
       });
     } catch (err) {
       console.warn('[Maps] Map init failed:', err);
@@ -366,6 +396,19 @@ const DexMaps: React.FC = () => {
     }
     mapRef.current = map;
     map.once('idle', () => setMapReady(true));
+    // Track rotation/tilt for the compass, and remember the view (debounced).
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+    map.on('rotate', () => setBearing(map.getBearing()));
+    map.on('pitch', () => setPitch(map.getPitch()));
+    map.on('moveend', () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        try {
+          const c = map.getCenter();
+          localStorage.setItem(VIEW_KEY, JSON.stringify({ center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), style: styleKeyRef.current }));
+        } catch { /* storage blocked */ }
+      }, 400);
+    });
     map.on('error', (e) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
       if ((e as { tile?: unknown; sourceId?: string }).tile || (e as { sourceId?: string }).sourceId || /fetch|network|load/i.test(String(e?.error?.message ?? ''))) {
@@ -575,7 +618,8 @@ const DexMaps: React.FC = () => {
 
       {/* Search */}
       <div
-        style={{ position: 'absolute', top: 12, left: 12, width: 'min(320px, calc(100% - 24px))', zIndex: 6 }}
+        className="dex-maps-search"
+        style={{ position: 'absolute', top: 12, left: 12, width: 'min(340px, calc(100% - 24px))', zIndex: 6 }}
         onFocus={() => setFocused(true)}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false); }}
       >
@@ -615,7 +659,7 @@ const DexMaps: React.FC = () => {
         {showRecentPanel && (
           <div role="listbox" aria-label="Recent searches" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Recent</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: 0.4 }}>Recent</span>
               <button onMouseDown={(e) => { e.preventDefault(); setRecent([]); }} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
             </div>
             {recent.map((r, i) => (
@@ -783,18 +827,32 @@ const DexMaps: React.FC = () => {
       )}
 
       {/* Vertical control stack (custom, DEX-styled) */}
-      <div style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border)', zIndex: 5 }}>
+      <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', zIndex: 5 }}>
         <button aria-label="Zoom in" title="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="plus" size={16} />
         </button>
         <button aria-label="Zoom out" title="Zoom out" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="minus" size={16} />
         </button>
         <button aria-label="My location" title="My location" style={{ ...ctrlBtn, borderWidth: 0 }}
-          onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}>
+          onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="navigation" size={15} />
+        </button>
+      </div>
+
+      {/* Compass (shows rotation; click = north up, flat) and 3D tilt. */}
+      <div style={{ position: 'absolute', right: 12, bottom: 146, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 5 }}>
+        <button aria-label={pitch > 1 ? 'Flat view' : '3D view'} title={pitch > 1 ? 'Flat view' : 'Tilt to 3D'} aria-pressed={pitch > 1}
+          onClick={() => mapRef.current?.easeTo({ pitch: pitch > 1 ? 0 : 60, duration: isReduceMotion() ? 0 : 400 })}
+          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 9999, fontSize: 11, fontWeight: 700, color: pitch > 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>3D</button>
+        <button aria-label="Reset to north" title="North up" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
+          onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: isReduceMotion() ? 0 : 400 })}
+          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 9999, opacity: Math.abs(bearing) < 0.5 && pitch < 1 ? 0.55 : 1 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)`, transition: 'transform 0.1s linear' }}>
+            <path d="M12 2l4 10h-8z" fill="#ff453a" /><path d="M12 22l-4-10h8z" fill="currentColor" opacity="0.6" />
+          </svg>
         </button>
       </div>
 
@@ -802,9 +860,9 @@ const DexMaps: React.FC = () => {
       <button aria-label={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
         title={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
         onClick={cycleStyle}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg-elevated)'}
+        className="dex-mat-frosted"
         style={{ position: 'absolute', left: 12, bottom: 28, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10,
+          borderRadius: 9999,
           color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'background 0.12s ease', zIndex: 5 }}>
         <DexIcon name={MAP_STYLES[styleKey].icon} size={14} />
         {MAP_STYLES[styleKey].label}

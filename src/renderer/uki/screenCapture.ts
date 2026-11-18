@@ -6,24 +6,12 @@
 // =============================================================================
 /**
  * UKI screen capture — grabs a still of the desktop so UKI can "look at the
- * screen" and answer about what the user is seeing. Reuses the existing
- * `screencapture:getSources` main-process handler (Electron desktopCapturer), so
- * no new native surface is introduced. Returns a data URL, or null under the web
- * shell / when capture is unavailable. Image is a thumbnail-resolution frame
- * (the shared handler caps thumbnail size) — enough for layout/context, not
- * pixel-perfect OCR.
+ * screen" and answer about what the user is seeing. Uses the WebView's system
+ * screen picker (getDisplayMedia): the user chooses the window or screen and
+ * the OS shows its sharing indicator. (The old Electron `screencapture:getSources`
+ * path was removed: nothing in the Tauri build answers it, so every capture
+ * paid for a failed IPC round trip first.)
  */
-
-interface CaptureSource {
-  id: string;
-  name: string;
-  thumbnail: string; // data URL
-}
-
-function bridge(): { invoke?: (c: string) => Promise<unknown> } | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex;
-}
 
 type DisplayMediaFn = (opts: { video: boolean | Record<string, unknown>; audio: boolean }) => Promise<MediaStream>;
 
@@ -34,7 +22,7 @@ function displayMedia(): DisplayMediaFn | null {
 
 /** True when a capture path exists (native bridge or the WebView's screen picker). */
 export function isScreenCaptureAvailable(): boolean {
-  return !!bridge()?.invoke || !!displayMedia();
+  return !!displayMedia();
 }
 
 /** Longest side of the shared frame; enough for layout/text, small to send. */
@@ -75,29 +63,11 @@ export async function captureViaPicker(getDisplayMedia: DisplayMediaFn | null = 
 }
 
 /**
- * Capture a still image of the primary screen as a data URL, or null if capture
- * is unavailable / fails. Prefers a full-screen source over an individual window.
+ * Capture a still image of the screen (through the system picker) as a data
+ * URL, or null if the user cancels or capture is unavailable.
  */
 export async function captureScreenImage(): Promise<string | null> {
-  const native = await captureViaBridge();
-  // The Tauri shell has no `screencapture:getSources` handler, so this falls
-  // through to the user-driven system picker.
-  return native ?? captureViaPicker();
-}
-
-async function captureViaBridge(): Promise<string | null> {
-  const ipc = bridge();
-  if (!ipc?.invoke) return null;
-  try {
-    const sources = (await ipc.invoke('screencapture:getSources')) as CaptureSource[] | undefined;
-    if (!Array.isArray(sources) || sources.length === 0) return null;
-    const screenSrc = sources.find((s) => /screen|entire|display/i.test(s.name)) ?? sources[0];
-    return typeof screenSrc?.thumbnail === 'string' && screenSrc.thumbnail.startsWith('data:')
-      ? screenSrc.thumbnail
-      : null;
-  } catch {
-    return null;
-  }
+  return captureViaPicker();
 }
 
 // ---- Camera: one explicit frame ---------------------------------------------

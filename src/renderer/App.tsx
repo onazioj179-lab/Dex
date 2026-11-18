@@ -17,6 +17,8 @@
  * ===========================================================================
  */
 
+import { SetupAssistant } from './shell/SetupAssistant';
+import { wireUkiCommandTasks, wireDdropTasks } from './services/backgroundTasks';
 import { installSelectionGuard } from './shell/selectionGuard';
 import { GlassFilters } from './components/GlassFilters';
 import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
@@ -230,6 +232,8 @@ export const App: React.FC = () => {
   // Ctrl+A outside a text field never selects the whole shell.
   useEffect(() => installSelectionGuard(), []);
   useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
+  // Background tasks (UKI commands): listen from boot so a finished command is reported once.
+  useEffect(() => { wireUkiCommandTasks(); wireDdropTasks(); }, []);
   // Local-file links (dexmedia) download instead of navigating DEX away.
   useEffect(() => installMediaLinkGuard(), []);
   // Local diagnostics (Nexus > Diagnostics): counters only, nothing leaves this computer.
@@ -522,6 +526,8 @@ export const App: React.FC = () => {
       {/* The shell's own global rules (html, body, *). App style blocks must stay scoped. */}
       <style data-dex-shell-style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
       <GlassFilters />
+      {/* First run only (fresh profile); existing profiles never see it. */}
+      <SetupAssistant />
       
       {/* Window drag region for frameless window (Windows) */}
       <div className="dex-window-titlebar" aria-hidden="true" />

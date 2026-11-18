@@ -2008,7 +2008,7 @@ const UkiOverlay: React.FC = () => {
               <div style={{ marginBottom: 4 }}>
                 <div style={{
                   fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                  letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 2,
+                  letterSpacing: '0.01em', textTransform: 'none', marginBottom: 2,
                 }}>You</div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>{turn.userText}</div>
               </div>
@@ -2016,7 +2016,7 @@ const UkiOverlay: React.FC = () => {
                 <div style={{
                   fontSize: 10, fontWeight: 600,
                   color: turn.success ? 'var(--color-accent)' : 'var(--color-error)',
-                  letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 2,
+                  letterSpacing: '0.01em', textTransform: 'none', marginBottom: 2,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   UKI
@@ -2079,7 +2079,7 @@ const UkiOverlay: React.FC = () => {
             <div style={{ marginBottom: response ? 10 : 0 }}>
               <div style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 4,
+                letterSpacing: '0.01em', textTransform: 'none', marginBottom: 4,
               }}>
                 You
               </div>
@@ -2131,7 +2131,7 @@ const UkiOverlay: React.FC = () => {
             <div>
               <div style={{
                 fontSize: 10, fontWeight: 600, color: 'var(--color-accent)',
-                letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 4,
+                letterSpacing: '0.01em', textTransform: 'none', marginBottom: 4,
               }}>
                 UKI
               </div>
@@ -2154,6 +2154,19 @@ const UkiOverlay: React.FC = () => {
               borderRadius: 6,
             }}>
               {error}
+              {/Online speech recognition|microphone/i.test(String(error)) && (
+                // One click to the exact Windows page that fixes it (the user
+                // changes the system setting; DEX never flips it for them).
+                <button
+                  type="button"
+                  className="dex-pill"
+                  style={{ display: 'flex', marginTop: 6, height: 24, fontSize: 11 }}
+                  onClick={() => {
+                    const uri = /Online speech/i.test(String(error)) ? 'ms-settings:privacy-speech' : 'ms-settings:privacy-microphone';
+                    void (window as any).dex?.invoke?.('shell:openExternal', uri);
+                  }}
+                >Open Windows settings</button>
+              )}
             </div>
           )}
 
@@ -2178,7 +2191,7 @@ const UkiOverlay: React.FC = () => {
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)',
-                letterSpacing: '0.4px', textTransform: 'uppercase',
+                letterSpacing: '0.4px', textTransform: 'none',
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: 0,
               }}

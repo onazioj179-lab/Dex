@@ -126,8 +126,8 @@ const card: React.CSSProperties = {
 const fieldLabel: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  letterSpacing: '0.01em',
+  textTransform: 'none',
   color: colors.text.tertiary,
   marginBottom: 4,
 };

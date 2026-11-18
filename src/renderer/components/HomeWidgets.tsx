@@ -179,7 +179,7 @@ const ClockWidget: React.FC<{ widget: Widget }> = ({ widget }) => {
         </div>
       )}
 
-      <div style={{ fontSize: metaSize, fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', marginBottom: 6 }}>
+      <div style={{ fontSize: metaSize, fontWeight: 700, letterSpacing: '0.01em', color: 'rgba(255,255,255,0.72)', textTransform: 'none', marginBottom: 6 }}>
         {greeting}
       </div>
       <div style={{ fontSize: timeSize, fontWeight: 250, letterSpacing: '-0.03em', lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 4px 20px rgba(0,0,0,0.34)' }}>
@@ -323,7 +323,7 @@ const RecentFilesWidget: React.FC = () => {
   const recents = useRecentFiles(s => s.recentFiles).slice(0, 6);
   return (
     <div style={{ padding: 'var(--space-2)', overflow: 'hidden' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Recent Files</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 6 }}>Recent Files</div>
       {recents.length === 0 && <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No recent files</div>}
       {recents.map((f: { name: string }, i: number) => (
         <div key={i} style={{ fontSize: 12, color: '#fff', padding: '3px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -443,7 +443,7 @@ const SystemStatusWidget: React.FC = () => {
   return (
     <div style={{ padding: 10, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>System</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'none' }}>System</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: network.online ? 'var(--color-success)' : 'var(--color-error)' }} />
           <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)' }}>{network.online ? 'Online' : 'Offline'}</span>
@@ -474,7 +474,7 @@ const NotesScratchpadWidget: React.FC<{ widgetId: string }> = ({ widgetId }) => 
   }, [widgetId]);
   return (
     <div style={{ padding: 'var(--space-2)', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'none', marginBottom: 4 }}>Notes</div>
       <AssistedTextarea
         value={text}
         onChange={e => save(e.target.value)}
@@ -693,7 +693,7 @@ const StorageWidget: React.FC = () => {
   }
   return (
     <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Storage</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'none', marginBottom: 'var(--space-2)' }}>Storage</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 'var(--space-2)' }}>
         <span style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatBytes(storage.free)}</span>
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>free of {formatBytes(storage.total)}</span>

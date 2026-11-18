@@ -4,6 +4,9 @@
  * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
  */
 import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
+import { SegmentedControl, DexCapsuleButton } from '../../components/controls';
+import { boardToCsv } from './kanbanExport';
+import { pickSavePath, writeTextFile } from '../../services/nativeFiles';
 import { insertKanbanCard, type KanbanRestoreDetail } from '../../services/recycleRestore';
 import { DexSearchInput } from '../../styles/components';
 import { dueStatus, dueStatusColor, relativeDueLabel, advanceDate } from '../../../shared/time/dateHelpers';
@@ -43,6 +46,11 @@ interface KanbanBoard {
   columns: KanbanColumn[];
   createdAt: number;
 }
+
+const listRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'minmax(180px, 2fr) minmax(90px, 1fr) 80px 100px 80px', gap: 12, alignItems: 'center',
+  height: 32, fontSize: 12, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-subtle)', padding: '0 4px',
+};
 
 // -- Persistence --------------------------------------------------------
 
@@ -259,7 +267,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   headerTitle: { fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 4 },
   body: { padding: 'var(--space-4) var(--space-5)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 },
-  label: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
+  label: { fontSize: 11, fontWeight: 600, textTransform: 'none' as const, letterSpacing: '0.01em', color: 'var(--color-text-muted, #999)', marginBottom: -4 },
   input: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none', fontFamily: 'inherit' },
   select: { width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px solid var(--color-border, var(--color-border))', background: 'var(--color-bg-surface-solid, #0e0e0e)', color: 'var(--color-text-primary, #fafafa)', fontSize: 13, outline: 'none' },
   addBtn: { padding: '6px 14px', borderRadius: 10, border: 'none', background: 'var(--color-accent-fill)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
@@ -275,6 +283,10 @@ const KanbanApp: React.FC = () => {
   const [boards, setBoards] = useState<KanbanBoard[]>(loadBoards);
   const [activeBoardIdx, setActiveBoardIdx] = useState(0);
   const [editingCard, setEditingCard] = useState<{ colId: string; cardIdx: number } | null>(null);
+  // Board (columns) or List (one dense table of every card, same filters/sort).
+  const [layout, setLayout] = useState<'board' | 'list'>(() => { try { return localStorage.getItem('dex-kanban-layout') === 'list' ? 'list' : 'board'; } catch { return 'board'; } });
+  useEffect(() => { try { localStorage.setItem('dex-kanban-layout', layout); } catch { /* storage blocked */ } }, [layout]);
+  const [exportMsg, setExportMsg] = useState('');
   const [addingToCol, setAddingToCol] = useState<string | null>(null);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newColTitle, setNewColTitle] = useState('');
@@ -606,6 +618,7 @@ const KanbanApp: React.FC = () => {
 
       {/* Controls: search / filter / sort */}
       <div className="dex-liquid-glass" style={styles.controls}>
+        <SegmentedControl semantics="tabs" size="sm" aria-label="Layout" options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]} value={layout} onChange={(v) => setLayout(v as 'board' | 'list')} />
         <div style={{ width: 220 }}>
           <DexSearchInput size="sm" fullWidth value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch('')} placeholder="Search cards..." />
         </div>
@@ -628,11 +641,55 @@ const KanbanApp: React.FC = () => {
             {sortDir === 'asc' ? 'Asc' : 'Desc'}
           </button>
         )}
-        {viewActive && <span style={styles.controlHint}>Drag disabled while filtered/sorted</span>}
+        {viewActive && layout === 'board' && <span style={styles.controlHint}>Drag disabled while filtered/sorted</span>}
+        <span style={{ flex: 1 }} />
+        {exportMsg && <span role="status" style={styles.controlHint}>{exportMsg}</span>}
+        <DexCapsuleButton
+          size="sm"
+          style={{ border: '1px solid var(--color-border-subtle)' }}
+          onClick={async () => {
+            setExportMsg('');
+            const csv = boardToCsv(board.columns);
+            try {
+              const path = await pickSavePath(`${board.name.replace(/[\\/:*?"<>|]/g, '_') || 'board'}.csv`, [{ name: 'CSV', extensions: ['csv'] }], 'Export board');
+              if (!path) return;
+              await writeTextFile(path, csv);
+              setExportMsg(`Exported ${totalCards} cards`);
+            } catch (e) {
+              setExportMsg(`Not exported: ${(e as Error)?.message || 'failed'}`);
+            }
+          }}
+        >
+          Export CSV
+        </DexCapsuleButton>
       </div>
 
+      {layout === 'list' && (
+        <div role="table" aria-label={`${board.name} cards`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 16px 16px' }}>
+          <div role="row" style={{ ...listRow, position: 'sticky', top: 0, background: 'var(--color-bg-base)', color: 'var(--color-text-tertiary)', fontWeight: 600 }}>
+            <span role="columnheader">Title</span><span role="columnheader">Status</span><span role="columnheader">Priority</span><span role="columnheader">Due</span><span role="columnheader">Checklist</span>
+          </div>
+          {board.columns.flatMap(col => getDisplayCards(col).map(({ card, realIdx }) => {
+            const done = card.checklist.filter(x => x.done).length;
+            const overdue = !!card.dueDate && new Date(card.dueDate).getTime() < Date.now() - 86400000;
+            return (
+              <div role="row" key={card.id} tabIndex={0} onClick={() => setEditingCard({ colId: col.id, cardIdx: realIdx })}
+                onKeyDown={(e) => { if (e.key === 'Enter') setEditingCard({ colId: col.id, cardIdx: realIdx }); }}
+                style={{ ...listRow, cursor: 'pointer' }}>
+                <span role="cell" style={{ color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.title}</span>
+                <span role="cell">{col.title}</span>
+                <span role="cell" style={{ textTransform: 'capitalize' }}>{card.priority}</span>
+                <span role="cell" style={{ color: overdue ? 'var(--color-error)' : undefined, fontVariantNumeric: 'tabular-nums' }}>{card.dueDate || '—'}</span>
+                <span role="cell" style={{ fontVariantNumeric: 'tabular-nums' }}>{card.checklist.length ? `${done}/${card.checklist.length}` : '—'}</span>
+              </div>
+            );
+          }))}
+          {totalCards === 0 && <div style={{ padding: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>No cards yet. Switch to Board to add some.</div>}
+        </div>
+      )}
+
       {/* Board */}
-      <div style={styles.board}>
+      {layout === 'board' && <div style={styles.board}>
         {board.columns.map(col => {
           const atLimit = !!col.limit && col.cards.length >= col.limit;
           const overLimit = !!col.limit && col.cards.length > col.limit;
@@ -795,7 +852,7 @@ const KanbanApp: React.FC = () => {
             {Icons.plus} Add column
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Card Detail Modal */}
       {editingCard && editingCardData && (

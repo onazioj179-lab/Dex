@@ -609,7 +609,11 @@ function fuzzyMatch(query: string, text: string): { score: number; highlights: H
     tIdx++;
   }
 
-  if (qIdx === q.length) {
+  // A scattered subsequence is noise, not a match: "dark" is in "passworD...
+  // shAdow ... locK" too. Accept char-level matches only when they sit close
+  // together (span at most twice the query) -- "ntes" still finds "notes".
+  const span = charHighlights.length ? charHighlights[charHighlights.length - 1].end - charHighlights[0].start : Infinity;
+  if (qIdx === q.length && span <= Math.max(q.length * 2, q.length + 2)) {
     // Merge adjacent highlights
     const merged: HighlightSpan[] = [];
     for (const h of charHighlights) {

@@ -12,7 +12,24 @@
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::Manager;
+
+use crate::util::LockSafe;
+
+/// Cancel flags of downloads running in the background, by renderer id.
+fn running() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
+    static R: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
+    R.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Renderer-chosen ids: short and plain, so they are safe as map keys and in events.
+pub(crate) fn valid_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
 
 /// Upper bound so a runaway response can't fill the disk.
 const MAX_BYTES: u64 = 8 * 1024 * 1024 * 1024;
@@ -76,11 +93,22 @@ pub(crate) fn unique_path(dir: &Path, name: &str) -> PathBuf {
         .unwrap_or_else(|| dir.join(format!("{stem} ({}){ext}", std::process::id())))
 }
 
-fn start(app: &tauri::AppHandle, url: &str) -> Value {
-    let Ok(parsed) = tauri::Url::parse(url.trim()) else { return fail("not a valid address") };
+fn check_url(url: &str) -> Result<tauri::Url, Value> {
+    let Ok(parsed) = tauri::Url::parse(url.trim()) else { return Err(fail("not a valid address")) };
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return fail("only http and https downloads are allowed");
+        return Err(fail("only http and https downloads are allowed"));
     }
+    Ok(parsed)
+}
+
+fn start(app: &tauri::AppHandle, url: &str) -> Value {
+    run(app, url, None, &mut |_, _| {})
+}
+
+/// Download `url` into Downloads. `cancel` stops it (the .part file is
+/// removed); `progress(received, total)` is called as bytes arrive.
+fn run(app: &tauri::AppHandle, url: &str, cancel: Option<&AtomicBool>, progress: &mut dyn FnMut(u64, Option<u64>)) -> Value {
+    let parsed = match check_url(url) { Ok(p) => p, Err(e) => return e };
     let Ok(dir) = app.path().download_dir() else { return fail("couldn't find the Downloads folder") };
     let _ = std::fs::create_dir_all(&dir);
 
@@ -90,6 +118,7 @@ fn start(app: &tauri::AppHandle, url: &str) -> Value {
         Err(e) => return fail(format!("couldn't reach the server: {e}")),
     };
     let name = file_name_for(parsed.as_str(), resp.header("content-disposition"));
+    let expected: Option<u64> = resp.header("content-length").and_then(|v| v.trim().parse().ok());
     let target = unique_path(&dir, &name);
     let part = target.with_extension(format!(
         "{}part",
@@ -103,6 +132,11 @@ fn start(app: &tauri::AppHandle, url: &str) -> Value {
     let mut buf = vec![0u8; 256 * 1024];
     let mut total: u64 = 0;
     loop {
+        if cancel.map(|c| c.load(Ordering::Relaxed)).unwrap_or(false) {
+            drop(file);
+            let _ = std::fs::remove_file(&part);
+            return json!({ "success": false, "cancelled": true, "error": "cancelled" });
+        }
         let n = match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => n,
@@ -113,6 +147,7 @@ fn start(app: &tauri::AppHandle, url: &str) -> Value {
             }
         };
         total += n as u64;
+        progress(total, expected);
         if total > MAX_BYTES || file.write_all(&buf[..n]).is_err() {
             drop(file);
             let _ = std::fs::remove_file(&part);
@@ -127,11 +162,57 @@ fn start(app: &tauri::AppHandle, url: &str) -> Value {
     json!({ "success": true, "path": target.to_string_lossy(), "size": total, "fileName": target.file_name().map(|n| n.to_string_lossy().to_string()) })
 }
 
+/// Background download with live `download:progress` events
+/// ({ id, state: progressing|completed|failed|cancelled, received, total, percent, path?, fileName?, error? }).
+fn start_background(app: &tauri::AppHandle, url: &str, id: &str) -> Value {
+    if let Err(e) = check_url(url) { return e; }
+    let flag = Arc::new(AtomicBool::new(false));
+    {
+        let mut map = running().lock_safe();
+        if map.contains_key(id) { return fail("a download with this id is already running"); }
+        map.insert(id.to_string(), flag.clone());
+    }
+    let id_out = id.to_string();
+    let (app, url, id) = (app.clone(), url.to_string(), id.to_string());
+    std::thread::spawn(move || {
+        let mut last = Instant::now() - Duration::from_secs(1);
+        let mut on_progress = |received: u64, total: Option<u64>| {
+            if last.elapsed() < Duration::from_millis(200) { return; }
+            last = Instant::now();
+            let percent = total.filter(|t| *t > 0).map(|t| ((received.min(t) * 100) / t) as u32);
+            crate::native_ops::emit_event(&app, "download:progress", &json!({
+                "id": id, "state": "progressing", "received": received, "total": total, "percent": percent,
+            }));
+        };
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&app, &url, Some(&flag), &mut on_progress)))
+            .unwrap_or_else(|_| fail("the download stopped unexpectedly"));
+        running().lock_safe().remove(&id);
+        let state = if res.get("success").and_then(|v| v.as_bool()) == Some(true) { "completed" }
+            else if res.get("cancelled").and_then(|v| v.as_bool()) == Some(true) { "cancelled" } else { "failed" };
+        let mut ev = json!({ "id": id, "state": state });
+        if let (Some(o), Some(r)) = (ev.as_object_mut(), res.as_object()) {
+            for k in ["path", "fileName", "size", "error"] { if let Some(v) = r.get(k) { o.insert(k.into(), v.clone()); } }
+            if state == "completed" { o.insert("percent".into(), json!(100)); }
+        }
+        crate::native_ops::emit_event(&app, "download:progress", &ev);
+    });
+    json!({ "success": true, "id": id_out, "started": true })
+}
+
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
-        "download:start" => match args.get(0).and_then(|v| v.as_str()) {
-            Some(url) => start(app, url),
-            None => fail("missing url"),
+        "download:start" => match (args.get(0).and_then(|v| v.as_str()), args.get(1).and_then(|v| v.as_str())) {
+            (Some(url), Some(id)) if valid_id(id) => start_background(app, url, id),
+            (Some(_), Some(_)) => fail("invalid download id"),
+            (Some(url), None) => start(app, url),
+            _ => fail("missing url"),
+        },
+        "download:cancel" => match args.get(0).and_then(|v| v.as_str()) {
+            Some(id) => match running().lock_safe().get(id) {
+                Some(flag) => { flag.store(true, Ordering::Relaxed); json!({ "success": true }) }
+                None => fail("no such download"),
+            },
+            None => fail("missing id"),
         },
         _ => Value::Null,
     }
@@ -147,6 +228,14 @@ mod tests {
         assert_eq!(file_name_for("https://x.com/", None), "download");
         assert_eq!(file_name_for("https://x.com/d", Some("attachment; filename=\"re:port?.pdf\"")), "re_port_.pdf");
         assert_eq!(file_name_for("https://x.com/..", None), "download");
+    }
+
+    #[test]
+    fn download_ids_are_plain() {
+        assert!(valid_id("dl_1731_ab-9"));
+        assert!(!valid_id(""));
+        assert!(!valid_id("../x"));
+        assert!(!valid_id(&"a".repeat(65)));
     }
 
     #[test]

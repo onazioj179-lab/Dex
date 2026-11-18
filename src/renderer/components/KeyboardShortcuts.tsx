@@ -287,7 +287,7 @@ const KeyboardShortcuts: React.FC = () => {
                 <div key={group.title}>
                   <div style={{
                     fontSize: 10, fontWeight: 700, color: 'var(--color-text-tertiary)',
-                    textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10,
+                    textTransform: 'none', letterSpacing: '0.01em', marginBottom: 10,
                   }}>
                     {group.title}
                   </div>

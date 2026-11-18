@@ -120,7 +120,7 @@ const selectToolbar: React.CSSProperties = {
   borderBottom: '1px solid var(--color-border-subtle)',
 };
 const groupHeader: React.CSSProperties = {
-  fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase',
+  fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: 'none',
   color: 'var(--color-text-tertiary)', padding: '14px 0 6px',
 };
 const rowStyle: React.CSSProperties = {

@@ -38,18 +38,23 @@ export interface DockPrefs {
 export const DEFAULT_DOCK_PREFS: DockPrefs = {
   style: 'morphing',
   edge: 'bottom',
-  autoCollapse: false,
-  expanded: true,
+  // Owner (2026-11-17): the Dock folds to its search button when idle by
+  // default, so it never sits on top of an app's own bottom controls.
+  autoCollapse: true,
+  expanded: false,
   workspacePadding: 0,
 };
 
 export function sanitizeDockPrefs(v: unknown): DockPrefs {
-  const o = (v && typeof v === 'object' ? v : {}) as Partial<DockPrefs>;
+  const o = (v && typeof v === 'object' ? v : {}) as Partial<DockPrefs> & { acV2?: boolean };
+  // Prefs saved before the auto-collapse default changed (no acV2 mark) take
+  // the new default once; after that the user's own choice sticks.
+  const migrate = !o.acV2;
   return {
     style: o.style === 'classic' ? 'classic' : 'morphing',
     edge: o.edge === 'left' || o.edge === 'right' ? o.edge : 'bottom',
-    autoCollapse: o.autoCollapse === true,
-    expanded: o.expanded !== false,
+    autoCollapse: migrate ? true : o.autoCollapse === true,
+    expanded: migrate ? false : o.expanded !== false,
     workspacePadding: Math.max(0, Math.min(48, Math.round(Number(o.workspacePadding) || 0))),
   };
 }
@@ -68,7 +73,7 @@ interface DockState extends DockPrefs {
 
 function persist(s: DockPrefs): void {
   const { style, edge, autoCollapse, expanded, workspacePadding } = s;
-  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, autoCollapse, expanded, workspacePadding })); } catch { /* storage full */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, autoCollapse, expanded, workspacePadding, acV2: true })); } catch { /* storage full */ }
 }
 
 export const useDockStore = create<DockState>((set, get) => ({

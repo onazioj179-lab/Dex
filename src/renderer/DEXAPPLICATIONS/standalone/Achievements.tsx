@@ -27,6 +27,8 @@ import {
   loadChallenges, getChallengeLevel, type DailyChallengeState,
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
+import { useDexSetting, writeDexSetting } from '../../hooks/useDexSetting';
+import { AchievementBrowser } from './AchievementBrowser';
 
 // DEX Blue Modern tokens, so Trophies follows light/dark and the window
 // material like every other app (it used to be hard-coded near-black + gold).
@@ -54,6 +56,9 @@ function relTime(ts: number): string {
 const Achievements: React.FC = () => {
   const [engagement, setEngagement] = useState<EngagementState>(() => loadEngagement());
   const [challenges, setChallenges] = useState<DailyChallengeState>(() => loadChallenges());
+  // Owner controls: tracking and unlock notifications are both optional.
+  const tracking = useDexSetting('achievementsEnabled', true);
+  const notifyOn = useDexSetting('achievementNotifications', true);
 
   // Live-update: the achievement engine fires these when an unlock or challenge
   // lands (from any app), so an open Trophies dashboard reflects it instantly.
@@ -193,6 +198,15 @@ const Achievements: React.FC = () => {
                 {engagement.stats.currentStreak}d streak
               </div>
             )}
+            {([
+              ['Track progress', tracking, 'achievementsEnabled', 'When off, DEX records no usage for trophies and nothing new unlocks. Earned trophies stay.'],
+              ['Notify me', notifyOn, 'achievementNotifications', 'Unlocks go to the Notification Center. Off keeps them quiet.'],
+            ] as const).map(([label, on, key, tip]) => (
+              <label key={key} title={tip} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: TXT_DIM, cursor: 'pointer' }}>
+                <input type="checkbox" checked={on} onChange={(e) => writeDexSetting(key, e.target.checked)} aria-label={label} />
+                {label}
+              </label>
+            ))}
             <button onClick={shareProgress} title="Copy progress summary" style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
               border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
@@ -301,6 +315,8 @@ const Achievements: React.FC = () => {
           </section>
         )}
 
+        <AchievementBrowser unlocked={unlocked} unlockedAt={unlockedAt} stats={progressStats as UserStats} />
+
         <DailyChallengesBar challenges={challenges} />
       </div>
     </div>
@@ -337,7 +353,7 @@ const HeroSpotlight: React.FC<{
     }}>
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
           <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>{ach.rarity}</span>
           <span style={{ fontSize: 11, color: TXT_DIM }}>{isUnlocked ? `Unlocked ${relTime(ts)}` : 'Next up'}</span>
         </div>
@@ -346,7 +362,7 @@ const HeroSpotlight: React.FC<{
             <DexIcon name={isUnlocked ? ach.icon : 'lock'} size={28} color="var(--color-text-secondary)" />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{ach.title}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{ach.title}</div>
             <div style={{ fontSize: 12.5, color: TXT_DIM, marginTop: 3, maxWidth: 380, lineHeight: 1.4 }}>{ach.description}</div>
           </div>
         </div>
@@ -401,7 +417,7 @@ const StatsRing: React.FC<{
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>{totalUnlocked.toLocaleString()}</div>
+          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1 }}>{totalUnlocked.toLocaleString()}</div>
           <div style={{ fontSize: 12, color: TXT_DIM, marginTop: 3 }}>of {totalAchievements.toLocaleString()} trophies unlocked</div>
           <div style={{ marginTop: 9, fontSize: 11.5, fontWeight: 600, color: GOLD }}>{level.title}</div>
         </div>
@@ -410,8 +426,8 @@ const StatsRing: React.FC<{
         {tiles.map(t => (
           <div key={t.label} style={{ padding: '10px 8px', borderRadius: 14, textAlign: 'center', background: PANEL_2, border: `1px solid ${BORDER}` }}>
             <DexIcon name={t.icon} size={15} color={GOLD} />
-            <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{t.value}</div>
-            <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>{t.value}</div>
+            <div style={{ fontSize: 9.5, color: TXT_DIM, marginTop: 1, textTransform: 'none', letterSpacing: '0.01em' }}>{t.label}</div>
           </div>
         ))}
       </div>
@@ -431,7 +447,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 96 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD }} />
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: GOLD }}>Daily</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none', color: GOLD }}>Daily</span>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>Lv {level.level} · {level.title}</div>
         <div style={{ fontSize: 10, color: TXT_DIM }}>
@@ -450,7 +466,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
                 <div key={i} title={`${h.date}: ${h.xpEarned} XP`} style={{ width: 5, height: `${Math.max(2, Math.round((h.xpEarned / max) * 26))}px`, borderRadius: 1, background: GOLD, opacity: h.xpEarned > 0 ? 0.85 : 0.25 }} />
               ))}
             </div>
-            <div style={{ fontSize: 9, color: TXT_DIM, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Best {best} XP · {challenges.history.length}d</div>
+            <div style={{ fontSize: 9, color: TXT_DIM, letterSpacing: '0.01em', textTransform: 'none' }}>Best {best} XP · {challenges.history.length}d</div>
           </div>
         );
       })()}

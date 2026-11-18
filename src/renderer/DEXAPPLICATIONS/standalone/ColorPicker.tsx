@@ -376,7 +376,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   valueLabel: {
     fontSize: 10, fontWeight: 600, color: 'var(--color-text-muted)',
-    textTransform: 'uppercase', letterSpacing: '0.5px',
+    textTransform: 'none', letterSpacing: '0.01em',
   },
   valueText: {
     fontSize: 13, color: 'var(--color-text-primary)',

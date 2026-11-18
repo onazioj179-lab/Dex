@@ -22,8 +22,9 @@
 // - Entrance animation lives in CSS (.dex-modal-*) on token durations, so
 //   prefers-reduced-motion is honoured automatically.
 // ===========================================================================
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useOverlay } from '../services/overlayStack';
 import { space, fontSize, fontWeight, zIndex } from '../styles/tokens';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -108,16 +109,18 @@ export function Modal({
     (first ?? panel).focus();
   }, [open]);
 
-  // Escape + focus trap.
+  // Escape goes through the shared overlay stack: a dialog opened from this
+  // one (or a menu inside it) closes first, this one stays. With
+  // dismissOnEscape off the entry still sits on the stack so Escape cannot
+  // reach the dialog behind it.
+  const escClose = useCallback(() => { if (dismissOnEscape) onClose(); }, [dismissOnEscape, onClose]);
+  const { isTop } = useOverlay(open, escClose, { ref: panelRef, dismissOnOutside: false });
+
+  // Focus trap (top dialog only, so a stacked dialog owns Tab).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissOnEscape) {
-        e.stopPropagation();
-        onClose();
-        return;
-      }
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab' || !isTop()) return;
       const panel = panelRef.current;
       if (!panel) return;
       const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
@@ -135,7 +138,8 @@ export function Modal({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, dismissOnEscape, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 

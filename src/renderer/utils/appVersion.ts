@@ -27,7 +27,7 @@ export const getRuntimeAppVersion = async (): Promise<string> => {
  */
 export const getBuildSerial = (): string => ((import.meta.env.VITE_DEX_BUILD as string) || '').trim();
 
-/** "7.0.1 (18a)" — or just the version when no serial is set. */
+/** "7.0.2 (001z)" — or just the version when no serial is set. */
 export const formatDisplayVersion = (version: string, serial: string = getBuildSerial()): string =>
   serial ? `${version} (${serial})` : version;
 

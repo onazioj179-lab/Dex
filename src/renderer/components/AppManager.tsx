@@ -13,6 +13,7 @@
  */
 
 import { appBackLabel, tryAppBack, tryAppForward, MOUSE_BACK, MOUSE_FORWARD } from '../services/backNavigation';
+import { byAppId, baseAppId, AppWindowContext } from '../services/appWindows';
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { platform } from '../utils';
@@ -253,7 +254,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
 // Default floating window sizes per app live in the shared app registry
 // (shell/appRegistry.ts) so the window manager, launcher and app info agree.
 
-const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
+const DOCK_FILE_DROP_TARGETS_RAW: Partial<Record<AppId, CreativeAppId>> = {
   videoeditor: 'videoeditor',
   imosion: 'imosion',
   prism: 'prism',
@@ -262,6 +263,7 @@ const DOCK_FILE_DROP_TARGETS: Partial<Record<AppId, CreativeAppId>> = {
   axl: 'axl',
   notes: 'notes',
 };
+const DOCK_FILE_DROP_TARGETS = byAppId(DOCK_FILE_DROP_TARGETS_RAW as Record<string, any>) as typeof DOCK_FILE_DROP_TARGETS_RAW;
 
 function inferAssetKindFromPath(filePath: string): AssetKind {
   const lower = filePath.toLowerCase();
@@ -273,7 +275,7 @@ function inferAssetKindFromPath(filePath: string): AssetKind {
   return 'clip';
 }
 
-const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
+const APP_WINDOW_MIN_SIZES_RAW: Record<string, { w: number; h: number }> = {
   browser: { w: 720, h: 460 },
   files: { w: 700, h: 460 },
   gallery: { w: 700, h: 460 },
@@ -287,6 +289,7 @@ const APP_WINDOW_MIN_SIZES: Record<string, { w: number; h: number }> = {
   collabhub: { w: 760, h: 520 },
   maps: { w: 640, h: 460 },
 };
+const APP_WINDOW_MIN_SIZES = byAppId(APP_WINDOW_MIN_SIZES_RAW as Record<string, any>) as typeof APP_WINDOW_MIN_SIZES_RAW;
 
 /** Settings > Frame Snapping prefs (written by AccessPanels.tsx). */
 function readSnapPrefs(): { enabled: boolean; gutter: number; cycleOnRepeat: boolean } {
@@ -342,7 +345,7 @@ const COMPACT_APPS: ReadonlySet<string> = new Set([
 const IS_WINDOWS = navigator.platform.includes('Win');
 
 // Map AppId to lazy component
-const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
+const APP_COMPONENTS_RAW: Record<AppId, React.LazyExoticComponent<any>> = {
   home: Home, files: Files, browser: Browser, settings: Settings, taskmanager: TaskManager, liveactivity: LiveActivityBrowser, transfers: Transfers,
   notes: Notes, tasks: Tasks, power: Power, workflows: Workflows,
   gallery: Gallery, audio: AudioPage, store: Store, games: Games,
@@ -371,13 +374,14 @@ const APP_COMPONENTS: Record<AppId, React.LazyExoticComponent<any>> = {
   terminal: TerminalApp,
   security: SecurityCenter,
 };
+const APP_COMPONENTS = byAppId(APP_COMPONENTS_RAW as Record<string, any>) as typeof APP_COMPONENTS_RAW;
 
 // -- App PNG Icons (branded creative app icons) ---------------------------
 import vinxIconPng from '../../../appicons/vinx.png';
 import imosionIconPng from '../../../appicons/imosion.png';
 import forgeIconPng from '../../../appicons/forge.png';
 import nexusIconPng from '../../../appicons/nexus.png';
-import { useDexSetting } from '../hooks/useDexSetting';
+import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { notificationsAllowed } from '../utils/notificationsAllowed';
 
@@ -397,7 +401,7 @@ const AppIconImg: React.FC<{ appId: string; size?: number }> = ({ appId, size = 
 // -- SVG Icons -------------------------------------------------------------
 const dockIconStyle: React.CSSProperties = {};
 const sw = 2.5;
-const Icons: Record<string, JSX.Element> = {
+const Icons_RAW: Record<string, JSX.Element> = {
   home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   files: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   notes: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
@@ -449,6 +453,7 @@ const Icons: Record<string, JSX.Element> = {
   close: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
 };
+const Icons = byAppId(Icons_RAW as Record<string, any>) as typeof Icons_RAW;
 
 // All apps for Launchpad -- full DEX app surface organized by category.
 // Brand color is DERIVED from APP_DEFINITIONS (the single source of truth in
@@ -695,9 +700,11 @@ const AppBody = React.memo(function AppBody({ appId }: { appId: AppId }) {
   if (!Comp) return null;
   return (
     <AppErrorBoundary appId={appId}>
-      <Suspense fallback={<Loading appId={appId} />}>
-        <Comp />
-      </Suspense>
+      <AppWindowContext.Provider value={appId}>
+        <Suspense fallback={<Loading appId={appId} />}>
+          <Comp />
+        </Suspense>
+      </AppWindowContext.Provider>
     </AppErrorBoundary>
   );
 });
@@ -1126,6 +1133,8 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
+    // Trophies › "Track progress" off: no usage stats are recorded at all.
+    if (!readDexSetting('achievementsEnabled', true)) return;
     try {
       const { state, newUnlocks } = checkAchievements(mutate(loadEngagement()));
       saveEngagement(state);
@@ -1980,7 +1989,7 @@ export const AppManager: React.FC = () => {
   const lastTabFrontRef = useRef<AppId>('home');
   useEffect(() => {
     const id = currentApp;
-    if (!COMPACT_APPS.has(id)) {
+    if (!COMPACT_APPS.has(baseAppId(id))) {
       if (!detachedApps.has(id)) lastTabFrontRef.current = id;
       return;
     }
@@ -3752,7 +3761,13 @@ export const AppManager: React.FC = () => {
       cullTimer = setTimeout(cull, 120);
     };
     apply(useSpatialStore.getState());
-    const unsub = useSpatialStore.subscribe(apply);
+    // Only camera, enable or window-set changes matter here. Every other
+    // store write (zones refitting, groups, guides, selection) used to re-run
+    // this and push the level-of-detail pass back each time.
+    const unsub = useSpatialStore.subscribe((st, prev) => {
+      if (st.camera === prev.camera && st.enabled === prev.enabled && st.windows === prev.windows && st.viewport === prev.viewport) return;
+      apply(st);
+    });
     return () => { unsub(); if (cullTimer) clearTimeout(cullTimer); if (motionTimer) clearTimeout(motionTimer); };
   }, [splitMode, spatialEnabled]);
 
@@ -3792,6 +3807,24 @@ export const AppManager: React.FC = () => {
     };
     const inHud = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-spatial-hud]');
     const inWindow = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-floating-window]');
+    // Can some scroll container between the target and its window still move
+    // in this direction? Text fields and editors count as scrollable.
+    const canScrollInside = (target: EventTarget | null, dx: number, dy: number): boolean => {
+      let n = target as HTMLElement | null;
+      while (n && !n.hasAttribute?.('data-floating-window')) {
+        if (n.isContentEditable || /^(TEXTAREA|SELECT)$/.test(n.tagName)) return true;
+        const cs = getComputedStyle(n);
+        const oy = /(auto|scroll|overlay)/.test(cs.overflowY), ox = /(auto|scroll|overlay)/.test(cs.overflowX);
+        if (dy && oy && n.scrollHeight > n.clientHeight + 1) {
+          if ((dy > 0 && n.scrollTop + n.clientHeight < n.scrollHeight - 1) || (dy < 0 && n.scrollTop > 0)) return true;
+        }
+        if (dx && ox && n.scrollWidth > n.clientWidth + 1) {
+          if ((dx > 0 && n.scrollLeft + n.clientWidth < n.scrollWidth - 1) || (dx < 0 && n.scrollLeft > 0)) return true;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    };
     const onWheel = (e: WheelEvent) => {
       if (inHud(e.target)) return;
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
@@ -3808,7 +3841,10 @@ export const AppManager: React.FC = () => {
         st().zoomAtPoint(p.x, p.y, Math.min(1.25, Math.max(0.8, Math.exp(-dy * 0.0025))));
         return;
       }
-      if (!inWindow(e.target)) {
+      // Scroll chaining (owner, 2026-11-17): over an app the wheel scrolls the
+      // app first; once the app cannot scroll any further that way (or has
+      // nothing to scroll), the same wheel pans the canvas.
+      if (!inWindow(e.target) || !canScrollInside(e.target, e.shiftKey ? dy : dx, e.shiftKey ? 0 : dy)) {
         e.preventDefault();
         e.stopPropagation();
         st().pan(-(e.shiftKey ? dy : dx), e.shiftKey ? 0 : -dy);
@@ -3923,7 +3959,6 @@ export const AppManager: React.FC = () => {
         case 'actualSize': claim(); st.setZoom(1); return;
         case 'fitAll': claim(); st.fitAll(); return;
         case 'back': claim(); st.back(); return;
-        case 'minimap': claim(); st.toggleMinimap(); return;
         case 'windows': claim(); window.dispatchEvent(new CustomEvent('dex-spatial-windows')); return;
         case 'saveView': claim(); st.saveView(); return;
         case 'focusFront': {

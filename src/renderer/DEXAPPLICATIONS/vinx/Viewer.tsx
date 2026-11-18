@@ -10,6 +10,7 @@
  * scrubber, safe zone overlays, full screen toggle.
  */
 
+import { playbackSource } from './mediaProxy';
 import React, { useCallback, useRef, useState, useEffect, memo, useMemo } from 'react';
 import { useVinxStore } from './VinxStore';
 import { ProgramLutOverlay } from './ProgramLutOverlay';
@@ -108,6 +109,8 @@ const VideoLayer: React.FC<{
 }> = memo(({ currentFrame, frameRate, registerVideo, unregisterVideo }) => {
   const activeSequence = useVinxStore(s => s.getActiveSequence());
   const mediaBin = useVinxStore(s => s.project.mediaBin);
+  const useProxies = useVinxStore(s => !!s.project.proxySettings?.enabled);
+  const exportingOriginals = useVinxStore(s => s.exportingOriginals);
   const colorGrade = useVinxStore(s => s.colorGrade);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
@@ -154,7 +157,8 @@ const VideoLayer: React.FC<{
         const clipEndSec = frameToSec(clip.endFrame, frameRate);
         const isVisible = currentSec >= clipStartSec && currentSec < clipEndSec;
         // Disk paths (desktop import) load through the dexmedia protocol; blob:/http pass through.
-        const src = toMediaUrl(media?.path || media?.proxyPath || '');
+        // "Use proxies" plays the small copy; export always plays the original.
+        const src = toMediaUrl(playbackSource(media, useProxies, exportingOriginals));
 
         // Transition opacity: fade in/out at clip boundaries
         let transitionOpacity = 1;

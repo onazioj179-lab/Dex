@@ -368,9 +368,9 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: {
     fontSize: '10px',
     fontWeight: 700,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.01em',
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
   },
   textarea: {
     width: '100%',

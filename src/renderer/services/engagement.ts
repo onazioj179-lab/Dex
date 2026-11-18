@@ -175,6 +175,8 @@ export function checkAchievements(
   totalPoints?: number,
 ): { state: EngagementState; newUnlocks: Achievement[] } {
   const newUnlocks: Achievement[] = [];
+  // Trophies › "Track progress" off: nothing new unlocks (existing trophies stay).
+  try { if (JSON.parse(localStorage.getItem('dex-settings') || '{}').achievementsEnabled === false) return { state, newUnlocks }; } catch { /* storage blocked */ }
   const unlockedSet = new Set(state.unlockedAchievements); // O(1) has() vs O(n) includes()
   let unlocked = [...state.unlockedAchievements];
   const unlockedAt: Record<string, number> = { ...(state.unlockedAt || {}) };

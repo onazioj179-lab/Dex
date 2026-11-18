@@ -154,7 +154,7 @@ const NexusUkiPanel: React.FC = () => {
       {recentTasks.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Background Tasks</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.02em' }}>Background Tasks</div>
             {hasFinishedTasks && (
               <button
                 onClick={clearFinished}
@@ -179,7 +179,7 @@ const NexusUkiPanel: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 9999, flexShrink: 0, background: TASK_TONE[t.status] }} />
                   <span style={{ fontSize: 12, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.title}>{t.title}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: TASK_TONE[t.status], textTransform: 'uppercase', flexShrink: 0 }}>{t.status}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: TASK_TONE[t.status], textTransform: 'none', flexShrink: 0 }}>{t.status}</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>{timeAgo(t.updatedAt)}</span>
                   {!FINISHED_STATUSES.has(t.status) && isTaskControllable(t.id) && (
                     <>
@@ -211,12 +211,12 @@ const NexusUkiPanel: React.FC = () => {
       {/* History — full scrollable UKI conversation timeline (newest first). */}
       {historyTurns.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>History · {conversationHistory.length}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.02em' }}>History · {conversationHistory.length}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingRight: 2 }}>
           {historyTurns.map((t) => (
             <div key={t.id} style={{ ...chip, display: 'block', whiteSpace: 'normal', width: '100%', padding: '8px 10px', borderRadius: 'var(--radius-md, 8px)', fontWeight: 400 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: t.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)', textTransform: 'uppercase' }}>{t.intent || 'chat'}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: t.success ? 'var(--color-accent)' : 'var(--color-error, #ff453a)', textTransform: 'none' }}>{t.intent || 'chat'}</span>
                 <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>{timeAgo(t.timestamp)}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' as any }}>{t.userText}</div>
@@ -232,7 +232,7 @@ const NexusUkiPanel: React.FC = () => {
       {/* Reasoning trail */}
       {recentThoughts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Reasoning</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.02em' }}>Reasoning</div>
           {recentThoughts.map((th) => (
             <div key={th.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
               <span style={{ width: 5, height: 5, borderRadius: 9999, flexShrink: 0, background: th.success ? 'var(--color-accent-fill)' : 'var(--color-error, #ff453a)' }} />
@@ -247,7 +247,7 @@ const NexusUkiPanel: React.FC = () => {
       {/* Knowledge nodes */}
       {topNodes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Knowledge</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.02em' }}>Knowledge</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {topNodes.map((n) => (
               <span key={n.id} style={{ ...chip, borderColor: (n.color || 'var(--color-border-subtle)') }} title={`${n.category} · weight ${n.weight}`}>

@@ -80,6 +80,8 @@ export const SETTINGS_INDEX: SettingIndexEntry[] = [
 
   // ---------------- Performance ----------------
   { label: 'Daily Auto-Optimize', section: 'performance', desc: 'Re-detect hardware and optimize each day', keywords: 'tier hardware optimize performance' },
+  { label: 'Resource Saver', section: 'performance', desc: 'Performance mode: Resource Saver, Balanced, Performance or Maximum (Automatic picks one for this PC)', keywords: 'low power battery slow computer performance mode tier balanced automatic' },
+  { label: 'Awake background tabs', section: 'performance', desc: 'How many Browser tabs keep a live page; the rest sleep', keywords: 'browser tabs sleep suspend memory resource saver' },
   { label: 'Predictive Pre-warm', section: 'performance', desc: 'Pre-warm the next likely app while idle', keywords: 'prewarm predictive performance' },
 
   // ---------------- System Monitor ----------------

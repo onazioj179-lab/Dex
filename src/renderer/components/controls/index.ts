@@ -17,3 +17,8 @@ export {
 } from './SegmentedControl';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Pill, type PillProps } from './Pill';
+export {
+  DexCapsuleGroup, DexCapsuleDivider, DexCapsuleButton, DexFloatingSearch, DexDisclosureGroup, CapsuleGlyph,
+  type DexCapsuleGroupProps, type DexCapsuleButtonProps, type DexFloatingSearchProps, type DexDisclosureGroupProps,
+} from './Capsule';
+export * from './capsuleTokens';

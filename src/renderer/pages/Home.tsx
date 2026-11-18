@@ -33,7 +33,7 @@ import { CreatorMark } from '../shell/CreatorMark';
 
 const SPATIAL_MENU_ICONS: Record<string, string> = {
   enter: 'maximize', fit: 'maximize', 'zoom-in': 'zoom-in', 'zoom-out': 'minus', actual: 'search',
-  back: 'arrow-left', windows: 'layers', minimap: 'grid', leave: 'close',
+  back: 'arrow-left', windows: 'layers', leave: 'close',
 };
 
 // App icon images
@@ -847,7 +847,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                         </div>
                       )}
                       {p.mode === 'live' && (
-                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LIVE</div>
+                        <div style={{ position: 'absolute', top: 4, left: 4, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,59,48,0.7)', fontSize: 8, fontWeight: 700, color: '#fff', letterSpacing: '0.01em', textTransform: 'none' }}>LIVE</div>
                       )}
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 'var(--space-3) 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,0.6))', fontSize: 10, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', letterSpacing: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
@@ -863,7 +863,7 @@ const WallpaperPickerModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                 {renderGrid(imagePresets)}
                 <div className="dex-label-caps" style={{ marginBottom: 10 }}>Presets</div>
                 {renderGrid(staticPresets)}
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,59,48,0.6)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Black & Red</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,59,48,0.6)', textTransform: 'none', letterSpacing: '0.01em', marginBottom: 10 }}>Black & Red</div>
                 {renderGrid(redPresets)}
                 <div className="dex-label-caps" style={{ marginBottom: 10 }}>Live Wallpapers</div>
                 {renderGrid(livePresets)}

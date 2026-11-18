@@ -11,6 +11,7 @@
  */
 
 import { toMediaUrl } from '../utils/mediaUrl';
+import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
@@ -351,6 +352,7 @@ async function fileOp(channel: string, ...args: unknown[]): Promise<unknown> {
 }
 
 export const Files: React.FC = () => {
+  const winId = useAppWindowId('files'); // this window ('files' or 'files~2', ...)
   const { confirm, ConfirmHost } = useConfirm();
   // ===== PATTERN LEARNING =====
   useAppTracking('files');
@@ -516,6 +518,7 @@ export const Files: React.FC = () => {
   const ukiCtxRef = useRef({ currentPath, selectedFile, selectedFiles, files, selectedLocation, activeCollection });
   useEffect(() => { ukiCtxRef.current = { currentPath, selectedFile, selectedFiles, files, selectedLocation, activeCollection }; });
   useEffect(() => {
+    if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('files', () => {
       const c = ukiCtxRef.current;
       const sel = c.selectedFile ? c.files.find(f => f.path === c.selectedFile) : undefined;
@@ -549,7 +552,7 @@ export const Files: React.FC = () => {
       unregisterUkiAppContext('files');
       unregisterUkiAppAction('files.listCurrentFolder');
     };
-  }, []);
+  }, [winId]);
 
   const saveSmartFolder = useCallback(() => {
     if (!filters.query && filters.category === 'all' && filters.dateRange === 'all' && filters.sizeRange === 'all') return;
@@ -755,7 +758,7 @@ export const Files: React.FC = () => {
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       const target = e.target as HTMLElement | null;
       // Don't hijack typing in inputs (rename, search, etc.)
       const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -911,7 +914,7 @@ export const Files: React.FC = () => {
   // Keyboard shortcuts for file operations
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard && !isTypingTarget(e.target)) {
         e.preventDefault();
         handlePasteFile();
@@ -1308,7 +1311,7 @@ export const Files: React.FC = () => {
   // hijacked, and gated on there being a selection (or a staged batch).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'files')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       const t = e.target as HTMLElement | null;
       const inEditable = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
       if (inEditable) return;
@@ -1745,7 +1748,7 @@ export const Files: React.FC = () => {
       {/* Main Content */}
       <div style={styles.main}>
         {/* Toolbar */}
-        <div style={styles.toolbar}>
+        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">
           <div style={styles.navButtons}>
             <button
               className="dex-toolbtn"
@@ -2027,12 +2030,12 @@ export const Files: React.FC = () => {
             <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
             <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
-            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
-            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
-            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
+            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
+            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
-            <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
-            <button onClick={clearSelection} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
+            <button onClick={() => handleSelectAll()} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
+            <button onClick={clearSelection} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
           </div>
         )}
 
@@ -2562,9 +2565,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10.5px',
     fontWeight: 600,
     color: 'var(--color-text-tertiary)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     padding: 'var(--space-3) 10px 4px',
-    letterSpacing: '0.8px',
+    letterSpacing: '0.01em',
   },
   sidebarItem: {
     display: 'flex',
@@ -2590,14 +2593,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   
   // Toolbar
+  // Floating toolbar (shared frosted material, inset and rounded) instead of
+  // a full-width boxed strip.
   toolbar: {
-    minHeight: '52px',
+    minHeight: '44px',
     display: 'flex',
     alignItems: 'center',
-    padding: '10px var(--space-4)',
+    padding: '4px 10px',
     gap: 'var(--space-2)',
-    borderBottom: '1px solid var(--pg-border)',
-    background: 'var(--pg-toolbar)',
+    margin: '8px 8px 4px',
+    borderRadius: 14,
   },
   navButtons: {
     display: 'flex',

@@ -15,6 +15,7 @@
 //
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useAppWindowId } from '../../services/appWindows';
 import { createPortal } from 'react-dom';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 
@@ -84,6 +85,7 @@ interface SketchPadProps {
 }
 
 export default function SketchPad({ mode, onInsert, onCancel }: SketchPadProps) {
+  const winId = useAppWindowId('notes'); // this window ('notes' or 'notes~2', ...)
   const W = 640;
   const H = mode === 'signature' ? 220 : 380;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,7 +105,7 @@ export default function SketchPad({ mode, onInsert, onCancel }: SketchPadProps) 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!keyEventForApp(e, 'notes')) return; // key meant for another app
+      if (!keyEventForApp(e, winId)) return; // key meant for another app
       if (e.key === 'Escape') onCancel();
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); setStrokes((s) => s.slice(0, -1)); }
     };

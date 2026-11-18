@@ -271,7 +271,7 @@ const categoryRow: React.CSSProperties = {
   padding: `${space[2]}px ${space[3]}px`,
   fontSize: fontSize.xs,
   fontWeight: fontWeight.semibold,
-  textTransform: 'uppercase',
+  textTransform: 'none',
   letterSpacing: 0.6,
   color: 'var(--color-text-secondary)',
   background: 'var(--color-bg-inset, #101012)',

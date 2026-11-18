@@ -133,7 +133,7 @@ const PomodoroTimer: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: accentColor, boxShadow: running ? `0 0 4px ${accentColor}` : 'none', transition: 'box-shadow 0.3s ease' }} />
-                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 600, letterSpacing: '0.01em', textTransform: 'none' }}>
                     {idle ? 'Ready' : running ? PHASE_LABELS[phase] : 'Paused'}
                   </span>
                 </div>

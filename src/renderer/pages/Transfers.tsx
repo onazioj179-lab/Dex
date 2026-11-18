@@ -1116,12 +1116,12 @@ const Transfers: React.FC = () => {
 
             {activeTransfers.length === 0 && pendingDevices.length === 0 && failedList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px var(--space-5)', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                <div style={{ width: 56, height: 56, borderRadius: 10, background: 'rgba(50,213,75,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-3)' }}>
-                  <span style={{ color: 'var(--color-success, #32D54B)', display: 'flex' }}>{Icons.send}</span>
+                <div style={{ width: 56, height: 56, borderRadius: 9999, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-3)' }}>
+                  <span style={{ color: 'var(--color-text-secondary)', display: 'flex' }}>{Icons.send}</span>
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Pick a device, then the files to send</div>
-                <button onClick={() => setActiveTab('devices')} style={{ padding: '6px var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Choose a Device</button>
+                <button onClick={() => setActiveTab('devices')} style={{ padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Choose a Device</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1137,8 +1137,8 @@ const Transfers: React.FC = () => {
                   const dispSpeed = (t.speed && t.speed > 0 ? t.speed : (stat?.speed ?? 0));
                   const dispEta = (t.timeRemainingMs && t.timeRemainingMs > 0 ? t.timeRemainingMs : (stat?.etaMs ?? 0));
                   return (
-                  <div key={t.transferId} onContextMenu={e => showCtxMenu(e, buildTransferCtxItems(t))} className="dex-liquid-glass" style={{
-                    padding: 'var(--space-4) 18px', borderRadius: 'var(--radius-xl)',
+                  <div key={t.transferId} onContextMenu={e => showCtxMenu(e, buildTransferCtxItems(t))} className="dex-mat-frosted dex-enter" style={{
+                    padding: '14px 16px', borderRadius: 18,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div>
@@ -1146,13 +1146,13 @@ const Transfers: React.FC = () => {
                           {title}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                          {t.status === 'complete' ? 'Done' : `${formatSpeed(dispSpeed)} | ETA: ${formatTime(dispEta)}`}
+                          {t.status === 'complete' ? '✓ Done' : t.status === 'awaiting-approval' || t.status === 'connecting' ? 'Waiting…' : `${formatSpeed(dispSpeed)} · ${formatTime(dispEta)} left`}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => cancelTransfer(t.transferId)} title="Cancel" aria-label="Cancel transfer" style={{
-                          width: 28, height: 28, borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,69,58,0.3)',
-                          background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
+                          width: 28, height: 28, borderRadius: 9999, border: 'none',
+                          background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-secondary)',
                           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>{Icons.close}</button>
                       </div>

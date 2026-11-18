@@ -1,0 +1,74 @@
+{
+  "label": "before",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/before-exe/dex-tauri.exe",
+  "at": "2026-11-17T19:27:30.558Z",
+  "machine": {
+    "os": "Windows 10.0.26300",
+    "cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+    "logicalCores": 8,
+    "ramGB": 16
+  },
+  "method": "release exe, isolated DEX_DATA_DIR + WebView2 profile, driven over CDP; timings are wall clock from process spawn",
+  "cold": {
+    "spawnToCdpMs": 1535,
+    "spawnToDesktopUsableMs": 2264,
+    "domContentLoadedMs": 436,
+    "loadMs": 440,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 161
+  },
+  "idleShell": {
+    "cpuPctOfOneCore": 4.6,
+    "processes": 7,
+    "workingSetMB": 802,
+    "privateMB": 487
+  },
+  "appLaunchMs": {
+    "notes": 26,
+    "files": 54,
+    "settings": 57,
+    "ledger": 47,
+    "calculator": null,
+    "calendar": 49,
+    "tasks": 45,
+    "dexcode": 61,
+    "taskmanager": 37,
+    "games": 38
+  },
+  "idleWithApps": {
+    "apps": 10,
+    "cpuPctOfOneCore": 20.6,
+    "processes": 7,
+    "workingSetMB": 623,
+    "privateMB": 344
+  },
+  "warm": {
+    "spawnToCdpMs": 550,
+    "spawnToDesktopUsableMs": 1105,
+    "domContentLoadedMs": 368,
+    "loadMs": 371,
+    "firstContentfulPaintMs": null,
+    "jsHeapMB": 12,
+    "domNodes": 134
+  },
+  "browser": {
+    "savedTabs": 100,
+    "tabsKeptAfterRestore": 100,
+    "openMs": 22,
+    "livePageTargets": 1,
+    "settleMs": 10050,
+    "cpuPctOfOneCore": 2.3,
+    "processes": 8,
+    "workingSetMB": 918,
+    "privateMB": 578
+  },
+  "browserAfterVisits": {
+    "visited": 20,
+    "livePageTargets": 1,
+    "cpuPctOfOneCore": 4.4,
+    "processes": 8,
+    "workingSetMB": 762,
+    "privateMB": 452
+  }
+}

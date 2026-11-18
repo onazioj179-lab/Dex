@@ -108,3 +108,15 @@ describe('meta trophy repair (revoke early unlocks)', () => {
     expect(JSON.parse(localStorage.getItem('dex-engagement-state')!).metaRepairV1).toBe(true);
   });
 });
+
+describe('Trophies tracking switch', () => {
+  it('with Track progress off, nothing new unlocks', async () => {
+    const { checkAchievements } = await import('../../src/renderer/services/engagement');
+    const { ACHIEVEMENTS } = await import('../../src/renderer/services/achievementsCatalog');
+    const st = { stats: { appsUsed: ['notes', 'files', 'browser', 'settings'], totalSessions: 50 } as never, unlockedAchievements: [], unlockedAt: {}, lastTipIndex: 0, dismissedTips: [] };
+    localStorage.setItem('dex-settings', JSON.stringify({ achievementsEnabled: false }));
+    expect(checkAchievements(st as never).newUnlocks).toHaveLength(0);
+    localStorage.setItem('dex-settings', '{}');
+    expect(ACHIEVEMENTS.length).toBeGreaterThan(0);
+  });
+});

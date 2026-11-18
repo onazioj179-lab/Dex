@@ -21,7 +21,7 @@ import { isReduceMotion } from '../utils/MotionController';
 import {
   type Camera, type Rect, type ArrangeKind, type ZoomLimits, type Guide, type AlignKind,
   DEFAULT_LIMITS, HOME_CAMERA, sanitizeCamera, zoomAt, zoomToAt, panBy, fitRect,
-  boundsOf, lerpCamera, easeOutCubic, arrange, viewRect, alignRects, distributeRects,
+  boundsOf, lerpCamera, easeOutCubic, arrange, viewRect, alignRects, distributeRects, fitZonesToWindows,
   presetZoneRects,
 } from '../shell/spatial/spatialMath';
 
@@ -242,7 +242,12 @@ export const useSpatialStore = create<SpatialState>()(
         },
         toggleMinimap: () => set({ minimap: !get().minimap }),
         setSnapGrid: (on) => set({ snapGrid: on }),
-        setWindows: (windows) => set({ windows }),
+        // Zones follow their apps: refit on every window sync (no-op when
+        // nothing moved, so it costs nothing at rest).
+        setWindows: (windows) => {
+          const zones = fitZonesToWindows(get().zones, Object.values(windows));
+          set(zones === get().zones ? { windows } : { windows, zones });
+        },
         setViewport: (w, h) => {
           if (!(w > 0 && h > 0)) return; // ignore pre-layout zero sizes
           const v = get().viewport;

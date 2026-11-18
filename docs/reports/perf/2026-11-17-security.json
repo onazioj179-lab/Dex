@@ -1,0 +1,146 @@
+{
+  "at": "2026-11-18T03:59:12.206Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p22b-exe/dex-tauri.exe",
+  "passed": 21,
+  "failed": 0,
+  "results": [
+    {
+      "name": "fresh profile: onboarding not started",
+      "pass": true,
+      "observed": "not-started"
+    },
+    {
+      "name": "fresh profile: DDrop discovery refused (onboarding-required)",
+      "pass": true,
+      "observed": {
+        "error": "onboarding-required",
+        "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        "ok": false,
+        "success": false
+      }
+    },
+    {
+      "name": "fresh profile: UKI command refused (onboarding-required)",
+      "pass": true,
+      "observed": {
+        "error": "onboarding-required",
+        "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        "ok": false,
+        "success": false
+      }
+    },
+    {
+      "name": "complete refused without the required decision",
+      "pass": true,
+      "observed": {
+        "error": "the required decision is not on record",
+        "ok": false
+      }
+    },
+    {
+      "name": "tampered onboarding.json (claims done, no documents accepted) is not trusted",
+      "pass": true,
+      "observed": "not-started"
+    },
+    {
+      "name": "accepting stale document versions is refused",
+      "pass": true,
+      "observed": "the documents changed; review the current versions"
+    },
+    {
+      "name": "accepting the current versions records the decision",
+      "pass": true,
+      "observed": "in-progress"
+    },
+    {
+      "name": "privileged command refused",
+      "pass": true,
+      "observed": "UKI does not run commands that need administrator rights or change system settings. Run it yourself in Terminal if you mean to."
+    },
+    {
+      "name": "elevation (-Verb RunAs) refused",
+      "pass": true,
+      "observed": "UKI does not run commands that need administrator rights or change system settings. Run it yourself in Terminal if you mean to."
+    },
+    {
+      "name": "Windows folder refused as working folder",
+      "pass": true,
+      "observed": "UKI cannot run commands inside Windows or program folders"
+    },
+    {
+      "name": "relative working folder refused",
+      "pass": true,
+      "observed": "the working folder must be a full path"
+    },
+    {
+      "name": "approved command runs and its output is captured",
+      "pass": true,
+      "observed": {
+        "status": "completed",
+        "exit": 0
+      }
+    },
+    {
+      "name": "secret-looking environment variables are not passed to the command",
+      "pass": true,
+      "observed": [
+        "DEX_UKI_OK",
+        "secret=",
+        "task=1"
+      ]
+    },
+    {
+      "name": "task runs marked DEX_UKI_TASK=1",
+      "pass": true,
+      "observed": null
+    },
+    {
+      "name": "cancel stops a running command",
+      "pass": true,
+      "observed": "cancelled"
+    },
+    {
+      "name": "timeout stops a command that runs too long",
+      "pass": true,
+      "observed": "timed-out"
+    },
+    {
+      "name": "history lists the tasks",
+      "pass": true,
+      "observed": 3
+    },
+    {
+      "name": "web page in a Browser tab cannot reach DEX native IPC",
+      "pass": true,
+      "observed": {
+        "exposed": "{\"tauri\":\"object\",\"dex\":\"undefined\",\"ipc\":\"object\"}",
+        "tryIpc": "refused:Command dex_ipc not allowed by ACL"
+      }
+    },
+    {
+      "name": "download starts in the background and returns at once",
+      "pass": true,
+      "observed": {
+        "id": "dl_sectest_1",
+        "started": true,
+        "success": true
+      }
+    },
+    {
+      "name": "download reports progress and completes with the full size",
+      "pass": true,
+      "observed": {
+        "events": 2,
+        "final": {
+          "size": 3145728,
+          "fileName": "dex-sectest-1794974349638.bin"
+        }
+      }
+    },
+    {
+      "name": "test download removed again",
+      "pass": true,
+      "observed": "dex-sectest-1794974349638.bin"
+    }
+  ]
+}

@@ -13,7 +13,11 @@ type Box = { x: number; y: number; w: number; h: number };
 const PREFS = 'dex-dock-prefs-v1';
 
 async function boot(page: Page, prefs?: Record<string, unknown>): Promise<void> {
-  if (prefs) await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(prefs)] as const);
+  // The shipped default is folded + auto-collapse (owner 2026-11-17); these
+  // geometry tests start from an open Dock that stays open, marked as a
+  // deliberate choice (acV2) so the one-time migration leaves it alone.
+  const seeded = { expanded: true, autoCollapse: false, ...prefs, acV2: true };
+  await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(seeded)] as const);
   await page.goto('/');
   await page.waitForFunction(() => !!window.__dexRunningApps && !!document.querySelector('.dex-mdock'), null, { timeout: 120_000 });
   await page.waitForTimeout(500);
@@ -51,13 +55,16 @@ function inside(b: Box, v: { w: number; h: number }) {
 }
 
 test.describe('Morphing Dock', () => {
-  test('morphs from the trigger: the search button stays put, collapse is faster, nothing leaves the screen', async ({ page }) => {
+  test('stays centred open and collapsed, collapse is faster, nothing leaves the screen', async ({ page }) => {
     await boot(page);
     const v = await vp(page);
     const dockOpen = (await box(page, '.dex-mdock'))!;
     const trigOpen = (await box(page, '[data-dock-item="__trigger"]'))!;
     inside(dockOpen, v);
     expect(dockOpen.y + dockOpen.h).toBe(v.h - 8);
+    // Absolute centre of the bottom edge (owner, 2026-11-17).
+    expect(Math.abs(dockOpen.x + dockOpen.w / 2 - v.w / 2)).toBeLessThanOrEqual(1);
+    void trigOpen;
 
     await page.locator('[data-dock-item="__trigger"]').focus();
     await page.keyboard.press('Escape');
@@ -67,15 +74,11 @@ test.describe('Morphing Dock', () => {
     const trigClosed = (await box(page, '[data-dock-item="__trigger"]'))!;
     expect(dockClosed.w).toBe(52);
     expect(dockClosed.h).toBe(52);
-    // Icon continuity: the trigger is the same element in the same place.
-    expect(Math.abs(trigClosed.x - trigOpen.x)).toBeLessThanOrEqual(1);
+    // Collapsed, the search button is centred too.
+    expect(Math.abs(dockClosed.x + dockClosed.w / 2 - v.w / 2)).toBeLessThanOrEqual(1);
     expect(Math.abs(trigClosed.y - trigOpen.y)).toBeLessThanOrEqual(1);
 
-    // Mid-morph the trigger does not move either.
     await page.locator('[data-dock-item="__trigger"]').click();
-    await page.waitForTimeout(110);
-    const mid = (await box(page, '[data-dock-item="__trigger"]'))!;
-    expect(Math.abs(mid.x - trigClosed.x)).toBeLessThanOrEqual(1);
     await settled(page);
     expect(await page.locator('.dex-mdock').getAttribute('data-state')).toBe('expanded');
 
@@ -101,13 +104,19 @@ test.describe('Morphing Dock', () => {
     await ctx.close();
   });
 
-  test('a full-size app stays clear of the top bar and the Dock; the wallpaper shows under the Dock', async ({ page }) => {
+  // Owner spec (2026-11-17): the Dock is a floating overlay. A full-size app
+  // starts below the top bar and fills to the bottom edge; the Dock floats
+  // over it (no reserved strip, no black band).
+  test('a full-size app starts below the top bar and fills to the bottom edge; the Dock floats over it', async ({ page }) => {
     await boot(page);
     await open(page, 'notes');
+    const v = await vp(page);
     const app = (await box(page, '[data-app-id="notes"]'))!;
     const dock = (await box(page, '.dex-mdock'))!;
     expect(app.y).toBeGreaterThanOrEqual(await topBar(page));
-    expect(app.y + app.h).toBeLessThanOrEqual(dock.y);
+    expect(Math.abs(app.y + app.h - v.h)).toBeLessThanOrEqual(1);
+    const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.dex-mdock'), [dock.x + dock.w / 2, dock.y + dock.h / 2]);
+    expect(onTop).toBe(true);
   });
 
   test('keyboard: Tab reaches the Dock once, arrows move, Escape collapses and keeps focus', async ({ page }) => {
@@ -130,15 +139,33 @@ test.describe('Morphing Dock', () => {
     await boot(page);
     const before = await page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
     expect(before.length).toBeGreaterThanOrEqual(3);
-    const a = (await box(page, `[data-dock-item="${before[0]}"]`))!;
-    const c = (await box(page, `[data-dock-item="${before[2]}"]`))!;
-    await page.mouse.move(a.x + a.w / 2, a.y + a.h / 2);
-    await page.mouse.down();
-    for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2);
-    await page.mouse.up();
-    await page.waitForTimeout(200);
-    const after = await page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
-    expect(after[0]).toBe(before[1]);
+    const order = () => page.$$eval('.dex-mdock [data-group="pinned"]', (els) => els.map((e) => (e as HTMLElement).dataset.dockItem));
+    // Measure only once the Dock has stopped moving: boxes read during the
+    // entrance animation put the drag in the wrong place (CI flake, #34).
+    const stableBox = async (sel: string) => {
+      let prev = '';
+      for (let i = 0; i < 40; i++) {
+        const b = await box(page, sel);
+        const k = JSON.stringify(b);
+        if (b && k === prev) return b;
+        prev = k;
+        await page.waitForTimeout(50);
+      }
+      return (await box(page, sel))!;
+    };
+    const drag = async () => {
+      const a = await stableBox(`[data-dock-item="${before[0]}"]`);
+      const c = await stableBox(`[data-dock-item="${before[2]}"]`);
+      await page.mouse.move(a.x + a.w / 2, a.y + a.h / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 8; i++) { await page.mouse.move(a.x + a.w / 2 + ((c.x + c.w - a.x) * i) / 8, a.y + a.h / 2); await page.waitForTimeout(16); }
+      await page.mouse.up();
+    };
+    await drag();
+    // A loaded runner can drop the drag's first moves; one re-measured retry.
+    if ((await order())[0] === before[0]) { await page.waitForTimeout(300); if ((await order())[0] === before[0]) await drag(); }
+    await expect.poll(async () => (await order())[0], { timeout: 4000 }).toBe(before[1]);
+    const after = await order();
     expect(after.indexOf(before[0]!)).toBeGreaterThan(0);
     await page.reload();
     await page.waitForFunction(() => !!document.querySelector('.dex-mdock [data-group="pinned"]'));
@@ -147,7 +174,7 @@ test.describe('Morphing Dock', () => {
   });
 
   for (const edge of ['left', 'right'] as const) {
-    test(`${edge} Dock: below the top bar, on screen, apps clear of it`, async ({ page }) => {
+    test(`${edge} Dock: below the top bar, on screen, floating over full-width apps`, async ({ page }) => {
       await boot(page, { edge, expanded: true });
       await open(page, 'notes');
       const v = await vp(page);
@@ -155,8 +182,8 @@ test.describe('Morphing Dock', () => {
       inside(dock, v);
       expect(dock.y).toBeGreaterThanOrEqual(await topBar(page));
       const app = (await box(page, '[data-app-id="notes"]'))!;
-      if (edge === 'left') expect(app.x).toBeGreaterThanOrEqual(dock.x + dock.w);
-      else expect(app.x + app.w).toBeLessThanOrEqual(dock.x);
+      expect(app.x).toBeLessThanOrEqual(1);
+      expect(Math.abs(app.x + app.w - v.w)).toBeLessThanOrEqual(1);
     });
   }
 

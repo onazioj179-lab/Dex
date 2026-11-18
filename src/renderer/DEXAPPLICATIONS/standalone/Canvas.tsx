@@ -1640,8 +1640,8 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 600,
     color: 'var(--color-text-primary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
+    textTransform: 'none',
+    letterSpacing: '0.01em',
   },
   // Text buttons in the Boards row (smallBtn is a fixed 24px icon button).
   textBtn: {

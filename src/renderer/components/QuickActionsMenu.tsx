@@ -18,6 +18,7 @@
  */
 
 import React, { useState, useEffect, useCallback, memo } from 'react';
+import { useOverlay } from '../services/overlayStack';
 import { useClipboardStore, detectClipKind, type ClipKind } from '../store/clipboardStore';
 import { useRunningApps } from '../store/runningApps';
 
@@ -67,12 +68,8 @@ export const QuickActionsMenu: React.FC = () => {
 
   const close = useCallback(() => setCtx(null), []);
 
-  useEffect(() => {
-    if (!ctx) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [ctx, close]);
+  // Escape goes through the shared overlay stack: only the top overlay closes.
+  useOverlay(!!ctx, close, { dismissOnOutside: false });
 
   if (!ctx) return null;
 

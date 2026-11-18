@@ -42,7 +42,7 @@ export function ProBadge({ gate, currentPlan, hideWhenUnlocked = true }: ProBadg
         fontWeight: 600,
         borderRadius: radius.full,
         letterSpacing: 0.4,
-        textTransform: 'uppercase',
+        textTransform: 'none',
       }}
     >{label}</span>
   );

@@ -253,13 +253,29 @@ export function magneticSnap(moving: Rect, others: Rect[], threshold: number): {
   return { x, y, guides };
 }
 
-export type AlignKind = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
+export type AlignKind = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom'
+  | 'same-width' | 'same-height' | 'same-size';
 
-/** Align rects to the extreme (or centre) of their shared bounds. Sizes kept. */
+/**
+ * Align rects to the extreme (or centre) of their shared bounds, sizes kept --
+ * or, for the `same-*` kinds, give every rect the size of the largest one
+ * (positions kept), so a row of apps lines up at one size.
+ */
 export function alignRects(items: ArrangeItem[], kind: AlignKind): Record<string, Rect> {
   const b = boundsOf(items);
   const out: Record<string, Rect> = {};
   if (!b) return out;
+  if (kind === 'same-width' || kind === 'same-height' || kind === 'same-size') {
+    const ref = items.reduce((m, it) => (it.w * it.h > m.w * m.h ? it : m), items[0]);
+    for (const it of items) {
+      out[it.id] = {
+        x: it.x, y: it.y,
+        w: kind === 'same-height' ? it.w : ref.w,
+        h: kind === 'same-width' ? it.h : ref.h,
+      };
+    }
+    return out;
+  }
   for (const it of items) {
     let { x, y } = it;
     if (kind === 'left') x = b.x;
@@ -312,4 +328,34 @@ export function pinchCamera(cam: Camera, prev: [{ x: number; y: number }, { x: n
 export function gestureCamera(cam: Camera, d: { cx: number; cy: number; dx: number; dy: number; scale: number }, limits: ZoomLimits = DEFAULT_LIMITS): Camera {
   const zoomed = zoomAt(cam, d.cx, d.cy, d.scale, limits);
   return panBy(zoomed, d.dx, d.dy);
+}
+
+/**
+ * Zones hug the apps inside them: a zone that holds windows (centre inside)
+ * becomes their bounds plus `pad`, never smaller than the zone minimum, so it
+ * grows when an app is dropped in or resized and shrinks when one leaves.
+ * Empty zones keep their place and size. Returns the same array when nothing
+ * changed (cheap to call on every window sync).
+ */
+export function fitZonesToWindows<Z extends Rect & { id: string }>(
+  zones: Z[], windows: Array<Rect & { minimized?: boolean }>, pad = 24, min = { w: 200, h: 150 },
+): Z[] {
+  let changed = false;
+  const out = zones.map((z) => {
+    const inside = windows.filter((w) => {
+      if (w.minimized) return false;
+      const cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+      return cx >= z.x && cx <= z.x + z.w && cy >= z.y && cy <= z.y + z.h;
+    });
+    if (!inside.length) return z;
+    const b = boundsOf(inside)!;
+    const w = Math.max(min.w, Math.round(b.w + pad * 2));
+    const h = Math.max(min.h, Math.round(b.h + pad * 2));
+    const x = Math.round(b.x + b.w / 2 - w / 2);
+    const y = Math.round(b.y + b.h / 2 - h / 2);
+    if (x === z.x && y === z.y && w === z.w && h === z.h) return z;
+    changed = true;
+    return { ...z, x, y, w, h };
+  });
+  return changed ? out : zones;
 }

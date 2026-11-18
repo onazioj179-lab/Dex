@@ -16,6 +16,7 @@
  * puts a numbers-only summary on the clipboard when you ask for it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { SegmentedControl } from './controls';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useUkiTasks } from '../store/ukiTasksStore';
 import {
@@ -469,11 +470,7 @@ const ResourcesPane: React.FC<ResourcesPaneProps> = ({ available, visible, self,
         title="DEX resource use"
         sub={!visible ? 'Paused while hidden' : last ? `Every ${SAMPLE_MS / 1000} s · last sample ${fmtClock(last)}` : hint}
         action={
-          <div role="radiogroup" aria-label="Time range" style={S.segment}>
-            {RANGES.map((x) => (
-              <button key={x.id} type="button" role="radio" aria-checked={x.id === range} onClick={() => onRange(x.id)} style={{ ...S.segBtn, ...(x.id === range ? S.segBtnOn : null) }}>{x.label}</button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Time range" size="sm" options={RANGES.map((x) => ({ value: x.id, label: x.label }))} value={range} onChange={(v) => onRange(v)} />
         }
       />
       {sampleError && <p role="alert" style={{ ...S.empty, color: 'var(--color-warning)' }}>The native sampler did not answer. Figures resume on the next successful sample.</p>}
@@ -563,7 +560,7 @@ const S: Record<string, React.CSSProperties> = {
   main: { flex: 1, minWidth: 0, overflow: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   head: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minHeight: 28 },
   title: { margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' },
-  h3: { margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  h3: { margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.01em' },
   subtle: { fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 },
   caption: { margin: 0, fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 },
   empty: { margin: 0, padding: '6px 0', fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 },

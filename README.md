@@ -3,12 +3,12 @@
 A desktop environment for Windows that brings notes, files, a web browser,
 creative tools and an AI assistant into one workspace.
 
-**Version:** 7.0.1 · **Creator:** Onazi oJ · **License:** [DEX Software License v1.0](LICENSE)
+**Version:** 7.0.2 (001z) · **Creator:** Onazi oJ · **License:** [DEX Software License v1.0](LICENSE)
 
-> **Release status.** The source in this repository is version 7.0.1. The 7.0.1
+> **Release status.** The source in this repository is version 7.0.2 (001z). The 7.0.2
 > installer has not been published yet; the newest published installer is
 > [v6.1.0](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0). What
-> remains before 7.0.1 ships is listed in [DEX_REMAINING_WORK.md](DEX_REMAINING_WORK.md).
+> remains before 7.0.2 ships is listed in [DEX_REMAINING_WORK.md](DEX_REMAINING_WORK.md).
 
 ---
 
@@ -106,7 +106,7 @@ entry and one upgrade path.
 ### Verifying a download
 
 ```powershell
-Get-FileHash .\DEX_7.0.1_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\DEX_7.0.2_x64-setup.exe -Algorithm SHA256
 ```
 
 Compare the result with the checksum listed on the release page.

@@ -12,6 +12,7 @@
  * No server. The UI just orchestrates the backupSync service.
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import {
   exportEncrypted,
   importEncrypted,
@@ -302,23 +303,15 @@ const BackupSync: React.FC = () => {
                 app v{pending.payload.appVersion}
               </div>
 
-              <div style={styles.segRow} role="radiogroup" aria-label="Restore mode">
-                {(['merge', 'replace'] as RestoreMode[]).map((m) => (
-                  <button
-                    key={m}
-                    className="bks-seg"
-                    role="radio"
-                    aria-checked={restoreMode === m}
-                    onClick={() => setRestoreMode(m)}
-                    style={{
-                      ...styles.seg,
-                      ...(restoreMode === m ? styles.segActive : {}),
-                    }}
-                  >
-                    {m === 'merge' ? 'Merge (keep newer)' : 'Replace (overwrite)'}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                aria-label="Restore mode"
+                size="md"
+                fill
+                options={[{ value: 'merge', label: 'Merge (keep newer)' }, { value: 'replace', label: 'Replace (overwrite)' }] as { value: RestoreMode; label: string }[]}
+                value={restoreMode}
+                onChange={(m) => setRestoreMode(m)}
+                style={{ marginBottom: 6 }}
+              />
               <p style={styles.segHelp}>
                 {restoreMode === 'merge'
                   ? 'Per key, keeps whichever value is newer. Local data not in the backup is left alone.'
@@ -514,7 +507,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardLabel: {
     fontSize: '12px',
     fontWeight: 600,
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: '0.4px',
     color: 'var(--color-text-secondary)',
     marginBottom: 'var(--space-2)',
@@ -633,7 +626,7 @@ const styles: Record<string, React.CSSProperties> = {
   summaryGrid: { display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' },
   stat: { textAlign: 'center', minWidth: '54px' },
   statValue: { fontSize: '18px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
-  statLabel: { fontSize: '10.5px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.3px' },
+  statLabel: { fontSize: '10.5px', color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: '0.3px' },
   errList: { margin: 'var(--space-2) 0 0 0', padding: '0 0 0 var(--space-4)' },
   errItem: { fontSize: '11.5px', color: 'var(--color-error, #ff453a)', lineHeight: 1.5 },
   reloadNote: { fontSize: '11.5px', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)' },

@@ -225,7 +225,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     fontWeight: 600,
     borderRadius: 'var(--radius-sm)',
-    textTransform: 'uppercase',
+    textTransform: 'none',
     letterSpacing: '0.03em',
   },
   cardActions: {
@@ -1875,7 +1875,7 @@ const CollabHub: React.FC = () => {
 
                         {/* Shared synced scratch note */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
                             Shared scratch note · synced across windows
                           </div>
                           <AssistedTextarea
@@ -1898,7 +1898,7 @@ const CollabHub: React.FC = () => {
 
                         {/* Live cross-window chat */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
                             Live chat · {liveChat.length} message{liveChat.length === 1 ? '' : 's'} this session
                           </div>
                           <div
@@ -2042,7 +2042,7 @@ const CollabHub: React.FC = () => {
 
                       {/* Presence list */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
                           Members · {activeRoom.members.length}
                         </div>
                         {[...activeRoom.members]
@@ -2088,7 +2088,7 @@ const CollabHub: React.FC = () => {
 
                     {/* Activity timeline */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-tertiary, #8e8e93)' }}>
                         Activity timeline
                       </div>
                       {[...activeRoom.activity].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30).map(a => (

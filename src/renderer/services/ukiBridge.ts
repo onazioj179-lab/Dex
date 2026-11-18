@@ -14,10 +14,62 @@ import type { UkiUIState } from '../store/ukiStore';
 import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
 import { useRunningApps } from '../store/runningApps';
 import { readDexSetting } from '../hooks/useDexSetting';
+import { isTauri } from './platform/tauriCompat';
 
 let initialized = false;
 let recognition: any = null;
 let shouldKeepListening = false;
+// Native (Windows online dictation) session: listener removers, when active.
+let nativeSpeechOff: Array<() => void> | null = null;
+
+function onNative(dex: any, channel: string, fn: (...a: unknown[]) => void): () => void {
+  const ret = dex?.on?.(channel, fn);
+  return () => { if (typeof ret === 'function') ret(); else dex?.off?.(channel, fn); };
+}
+
+/**
+ * Desktop app: UKI listens through Windows' own speech recognizer (online
+ * dictation, `speech:*` native channels). WebView2 has a Web Speech object but
+ * no speech service behind it, so it never started. Returns false when the
+ * native path is not available (web preview), so the caller falls back.
+ */
+function startNativeSpeech(dex: any): boolean {
+  if (!isTauri() || !dex?.invoke) return false;
+  const store = useUkiStore;
+  shouldKeepListening = true;
+  const last = (a: unknown[]) => a[a.length - 1] as { text?: string; error?: string } | undefined;
+  nativeSpeechOff = [
+    onNative(dex, 'speech:hypothesis', (...a) => { const t = last(a)?.text; if (t) store.getState().setPartialTranscript(t); }),
+    onNative(dex, 'speech:result', (...a) => {
+      const t = (last(a)?.text || '').trim();
+      if (!t) return;
+      store.getState().setTranscript(t);
+      store.getState().setPartialTranscript('');
+      dex?.uki?.transcript?.(t);
+      store.getState().setAudioLevel(0.85);
+      setTimeout(() => store.getState().setAudioLevel(0.2), 120);
+    }),
+    onNative(dex, 'speech:error', (...a) => { const e = last(a)?.error; if (e) store.getState().setError(e); }),
+    onNative(dex, 'speech:ended', () => {
+      store.getState().setAudioLevel(0);
+      // Windows ends a session after long silence; keep listening if still on.
+      if (shouldKeepListening) void dex.invoke('speech:start', { lang: 'en-US' });
+    }),
+  ];
+  void Promise.resolve(dex.invoke('speech:start', { lang: 'en-US' })).then((r: any) => {
+    if (r && r.success === false) {
+      store.getState().setError(r.error || 'Speech recognition could not start.');
+      stopSpeechRecognition();
+    } else {
+      store.getState().setError(null);
+      store.getState().setAudioLevel(0.2);
+    }
+  }).catch((e: unknown) => {
+    store.getState().setError(`Speech recognition could not start: ${String(e)}`);
+    stopSpeechRecognition();
+  });
+  return true;
+}
 let knowledgeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingKnowledgeNodes: Array<{
   id: string;
@@ -62,6 +114,8 @@ function startSpeechRecognition(ipc: any, dex: any): void {
     recognition = null;
     return;
   }
+
+  if (startNativeSpeech(dex)) return;
 
   if (!getUserMedia) {
     store.getState().setError('Microphone access is not available in this environment');
@@ -174,6 +228,12 @@ function startSpeechRecognition(ipc: any, dex: any): void {
 
 function stopSpeechRecognition(): void {
   shouldKeepListening = false;
+  if (nativeSpeechOff) {
+    nativeSpeechOff.forEach((off) => { try { off(); } catch { /* gone */ } });
+    nativeSpeechOff = null;
+    const dex = (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex;
+    void dex?.invoke?.('speech:stop');
+  }
   if (recognition) {
     try {
       recognition.stop();
