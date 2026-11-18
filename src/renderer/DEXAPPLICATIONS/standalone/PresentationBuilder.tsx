@@ -21,6 +21,8 @@ import {
   historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
 } from './presentationDeck';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { takeInboxSlides, SLIDES_IMPORT_EVENT } from './creativeStudio/boardToSlides';
+import { findMissingPictures } from './creativeStudio/resources';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -378,6 +380,22 @@ const PresentationBuilder: React.FC = () => {
       unregisterUkiAppContext('presentation');
       unregisterUkiAppAction('presentation.outline');
     };
+  }, []);
+
+  // Slides sent from the board (Creative Studio › Send to Slides) are appended
+  // as normal, editable, undoable slides and the first one is shown.
+  useEffect(() => {
+    const take = () => {
+      const incoming = takeInboxSlides().map(migrateSlide);
+      if (!incoming.length) return;
+      setSlides((prev) => {
+        setCurrentIdx(prev.length);
+        return [...prev, ...incoming];
+      });
+    };
+    take();
+    window.addEventListener(SLIDES_IMPORT_EVENT, take);
+    return () => window.removeEventListener(SLIDES_IMPORT_EVENT, take);
   }, []);
 
   // ---- Slide ops ----
@@ -874,6 +892,15 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('text')} style={toolbarBtn}>+ Text</button>
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
+          <button style={toolbarBtn} title="Find pictures given as web addresses that do not load now" data-testid="slides-check-pictures" onClick={async () => {
+            const r = await findMissingPictures(slides);
+            const say = (type: string, message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+            if (!r.checked) { say('info', 'All pictures are stored in the deck; nothing can go missing.'); return; }
+            if (!r.missing.length) { say('success', `All ${r.checked} web picture${r.checked > 1 ? 's' : ''} load.`); return; }
+            setCurrentIdx(r.missing[0].slide - 1);
+            setSelectedBlockId(r.missing[0].blockId);
+            say('warning', `${r.missing.length} picture${r.missing.length > 1 ? 's' : ''} did not load (slide${r.missing.length > 1 ? 's' : ''} ${[...new Set(r.missing.map((m) => m.slide))].join(', ')}). Choose a picture from this PC to embed it.`);
+          }}>Check pictures</button>
           <span style={{ width: 8 }} />
           <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />

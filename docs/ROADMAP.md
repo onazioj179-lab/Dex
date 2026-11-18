@@ -53,8 +53,14 @@
 >   before/after (was placeholder squares), native Save dialog via new `fs:writeBase64` (#353). Context Budget Manager
 >   on every provider call (#354). DEX Code Tests tab via Umari + Xack (#355). Files batch Rename… (#356). Bio result
 >   fingerprints + stale flag (#357). Canvas smart guides + locking (#358).
-> - Still not done in Part 24: Creative Studio merge of Canvas/Design/Present (H, beyond guides/locking), component
->   library, asset relinking, missing-font warnings, project packaging; Browser (L, audited: tabs/bookmarks/history/
+> - **Batch 3 (same PR): Creative Studio (#359).** The Canvas window is now Creative Studio with Board and Slides
+>   modes (each the full editor, mounted on first use and kept); opening Presentation lands in Studio › Slides, so a
+>   deck is never edited in two places. Board → "To Slides": each frame becomes an editable slide (reading order,
+>   layout scaled into 960×540, stickies/text → text, rectangles/frames → shapes, images kept), counting what slides
+>   cannot hold (connectors, ellipse outlines, freehand ink). Slides › "Check pictures" finds web-address pictures
+>   that do not load, by slide. There is no separate "Design" app to merge; fonts are the system UI font (no
+>   missing-font case); board and from-PC pictures are embedded (no relinking case).
+> - Still not done in Part 24: reusable component library, a single Studio project file (board + deck); Browser (L, audited: tabs/bookmarks/history/
 >   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
 >   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
 

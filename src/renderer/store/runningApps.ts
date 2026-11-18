@@ -71,6 +71,12 @@ export const useRunningApps = create<RunningAppsState>()(
         // session, an old shortcut, UKI).
         // A window id of an app that has only one window opens that window.
         if (app.id !== baseAppId(app.id) && !supportsMultipleWindows(app.id)) app = { ...app, id: baseAppId(app.id) };
+        // Presentation lives in Creative Studio (the Canvas window) now: open
+        // the Studio in Slides mode so the deck is never edited in two places.
+        if (baseAppId(app.id) === 'presentation') {
+          try { localStorage.setItem('dex-creative-studio-mode', 'slides'); window.dispatchEvent(new CustomEvent('dex-creative-studio-mode', { detail: { mode: 'slides' } })); } catch { /* non-DOM */ }
+          app = { ...app, id: 'canvas', name: APP_DEFINITIONS.canvas?.name ?? 'Creative Studio', icon: APP_DEFINITIONS.canvas?.icon ?? app.icon };
+        }
         if (RETIRED_APPS[baseAppId(app.id)]) {
           try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: RETIRED_APPS[baseAppId(app.id)] } })); } catch { /* non-DOM */ }
           return;
@@ -448,7 +454,7 @@ const APP_DEFINITIONS_RAW: Record<string, { name: string; color: string; icon: s
   colorpicker: { name: 'Colors', color: '#BF5AF2', icon: 'colorpicker', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'creative', description: 'Pick colours, build palettes and copy colour codes' },
   learn: { name: 'Learn', color: '#5E5CE6', icon: 'learn', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Shortcuts, tips and your usage patterns, kept on this computer' },
   collabhub: { name: 'Collab Hub', color: '#5E5CE6', icon: 'collabhub', shortcut: 'Alt+H', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Real-time collaboration for creative projects with sharing, chat, and checkpoints', category: 'productivity' },
-  canvas: { name: 'Canvas', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Whiteboard and drawing: sticky notes, shapes, frames, connectors, images and paint layers', category: 'creative' },
+  canvas: { name: 'Creative Studio', color: '#FF9500', icon: 'canvas', shortcut: 'Alt+D', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Board and Slides in one studio: whiteboard, drawing and diagrams, then turn frames into an editable deck and present it', category: 'creative' },
   creativehub: { name: 'Creative Hub', color: '#5E5CE6', icon: 'palette', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Recent projects, creative apps, templates and storage in one place', category: 'creative' },
   timer: { name: 'Timer', color: '#30D158', icon: 'timer', shortcut: 'Alt+M', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, description: 'Simple countdown timer with presets', category: 'utility' },
 

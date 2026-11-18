@@ -130,6 +130,19 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 // Component
 // ---------------------------------------------------------------------------
 
+import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
+import { setStudioMode } from './creativeStudio/studioMode';
+
+/** True when a drawing layer has any painted pixel (checked only on demand). */
+function hasInk(c: HTMLCanvasElement): boolean {
+  try {
+    const d = c.getContext('2d')?.getImageData(0, 0, c.width, c.height).data;
+    if (!d) return false;
+    for (let i = 3; i < d.length; i += 16) if (d[i] !== 0) return true;
+  } catch { /* unreadable: treat as empty */ }
+  return false;
+}
+
 const Canvas: React.FC = () => {
   const viewRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1384,6 +1397,13 @@ const Canvas: React.FC = () => {
                   <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'rename', value: boards.boards.find(b => b.id === boards.activeId)?.name ?? '' })} aria-label="Rename board" title="Rename board">Rename</button>
                   <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'folder', value: boards.boards.find(b => b.id === boards.activeId)?.folder ?? '' })} aria-label="Move board to folder" title="Move to folder">Folder</button>
                   <button style={s.textBtn} onClick={() => void deleteActiveBoard()} aria-label="Delete board" title="Delete board">Delete</button>
+                  <button style={s.textBtn} data-testid="canvas-send-to-slides" onClick={() => {
+                    const { slides, report } = boardToSlides(objectsRef.current, { hasDrawing: layers.some(l => l.visible && hasInk(l.canvas)) });
+                    if (!sendSlidesToPresentation(slides)) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Nothing to send: add sticky notes, text, shapes or images (frames become slides).' } })); return; }
+                    setStudioMode('slides');
+                    const extra = describeNotCarried(report);
+                    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Added ${report.slides} slide${report.slides > 1 ? 's' : ''} from this board (${report.carried} objects).${extra ? ` ${extra}` : ''}` } }));
+                  }} aria-label="Send board to Slides" title="Each frame becomes a slide (or the whole board if it has no frames)">To Slides</button>
                 </div>
               )}
             </div>
