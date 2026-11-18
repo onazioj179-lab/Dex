@@ -30,6 +30,7 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContex
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { NativeWebview } from '../components/NativeWebview';
 import ContextMenu, { useContextMenu } from '../components/ContextMenu';
+import { TabSearch } from '../components/browser/TabSearch';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
 import { useBackgroundTasks } from '../services/backgroundTasks';
 import { getStoredTier } from '../services/TierManager';
@@ -567,6 +568,7 @@ export const Browser: React.FC = () => {
   // WebView2 page, no timers). Before a tab sleeps its page is asked whether it
   // is playing sound or holds edited fields; if so it stays awake.
   const tabMenu = useContextMenu();
+  const [showTabSearch, setShowTabSearch] = useState(false);
   const toggleKeepAwake = useCallback((id: string) => {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, keepAwake: t.keepAwake ? undefined : true, ...(t.keepAwake ? {} : { background: false }) } : t));
   }, []);
@@ -821,6 +823,11 @@ export const Browser: React.FC = () => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!keyEventForApp(e, winId)) return; // key meant for another app
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setShowTabSearch(true);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowFindBar(true);
@@ -2159,7 +2166,23 @@ export const Browser: React.FC = () => {
           >
             {Icon.plus}
           </button>
+          <button
+            style={styles.newTabBtn}
+            onClick={() => setShowTabSearch(v => !v)}
+            title="Search tabs (Ctrl+Shift+A)"
+            aria-label="Search tabs"
+            aria-expanded={showTabSearch}
+          >
+            {Icon.search}
+          </button>
         </div>
+        {showTabSearch && (
+          <TabSearch
+            tabs={tabs.map(t => ({ id: t.id, title: t.title, url: t.url, pinned: t.pinned, active: t.id === activeTab, sleeping: !!t.background && t.id !== activeTab && !!t.url }))}
+            onPick={(id) => { const t = tabs.find(x => x.id === id); setActiveTab(id); if (t) setUrlInput(t.url); }}
+            onClose={() => setShowTabSearch(false)}
+          />
+        )}
 
         {/* Right actions */}
         <div style={styles.rightActions}>
