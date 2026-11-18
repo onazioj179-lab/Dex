@@ -18,7 +18,7 @@ import {
 
 export type SegmentedOption<T extends string> =
   | T
-  | { value: T; label?: React.ReactNode; icon?: React.ReactNode; title?: string; disabled?: boolean };
+  | { value: T; label?: React.ReactNode; icon?: React.ReactNode; title?: string; disabled?: boolean; testId?: string };
 
 export interface SegmentedControlProps<T extends string> {
   options: ReadonlyArray<SegmentedOption<T>>;
@@ -142,6 +142,7 @@ export function SegmentedControl<T extends string>({
             onMouseEnter={(e) => { if (!active && enabled(i)) e.currentTarget.style.background = CAPSULE_HOVER_BG; }}
             onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             data-active={active || undefined}
+            data-testid={typeof o === 'object' ? o.testId : undefined}
             style={{
               height: segH,
               padding: `0 ${CAPSULE_PAD_X[size]}px`,

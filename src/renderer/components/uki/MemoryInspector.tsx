@@ -13,6 +13,7 @@
 // DEX v3.8.9 wave B - UKI trust UI
 
 import React, { useMemo, useState } from 'react';
+import { SegmentedControl } from '../controls';
 import { Button } from '../../ui/Button';
 import { DexSearchInput } from '../../styles/components';
 import {
@@ -69,33 +70,14 @@ export function MemoryInspector({ store, onForget, onExport, now }: MemoryInspec
         <Button variant="secondary" onClick={handleExport} data-testid="memory-export">Export</Button>
       </header>
 
-      <div role="tablist" aria-label="Memory tier" style={{ display: 'flex', gap: space[1] }}>
-        {KINDS.map((k) => {
-          const active = k.id === kind;
-          return (
-            <button
-              key={k.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              data-testid={`memory-tab-${k.id}`}
-              onClick={() => setKind(k.id)}
-              style={{
-                background: active ? colors.accent.light : 'transparent',
-                color: active ? colors.accent.default : colors.text.secondary,
-                border: `1px solid ${active ? colors.accent.default : colors.border.subtle}`,
-                borderRadius: radius.full,
-                padding: `${space[1]}px ${space[3]}px`,
-                fontSize: fontSize.xs,
-                fontWeight: fontWeight.semibold,
-                cursor: 'pointer',
-              }}
-            >
-              {k.label}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedControl
+        semantics="tabs"
+        size="md"
+        aria-label="Memory tier"
+        options={KINDS.map((k) => ({ value: k.id, label: k.label, testId: `memory-tab-${k.id}` }))}
+        value={kind}
+        onChange={(v) => setKind(v as typeof kind)}
+      />
 
       {items.length === 0 ? (
         <div data-testid="memory-empty" style={{ color: colors.text.tertiary, fontSize: fontSize.sm, padding: space[3] }}>
