@@ -28,6 +28,7 @@ import { frameScheduler } from '../../services/FrameScheduler';
 import { buildProjectReport, dueMs as reportDueMs, type ReportTask } from './projectReport';
 import { sendToNotes } from '../../services/sendTo';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { toLocalDateInput } from '../../utils/localDate';
 
 // ---------------------------------------------------------------------------
 // Cross-app helpers (match the standalone-app conventions)
@@ -463,7 +464,7 @@ const ProjectDashboard: React.FC = () => {
           style={{ ...s.refreshBtn, marginRight: 8 }}
           onClick={() => {
             const r = currentReport(projectName, `${kindMeta.label} workspace`);
-            void sendToNotes(r.markdown, `${projectName} — status ${new Date().toISOString().slice(0, 10)}`);
+            void sendToNotes(r.markdown, `${projectName} — status ${toLocalDateInput(new Date())}`);
             toast('success', 'Status report added to Notes');
           }}
           title="Write a status report from your tasks, notes and recent activity into a new note"

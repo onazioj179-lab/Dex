@@ -110,6 +110,7 @@ import { colorInputValue } from '../../utils/canvasTheme';
 import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
 import { ASSET_SHAPES, ASSET_PATTERNS, ASSET_GRADIENTS, GRADIENT_STOPS, renderAsset } from './assetRender';
 import { dexConfirm } from '../../components/dexConfirm';
+import { toLocalDateInput } from '../../utils/localDate';
 
 // Swatches must be real colours: the canvas cannot paint a CSS variable, so the
 // old `var(--color-error)` swatches left the brush colour unusable.
@@ -1377,7 +1378,7 @@ const Prism: React.FC = () => {
     }
     
     const link = document.createElement('a');
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const timestamp = toLocalDateInput(new Date());
     link.download = `prism-export-${timestamp}.${format}`;
     link.href = exportCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : format}`, quality / 100);
     link.click();
@@ -1432,7 +1433,7 @@ const Prism: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prism-project-${new Date().toISOString().slice(0, 10)}.prism.json`;
+    a.download = `prism-project-${toLocalDateInput(new Date())}.prism.json`;
     a.click();
     URL.revokeObjectURL(url);
     setIsDirty(false);
@@ -3191,7 +3192,7 @@ const Prism: React.FC = () => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `prism-export-${new Date().toISOString().slice(0, 10)}.${val}`;
+                a.download = `prism-export-${toLocalDateInput(new Date())}.${val}`;
                 a.click();
                 URL.revokeObjectURL(url);
               } else {

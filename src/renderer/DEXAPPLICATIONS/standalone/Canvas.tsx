@@ -136,6 +136,7 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
 import { setStudioMode } from './creativeStudio/studioMode';
 import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
+import { toLocalDateInput } from '../../utils/localDate';
 
 /** True when a drawing layer has any painted pixel (checked only on demand). */
 function hasInk(c: HTMLCanvasElement): boolean {
@@ -1128,7 +1129,7 @@ const Canvas: React.FC = () => {
       const url = flat.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `canvas-${new Date().toISOString().slice(0, 10)}.png`;
+      a.download = `canvas-${toLocalDateInput(new Date())}.png`;
       a.click();
       toast('success', 'Exported PNG');
     } catch {

@@ -23,7 +23,7 @@ describe('Kanban CSV export', () => {
 
   it('one row per card with its column as status', () => {
     const csv = boardToCsv([
-      { title: 'To do', cards: [{ title: 'Write spec', description: '', priority: 'high', dueDate: '2026-12-01', createdAt: Date.UTC(2026, 10, 17), labels: [{ text: 'docs' }], checklist: [{ done: true }, { done: false }] }] },
+      { title: 'To do', cards: [{ title: 'Write spec', description: '', priority: 'high', dueDate: '2026-12-01', createdAt: new Date(2026, 10, 17, 12).getTime(), labels: [{ text: 'docs' }], checklist: [{ done: true }, { done: false }] }] },
       { title: 'Done', cards: [] },
     ]);
     const lines = csv.trim().split('\r\n');

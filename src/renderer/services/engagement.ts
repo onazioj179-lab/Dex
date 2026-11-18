@@ -14,6 +14,7 @@ import {
   ACHIEVEMENTS, DEFAULT_STATS, CATEGORY_META, RARITY_META,
 } from './achievementsCatalog';
 import { platform } from '../utils';
+import { toLocalDateInput } from '../utils/localDate';
 
 // Re-export types and catalog for backward compatibility
 export type { UserStats, Achievement, AchievementCategory };
@@ -104,7 +105,7 @@ export function saveEngagement(state: EngagementState) {
 
 /** Called on every DEX session start -- updates streak & session count */
 export function recordSessionStart(state: EngagementState): EngagementState {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateInput(new Date());
   const lastActive = state.stats.lastActive;
   const stats = { ...state.stats };
   const now = new Date();
@@ -115,7 +116,7 @@ export function recordSessionStart(state: EngagementState): EngagementState {
 
   // Streak logic
   if (lastActive !== today) {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const yesterday = toLocalDateInput(new Date(Date.now() - 86400000));
     if (lastActive === yesterday) {
       stats.currentStreak++;
     } else if (lastActive !== today) {

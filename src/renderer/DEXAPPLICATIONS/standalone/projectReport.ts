@@ -1,3 +1,4 @@
+import { toLocalDateInput } from '../../utils/localDate';
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
@@ -22,7 +23,7 @@ export interface ReportInput {
 }
 
 const DAY = 86_400_000;
-const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const day = (ms: number) => toLocalDateInput(new Date(ms));
 
 /**
  * A task's due moment in LOCAL time. "2026-11-18" means that local day:

@@ -324,6 +324,7 @@ const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 
 import { formatClock } from '../../shared/format/units';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { dexConfirm } from '../components/dexConfirm';
+import { toLocalDateInput } from '../utils/localDate';
 const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
@@ -635,7 +636,7 @@ export const Gallery: React.FC = () => {
         return true;
       });
       if (!hits.length) return `No items in "${c.selectedAlbum}" match.`;
-      return `${hits.length} match in "${c.selectedAlbum}":\n` + hits.slice(0, 80).map((m) => `${m.name} · ${m.type}${m.width && m.height ? ` · ${m.width}×${m.height}` : ''} · ${m.date instanceof Date && !Number.isNaN(m.date.getTime()) ? m.date.toISOString().slice(0, 10) : 'no date'}${m.favorite ? ' · favourite' : ''}`).join('\n');
+      return `${hits.length} match in "${c.selectedAlbum}":\n` + hits.slice(0, 80).map((m) => `${m.name} · ${m.type}${m.width && m.height ? ` · ${m.width}×${m.height}` : ''} · ${m.date instanceof Date && !Number.isNaN(m.date.getTime()) ? toLocalDateInput(m.date) : 'no date'}${m.favorite ? ' · favourite' : ''}`).join('\n');
     });
     registerUkiAppAction('gallery', {
       id: 'gallery.getSelection',

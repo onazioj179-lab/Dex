@@ -1,3 +1,4 @@
+import { toLocalDateInput } from '../utils/localDate';
 /**
  * DEX Daily Challenges System
  * Gamified daily tasks to boost engagement and app mastery
@@ -86,7 +87,7 @@ const CHALLENGE_POOL: Challenge[] = [
 const STORAGE_KEY = 'dex-daily-challenges';
 
 function getTodayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateInput(new Date());
 }
 
 export function loadChallenges(): DailyChallengeState {
@@ -141,7 +142,7 @@ export function rollNewDay(prev: DailyChallengeState): DailyChallengeState {
   let currentStreak = prev.currentStreak;
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = yesterday.toISOString().split('T')[0];
+  const yesterdayKey = toLocalDateInput(yesterday);
 
   if (prev.lastCompletionDate === yesterdayKey && prev.completedToday.length > 0) {
     currentStreak = prev.currentStreak + 1;

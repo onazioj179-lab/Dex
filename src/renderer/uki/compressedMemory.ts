@@ -37,6 +37,7 @@
 import * as cache from './cache';
 import { readTurns } from './memory';
 import { migrate, SCHEMA_VERSION, type UkiTurnRecord, type UkiVersioned } from './schemas';
+import { toLocalDateInput } from '../utils/localDate';
 
 const TURNS_KEY = 'uki:mem:turns';
 const ARCHIVE_KEY = 'uki:mem:archive';
@@ -143,7 +144,7 @@ function buildSummary(turns: readonly UkiTurnRecord[]): { summary: string; topic
   const first = turns[0];
   const last = turns[turns.length - 1];
   const headline = `Archive of ${turns.length} turns covering ${topics.slice(0, 3).join(', ') || 'general chat'}`;
-  const range = first && last ? ` (${new Date(first.ts).toISOString().slice(0, 10)} -> ${new Date(last.ts).toISOString().slice(0, 10)})` : '';
+  const range = first && last ? ` (${toLocalDateInput(new Date(first.ts))} -> ${toLocalDateInput(new Date(last.ts))})` : '';
   return { summary: headline + range, topics, apps: [...appSet] };
 }
 
