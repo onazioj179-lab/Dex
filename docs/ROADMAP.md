@@ -60,7 +60,8 @@
 >   cannot hold (connectors, ellipse outlines, freehand ink). Slides › "Check pictures" finds web-address pictures
 >   that do not load, by slide. There is no separate "Design" app to merge; fonts are the system UI font (no
 >   missing-font case); board and from-PC pictures are embedded (no relinking case).
-> - Still not done in Part 24: reusable component library, a single Studio project file (board + deck); Browser (L, audited: tabs/bookmarks/history/
+> - **Batch 4 (#156):** UKI actions in six more apps (#360), recoverable deletes (#363-#365), in-app confirm/prompt everywhere (#366-#367), Studio project files `.dexstudio` (#368) and component library (#369).
+> - Still not done in Part 24: Browser (L, audited: tabs/bookmarks/history/
 >   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
 >   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
 
