@@ -30,7 +30,7 @@ import {
 } from '../../services/collabSession';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
-import { dexConfirm } from '../../components/dexConfirm';
+import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -610,11 +610,11 @@ const CollabHub: React.FC = () => {
     ].slice(-200),
   });
 
-  const handleCreateRoom = useCallback(() => {
-    const name = prompt('Room name:');
+  const handleCreateRoom = useCallback(async () => {
+    const name = await dexPrompt({ title: 'New room', label: 'Room name', confirmLabel: 'Next' });
     if (!name || !name.trim()) return;
-    const topic = prompt('Topic (optional):') || '';
-    const appId = (prompt('Linked app (vinx, imosion, prism, flux, forge, axl):') || 'prism')
+    const topic = (await dexPrompt({ title: 'New room', label: 'Topic (optional)', confirmLabel: 'Next', allowEmpty: true })) || '';
+    const appId = ((await dexPrompt({ title: 'New room', label: 'Linked app (vinx, imosion, prism, flux, forge, axl)', defaultValue: 'prism', confirmLabel: 'Create room' })) || 'prism')
       .trim()
       .toLowerCase();
 
@@ -1075,11 +1075,11 @@ const CollabHub: React.FC = () => {
     }
   }, [handleAccessRequest]);
 
-  const handleCreateProject = useCallback(() => {
-    const name = prompt('Project name:');
+  const handleCreateProject = useCallback(async () => {
+    const name = await dexPrompt({ title: 'New project', label: 'Project name', confirmLabel: 'Next' });
     if (!name) return;
-    
-    const appId = prompt('App (vinx, imosion, prism, flux, forge, axl):') || 'prism';
+
+    const appId = (await dexPrompt({ title: 'New project', label: 'App (vinx, imosion, prism, flux, forge, axl)', defaultValue: 'prism', confirmLabel: 'Create project' })) || 'prism';
     const project = createProject(name, appId);
     setActiveProject(project.id);
     

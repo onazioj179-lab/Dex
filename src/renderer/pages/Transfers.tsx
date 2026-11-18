@@ -17,6 +17,7 @@ import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { notificationSoundEnabled } from '../utils/notificationsAllowed';
+import { dexPrompt } from '../components/dexConfirm';
 
 // QR Code encoder — Version 1-4 byte mode with L error correction (item 108)
 // Produces a real scannable QR code, no external library needed
@@ -837,8 +838,8 @@ const Transfers: React.FC = () => {
   const buildDeviceCtxItems = useCallback((d: DTPDevice): ContextMenuItem[] => [
     { label: 'Send Files', icon: Icons.send, onClick: () => sendToDevice(d) },
     { label: trustedDevices.has(d.deviceId) ? 'Remove Trust' : 'Trust Device', onClick: () => toggleTrusted(d.deviceId), divider: true },
-    { label: 'Set Nickname', onClick: () => {
-      const name = prompt('Device nickname:', deviceNicknames[d.deviceId] || d.deviceName);
+    { label: 'Set Nickname', onClick: async () => {
+      const name = await dexPrompt({ title: 'Device nickname', label: 'Name', defaultValue: deviceNicknames[d.deviceId] || d.deviceName, confirmLabel: 'Save' });
       if (name) setNickname(d.deviceId, name);
     }},
     { label: 'Copy Address', onClick: () => navigator.clipboard.writeText(`${d.address}:${d.port}`) },

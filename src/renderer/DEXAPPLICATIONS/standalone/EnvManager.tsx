@@ -21,7 +21,7 @@ import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
-import { dexConfirm } from '../../components/dexConfirm';
+import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
 
 interface EnvBridge {
   listSystem: () => Promise<Array<{ name: string; value: string }>>;
@@ -323,10 +323,8 @@ export default function EnvManager(): React.ReactElement {
   }, [newName, newValue, save, flash, isProfile, activeProfile, mutateActiveProfile]);
 
   // ---- profile management -------------------------------------------------
-  const createProfile = useCallback(() => {
-    let name = '';
-    try { name = (window.prompt('Profile name', `Profile ${profiles.length + 1}`) || '').trim(); }
-    catch { name = `Profile ${profiles.length + 1}`; }
+  const createProfile = useCallback(async () => {
+    const name = ((await dexPrompt({ title: 'New profile', label: 'Name', defaultValue: `Profile ${profiles.length + 1}`, confirmLabel: 'Create' })) || '').trim();
     if (!name) return;
     const prof: EnvProfile = { id: makeId(), name, entries: [] };
     updateProfiles([...profiles, prof]);
@@ -334,11 +332,9 @@ export default function EnvManager(): React.ReactElement {
     toast('success', `Created profile "${name}"`);
   }, [profiles, updateProfiles]);
 
-  const renameProfile = useCallback(() => {
+  const renameProfile = useCallback(async () => {
     if (!activeProfile) return;
-    let name = '';
-    try { name = (window.prompt('Rename profile', activeProfile.name) || '').trim(); }
-    catch { name = ''; }
+    const name = ((await dexPrompt({ title: 'Rename profile', label: 'Name', defaultValue: activeProfile.name, confirmLabel: 'Rename' })) || '').trim();
     if (!name) return;
     updateProfiles(profiles.map(p => p.id === activeProfile.id ? { ...p, name } : p));
   }, [activeProfile, profiles, updateProfiles]);

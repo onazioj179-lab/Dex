@@ -133,7 +133,7 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 
 import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
 import { setStudioMode } from './creativeStudio/studioMode';
-import { dexConfirm } from '../../components/dexConfirm';
+import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
 
 /** True when a drawing layer has any painted pixel (checked only on demand). */
 function hasInk(c: HTMLCanvasElement): boolean {
@@ -773,7 +773,7 @@ const Canvas: React.FC = () => {
 
     // Text tool: place text immediately on click.
     if (toolRef.current === 'text') {
-      placeText(pt);
+      void placeText(pt);
       return;
     }
 
@@ -876,18 +876,13 @@ const Canvas: React.FC = () => {
   };
 
   // Text placement via a transient prompt.
-  const placeText = (pt: Point) => {
+  const placeText = async (pt: Point) => {
     const layer = getActiveLayer();
     if (!layer || !layer.visible) {
       toast('info', 'Active layer is hidden');
       return;
     }
-    let text: string | null = null;
-    try {
-      text = window.prompt('Enter text');
-    } catch {
-      text = null;
-    }
+    const text = await dexPrompt({ title: 'Add text', label: 'Text', confirmLabel: 'Add' });
     if (!text) return;
     const ctx = layer.canvas.getContext('2d');
     if (!ctx) return;
@@ -1021,10 +1016,9 @@ const Canvas: React.FC = () => {
     persist();
   };
 
-  const renameLayer = (id: string) => {
+  const renameLayer = async (id: string) => {
     const current = layersRef.current.find(l => l.id === id);
-    let name: string | null = null;
-    try { name = window.prompt('Layer name', current?.name || ''); } catch { name = null; }
+    const name = await dexPrompt({ title: 'Rename layer', label: 'Name', defaultValue: current?.name || '', confirmLabel: 'Rename' });
     if (name == null) return;
     const trimmed = name.trim();
     if (!trimmed) return;

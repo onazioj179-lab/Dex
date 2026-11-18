@@ -43,7 +43,7 @@ import { useRunningApps } from '../store/runningApps';
 import { normalizeAddress } from '../services/browserAddress';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../services/appIntents';
-import { dexConfirm } from '../components/dexConfirm';
+import { dexConfirm, dexPrompt } from '../components/dexConfirm';
 
 // ===========================================================================
 // TYPES
@@ -2361,8 +2361,8 @@ ${text}
           </button>
           <div style={styles.dropdownDivider} />
           {/* Tab Groups */}
-          <button style={styles.dropdownItem} onClick={() => {
-            const name = prompt('Group name:');
+          <button style={styles.dropdownItem} onClick={async () => {
+            const name = await dexPrompt({ title: 'New tab group', label: 'Name', confirmLabel: 'Create' });
             if (name) { createTabGroup(name, TAB_GROUP_COLORS[tabGroups.size % TAB_GROUP_COLORS.length], [activeTab]); setShowTabMenu(false); }
           }}>Add to New Group...</button>
           {Array.from(tabGroups.entries()).map(([gid, group]) => (
@@ -2422,8 +2422,8 @@ ${text}
           <div style={styles.sidePanelHeader}>
             <span>Bookmarks</span>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <button style={styles.clearBtn} onClick={() => {
-                const name = prompt('Folder name:');
+              <button style={styles.clearBtn} onClick={async () => {
+                const name = await dexPrompt({ title: 'New bookmark folder', label: 'Name', confirmLabel: 'Create' });
                 if (name) createBookmarkFolder(name);
               }} aria-label="New folder">+ Folder</button>
               <button style={styles.panelClose} onClick={() => setShowBookmarks(false)} aria-label="Close">{Icon.close}</button>

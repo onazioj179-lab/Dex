@@ -24,12 +24,12 @@ function walk(dir: string): string[] {
 }
 
 describe('no native confirm()', () => {
-  it('only the dialog helpers and crash recovery call the system confirm box', () => {
+  it('only the dialog helpers and crash recovery use the system confirm/prompt/alert boxes', () => {
     const root = path.resolve(__dirname, '../../src/renderer');
     const offenders = walk(root)
       .map((f) => path.relative(root, f).split(path.sep).join('/'))
       .filter((rel) => !ALLOWED.has(rel))
-      .filter((rel) => /(window\.confirm\(|(^|[^.\w])confirm\(\s*[`'"])/m.test(fs.readFileSync(path.join(root, rel), 'utf8')));
+      .filter((rel) => /(window\.(confirm|prompt|alert)\(|(^|[^.\w])(confirm|prompt|alert)\(\s*[`'"])/m.test(fs.readFileSync(path.join(root, rel), 'utf8')));
     expect(offenders).toEqual([]);
   }, 60_000);
 });
