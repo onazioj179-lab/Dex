@@ -1,3 +1,4 @@
+import { frameStep, decay } from './frameTime';
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
@@ -400,6 +401,7 @@ export class MomentumScroller {
     }
     this._velocity = velocity;
     if (this._raf === null) {
+      this._lastCoast = null;
       this._coast();
     }
   }
@@ -423,9 +425,13 @@ export class MomentumScroller {
     this._spring?.stop();
   }
 
-  private _coast = (): void => {
-    this._velocity *= this._friction;
-    this._position += this._velocity;
+  private _lastCoast: number | null = null;
+  // Time-based: the same coast in real time at 60, 90, 120 or 144 Hz (utils/frameTime).
+  private _coast = (now: number = performance.now()): void => {
+    const step = frameStep(this._lastCoast, now);
+    this._lastCoast = now;
+    this._velocity *= decay(this._friction, step);
+    this._position += this._velocity * step;
     this._onScroll?.(this._position);
 
     if (Math.abs(this._velocity) < 0.5) {
@@ -568,6 +574,7 @@ export class ElasticScroller {
 
     // Start coasting
     if (this._raf === null) {
+      this._lastCoast = null;
       this._coast();
     }
   }
@@ -609,14 +616,18 @@ export class ElasticScroller {
     this._isBouncing = false;
   }
 
-  private _coast = (): void => {
-    this._velocity *= this._friction;
-    this._position += this._velocity;
+  private _lastCoast: number | null = null;
+  // Time-based: the same coast in real time at 60, 90, 120 or 144 Hz (utils/frameTime).
+  private _coast = (now: number = performance.now()): void => {
+    const step = frameStep(this._lastCoast, now);
+    this._lastCoast = now;
+    this._velocity *= decay(this._friction, step);
+    this._position += this._velocity * step;
 
     // Check if we've gone beyond bounds
     if (this._position < this._minBound) {
       // Apply resistance to velocity
-      this._velocity *= 0.5;
+      this._velocity *= decay(0.5, step);
       const over = this._minBound - this._position;
       this._position = this._minBound - this._rubberBand(over);
       
@@ -626,7 +637,7 @@ export class ElasticScroller {
         return;
       }
     } else if (this._position > this._maxBound) {
-      this._velocity *= 0.5;
+      this._velocity *= decay(0.5, step);
       const over = this._position - this._maxBound;
       this._position = this._maxBound + this._rubberBand(over);
       

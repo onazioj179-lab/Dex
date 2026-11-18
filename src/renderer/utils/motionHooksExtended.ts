@@ -11,6 +11,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react';
+import { frameStep, decay } from './frameTime';
 import { useMediaQuery } from './motionHooks';
 import { notificationsAllowed } from './notificationsAllowed';
 
@@ -25,17 +26,19 @@ export function useScrollDeceleration(config: ScrollDecelerationConfig = { curve
   const rafRef = useRef<number | null>(null);
   const decelerate = useCallback((el: HTMLElement, initialVelocity: number) => {
     velocityRef.current = initialVelocity;
-    const tick = () => {
+    let last: number | null = null;
+    const tick = (now: number) => {
+      const step = frameStep(last, now); last = now; // refresh-rate independent
       const v = velocityRef.current;
       if (Math.abs(v) < 0.5) { velocityRef.current = 0; return; }
-      el.scrollTop += v;
+      el.scrollTop += v * step;
       switch (curve) {
-        case "linear": velocityRef.current *= 0.95; break;
-        case "easeOut": velocityRef.current *= 0.88; break;
-        case "friction": velocityRef.current *= friction; break;
+        case "linear": velocityRef.current *= decay(0.95, step); break;
+        case "easeOut": velocityRef.current *= decay(0.88, step); break;
+        case "friction": velocityRef.current *= decay(friction, step); break;
         case "bounce":
           if (el.scrollTop <= 0 || el.scrollTop >= el.scrollHeight - el.clientHeight) { velocityRef.current *= -bounce; }
-          else { velocityRef.current *= 0.9; }
+          else { velocityRef.current *= decay(0.9, step); }
           break;
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -255,10 +258,12 @@ export function useScrollController(config: ScrollControllerConfig = {}) {
     lastTimeRef.current = now;
   }, [maxVelocity]);
   const applyMomentum = useCallback((el: HTMLElement, onComplete?: () => void) => {
-    const tick = () => {
+    let last: number | null = null;
+    const tick = (now: number) => {
+      const step = frameStep(last, now); last = now; // refresh-rate independent
       if (Math.abs(velocityRef.current) < velocityThreshold) { velocityRef.current = 0; onComplete?.(); return; }
-      el.scrollTop += velocityRef.current;
-      velocityRef.current *= friction;
+      el.scrollTop += velocityRef.current * step;
+      velocityRef.current *= decay(friction, step);
       rafRef.current = requestAnimationFrame(tick);
     };
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
