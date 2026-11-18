@@ -20,9 +20,7 @@ const ROOT = path.resolve(__dirname, '../../src');
 const ALLOWED: Record<string, { count: number; why: string }> = {
   'renderer/DEXAPPLICATIONS/flux/expressions.ts': { count: 2, why: 'token allowlist runs before compilation (#161)' },
   'renderer/DEXAPPLICATIONS/standalone/dexCode/runtime.ts': { count: 1, why: 'runs code the user typed on purpose' },
-  'renderer/components/NativeWebview.tsx': { count: 1, why: 'syntax check only, never called' },
-  'renderer/DEXAPPLICATIONS/standalone/dexCode/diagnostics.ts': { count: 1, why: "syntax check of the user's own open file (which Run already executes); compiled, never called" },
-};
+  'renderer/components/NativeWebview.tsx': { count: 1, why: 'syntax check only, never called' },};
 
 const SITE = /\bnew\s+Function\s*\(|(?<![.\w])eval\s*\(/g;
 

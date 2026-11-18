@@ -36,11 +36,19 @@ describe('DEX Code diagnostics', () => {
     expect(scanStructure('a();\n/* never')[0]).toMatchObject({ line: 2 });
   });
 
-  it('other syntax errors are reported for the file, never with a guessed line', () => {
-    const d = diagnose('a.js', 'const = 5;');
+  it('every JavaScript syntax error gets its exact line and column (acorn)', () => {
+    const d = diagnose('a.js', 'let ok = 1;\nconst = 5;');
+    expect(d).toEqual([{ line: 2, col: 7, message: 'Syntax error: Unexpected token', severity: 'error' }]);
+    expect(diagnose('a.js', 'function f() {\n  return 1 +;\n}')[0]).toMatchObject({ line: 2 });
+    expect(diagnose('a.mjs', 'import x from "y";\nexport const a = await x;\n')).toEqual([]);
+    expect(diagnose('a.js', 'class A { #p = 1; get p() { return this.#p ?? 0; } }\nconst o = { ...{ a: 1 } }?.a;\n')).toEqual([]);
+  });
+
+  it('DexScript: maps the line through the transpiler when lines are kept', () => {
+    // (`let = 2` would be valid sloppy-mode JS: `let` can be a variable name.)
+    const d = diagnose('a.dex', 'let a = 1\nlet b = = 2\n');
     expect(d).toHaveLength(1);
-    expect(d[0].line).toBeNull();
-    expect(d[0].message).toMatch(/^Syntax error/);
+    expect(d[0].line).toBe(2);
   });
 
   it('other file types are not checked (no fake diagnostics)', () => {

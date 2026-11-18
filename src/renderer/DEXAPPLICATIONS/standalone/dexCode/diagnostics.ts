@@ -8,12 +8,13 @@
 // DEX Code diagnostics: real syntax problems, located only when the location is
 // known for certain.
 //   JSON        the engine's own parse error, converted from its position to line/col
-//   JS / DexScript
-//               a scanner pinpoints unbalanced ( ) [ ] { }, unterminated strings,
-//               template literals and block comments; anything else the JS engine
-//               rejects is reported for the file without a line (never guessed).
-// No new dependency: this runs in the renderer on the open file only.
+//   JS          acorn (full ECMAScript parser): exact line/col for every syntax error
+//   DexScript   the structure scanner on the source, then acorn on the transpiled
+//               JS; its line is used only when the transpiler kept the line count
+//   JSX         the structure scanner (acorn does not parse JSX)
+// Nothing is compiled or run; this checks the open file only.
 
+import { parse as parseJs } from 'acorn';
 import { transpileDexScript } from './runtime';
 
 export interface Diagnostic { line: number | null; col: number | null; message: string; severity: 'error' | 'warning' }
@@ -157,17 +158,22 @@ export function scanStructure(src: string): Diagnostic[] {
   return out;
 }
 
-/** The JS engine's verdict for the whole file (no position available from it). */
-function engineCheck(js: string): Diagnostic[] {
-  try {
-    // Parse only, never run. Module syntax is not valid in a Function body,
-    // so import/export lines are ignored for this check.
-    // eslint-disable-next-line no-new-func
-    new Function(js.replace(/^\s*(import|export)\b[^\n]*$/gm, ''));
-    return [];
-  } catch (e) {
-    return [{ line: null, col: null, message: `Syntax error: ${(e as Error).message}`, severity: 'error' }];
+/**
+ * Full JavaScript parse with acorn (latest syntax). Exact line/column for every
+ * syntax error; nothing is compiled or run. Tries module first (import/export,
+ * top-level await), then script (with-statements and other sloppy-mode code).
+ * `mapLines`: false when the source was transpiled and lines may have moved.
+ */
+function parseCheck(js: string, mapLines = true): Diagnostic[] {
+  const opts = { ecmaVersion: 'latest' as const, locations: true, allowHashBang: true, allowAwaitOutsideFunction: true, allowReturnOutsideFunction: true };
+  let first: unknown = null;
+  for (const sourceType of ['module', 'script'] as const) {
+    try { parseJs(js, { ...opts, sourceType }); return []; } catch (e) { if (!first) first = e; }
   }
+  const e = first as { message?: string; loc?: { line: number; column: number } };
+  const message = `Syntax error: ${String(e?.message ?? 'invalid JavaScript').replace(/\s*\(\d+:\d+\)$/, '')}`;
+  if (mapLines && e?.loc) return [{ line: e.loc.line, col: e.loc.column + 1, message, severity: 'error' }];
+  return [{ line: null, col: null, message, severity: 'error' }];
 }
 
 export function diagnose(fileName: string, src: string): Diagnostic[] {
@@ -177,9 +183,11 @@ export function diagnose(fileName: string, src: string): Diagnostic[] {
     const structural = scanStructure(src);
     if (structural.length) return structural;
     if (ext === 'jsx') return [];
-    let js = src;
-    if (ext === 'dex') { try { js = transpileDexScript(src); } catch (e) { return [{ line: null, col: null, message: String((e as Error).message), severity: 'error' }]; } }
-    return engineCheck(js);
+    if (ext !== 'dex') return parseCheck(src);
+    let js: string;
+    try { js = transpileDexScript(src); } catch (e) { return [{ line: null, col: null, message: String((e as Error).message), severity: 'error' }]; }
+    // Lines map through the transpiler only when it kept the line count.
+    return parseCheck(js, js.split('\n').length === src.split('\n').length);
   }
   return [];
 }
