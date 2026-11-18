@@ -4,6 +4,7 @@
  * Layered raster drawing canvas with brushes, shapes, text, pan/zoom and history.
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { CAPSULE_HEIGHT, CAPSULE_SELECTED_BG } from '../../components/controls/capsuleTokens';
 import DexIcon from '../../components/DexIcon';
 import { CanvasObjectLayer } from './CanvasObjectLayer';
 import { type BoardObject, createObject, createConnector, sanitizeObjects, drawObjects, STICKY_COLORS, MAX_IMAGE_BYTES, BOARD_TEMPLATES } from './canvasObjects';
@@ -1110,6 +1111,7 @@ const Canvas: React.FC = () => {
             <button
               key={t.id}
               style={{ ...s.toolBtn, ...(tool === t.id ? s.toolBtnActive : {}) }}
+              aria-pressed={tool === t.id}
               onClick={() => setTool(t.id)}
               title={t.label}
               aria-label={t.label}
@@ -1141,6 +1143,7 @@ const Canvas: React.FC = () => {
             <button
               key={t}
               style={{ ...s.toolBtn, ...(tool === t ? s.toolBtnActive : {}) }}
+              aria-pressed={tool === t}
               onClick={() => setTool(t)}
               title={t.charAt(0).toUpperCase() + t.slice(1)}
               aria-label={t}
@@ -1275,7 +1278,7 @@ const Canvas: React.FC = () => {
           <button style={s.actionBtn} onClick={() => zoomAt(1 / 1.2)} title="Zoom out" aria-label="Zoom out">
             <DexIcon name="minus" size={16} />
           </button>
-          <button style={s.zoomLabel} onClick={resetZoom} title="Reset zoom (Ctrl+0)">{Math.round(zoom * 100)}%</button>
+          <button style={s.zoomLabel} onClick={resetZoom} title="Reset zoom (Ctrl+0)" aria-label={`Zoom ${Math.round(zoom * 100)}%, reset to 100%`}>{Math.round(zoom * 100)}%</button>
           <button style={s.actionBtn} onClick={() => zoomAt(1.2)} title="Zoom in" aria-label="Zoom in">
             <DexIcon name="plus" size={16} />
           </button>
@@ -1473,11 +1476,14 @@ const s: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   toolbar: {
+    // Floating tool palette (DEX Capsule): inset from the edges, rounded, the
+    // canvas stays dominant around it.
     display: 'flex',
     alignItems: 'center',
     gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-3)',
-    borderRadius: 0,
+    padding: 4,
+    margin: '8px 8px 0',
+    borderRadius: 18, // = 14 (button radius) + 4 (padding): concentric
     flexShrink: 0,
     flexWrap: 'wrap',
   },
@@ -1487,21 +1493,21 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   toolBtn: {
-    width: 32,
-    height: 32,
+    width: CAPSULE_HEIGHT.md,
+    height: CAPSULE_HEIGHT.md,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: CAPSULE_HEIGHT.md / 2,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   toolBtnActive: {
-    background: 'var(--color-accent-fill)',
-    color: '#fff',
+    background: CAPSULE_SELECTED_BG,
+    color: 'var(--color-text-primary)',
   },
   divider: {
     width: 1,
@@ -1536,14 +1542,14 @@ const s: Record<string, React.CSSProperties> = {
     gap: 2,
   },
   sizeBtn: {
-    width: 28,
-    height: 28,
+    width: CAPSULE_HEIGHT.md,
+    height: CAPSULE_HEIGHT.md,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: CAPSULE_HEIGHT.md / 2,
     color: 'var(--color-text-tertiary)',
     cursor: 'pointer',
   },
@@ -1568,13 +1574,14 @@ const s: Record<string, React.CSSProperties> = {
   },
   zoomLabel: {
     minWidth: 48,
-    height: 32,
+    height: CAPSULE_HEIGHT.md,
+    fontVariantNumeric: 'tabular-nums',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: CAPSULE_HEIGHT.md / 2,
     color: 'var(--color-text-secondary)',
     fontSize: 12,
     cursor: 'pointer',
@@ -1584,14 +1591,15 @@ const s: Record<string, React.CSSProperties> = {
     gap: 4,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
+    minWidth: CAPSULE_HEIGHT.md,
+    height: CAPSULE_HEIGHT.md,
+    padding: '0 6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: CAPSULE_HEIGHT.md / 2,
     color: 'var(--color-text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -1646,11 +1654,11 @@ const s: Record<string, React.CSSProperties> = {
   // Text buttons in the Boards row (smallBtn is a fixed 24px icon button).
   textBtn: {
     flex: 1,
-    height: 24,
-    padding: '0 8px',
+    height: CAPSULE_HEIGHT.md,
+    padding: '0 10px',
     background: 'transparent',
     border: '1px solid var(--color-border-control)',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: CAPSULE_HEIGHT.md / 2,
     color: 'var(--color-text-secondary)',
     fontSize: 11,
     cursor: 'pointer',

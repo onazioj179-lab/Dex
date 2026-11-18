@@ -1,7 +1,7 @@
 {
-  "at": "2026-11-18T05:02:47.949Z",
-  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p23-exe/dex-tauri.exe",
-  "passed": 3,
+  "at": "2026-11-18T08:39:17.074Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p23b-exe/dex-tauri.exe",
+  "passed": 5,
   "failed": 0,
   "results": [
     {
@@ -28,6 +28,30 @@
       "pass": true,
       "observed": {
         "prompt": "PS C:\\Users\\onazi>"
+      }
+    },
+    {
+      "name": "Ledger segmented control is a pill with a concentric highlight",
+      "pass": true,
+      "observed": {
+        "outerH": 30,
+        "outerR": 15,
+        "innerR": 12,
+        "inset": 2.9,
+        "pill": true,
+        "concentric": true
+      }
+    },
+    {
+      "name": "Ledger month selector is one capsule with concentric buttons",
+      "pass": true,
+      "observed": {
+        "outerH": 34,
+        "outerR": 17,
+        "innerR": 14,
+        "inset": 2.9,
+        "pill": true,
+        "concentric": true
       }
     }
   ]

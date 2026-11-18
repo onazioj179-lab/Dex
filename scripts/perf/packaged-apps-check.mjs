@@ -56,6 +56,29 @@ try {
     await sleep(250);
   }
   check('Ctrl+` opens the integrated terminal with a real shell prompt', /PS [A-Z]:\\/.test(text), { prompt: text.trim().slice(-80) });
+
+  // Ledger (native data): capsule geometry of the Overview period control and the Budget month capsule.
+  await ev(`window.__dexRunningApps.getState().launchApp({ id: 'ledger', name: 'Ledger', icon: 'ledger' }); true`);
+  // A fresh (isolated) profile opens Ledger's first-run setup: create the ledger with its defaults.
+  for (let i = 0; i < 40; i++) {
+    const clicked = await ev(`(() => { const b = [...document.querySelectorAll('[data-app-id="ledger"] button')].find(x => /^Create ledger$/.test((x.textContent || '').trim()) && !x.disabled); if (b) { b.click(); return true; } return !!document.querySelector('[data-app-id="ledger"] .lg-segment'); })()`);
+    if (clicked) break;
+    await sleep(250);
+  }
+  await sleep(1500);
+  const geo = (sel) => `(() => { const el = document.querySelector('[data-app-id="ledger"] ${sel}'); if (!el) return null;
+    const o = el.getBoundingClientRect(), cs = getComputedStyle(el); const b = el.querySelector('button[aria-pressed="true"]') || el.querySelector('button');
+    const r = b.getBoundingClientRect(); const inset = r.top - o.top;
+    return { outerH: Math.round(o.height), outerR: parseFloat(cs.borderRadius), innerR: parseFloat(getComputedStyle(b).borderRadius), inset: Math.round(inset * 10) / 10,
+      pill: Math.abs(parseFloat(cs.borderRadius) - o.height / 2) < 0.6, concentric: Math.abs(parseFloat(cs.borderRadius) - inset - parseFloat(getComputedStyle(b).borderRadius)) < 0.6 }; })()`;
+  let seg = null;
+  for (let i = 0; i < 60 && !seg; i++) { seg = await ev(geo('.lg-segment')); if (!seg) await sleep(250); }
+  check('Ledger segmented control is a pill with a concentric highlight', seg?.pill && seg?.concentric, seg);
+  // Budget view: navigate with the sidebar and measure the month capsule.
+  await ev(`(() => { const b = [...document.querySelectorAll('[data-app-id="ledger"] button, [data-app-id="ledger"] a')].find(x => /^Budget$/.test((x.textContent || '').trim())); b && b.click(); return !!b; })()`);
+  let month = null;
+  for (let i = 0; i < 40 && !month; i++) { month = await ev(geo('.lg-month')); if (!month) await sleep(250); }
+  check('Ledger month selector is one capsule with concentric buttons', month?.pill && month?.concentric, month);
 } catch (e) {
   check('apps check completed', false, String(e?.stack || e).slice(0, 300));
 } finally {
