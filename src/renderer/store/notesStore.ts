@@ -11,7 +11,8 @@
 // Communicates with NotesManager backend via window.dex.invoke('dexnotes:*')
 // ==========================================================================
 
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
+import { createContext, useContext } from 'react';
 import { DEFAULT_NOTE_TEMPLATES, findBuiltinTemplate } from './noteTemplates';
 import type { NoteExportFormat } from '../DEXAPPLICATIONS/notes/notesFileFormat';
 // Loaded on demand: this store sits in the core chunk, the converters in the
@@ -553,7 +554,7 @@ export interface NotesStoreState {
 // Store Implementation
 // ---------------------------------------------------------------------------
 
-export const useNotesStore = create<NotesStoreState>((set, get) => ({
+const notesStoreInit: StateCreator<NotesStoreState> = (set, get) => ({
   // Initial state
   notes: [],
   folders: [],
@@ -1104,4 +1105,91 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
       set({ paneSize: { folders_width: fw, list_width: lw } });
     }
   },
-}));
+});
+
+// ---------------------------------------------------------------------------
+// One store per Notes window
+// ---------------------------------------------------------------------------
+//
+// The primary store (`useNotesStore`, also used by Home widgets, Send to Notes,
+// UKI, Recycle Bin restore ...) belongs to the first Notes window. Every extra
+// Notes window gets its own instance through NotesStoreContext, so its open
+// note, folder, search and panes are its own. All instances share the same
+// native notes database; after any change one instance broadcasts
+// NOTES_CHANGED and the others refresh their list and, when they show the same
+// note, reload it, so two windows never keep a stale copy of a note.
+
+export const NOTES_CHANGED_EVENT = 'dex-notes-changed';
+
+/** Methods that change notes data (the others only read or change local UI state). */
+export const NOTES_MUTATORS = [
+  'createNote', 'updateNote', 'deleteNote', 'restoreNote', 'permanentlyDeleteNote', 'duplicateNote',
+  'togglePin', 'toggleFavorite', 'createFolder', 'renameFolder', 'deleteFolder', 'moveNoteToFolder',
+  'addTag', 'removeTag', 'setTags', 'addAttachment', 'removeAttachment', 'addLink', 'removeLink',
+  'createFromTemplate', 'importFile', 'getDailyNote',
+] as const;
+
+let notesStoreSeq = 0;
+
+export function createNotesStore() {
+  const instance = ++notesStoreSeq;
+  const store = create<NotesStoreState>(notesStoreInit);
+  const base = store.getState() as unknown as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const name of NOTES_MUTATORS) {
+    const orig = base[name];
+    if (typeof orig !== 'function') continue;
+    patch[name] = async (...args: unknown[]) => {
+      const result = await (orig as (...a: unknown[]) => unknown)(...args);
+      try {
+        window.dispatchEvent(new CustomEvent(NOTES_CHANGED_EVENT, {
+          detail: { origin: instance, method: name, id: typeof args[0] === 'string' ? args[0] : null },
+        }));
+      } catch { /* non-DOM */ }
+      return result;
+    };
+  }
+  store.setState(patch as Partial<NotesStoreState>);
+
+  const onChanged = (e: Event) => {
+    const d = (e as CustomEvent<{ origin: number; method: string; id: string | null }>).detail;
+    if (!d || d.origin === instance) return;
+    const st = store.getState();
+    void st.loadNotes(st.selectedFolderId);
+    if (d.id && st.activeNote?.id === d.id) {
+      if (/delete/i.test(d.method)) store.setState({ activeNote: null, selectedNoteId: null });
+      else void st.loadNote(d.id);
+    }
+  };
+  if (typeof window !== 'undefined') window.addEventListener(NOTES_CHANGED_EVENT, onChanged);
+  const dispose = () => { if (typeof window !== 'undefined') window.removeEventListener(NOTES_CHANGED_EVENT, onChanged); };
+  return Object.assign(store, { instance, dispose });
+}
+
+export type NotesStoreApi = ReturnType<typeof createNotesStore>;
+
+const primaryNotesStore = createNotesStore();
+
+/** Set by an extra Notes window (DexNotes) for everything rendered inside it. */
+export const NotesStoreContext = createContext<NotesStoreApi | null>(null);
+
+/** The notes store of the window this component is in (the primary one outside Notes). */
+export function useNotesStoreApi(): NotesStoreApi {
+  return useContext(NotesStoreContext) ?? primaryNotesStore;
+}
+
+function useNotesStoreHook(...args: unknown[]): unknown {
+  const store = useContext(NotesStoreContext) ?? primaryNotesStore;
+  return (store as unknown as (...a: unknown[]) => unknown)(...args);
+}
+
+/**
+ * Hook: reads the current window's store. Static members (getState / setState /
+ * subscribe) are the PRIMARY store's, for code outside React (services, UKI).
+ */
+export const useNotesStore = Object.assign(useNotesStoreHook, {
+  getState: primaryNotesStore.getState,
+  setState: primaryNotesStore.setState,
+  subscribe: primaryNotesStore.subscribe,
+  getInitialState: primaryNotesStore.getInitialState,
+}) as unknown as typeof primaryNotesStore;

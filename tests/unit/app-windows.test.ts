@@ -53,9 +53,8 @@ describe('app windows', () => {
       expect(useRunningApps.getState().runningApps.map(a => a.id)).toEqual(['files']);
     });
 
-    it('Notes stays single-window until its open note is per window', () => {
-      expect(supportsMultipleWindows('notes')).toBe(false);
-      expect(useRunningApps.getState().openNewWindow('notes')).toBeNull();
+    it('Notes supports more windows (each window has its own notes store)', () => {
+      expect(supportsMultipleWindows('notes')).toBe(true);
     });
 
     it('apps without multi-window support never get a second window', () => {
