@@ -19,6 +19,7 @@ import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../i
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
+import { DexSwitch, CAPSULE_SELECTED_BG } from '../components/controls';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
@@ -523,21 +524,10 @@ const UpdateManagerSection: React.FC = () => {
   const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' };
   const desc: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 };
   const heading: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: 'var(--color-text-tertiary)', letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-4) 0 var(--space-2)', textTransform: 'none' as const };
-  const pill = (on: boolean): React.CSSProperties => ({
-    width: 44, height: 24, borderRadius: 10, border: on ? 'none' : '1px solid var(--color-border)', cursor: 'pointer',
-    background: on ? 'var(--color-accent)' : 'var(--color-bg-glass)',
-    position: 'relative', flexShrink: 0,
-  });
   const btnBase: React.CSSProperties = { padding: 'var(--space-2) var(--space-4)', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
 
   const Toggle: React.FC<{ on: boolean; onToggle: () => void; ariaLabel: string }> = ({ on, onToggle, ariaLabel }) => (
-    <button style={pill(on)} onClick={onToggle} aria-checked={on} role="switch" aria-label={ariaLabel}>
-      <span style={{
-        position: 'absolute', top: 2, left: on ? 22 : 2,
-        width: 20, height: 20, borderRadius: '50%', background: 'var(--color-bg-surface)',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-      }} />
-    </button>
+    <DexSwitch checked={on} onChange={() => onToggle()} label={ariaLabel} />
   );
 
   return (
@@ -2266,25 +2256,7 @@ export const Settings: React.FC = () => {
           </span>
           <span style={styles.settingDesc}>{description}</span>
         </div>
-        <button
-          style={{
-            ...styles.toggle,
-            // macOS-style: "on" uses the accent (was system green); the knob uses
-            // --color-accent-text (white) so it stays >=3:1 against the blue track.
-            background: settings[key] ? 'var(--color-accent-fill)' : 'var(--color-bg-glass)',
-            border: settings[key] ? 'none' : '1px solid var(--color-border)',
-          }}
-          onClick={() => toggleSetting(key)}
-          role="switch"
-          aria-checked={Boolean(settings[key])}
-          aria-label={`Toggle ${label}`}
-        >
-          <div style={{
-            ...styles.toggleKnob,
-            ...(settings[key] ? { background: 'var(--color-accent-text)' } : null),
-            transform: settings[key] ? 'translate(20px, -50%)' : 'translate(0, -50%)',
-          }} />
-        </button>
+        <DexSwitch checked={Boolean(settings[key])} onChange={() => toggleSetting(key)} label={label} />
       </div>
     );
   };
@@ -2297,25 +2269,7 @@ export const Settings: React.FC = () => {
         <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
       </div>
-      <button
-        style={{
-          ...styles.toggle,
-          background: checked ? 'var(--color-accent-fill)' : 'var(--color-bg-glass)',
-          border: checked ? 'none' : '1px solid var(--color-border)',
-          opacity: disabled ? 0.5 : 1,
-        }}
-        onClick={onChange}
-        disabled={disabled}
-        role="switch"
-        aria-checked={checked}
-        aria-label={`Toggle ${label}`}
-      >
-        <div style={{
-          ...styles.toggleKnob,
-          ...(checked ? { background: 'var(--color-accent-text)' } : null),
-          transform: checked ? 'translate(20px, -50%)' : 'translate(0, -50%)',
-        }} />
-      </button>
+      <DexSwitch checked={checked} onChange={() => onChange()} label={label} disabled={disabled} />
     </div>
   );
 
@@ -3772,25 +3726,7 @@ export const Settings: React.FC = () => {
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Daily Auto-Optimize</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Re-detect hardware and optimize settings each day</div>
               </div>
-              <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={autoOpt}
-                  onChange={(e) => setAutoOptimizeEnabled(e.target.checked)}
-                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                />
-                <span style={{
-                  position: 'absolute', inset: 0, borderRadius: 10,
-                  background: autoOpt ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  transition: 'background 0.2s ease',
-                }}>
-                  <span style={{
-                    position: 'absolute', left: autoOpt ? 20 : 2, top: 2, width: 20, height: 20,
-                    borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                  }} />
-                </span>
-              </label>
+              <DexSwitch checked={autoOpt} onChange={(v) => setAutoOptimizeEnabled(v)} label="Daily Auto-Optimize" />
             </div>
           </>
         );
@@ -4320,7 +4256,7 @@ export const Settings: React.FC = () => {
               position: 'relative', display: 'flex', alignItems: 'center',
               background: 'var(--color-bg-hover)',
               border: `1px solid ${settingsSearch ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
-              borderRadius: 4, transition: 'border-color 0.12s ease',
+              borderRadius: 9999, height: 28, boxSizing: 'border-box', transition: 'border-color 0.12s ease',
             }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2"
@@ -4544,9 +4480,9 @@ export const Settings: React.FC = () => {
                       aria-label={`Navigate to ${section.name} settings`}
                       style={{
                         ...styles.sectionItem,
-                        background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
+                        background: activeSection === section.id ? CAPSULE_SELECTED_BG : 'transparent',
                         color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                        boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+                        boxShadow: 'none',
                         fontWeight: activeSection === section.id ? 600 : 500,
                       }}
                       onClick={() => jumpToSection(section.id)}
@@ -4584,9 +4520,9 @@ export const Settings: React.FC = () => {
                       aria-label={`Navigate to ${section.name} settings`}
                       style={{
                         ...styles.sectionItem,
-                        background: activeSection === section.id ? 'var(--pg-row-active)' : 'transparent',
+                        background: activeSection === section.id ? CAPSULE_SELECTED_BG : 'transparent',
                         color: activeSection === section.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                        boxShadow: activeSection === section.id ? 'inset 0 0 0 1px var(--pg-border-active)' : 'none',
+                        boxShadow: 'none',
                         fontWeight: activeSection === section.id ? 600 : 500,
                       }}
                       onClick={() => setActiveSection(section.id)}
@@ -4810,29 +4746,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   
   // Toggle
-  toggle: {
-    width: '44px',
-    height: '24px',
-    borderRadius: '10px',
-    border: 'none',
-    cursor: 'pointer',
-    position: 'relative',
-    display: 'inline-flex',
-    alignItems: 'center',
-    transition: 'background 0.15s ease',
-  },
-  toggleKnob: {
-    width: '20px',
-    height: '20px',
-    borderRadius: '50%',
-    background: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-    position: 'absolute',
-    left: '2px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
-  },
   
 
   secondaryBtn: {

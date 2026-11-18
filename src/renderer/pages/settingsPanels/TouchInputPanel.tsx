@@ -12,6 +12,7 @@
 //
 
 import React, { useEffect, useRef, useState } from 'react';
+import { DexSwitch } from '../../components/controls';
 import { ContactTracker, touchCapabilities, MAX_CONTACTS, type Contact } from '../../shell/input/touchContacts';
 import { hapticSupport, hapticsEnabled, setHapticsEnabled, subscribeHaptics, haptic } from '../../shell/input/haptics';
 import { getDensityChoice, setDensityChoice, subscribeDensity, resolveDensity, type DensityChoice } from '../../utils/touchDensity';
@@ -27,17 +28,8 @@ const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: 'var(
 const desc: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.4 };
 const value: React.CSSProperties = { fontSize: 13, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
-const Switch: React.FC<{ on: boolean; label: string; disabled?: boolean; onChange: (v: boolean) => void }> = ({ on, label: aria, disabled, onChange }) => (
-  <button role="switch" aria-checked={on} aria-label={aria} disabled={disabled} onClick={() => onChange(!on)} style={{
-    width: 44, height: 24, borderRadius: 9999, border: on ? 'none' : '1px solid var(--color-border-control)', padding: 0,
-    background: on ? 'var(--color-accent)' : 'var(--color-bg-hover)', position: 'relative', cursor: disabled ? 'default' : 'pointer', flexShrink: 0,
-    opacity: disabled ? 0.5 : 1, transition: 'background var(--duration-normal, 150ms) ease',
-  }}>
-    <span style={{
-      position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: 9999, background: 'var(--color-accent-text)',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left var(--duration-normal, 150ms) ease',
-    }} />
-  </button>
+const Switch: React.FC<{ on: boolean; label: string; disabled?: boolean; onChange: (v: boolean) => void }> = ({ on, label, disabled, onChange }) => (
+  <DexSwitch checked={on} label={label} disabled={disabled} onChange={onChange} />
 );
 
 const TouchTestPad: React.FC = () => {

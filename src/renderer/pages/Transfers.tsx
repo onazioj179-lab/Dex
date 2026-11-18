@@ -10,6 +10,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { DexSwitch } from '../components/controls';
 import { useToastHelpers } from '../components/Toast';
 import { DexSearchInput } from '../styles/components';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
@@ -1460,9 +1461,7 @@ const Transfers: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Sound on complete</span>
               <div style={{ flex: 1 }} />
-              <div onClick={() => setSoundEnabled(p => !p)} role="switch" aria-checked={soundEnabled} aria-label="Sound on complete" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSoundEnabled(p => !p); } }} style={{ width: 32, height: 18, borderRadius: 10, background: soundEnabled ? 'rgba(48,209,88,0.3)' : 'var(--color-text-tertiary)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
-                <div style={{ width: 14, height: 14, borderRadius: 6, background: soundEnabled ? 'var(--color-success)' : 'var(--color-text-muted)', position: 'absolute', top: 2, transition: 'all 0.2s', ...(soundEnabled ? { right: 2 } : { left: 2 }) }} />
-              </div>
+              <DexSwitch size="sm" checked={soundEnabled} onChange={(v) => setSoundEnabled(v)} label="Sound on complete" />
             </div>
           </div>
         </div>

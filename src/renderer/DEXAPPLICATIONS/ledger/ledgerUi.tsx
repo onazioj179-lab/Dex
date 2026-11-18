@@ -337,10 +337,16 @@ textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height
 .lg-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; font-weight: 600; }
 .lg-modal-body { padding: 4px 16px 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .lg-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border-subtle); }
-.lg-segment { display: inline-flex; border: 1px solid var(--color-border); border-radius: 7px; overflow: hidden; }
-.lg-segment button { border: none; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12.5px; padding: 0 10px; height: 26px; cursor: pointer; }
-.lg-segment button + button { border-left: 1px solid var(--color-border); }
-.lg-segment button[aria-pressed="true"] { background: var(--color-accent-light); color: var(--color-text-primary); }
+/* DEX Capsule geometry (controls/capsuleTokens): one pill, 2 px inset + 1 px
+   outline, segments are concentric pills (radius 12 inside the 15 px outer), no
+   dividers, shared accent tint for the selected one. */
+.lg-segment { display: inline-flex; align-items: center; gap: 0; padding: 2px; border: 1px solid var(--color-border-subtle); border-radius: 15px; background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
+.lg-segment button { border: none; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12.5px; padding: 0 10px; height: 24px; border-radius: 12px; cursor: pointer; transition: background .12s ease, color .12s ease; }
+.lg-segment button:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
+.lg-month { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--color-border-subtle); border-radius: 17px; background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
+.lg-month h1 { min-width: 140px; text-align: center; margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lg-month button { border-radius: 14px; }
+.lg-segment button[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 22%, transparent); color: var(--color-text-primary); font-weight: 600; }
 .lg-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: 8px; background: var(--color-bg-hover); font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; }
 .lg-banner.lg-warn { background: rgba(255,159,10,.12); color: var(--color-text-primary); }
 .lg-banner.lg-error { background: rgba(255,69,58,.12); color: var(--color-text-primary); }

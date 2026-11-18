@@ -116,6 +116,12 @@ export default defineConfig({
           // packaged build. Pinning it with react-vendor keeps react-vendor a
           // self-contained leaf that loads first.
           if (id.includes('commonjsHelpers')) return 'react-vendor';
+          // Vite's virtual dynamic-import helper (used by every lazy import()).
+          // Unpinned, Rollup put it in whichever app chunk added a lazy import
+          // (app-standalone-dexcode for its Terminal panel), so dex-app-core
+          // imported it FROM that app chunk: a cycle that also made DEX Code
+          // load eagerly at startup. Shared infrastructure, so it lives in core.
+          if (id.includes('vite/preload-helper')) return 'dex-app-core';
           // Vendor chunks
           // NOTE: react, react-dom AND react-dependent libs (zustand) MUST share
           // ONE chunk. Splitting react-dom from react caused a SECRET_INTERNALS

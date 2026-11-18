@@ -59,9 +59,11 @@ export const BudgetView: React.FC = () => {
   return (
     <>
       <div className="lg-toolbar">
-        <IconBtn icon="chevron-left" label="Previous month" onClick={() => setM(shiftMonth(month, -1))} />
-        <h1 style={{ minWidth: 150, textAlign: 'center' }}>{formatMonth(month)}</h1>
-        <IconBtn icon="chevron-right" label="Next month" onClick={() => setM(shiftMonth(month, 1))} />
+        <div className="lg-month" role="group" aria-label="Month">
+          <IconBtn icon="chevron-left" label="Previous month" onClick={() => setM(shiftMonth(month, -1))} />
+          <h1 aria-live="polite">{formatMonth(month)}</h1>
+          <IconBtn icon="chevron-right" label="Next month" onClick={() => setM(shiftMonth(month, 1))} />
+        </div>
         <select className="lg-input" aria-label="Year" value={year} style={{ width: 84 }} onChange={e => setM(`${e.target.value}-${month.slice(5)}`)}>
           {Array.from({ length: 11 }, (_, i) => year - 5 + i).map(y => <option key={y} value={y}>{y}</option>)}
         </select>

@@ -14,7 +14,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
-import { useNotesStore, type NoteListItem } from '../../store/notesStore';
+import { useNotesStore, useNotesStoreApi, NotesStoreContext, createNotesStore, type NoteListItem, type NotesStoreApi } from '../../store/notesStore';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
@@ -218,7 +218,8 @@ function useResizer(
 // Main Component
 // ---------------------------------------------------------------------------
 
-const DexNotes: React.FC = () => {
+const DexNotesInner: React.FC = () => {
+  const notesApi = useNotesStoreApi(); // this window's store (static getState would be the first window's)
   const winId = useAppWindowId('notes'); // this window ('notes' or 'notes~2', ...)
   // -- Store ------------------------------------------------------------
 
@@ -819,7 +820,7 @@ const DexNotes: React.FC = () => {
       wasSaving.current = true;
     } else if (wasSaving.current) {
       wasSaving.current = false;
-      if (!useNotesStore.getState().saveError) setLastSavedAt(Date.now());
+      if (!notesApi.getState().saveError) setLastSavedAt(Date.now());
     }
   }, [saving]);
 
@@ -1413,6 +1414,19 @@ const DexNotes: React.FC = () => {
   );
 };
 
-DexNotes.displayName = 'DexNotes';
+DexNotesInner.displayName = 'DexNotesInner';
+
+/**
+ * Notes, one store per window: the first Notes window uses the shared store;
+ * every extra window ('notes~2', ...) gets its own, so each has its own open
+ * note, folder and search. Changes sync through the store's change events.
+ */
+const DexNotes: React.FC = () => {
+  const winId = useAppWindowId('notes');
+  const [store] = React.useState<NotesStoreApi | null>(() => (isExtraWindow(winId) ? createNotesStore() : null));
+  React.useEffect(() => () => store?.dispose(), [store]);
+  if (!store) return <DexNotesInner />;
+  return <NotesStoreContext.Provider value={store}><DexNotesInner /></NotesStoreContext.Provider>;
+};
 
 export default memo(DexNotes);

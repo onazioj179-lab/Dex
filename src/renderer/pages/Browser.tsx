@@ -31,6 +31,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { NativeWebview } from '../components/NativeWebview';
 import ContextMenu, { useContextMenu } from '../components/ContextMenu';
 import { TabSearch } from '../components/browser/TabSearch';
+import { DexSwitch } from '../components/controls';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
 import { useBackgroundTasks } from '../services/backgroundTasks';
 import { getStoredTier } from '../services/TierManager';
@@ -2606,23 +2607,7 @@ export const Browser: React.FC = () => {
             ] as { key: 'blockTrackers' | 'blockAds' | 'forceHttps'; label: string }[]).map(item => (
               <label key={item.key} style={styles.settingRow}>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>{item.label}</span>
-                <div
-                  style={{
-                    ...styles.toggleTrack,
-                    background: browserSettings[item.key] ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  }}
-                  role="switch"
-                  aria-checked={browserSettings[item.key]}
-                  aria-label={item.label}
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); writeDexSetting(item.key, !browserSettings[item.key]); } }}
-                  onClick={() => writeDexSetting(item.key, !browserSettings[item.key])}
-                >
-                  <div style={{
-                    ...styles.toggleKnob,
-                    transform: browserSettings[item.key] ? 'translateX(14px)' : 'translateX(0)',
-                  }} />
-                </div>
+                <DexSwitch size="sm" checked={!!browserSettings[item.key]} label={item.label} onChange={(v) => writeDexSetting(item.key, v)} />
               </label>
             ))}
             <div style={{ ...styles.settingRow, flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
@@ -2643,18 +2628,7 @@ export const Browser: React.FC = () => {
                   {activeHost ? (activeShieldsOff ? `Off on ${activeHost}: nothing blocked or hidden` : `On for ${activeHost}`) : 'Open a website to change this'}
                 </span>
               </span>
-              <div
-                style={{ ...styles.toggleTrack, background: activeHost && !activeShieldsOff ? 'var(--color-accent)' : 'var(--color-bg-hover)', opacity: activeHost ? 1 : 0.5 }}
-                role="switch"
-                aria-checked={!!activeHost && !activeShieldsOff}
-                aria-disabled={!activeHost}
-                aria-label="Shields for this site"
-                tabIndex={activeHost ? 0 : -1}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleShields(); } }}
-                onClick={toggleShields}
-              >
-                <div style={{ ...styles.toggleKnob, transform: activeHost && !activeShieldsOff ? 'translateX(14px)' : 'translateX(0)' }} />
-              </div>
+              <DexSwitch size="sm" checked={!!activeHost && !activeShieldsOff} disabled={!activeHost} label="Shields for this site" onChange={() => toggleShields()} />
             </div>
             {shieldsOff.length > 0 && (
               <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', padding: '0 14px var(--space-2)' }}>

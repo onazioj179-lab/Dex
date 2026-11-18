@@ -26,6 +26,7 @@
  * color noise) -- the map itself is the only saturated surface.
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { isReduceMotion } from '../../utils/MotionController';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -578,14 +579,6 @@ const DexMaps: React.FC = () => {
     await sendToNotes(lines.join('\n'), pin.name);
   }, [pin]);
 
-  const cycleStyle = useCallback(() => {
-    setStyleKey((k) => {
-      const i = STYLE_ORDER.indexOf(k);
-      return STYLE_ORDER[(i + 1) % STYLE_ORDER.length];
-    });
-  }, []);
-
-  const nextStyle = STYLE_ORDER[(STYLE_ORDER.indexOf(styleKey) + 1) % STYLE_ORDER.length];
   const showRecentPanel = focused && !query.trim() && recent.length > 0;
 
   if (failed) {
@@ -856,17 +849,18 @@ const DexMaps: React.FC = () => {
         </button>
       </div>
 
-      {/* Basemap style toggle (cycles streets -> satellite -> terrain) */}
-      <button aria-label={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
-        title={`Switch to ${MAP_STYLES[nextStyle].label} basemap`}
-        onClick={cycleStyle}
-        className="dex-mat-frosted"
-        style={{ position: 'absolute', left: 12, bottom: 28, height: 34, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 6,
-          borderRadius: 9999,
-          color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'background 0.12s ease', zIndex: 5 }}>
-        <DexIcon name={MAP_STYLES[styleKey].icon} size={14} />
-        {MAP_STYLES[styleKey].label}
-      </button>
+      {/* Basemap: every style visible and one click away (was a button that cycled). */}
+      <div className="dex-mat-frosted" style={{ position: 'absolute', left: 12, bottom: 28, zIndex: 5, borderRadius: 9999, padding: 2 }}>
+        <SegmentedControl
+          aria-label="Basemap"
+          variant="subtle"
+          size="lg"
+          options={STYLE_ORDER.map(k => ({ value: k, label: MAP_STYLES[k].label, icon: <DexIcon name={MAP_STYLES[k].icon} size={13} /> }))}
+          value={styleKey}
+          onChange={(k) => setStyleKey(k as StyleKey)}
+          style={{ background: 'transparent' }}
+        />
+      </div>
     </div>
   );
 };

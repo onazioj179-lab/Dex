@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
+import { DexSwitch } from '../components/controls';
 import { DexLoader } from '../components/LoadingStates';
 import { useAppTracking } from '../services/usePatternLearning';
 import { glassSidebar } from '../styles/glassMenu';
@@ -1546,20 +1547,9 @@ export const Workflows: React.FC = () => {
                     <div style={styles.cardFooter}>
                       <span style={styles.cardMeta}>{workflow.nodes?.length || workflow.steps || 0} steps · {formatLastRun(workflow.lastRun)}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button
-                          role="switch"
-                          aria-checked={workflow.enabled !== false}
-                          aria-label={`${workflow.enabled === false ? 'Enable' : 'Disable'} ${workflow.name}`}
-                          onClick={(e) => { e.stopPropagation(); toggleWorkflowEnabled(workflow.id); }}
-                          style={{
-                            width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
-                            background: workflow.enabled === false ? 'var(--color-border)' : 'var(--color-success, #30d158)',
-                            display: 'flex', alignItems: 'center', justifyContent: workflow.enabled === false ? 'flex-start' : 'flex-end',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
-                        </button>
+                        <span onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex' }}>
+                          <DexSwitch size="sm" checked={workflow.enabled !== false} label={`Enabled: ${workflow.name}`} onChange={() => toggleWorkflowEnabled(workflow.id)} />
+                        </span>
                         <button
                           style={{ ...styles.runBtn, background: `${workflow.color}22`, border: `1px solid ${workflow.color}40`, color: workflow.color, opacity: workflow.enabled === false ? 0.5 : 1, cursor: workflow.enabled === false ? 'default' : 'pointer' }}
                           aria-label="Run workflow"
@@ -1689,19 +1679,7 @@ export const Workflows: React.FC = () => {
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
                 <span>{selectedWorkflow?.enabled === false ? 'Disabled' : 'Enabled'}</span>
-                <button
-                  role="switch"
-                  aria-checked={selectedWorkflow?.enabled !== false}
-                  aria-label="Toggle workflow enabled"
-                  onClick={() => selectedWorkflow && toggleWorkflowEnabled(selectedWorkflow.id)}
-                  style={{
-                    width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
-                    background: selectedWorkflow?.enabled === false ? 'var(--color-border)' : 'var(--color-success, #30d158)',
-                    display: 'flex', alignItems: 'center', justifyContent: selectedWorkflow?.enabled === false ? 'flex-start' : 'flex-end',
-                  }}
-                >
-                  <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
-                </button>
+                <DexSwitch size="sm" checked={selectedWorkflow?.enabled !== false} label="Workflow enabled" disabled={!selectedWorkflow} onChange={() => selectedWorkflow && toggleWorkflowEnabled(selectedWorkflow.id)} />
               </label>
             </div>
 
@@ -1867,19 +1845,7 @@ export const Workflows: React.FC = () => {
                       </div>
                       <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
                         <span>Continue on error</span>
-                        <button
-                          role="switch"
-                          aria-checked={!!selectedNode.continueOnError}
-                          aria-label="Continue on error"
-                          onClick={() => updateNodeBehavior(selectedNode.id, { continueOnError: !selectedNode.continueOnError })}
-                          style={{
-                            width: 34, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
-                            background: selectedNode.continueOnError ? 'var(--color-accent)' : 'var(--color-border)',
-                            display: 'flex', alignItems: 'center', justifyContent: selectedNode.continueOnError ? 'flex-end' : 'flex-start',
-                          }}
-                        >
-                          <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'block' }} />
-                        </button>
+                        <DexSwitch size="sm" checked={!!selectedNode.continueOnError} label="Continue on error" onChange={() => updateNodeBehavior(selectedNode.id, { continueOnError: !selectedNode.continueOnError })} />
                       </label>
                     </div>
 

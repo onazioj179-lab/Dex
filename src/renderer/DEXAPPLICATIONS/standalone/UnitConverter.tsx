@@ -4,6 +4,7 @@
  * Professional unit converter — length, weight, temperature, volume, speed, data
  */
 import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { resolveUnitQuery } from '../../../shared/format/unitSearch';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
@@ -198,24 +199,15 @@ const UnitConverter: React.FC = () => {
       </div>
 
       {/* Category tabs */}
-      <div style={s.tabs} role="tablist" aria-label="Conversion category">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
-            className="uc-tab"
-            role="tab"
-            aria-selected={cat === category}
-            style={{
-              ...s.tab,
-              ...(cat === category ? s.tabActive : {}),
-            }}
-            title={cat}
-          >
-            <span style={s.tabIcon}>{CAT_ICONS[cat]}</span>
-            <span style={s.tabLabel}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
-          </button>
-        ))}
+      <div style={s.tabs}>
+        <SegmentedControl
+          semantics="tabs"
+          size="md"
+          aria-label="Conversion category"
+          options={CATEGORIES.map(cat => ({ value: cat, icon: <span aria-hidden="true" style={s.tabIcon}>{CAT_ICONS[cat]}</span>, label: cat.charAt(0).toUpperCase() + cat.slice(1) }))}
+          value={category}
+          onChange={(v) => handleCategoryChange(v as Category)}
+        />
       </div>
 
       {/* Converter */}
