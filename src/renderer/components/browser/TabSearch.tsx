@@ -76,7 +76,7 @@ export const TabSearch: React.FC<{ tabs: TabSearchItem[]; onPick: (id: string) =
             onMouseEnter={() => setSel(i)}
             onClick={() => { onPick(t.id); onClose(); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, cursor: 'pointer',
               background: i === sel ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
             }}
           >
