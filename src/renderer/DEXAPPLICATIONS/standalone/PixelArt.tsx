@@ -197,6 +197,7 @@ const PixelArt: React.FC = () => {
           toast('error', "Your saved Pixel Art couldn't be read, so a new drawing was started. The old data was kept in app storage.");
         }
         if (ok && parsed) {
+          histRef.current.expect = parsed.frames; // loading saved art is not an undo step
           setSize(parsed.size);
           setFrames(parsed.frames);
           setCurrentFrame(Math.min(parsed.currentFrame ?? 0, parsed.frames.length - 1));
@@ -509,6 +510,60 @@ const PixelArt: React.FC = () => {
     });
   }, [size]);
 
+  // ---- Undo / redo -----------------------------------------------------------
+  // One step per pause in editing (a stroke is one step). States are the
+  // immutable frames array plus the grid size, so snapshots cost nothing.
+  type Snap = { frames: Frame[]; size: GridSize };
+  const histRef = useRef<{ past: Snap[]; future: Snap[]; base: Snap; expect: Frame[] | null }>({ past: [], future: [], base: { frames, size }, expect: null });
+  const [histTick, setHistTick] = useState(0);
+  useEffect(() => {
+    const h = histRef.current;
+    // Loading saved art and undo/redo set exactly these frames: not a new step.
+    if (h.expect && frames === h.expect) { h.expect = null; h.base = { frames, size }; return; }
+    if (frames === h.base.frames && size === h.base.size) return;
+    const t = setTimeout(() => {
+      h.past.push(h.base);
+      if (h.past.length > 100) h.past.shift();
+      h.future = [];
+      h.base = { frames, size };
+      setHistTick(n => n + 1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [frames, size]);
+  const restore = useCallback((snap: Snap) => {
+    histRef.current.expect = snap.frames;
+    setFrames(snap.frames);
+    setSize(snap.size);
+    setCurrentFrame(c => Math.min(c, snap.frames.length - 1));
+    setHistTick(n => n + 1);
+  }, []);
+  const undo = useCallback(() => {
+    const h = histRef.current;
+    const prev = h.past.pop();
+    if (!prev) return;
+    h.future.push(h.base);
+    restore(prev);
+  }, [restore]);
+  const redo = useCallback(() => {
+    const h = histRef.current;
+    const next = h.future.pop();
+    if (!next) return;
+    h.past.push(h.base);
+    restore(next);
+  }, [restore]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (!keyEventForApp(e, 'pixelart') || isTypingTarget(e.target)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+  void histTick;
+
   const clearFrame = useCallback(() => {
     setFrames(prev => prev.map((f, i) => (i === currentFrame ? makeBlankFrame(size) : f)));
   }, [currentFrame, size]);
@@ -663,7 +718,7 @@ const PixelArt: React.FC = () => {
               }
             }
             setFrames(prev => prev.map((f, idx) => (idx === currentFrame ? next : f)));
-            toast('success', `Imported image into ${size}x${size} frame`);
+            toast('success', `Imported image into ${size}x${size} frame (Undo to restore the frame)`);
           } catch {
             toast('error', 'Image import failed');
           }
@@ -828,6 +883,8 @@ const PixelArt: React.FC = () => {
             style={toolBtn}
             title={`Import an image and downscale it into the ${size}x${size} grid`}
           >Import</button>
+          <button onClick={undo} disabled={!histRef.current.past.length} style={{ ...toolBtn, ...(!histRef.current.past.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Undo (Ctrl+Z)" aria-label="Undo">Undo</button>
+          <button onClick={redo} disabled={!histRef.current.future.length} style={{ ...toolBtn, ...(!histRef.current.future.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
           <button onClick={clearFrame} style={toolBtn}>Clear</button>
           <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Export PNG</button>
           <button onClick={exportSheet} disabled={frames.length < 2} style={{ ...toolBtn, ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} title={frames.length < 2 ? 'Add a second frame to export a sprite sheet' : 'Export all frames as one sprite-sheet PNG'}>Export Sheet</button>
