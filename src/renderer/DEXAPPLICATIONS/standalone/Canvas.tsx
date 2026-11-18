@@ -12,7 +12,7 @@ import {
   type BoardsIndex, type BoardPayload, UNFILED,
   loadIndex, saveIndex, loadBoard, saveBoard, deleteBoardData,
   addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
-  takeCanvasRequest, CANVAS_REQUEST_EVENT,
+  takeCanvasRequest, CANVAS_REQUEST_EVENT, setLiveBoardSource, takePendingBoardImport,
 } from './canvasBoards';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
@@ -353,6 +353,8 @@ const Canvas: React.FC = () => {
   const saveSeqRef = useRef(0);
   const [saveState, setSaveState] = useState<{ pending: boolean; savedAt: number | null; error: string | null }>({ pending: false, savedAt: null, error: null });
   useUnsavedGuard(saveState.pending || saveState.error !== null);
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const persist = useCallback(() => {
     const idx = boardsRef.current;
     if (!idx || !idx.activeId) return;
@@ -660,6 +662,16 @@ const Canvas: React.FC = () => {
     };
   }, []);
 
+  // Creative Studio project export reads the board as it is on screen.
+  useEffect(() => {
+    setLiveBoardSource(() => {
+      const idx = boardsRef.current;
+      if (!idx) return null;
+      return { name: idx.boards.find(b => b.id === idx.activeId)?.name ?? 'Board', payload: snapshotRef.current() };
+    });
+    return () => setLiveBoardSource(null);
+  }, []);
+
   // Requests from the Creative Hub: open a board, or start one from a template.
   const handleRequestRef = useRef<() => Promise<void>>(async () => {});
   handleRequestRef.current = async () => {
@@ -668,6 +680,20 @@ const Canvas: React.FC = () => {
     if (!req) return;
     if (req.boardId && boardsRef.current.boards.some(b => b.id === req.boardId)) {
       await switchBoard(req.boardId);
+      return;
+    }
+    if (req.importBoard) {
+      const imp = takePendingBoardImport();
+      if (!imp) return;
+      await newBoard();
+      const idx2 = boardsRef.current;
+      if (idx2) {
+        const named = renameBoard(idx2, idx2.activeId, imp.name);
+        boardsRef.current = named;
+        setBoards(named);
+        await saveIndexReported(named);
+      }
+      restorePayloadRef.current(imp.payload);
       return;
     }
     const tpl = req.templateId ? BOARD_TEMPLATES.find(t => t.id === req.templateId) : undefined;

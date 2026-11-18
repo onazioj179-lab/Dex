@@ -116,7 +116,7 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'removeItem'> | null {
 // ---- open requests from other apps (Creative Hub) ----------------------------
 // The Hub may ask Canvas to show a board or start one from a template before
 // Canvas is even mounted, so the request is parked here and consumed once.
-export interface CanvasRequest { boardId?: string; templateId?: string }
+export interface CanvasRequest { boardId?: string; templateId?: string; /** A board waits in takePendingBoardImport(). */ importBoard?: boolean }
 const REQUEST_KEY = 'dex-canvas-request';
 export const CANVAS_REQUEST_EVENT = 'dex-canvas-request';
 
@@ -133,4 +133,28 @@ export function takeCanvasRequest(): CanvasRequest | null {
     const r = JSON.parse(raw) as CanvasRequest;
     return r && typeof r === 'object' ? r : null;
   } catch { return null; }
+}
+
+// ---- live board source + board import (Creative Studio project files) --------
+// The board on screen is Canvas's state, not what is stored yet, and the board
+// index belongs to Canvas (writing it from outside would be overwritten), so a
+// project export asks Canvas for the live board and an import is handed to
+// Canvas to create. Held in memory: a board with drawing layers can be larger
+// than session storage allows.
+
+let liveBoardSource: (() => { name: string; payload: BoardPayload } | null) | null = null;
+let pendingImport: { name: string; payload: BoardPayload } | null = null;
+
+export function setLiveBoardSource(fn: typeof liveBoardSource): void { liveBoardSource = fn; }
+export function getLiveBoard(): { name: string; payload: BoardPayload } | null { try { return liveBoardSource?.() ?? null; } catch { return null; } }
+
+/** Ask Canvas to add this board as a new board and show it. */
+export function importBoardIntoCanvas(name: string, payload: BoardPayload): void {
+  pendingImport = { name, payload };
+  requestCanvas({ importBoard: true });
+}
+export function takePendingBoardImport(): { name: string; payload: BoardPayload } | null {
+  const p = pendingImport;
+  pendingImport = null;
+  return p;
 }
