@@ -9,7 +9,7 @@
 >   restored only 100 tabs. Not done: low-end/high-end hardware (one machine here), memory-pressure runs.
 > - **Batch 2 multi-window: SHIPPED (first slice, #328).** `services/appWindows.ts`: window ids `notes~2` resolve to their
 >   app in every shell map, each window mounts its own app copy (own document/navigation/scroll), shared stores stay
->   shared. Notes, Files, Terminal, Calculator, Ledger, DEX Code, Browser; "New Window" in the app menu. Not done: window
+>   shared. Files, Terminal, Calculator, Ledger, DEX Code, Browser (Notes excluded until its selection is per window); "New Window" in the app menu. Not done: window
 >   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
 > - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
 >   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.

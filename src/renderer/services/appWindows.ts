@@ -21,8 +21,11 @@ import { createContext, useContext } from 'react';
 export const WINDOW_SEP = '~';
 
 /** Apps that support more than one window. */
+// Notes is NOT here yet: its open note lives in one shared store
+// (store/notesStore.ts selectedNoteId/activeNote), so two windows would show and
+// switch the same note. It joins once selection is per window.
 export const MULTI_WINDOW_APPS: ReadonlySet<string> = new Set([
-  'notes', 'files', 'terminal', 'calculator', 'ledger', 'dexcode', 'browser',
+  'files', 'terminal', 'calculator', 'ledger', 'dexcode', 'browser',
 ]);
 
 export function baseAppId(id: string): string {

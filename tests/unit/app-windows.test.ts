@@ -41,16 +41,21 @@ describe('app windows', () => {
   describe('store', () => {
     beforeEach(() => useRunningApps.setState({ runningApps: [], currentAppId: 'home', sessionHistory: [] }));
 
-    it('opens a second Notes window; closing it leaves the first open', () => {
+    it('opens a second Files window; closing it leaves the first open', () => {
       const s = useRunningApps.getState();
-      s.launchApp({ id: 'notes', name: 'Notes', icon: 'notes', color: '#fff' });
-      const id = s.openNewWindow('notes');
-      expect(id).toBe('notes~2');
-      expect(useRunningApps.getState().runningApps.map(a => a.id)).toEqual(['notes', 'notes~2']);
-      expect(useRunningApps.getState().runningApps[1].name).toBe('Notes 2');
-      expect(useRunningApps.getState().currentAppId).toBe('notes~2');
-      useRunningApps.getState().closeApp('notes~2');
-      expect(useRunningApps.getState().runningApps.map(a => a.id)).toEqual(['notes']);
+      s.launchApp({ id: 'files', name: 'Files', icon: 'files', color: '#fff' });
+      const id = s.openNewWindow('files');
+      expect(id).toBe('files~2');
+      expect(useRunningApps.getState().runningApps.map(a => a.id)).toEqual(['files', 'files~2']);
+      expect(useRunningApps.getState().runningApps[1].name).toBe('Files 2');
+      expect(useRunningApps.getState().currentAppId).toBe('files~2');
+      useRunningApps.getState().closeApp('files~2');
+      expect(useRunningApps.getState().runningApps.map(a => a.id)).toEqual(['files']);
+    });
+
+    it('Notes stays single-window until its open note is per window', () => {
+      expect(supportsMultipleWindows('notes')).toBe(false);
+      expect(useRunningApps.getState().openNewWindow('notes')).toBeNull();
     });
 
     it('apps without multi-window support never get a second window', () => {
