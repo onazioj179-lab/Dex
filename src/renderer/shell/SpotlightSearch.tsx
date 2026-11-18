@@ -149,23 +149,22 @@ const ResultItem: React.FC<{
       role="option"
       style={{
         display: 'flex', alignItems: 'center',
-        width: '100%', height: 40, padding: '0 10px',
-        background: isSelected ? 'color-mix(in srgb, var(--color-accent, #3b82f6) 35%, transparent)' : 'transparent',
-        border: 'none', borderRadius: 10, cursor: 'pointer',
-        transition: isReduceMotion() ? 'none' : 'background 0.15s ease, transform 0.12s ease',
+        width: '100%', height: 38, padding: '0 10px',
+        background: isSelected ? 'color-mix(in srgb, var(--color-accent, #0A84FF) 18%, transparent)' : 'transparent',
+        border: 'none', borderRadius: 14, cursor: 'pointer',
+        transition: isReduceMotion() ? 'none' : 'background 0.12s ease',
         position: 'relative', gap: 10,
         textAlign: 'left',
-        transform: isSelected ? 'scale(1.01)' : 'scale(1)',
       }}
     >
       {/* Icon */}
       <div style={{
-        width: 26, height: 26, borderRadius: 4,
-        background: isSelected ? 'var(--color-border)' : (result.color ? `${result.color}18` : 'var(--color-bg-hover)'),
+        width: 26, height: 26, borderRadius: 10,
+        background: result.color ? `${result.color}1f` : 'var(--color-bg-hover)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
-        color: isSelected ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
-        transition: 'background 0.1s ease, color 0.1s ease',
+        color: isSelected ? 'var(--color-accent, #0A84FF)' : 'var(--color-text-secondary)',
+        transition: 'color 0.1s ease',
       }}>
         <CategoryIcon category={result.category} />
       </div>
@@ -174,9 +173,8 @@ const ResultItem: React.FC<{
       <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <div style={{
           fontSize: 13, fontWeight: isSelected ? 500 : 400,
-          color: isSelected ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
+          color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          transition: 'color 0.1s ease',
         }}>
           <HighlightedText text={result.title} highlights={result.highlights} />
         </div>
@@ -680,8 +678,9 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             className="spotlight-results-scroll"
             onMouseDown={e => e.preventDefault()}
             style={{
-              position: 'absolute', left: 0, right: 0, ...dropStyle,
-              maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
+              // Floating surface wider than the dock field, centred on it.
+              position: 'absolute', left: 'calc(50% - min(240px, 46vw))', width: 'min(480px, 92vw)', ...dropStyle,
+              maxHeight: 440, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
               // Liquid glass (master overhaul) -- the strong variant: translucent
               // enough to bloom the wallpaper/content behind it, opaque enough that
@@ -690,21 +689,19 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',
               backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
               WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-              border: '1px solid var(--color-border)',
-              borderRadius: 10,
+              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
+              borderRadius: 18,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
-              padding: '4px',
+              padding: 6,
               animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
             }}
           >
             {groupedResults.map(group => (
               <div key={group.category}>
-                <div className="dex-label-caps" style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px var(--space-3) 3px',
-                  fontSize: 10,
+                <div style={{
+                  padding: '8px 10px 2px', fontSize: 11, fontWeight: 600,
+                  color: 'var(--color-text-tertiary)',
                 }}>
-                  <CategoryIcon category={group.category} />
                   {CATEGORY_LABELS[group.category]}
                 </div>
                 {group.results.map((result, i) => {
@@ -759,27 +756,28 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           transformOrigin: 'bottom right',
           animation: isReduceMotion() ? 'none' : 'dexSpotlightRollOut 0.2s cubic-bezier(0.2,0.9,0.3,1)',
           pointerEvents: 'auto',
-          width: 'min(560px, 92vw)',
-          maxHeight: 'min(520px, 70vh)',
-          display: 'flex', flexDirection: 'column',
+          width: 'min(600px, 92vw)',
+          maxHeight: 'min(540px, 72vh)',
+          display: 'flex', flexDirection: 'column', gap: 4, padding: 6,
           // Master overhaul: glass search overlay (Part 3.7).
           background: 'var(--glass-bg, rgba(12,12,12,0.85))',
           backdropFilter: 'var(--glass-blur, blur(24px))',
           WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
           border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-          borderRadius: 10,
+          // Floating capsule: outer 24, inner input 18 (24 - 6 padding), rows 14.
+          borderRadius: 24,
           boxShadow: 'var(--pg-shadow-modal)',
           overflow: 'hidden',
         }}
       >
         {/* Input row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-          height: 52, padding: '0 18px',
-          borderBottom: '1px solid var(--color-bg-hover)',
+        <div data-testid="spotlight-capsule" style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          height: 48, padding: '0 8px 0 16px', borderRadius: 18,
+          background: 'var(--color-bg-hover)',
           flexShrink: 0,
         }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.2">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input
@@ -788,7 +786,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             value={query}
             onChange={e => handleSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search"
+            placeholder="Search apps, files, projects, settings"
             aria-label="Spotlight Search"
             role="combobox"
             aria-expanded={flatResults.length > 0}
@@ -824,14 +822,6 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               </svg>
             </button>
           )}
-          <kbd style={{
-            fontSize: 10, padding: '2px 6px',
-            background: 'var(--color-bg-hover)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 4, color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-family)',
-            flexShrink: 0,
-          }}>Esc</kbd>
         </div>
 
         {/* Scrollable results list */}
@@ -845,17 +835,15 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             style={{
               flex: 1, overflowY: 'auto', overflowX: 'hidden',
               scrollBehavior: 'smooth',
-              padding: '4px',
+              padding: '0 2px 2px',
             }}
           >
             {groupedResults.map(group => (
               <div key={group.category}>
-                <div className="dex-label-caps" style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px var(--space-3) 3px',
-                  fontSize: 10,
+                <div style={{
+                  padding: '8px 10px 2px', fontSize: 11, fontWeight: 600,
+                  color: 'var(--color-text-tertiary)',
                 }}>
-                  <CategoryIcon category={group.category} />
                   {CATEGORY_LABELS[group.category]}
                 </div>
                 {group.results.map(result => {
@@ -889,8 +877,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         {/* Footer hints */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '6px var(--space-4)',
-          borderTop: '1px solid var(--color-bg-hover)',
+          padding: '4px var(--space-4) 2px',
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -905,8 +892,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
                 <kbd key={k} style={{
                   padding: '1px 5px', fontSize: 10,
                   background: 'var(--color-bg-hover)',
-                  border: '1px solid var(--color-border-subtle)',
-                  borderRadius: 4, color: 'var(--color-text-tertiary)',
+                  border: 'none',
+                  borderRadius: 6, color: 'var(--color-text-tertiary)',
                   fontFamily: 'var(--font-family)',
                   lineHeight: '14px',
                 }}>{k}</kbd>

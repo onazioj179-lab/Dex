@@ -116,3 +116,29 @@ export function historyRedo<S>(h: DeckHistory<S>): { h: DeckHistory<S>; slides: 
   const next = h.future[0];
   return { h: { past: [...h.past, h.base].slice(-HISTORY_LIMIT), future: h.future.slice(1), base: next, lastAt: 0 }, slides: next };
 }
+
+// ---- outline → slides ---------------------------------------------------------
+
+/** "Title" lines start slides; indented or bulleted lines are that slide's bullets. Pure. */
+export function parseOutline(text: string): { title: string; bullets: string[] }[] {
+  const groups: { title: string; bullets: string[] }[] = [];
+  let cur: { title: string; bullets: string[] } | null = null;
+  for (const raw of text.split(/\r?\n/)) {
+    if (!raw.trim()) continue;
+    const indented = /^\s+/.test(raw) || /^\s*[-*•]\s+/.test(raw);
+    const line = raw.replace(/^\s*[-*•#]+\s*/, '').trim();
+    if (!line) continue;
+    if (!indented || !cur) { cur = { title: line, bullets: [] }; groups.push(cur); }
+    else cur.bullets.push(line);
+  }
+  return groups;
+}
+
+/**
+ * Where outline slides go: after the existing slides, unless the deck is just
+ * the untouched starter slide (then they replace it). Never drops user work.
+ */
+export function mergeOutlineSlides<S>(existing: S[], built: S[], isUntouchedStarter: (s: S) => boolean): { slides: S[]; firstNew: number; replaced: boolean } {
+  if (existing.length === 1 && isUntouchedStarter(existing[0])) return { slides: built, firstNew: 0, replaced: true };
+  return { slides: [...existing, ...built], firstNew: existing.length, replaced: false };
+}

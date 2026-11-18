@@ -60,3 +60,12 @@ export async function writeTextFile(path: string, content: string): Promise<void
   const r = await need().invoke('fs:writeText', path, content);
   if (!r?.ok) throw new Error(r?.error || `Could not write ${path}.`);
 }
+
+/** Write binary data (an image, an export) atomically. Throws with the native error. */
+export async function writeBinaryFile(path: string, data: Blob): Promise<void> {
+  const buf = new Uint8Array(await data.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  const r = await need().invoke('fs:writeBase64', path, btoa(bin));
+  if (!r?.ok) throw new Error(r?.error || `Could not write ${path}.`);
+}

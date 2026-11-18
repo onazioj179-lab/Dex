@@ -895,11 +895,37 @@ export class SpotlightEngine {
 
   start(onRefresh: () => void): void {
     this._onRefresh = onRefresh;
+    this._started = true;
     this._refreshIndex();
     sharedTick.subscribe('spotlight-index', () => this._refreshIndex(), 60000);
   }
 
+  private _started = false;
+  private _listeners = new Set<() => void>();
+
+  private _notifyRefresh(): void {
+    this._onRefresh?.();
+    for (const l of this._listeners) { try { l(); } catch { /* a listener never breaks indexing */ } }
+  }
+
+  /**
+   * Other search surfaces (the App Menu) listen for async results (files,
+   * projects, notes) without taking over the main callback. Starts indexing
+   * if nothing has yet. Returns the unsubscribe.
+   */
+  subscribe(fn: () => void): () => void {
+    this._listeners.add(fn);
+    if (!this._started) {
+      this._started = true;
+      this._refreshIndex();
+      sharedTick.subscribe('spotlight-index', () => this._refreshIndex(), 60000);
+    }
+    return () => { this._listeners.delete(fn); };
+  }
+
   destroy(): void {
+    if (this._listeners.size > 0) { this._onRefresh = null; return; } // still in use elsewhere
+    this._started = false;
     sharedTick.unsubscribe('spotlight-index');
     this._onRefresh = null;
     this._xenonUnsub?.();
@@ -1207,12 +1233,13 @@ export class SpotlightEngine {
     // bounded lists, so they live in the synchronous index (refreshed on the
     // 60s tick) and stay searchable instantly per keystroke — no async fanout.
     this._fetchProjectsFromBackend();
+    this._fetchCodeProjects();
     this._fetchWorkflowsFromBackend();
     // Refresh which project is currently active so ranking can boost its items.
     this._refreshActiveProject();
 
     this._index = items;
-    this._onRefresh?.();
+    this._notifyRefresh();
   }
 
   /** Resolve the active project id (cached) so ranking can boost its members. */
@@ -1249,9 +1276,42 @@ export class SpotlightEngine {
       }
       if (next.length > 0) {
         this._index = [...this._index, ...next];
-        this._onRefresh?.();
+        this._notifyRefresh();
       }
     } catch { /* projects channel unavailable -> omit source */ }
+  }
+
+  /**
+   * Code projects Umari found in the indexed folders (package.json, Cargo.toml,
+   * ...). Opens the project folder in Files; the subtitle says what kind of
+   * project it is and what its manifest declares for tests.
+   */
+  private async _fetchCodeProjects(): Promise<void> {
+    try {
+      const r = await (window as any).dex?.invoke?.('umari:projects');
+      if (!r?.ok || !Array.isArray(r.projects)) return;
+      const next: IndexedItem[] = [];
+      for (const p of r.projects as Array<{ name: string; root: string; kinds: string[]; testCommand: string | null; modified: number }>) {
+        const id = `codeproject-${p.root}`;
+        if (this._index.some((item) => item.id === id)) continue;
+        next.push({
+          id,
+          category: 'projects',
+          title: p.name,
+          subtitle: `${p.kinds.join(', ')} project · ${p.root}`,
+          searchText: `${p.name} ${p.kinds.join(' ')} project ${p.root}`.toLowerCase(),
+          icon: 'code',
+          color: '#0A84FF',
+          action: () => this._launchAppWithContext('files', p.root),
+          frequency: this._usageFrequency.get(id) || 0,
+          lastUsed: p.modified ? p.modified * 1000 : 0,
+        });
+      }
+      if (next.length) {
+        this._index = [...this._index, ...next];
+        this._notifyRefresh();
+      }
+    } catch { /* Umari unavailable (web preview) -> omit source */ }
   }
 
   /** Workflows from the native store (window.dex.workflows.getAll). */
@@ -1281,7 +1341,7 @@ export class SpotlightEngine {
       }
       if (next.length > 0) {
         this._index = [...this._index, ...next];
-        this._onRefresh?.();
+        this._notifyRefresh();
       }
     } catch { /* workflows channel unavailable -> omit source */ }
   }
@@ -1311,7 +1371,7 @@ export class SpotlightEngine {
         }
         if (newFiles.length > 0) {
           this._index = [...this._index, ...newFiles];
-          this._onRefresh?.();
+          this._notifyRefresh();
         }
       }
     } catch { /* IPC not available */ }
@@ -1359,7 +1419,7 @@ export class SpotlightEngine {
     queueMicrotask(() => {
       this._reindexQueued = false;
       this._refreshIndex();
-      this._onRefresh?.();
+      this._notifyRefresh();
     });
   }
 
@@ -1437,6 +1497,21 @@ export class SpotlightEngine {
     // 9. Mark top result
     if (deduped.length > 0 && deduped[0].category !== 'calculator') {
       deduped[0] = { ...deduped[0], category: 'top' };
+    }
+
+    // 9b. UKI: offered, never automatic. It only puts the text in UKI's box;
+    // nothing reaches an AI provider until the user sends it there.
+    if (q.length >= 3) {
+      deduped.push({
+        id: `uki-ask-${q}`,
+        category: 'actions',
+        title: `Ask UKI: "${q}"`,
+        subtitle: 'Opens UKI with this text; you send it',
+        color: '#0A84FF',
+        highlights: [],
+        score: 1,
+        action: () => { window.dispatchEvent(new CustomEvent('uki:ask', { detail: { text: q } })); },
+      });
     }
 
     // 10. Web suggestions (always appended at end after local results)
@@ -1946,7 +2021,7 @@ export class SpotlightEngine {
           });
           added = true;
         }
-        if (added) this._onRefresh?.();
+        if (added) this._notifyRefresh();
       }
     } catch { /* IPC not available */ }
   }
@@ -2013,7 +2088,7 @@ export class SpotlightEngine {
         });
         added = true;
       }
-      if (added) this._onRefresh?.();
+      if (added) this._notifyRefresh();
     } catch { /* Universal Search not available */ }
 
     // Also try File Intelligence API for deeper file discovery
@@ -2050,7 +2125,7 @@ export class SpotlightEngine {
         });
         added = true;
       }
-      if (added) this._onRefresh?.();
+      if (added) this._notifyRefresh();
     } catch { /* File Intelligence not available */ }
   }
 
@@ -2155,7 +2230,7 @@ export class SpotlightEngine {
     })();
 
     await Promise.allSettled([commands, screenshots, conversations]);
-    if (seq === this._sourcesSeq && added.value) this._onRefresh?.();
+    if (seq === this._sourcesSeq && added.value) this._notifyRefresh();
   }
 
   private _copyToClipboard(text: string): void {

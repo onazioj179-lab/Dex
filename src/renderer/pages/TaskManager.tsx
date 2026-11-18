@@ -30,6 +30,8 @@ import { appLifecycle, type AppPhase } from '../services/AppLifecycle';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
+import { topApps, formatTopApps } from './taskManagerUki';
 import { LineChart, canvasColor } from '../components/telemetry/LineChart';
 
 // -- types + persisted preferences --------------------------------------------
@@ -225,6 +227,26 @@ const TaskManager: React.FC = () => {
       setBridge('error');
       setLastError(e instanceof Error ? e.message : String(e));
     }
+  }, []);
+
+  // UKI: "which apps use the most memory / CPU" from a fresh process list.
+  useEffect(() => {
+    registerUkiAppAction('taskmanager', {
+      id: 'taskmanager.topApps',
+      description: 'list the apps using the most memory or CPU right now (same-named processes added up). Read-only.',
+      args: [{ name: 'by', type: 'string', optional: true }, { name: 'limit', type: 'string', optional: true }],
+      example: '{"by": "memory", "limit": "5"}',
+      mutates: false,
+    }, async (args) => {
+      const by = String(args.by ?? 'memory').toLowerCase() === 'cpu' ? 'cpu' : 'memory';
+      const limit = Number(args.limit ?? 10) || 10;
+      const dex = (window as { dex?: { system?: { getProcesses?: () => Promise<SystemProcess[]>; getStatus?: () => Promise<SystemStatusInfo> } } }).dex;
+      if (!dex?.system?.getProcesses) return 'The process list needs the DEX desktop app.';
+      const list = await dex.system.getProcesses();
+      const total = await dex.system.getStatus?.().then((st) => st?.memory?.total).catch(() => undefined);
+      return formatTopApps(topApps(Array.isArray(list) ? list : [], by, limit), by, typeof total === 'number' ? total / (1024 * 1024) : undefined /* status reports bytes */);
+    });
+    return () => unregisterUkiAppAction('taskmanager.topApps');
   }, []);
 
   const refreshProcesses = useCallback(async () => {

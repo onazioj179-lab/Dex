@@ -29,6 +29,7 @@ import { requestTerminalAt } from '../components/terminalProfiles';
 import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
+import { FilesBatchRenameDialog } from './FilesBatchRenameDialog';
 import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
@@ -368,6 +369,7 @@ export const Files: React.FC = () => {
 
   const [currentPath, setCurrentPath] = useState<string>('');
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [showBatchRename, setShowBatchRename] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('documents');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -548,9 +550,22 @@ export const Files: React.FC = () => {
       const names = c.files.slice(0, 200).map((f) => f.name).join(', ');
       return `${c.files.length} items in ${c.currentPath || c.selectedLocation}: ${names}`.slice(0, 4000);
     });
+    registerUkiAppAction('files', {
+      id: 'files.getSelection',
+      description: 'list the items the user has selected in Files, with full paths, kinds, sizes and dates (use before moving or renaming them).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      const picked = c.files.filter((f) => c.selectedFiles.has(f.path) || f.path === c.selectedFile);
+      if (!picked.length) return 'Nothing is selected in Files.';
+      return picked.slice(0, 200).map((f) => `${f.isDirectory ? 'folder' : f.extension || 'file'} · ${f.path} · ${f.isDirectory ? '' : `${f.size} bytes · `}modified ${f.modified instanceof Date && !Number.isNaN(f.modified.getTime()) ? f.modified.toISOString().slice(0, 10) : 'unknown'}`).join('\n').slice(0, 6000);
+    });
     return () => {
       unregisterUkiAppContext('files');
       unregisterUkiAppAction('files.listCurrentFolder');
+      unregisterUkiAppAction('files.getSelection');
     };
   }, [winId]);
 
@@ -2028,6 +2043,7 @@ export const Files: React.FC = () => {
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
             <button onClick={() => handleTransferSelected('copy')} title="Copy selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copy to...</button>
             <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
+            {selectedFiles.size > 1 && <button onClick={() => setShowBatchRename(true)} title="Rename the selected items with a preview" data-testid="files-batch-rename" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Rename...</button>}
             <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
             <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
@@ -2522,6 +2538,22 @@ export const Files: React.FC = () => {
         </div>
       )}
       <ConfirmHost />
+      {showBatchRename && (
+        <FilesBatchRenameDialog
+          dir={currentPath}
+          items={files.filter((f) => selectedFiles.has(f.path)).map((f) => ({ name: f.name, isDirectory: f.isDirectory }))}
+          existingNames={files.map((f) => f.name)}
+          rename={async (path, name) => { await fileOp('files:rename', path, name); }}
+          onDone={(r) => {
+            setShowBatchRename(false);
+            if (!r) return;
+            if (r.failed) toast.error(`Nothing renamed: ${r.failed}. Items were put back.`);
+            else toast.success(`Renamed ${r.renamed}${r.skipped ? `; ${r.skipped} left as is (conflicts)` : ''}`);
+            clearSelection();
+            loadFiles(currentPath);
+          }}
+        />
+      )}
     </div>
   );
 };

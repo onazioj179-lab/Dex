@@ -47,11 +47,22 @@
 >   token content) indexed by name only (`dex_search::is_sensitive_file`/`looks_like_secret`); project detection from
 >   manifests with only the test/build commands they declare; `umari:retrieve` = ranked, bounded excerpts with source
 >   path + project inside a caller-set character budget. UKI tools `find_context` (needs file-read) and `list_projects`.
-> - Not done in Part 24: Search capsule redesign (F), Gallery editing (G), Creative Studio (H), engineering/Bio (I),
->   DEX Code test runner UI (J; UKI can already run declared tests via list_projects → run_command), Files batch ops (K),
->   Browser (L), provider-reported token accounting in the context budget (E: `contextFit.ts` still estimates
->   ~4 chars/token), per-app context providers beyond `appContextRegistry`, cancellation of renderer-run app actions
->   from the Xack view (terminal tasks cancel natively).
+> - **Batch 2 (same PR):** Search: Umari code projects + an "Ask UKI" row (prefills UKI, sends nothing) in the
+>   App Menu search, engine listeners so async results reach every surface, Spotlight rows on capsule geometry (#352).
+>   Gallery: real pixel adjustments (8 controls) shared by preview and export, undo/redo, hold-to-see-original, real
+>   before/after (was placeholder squares), native Save dialog via new `fs:writeBase64` (#353). Context Budget Manager
+>   on every provider call (#354). DEX Code Tests tab via Umari + Xack (#355). Files batch Rename… (#356). Bio result
+>   fingerprints + stale flag (#357). Canvas smart guides + locking (#358).
+> - **Batch 3 (same PR): Creative Studio (#359).** The Canvas window is now Creative Studio with Board and Slides
+>   modes (each the full editor, mounted on first use and kept); opening Presentation lands in Studio › Slides, so a
+>   deck is never edited in two places. Board → "To Slides": each frame becomes an editable slide (reading order,
+>   layout scaled into 960×540, stickies/text → text, rectangles/frames → shapes, images kept), counting what slides
+>   cannot hold (connectors, ellipse outlines, freehand ink). Slides › "Check pictures" finds web-address pictures
+>   that do not load, by slide. There is no separate "Design" app to merge; fonts are the system UI font (no
+>   missing-font case); board and from-PC pictures are embedded (no relinking case).
+> - Still not done in Part 24: reusable component library, a single Studio project file (board + deck); Browser (L, audited: tabs/bookmarks/history/
+>   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
+>   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
 
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native

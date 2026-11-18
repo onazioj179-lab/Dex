@@ -227,6 +227,7 @@ const Learn = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Learn'));
 const CollabHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CollabHub'));
 const Canvas = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Canvas'));
 const CreativeHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/CreativeHub'));
+const CreativeStudio = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/creativeStudio/CreativeStudio'));
 const Timer = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Timer'));
 const ScreenRecorder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ScreenRecorder'));
 const PresentationBuilder = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PresentationBuilder'));
@@ -361,7 +362,7 @@ const APP_COMPONENTS_RAW: Record<AppId, React.LazyExoticComponent<any>> = {
   qrcode: QRCodeGenerator, colorpicker: ColorPickerApp,
   weather: Weather, worldclock: WorldClock, noisegenerator: NoiseGenerator, dexcode: DexCode,
   nexus: Nexus, learn: Learn, collabhub: CollabHub,
-  canvas: Canvas, creativehub: CreativeHub, timer: Timer,
+  canvas: CreativeStudio, creativehub: CreativeHub, timer: Timer,
   screenrecorder: ScreenRecorder, presentation: PresentationBuilder, pdfviewer: PDFViewer, pixelart: PixelArt,
   maps: DexMaps,
   git: GitClient,
@@ -526,7 +527,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   // Collaboration
   { id: 'collabhub', label: 'Collab Hub' },
   // Canvas & Timer
-  { id: 'canvas', label: 'Canvas' },
+  { id: 'canvas', label: 'Creative Studio' },
   { id: 'creativehub', label: 'Creative Hub' },
   { id: 'timer', label: 'Timer' },
   { id: 'maps', label: 'DEX Maps' },

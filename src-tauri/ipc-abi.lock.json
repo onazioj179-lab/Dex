@@ -597,6 +597,7 @@
     "fs:readText",
     "fs:readdir",
     "fs:stripMetadata",
+    "fs:writeBase64",
     "fs:writeText",
     "fts:index",
     "fts:rebuild",

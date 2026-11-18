@@ -2710,6 +2710,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "dialog:showSaveDialog" => native_ops::show_save_dialog(&app, &args),
         "fs:readText" => native_ops::read_text(&args),
         "fs:writeText" => native_ops::write_text(&args),
+        "fs:writeBase64" => native_ops::write_base64(&args),
         "fs:stripMetadata" => metadata_strip::strip_file(&args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----

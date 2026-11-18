@@ -19,6 +19,7 @@ import AutosaveIndicator from '../../components/AutosaveIndicator';
 import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -129,6 +130,19 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
+
+import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
+import { setStudioMode } from './creativeStudio/studioMode';
+
+/** True when a drawing layer has any painted pixel (checked only on demand). */
+function hasInk(c: HTMLCanvasElement): boolean {
+  try {
+    const d = c.getContext('2d')?.getImageData(0, 0, c.width, c.height).data;
+    if (!d) return false;
+    for (let i = 3; i < d.length; i += 16) if (d[i] !== 0) return true;
+  } catch { /* unreadable: treat as empty */ }
+  return false;
+}
 
 const Canvas: React.FC = () => {
   const viewRef = useRef<HTMLCanvasElement>(null);
@@ -604,6 +618,46 @@ const Canvas: React.FC = () => {
     commitObjects(objectsRef.current, [...objectsRef.current, obj]);
     setSelectedObj(obj.id);
   };
+
+  // UKI: read the open board (text of every object, grouped by frame) and send it to Slides.
+  useEffect(() => {
+    registerUkiAppAction('canvas', {
+      id: 'canvas.readBoard',
+      description: 'read the board open in Creative Studio: each frame and the sticky notes, text and shapes inside it (text only; images are named).',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const objs = objectsRef.current.filter((o) => o.kind !== 'connector');
+      const name = boardsRef.current?.boards.find((b) => b.id === boardsRef.current?.activeId)?.name ?? 'Board';
+      if (!objs.length) return `"${name}" has no objects.`;
+      const frames = objs.filter((o) => o.kind === 'frame');
+      const inFrame = (o: BoardObject, f: BoardObject) => o.x + o.w / 2 >= f.x && o.x + o.w / 2 <= f.x + f.w && o.y + o.h / 2 >= f.y && o.y + o.h / 2 <= f.y + f.h;
+      const line = (o: BoardObject) => `- ${o.kind}${o.kind === 'image' ? '' : `: ${o.text.trim().replace(/\s+/g, ' ').slice(0, 200) || '(empty)'}`}`;
+      const out = [`Board "${name}": ${objs.length} objects, ${frames.length} frames.`];
+      for (const f of frames) out.push(`Frame "${f.text || 'Untitled'}":`, ...objs.filter((o) => o.kind !== 'frame' && inFrame(o, f)).map(line));
+      const loose = objs.filter((o) => o.kind !== 'frame' && !frames.some((f) => inFrame(o, f)));
+      if (loose.length) out.push('Outside frames:', ...loose.map(line));
+      return out.join('\n').slice(0, 6000);
+    });
+    registerUkiAppAction('canvas', {
+      id: 'canvas.sendToSlides',
+      description: 'turn the open board into slides (each frame becomes a slide) and add them to the deck in Slides. Undoable there.',
+      args: [],
+      example: '{}',
+      mutates: true,
+    }, () => {
+      const { slides, report } = boardToSlides(objectsRef.current, { hasDrawing: layersRef.current.some((l) => l.visible && hasInk(l.canvas)) });
+      if (!sendSlidesToPresentation(slides)) return 'Nothing to send: the board has no sticky notes, text, shapes or images.';
+      setStudioMode('slides');
+      const extra = describeNotCarried(report);
+      return `Added ${report.slides} slide(s) with ${report.carried} objects to Slides.${extra ? ` ${extra}` : ''}`;
+    });
+    return () => {
+      unregisterUkiAppAction('canvas.readBoard');
+      unregisterUkiAppAction('canvas.sendToSlides');
+    };
+  }, []);
 
   // Requests from the Creative Hub: open a board, or start one from a template.
   const handleRequestRef = useRef<() => Promise<void>>(async () => {});
@@ -1384,6 +1438,13 @@ const Canvas: React.FC = () => {
                   <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'rename', value: boards.boards.find(b => b.id === boards.activeId)?.name ?? '' })} aria-label="Rename board" title="Rename board">Rename</button>
                   <button style={s.textBtn} onClick={() => setBoardEdit({ kind: 'folder', value: boards.boards.find(b => b.id === boards.activeId)?.folder ?? '' })} aria-label="Move board to folder" title="Move to folder">Folder</button>
                   <button style={s.textBtn} onClick={() => void deleteActiveBoard()} aria-label="Delete board" title="Delete board">Delete</button>
+                  <button style={s.textBtn} data-testid="canvas-send-to-slides" onClick={() => {
+                    const { slides, report } = boardToSlides(objectsRef.current, { hasDrawing: layers.some(l => l.visible && hasInk(l.canvas)) });
+                    if (!sendSlidesToPresentation(slides)) { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Nothing to send: add sticky notes, text, shapes or images (frames become slides).' } })); return; }
+                    setStudioMode('slides');
+                    const extra = describeNotCarried(report);
+                    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Added ${report.slides} slide${report.slides > 1 ? 's' : ''} from this board (${report.carried} objects).${extra ? ` ${extra}` : ''}` } }));
+                  }} aria-label="Send board to Slides" title="Each frame becomes a slide (or the whole board if it has no frames)">To Slides</button>
                 </div>
               )}
             </div>

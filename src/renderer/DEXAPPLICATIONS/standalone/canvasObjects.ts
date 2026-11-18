@@ -24,6 +24,8 @@ export interface BoardObject {
   /** connector: object ids at each end */
   from?: string;
   to?: string;
+  /** Locked objects cannot be moved, resized or deleted until unlocked. */
+  locked?: boolean;
 }
 
 export const STICKY_COLORS = ['#FFE58F', '#FFC2D1', '#B8E1FF', '#C7F0BD', '#E0CCFF', '#FFD6A5'];
@@ -78,6 +80,37 @@ export function connectorEnds(c: BoardObject, byId: Map<string, BoardObject>): {
 }
 
 /** Delete objects and any connector attached to them. */
+export interface Guide { axis: 'x' | 'y'; at: number }
+
+/**
+ * Smart snapping: align a moving box's left/centre/right (and top/middle/
+ * bottom) to the nearest matching line of another object, within `threshold`
+ * board units. Returns the correction to add and the guides to draw.
+ */
+export function smartSnap(
+  box: { x: number; y: number; w: number; h: number },
+  others: readonly { x: number; y: number; w: number; h: number }[],
+  threshold: number,
+): { dx: number; dy: number; guides: Guide[] } {
+  const lines = (b: { x: number; y: number; w: number; h: number }, axis: 'x' | 'y') =>
+    axis === 'x' ? [b.x, b.x + b.w / 2, b.x + b.w] : [b.y, b.y + b.h / 2, b.y + b.h];
+  const out = { dx: 0, dy: 0, guides: [] as Guide[] };
+  for (const axis of ['x', 'y'] as const) {
+    let best: { dist: number; off: number; at: number } | null = null;
+    for (const o of others) {
+      for (const a of lines(box, axis)) for (const b of lines(o, axis)) {
+        const dist = Math.abs(b - a);
+        if (dist <= threshold && (!best || dist < best.dist)) best = { dist, off: b - a, at: b };
+      }
+    }
+    if (best) {
+      if (axis === 'x') out.dx = best.off; else out.dy = best.off;
+      out.guides.push({ axis, at: best.at });
+    }
+  }
+  return out;
+}
+
 export function removeObjects(objs: BoardObject[], ids: Set<string>): BoardObject[] {
   return objs.filter((o) => !ids.has(o.id) && !(o.kind === 'connector' && ((o.from && ids.has(o.from)) || (o.to && ids.has(o.to)))));
 }
@@ -103,6 +136,7 @@ export function sanitizeObjects(raw: unknown): BoardObject[] {
     };
     if (o.kind === 'image') { if (typeof r.src !== 'string' || !r.src.startsWith('data:image/')) continue; o.src = r.src; }
     if (o.kind === 'connector') { if (typeof r.from !== 'string' || typeof r.to !== 'string') continue; o.from = r.from; o.to = r.to; }
+    if (r.locked === true) o.locked = true;
     out.push(o);
   }
   return out;

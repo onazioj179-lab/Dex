@@ -368,6 +368,25 @@ const DexCode: React.FC = () => {
       const name = s.currentFilePath || s.fileName;
       return `// ${name}\n${s.code}`.slice(0, 6000);
     });
+    // UKI can read the open file's problems (the same syntax checks as the Problems panel).
+    registerUkiAppAction('dexcode', {
+      id: 'dexcode.problems',
+      description: 'list the syntax problems in the file open in DexCode (JSON, JavaScript, DexScript), with line and column, plus the source lines around each.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const s = ukiCtxRef.current;
+      if (!s.code) return 'No file is open in DexCode.';
+      const found = diagnose(s.fileName, s.code);
+      if (!found.length) return `No problems found in ${s.fileName} (checked: JSON, JavaScript and DexScript syntax; other languages are not checked).`;
+      const lines = s.code.split('\n');
+      return found.slice(0, 20).map((d) => {
+        if (d.line == null) return `${d.message} (whole file)`;
+        const ctx = lines.slice(Math.max(0, d.line - 3), d.line + 1).map((l, k) => `${Math.max(1, d.line! - 2) + k}| ${l}`).join('\n');
+        return `Line ${d.line}, col ${d.col}: ${d.message}\n${ctx}`;
+      }).join('\n\n').slice(0, 6000);
+    });
     // UKI can OPEN a new file/buffer with generated content (mutating -> confirm).
     registerUkiAppAction('dexcode', {
       id: 'dexcode.newFile',
@@ -403,6 +422,7 @@ const DexCode: React.FC = () => {
     return () => {
       unregisterUkiAppContext('dexcode');
       unregisterUkiAppAction('dexcode.readActiveFile');
+      unregisterUkiAppAction('dexcode.problems');
       unregisterUkiAppAction('dexcode.newFile');
       unregisterUkiAppAction('dexcode.search');
     };
@@ -1170,6 +1190,7 @@ const DexCode: React.FC = () => {
     { id: 'goto', label: 'Go to line…', shortcut: 'Ctrl+G', run: () => { setShowGoToLine(true); setGoToLineInput(''); requestAnimationFrame(() => goToLineRef.current?.focus()); } },
     { id: 'problems', label: 'Show problems', shortcut: 'Ctrl+Shift+M', run: () => openPanel('problems') },
     { id: 'terminal', label: 'Open terminal', shortcut: 'Ctrl+`', run: () => openPanel('terminal') },
+    { id: 'tests', label: 'Run project tests…', run: () => openPanel('tests') },
     { id: 'sidebar', label: 'Toggle sidebar', shortcut: 'Ctrl+B', run: toggleSidebar },
     { id: 'fullscreen', label: 'Toggle full screen', run: toggleFullscreen },
   ], [handleNewFile, handleOpenFile, openFolder, handleSaveFile, handleSaveAs, runCode, openPanel, toggleSidebar, toggleFullscreen]);

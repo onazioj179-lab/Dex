@@ -25,13 +25,21 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContex
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
-import { editedCanvasSize } from './galleryEdit';
+import { NEUTRAL, ADJUSTMENT_KEYS, isNeutral, normalizeAdjustments, EditHistory, type Adjustments } from './galleryAdjust';
+import { AdjustedPreview, renderEditedBlob } from './galleryPreview';
+import { hasNativeFiles, pickSavePath, writeBinaryFile } from '../services/nativeFiles';
 import { openWithShell } from '../utils/openWithShell';
 import { persistOrWarn } from '../utils/persistOrWarn';
 
 // ===========================================================================
 // TYPES
 // ===========================================================================
+
+const editBtn = (disabled: boolean): React.CSSProperties => ({
+  flex: 1, padding: '5px 6px', borderRadius: 10, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)',
+  color: disabled ? 'var(--color-text-muted)' : 'var(--color-text-secondary)', fontSize: 11, cursor: disabled ? 'default' : 'pointer',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: disabled ? 0.6 : 1,
+});
 
 interface MediaItem {
   id: string;
@@ -423,10 +431,20 @@ export const Gallery: React.FC = () => {
     if (!adjustCacheKey) return null;
     try { return JSON.parse(localStorage.getItem(adjustCacheKey) || 'null'); } catch { return null; }
   }, [adjustCacheKey]);
-  const [adjustExposure, setAdjustExposure] = useState(0);
-  const [adjustContrast, setAdjustContrast] = useState(0);
-  const [adjustSaturation, setAdjustSaturation] = useState(0);
-  const [adjustTemp, setAdjustTemp] = useState(0);
+  // Non-destructive edits: parameters per photo, applied by the same pixel
+  // pipeline for the live preview and the saved copy (galleryAdjust.ts).
+  const [adj, setAdj] = useState<Adjustments>(NEUTRAL);
+  const setAdjKey = useCallback((k: keyof Adjustments, v: number) => setAdj((a) => ({ ...a, [k]: v })), []);
+  const adjustExposure = adj.exposure, adjustContrast = adj.contrast, adjustSaturation = adj.saturation, adjustTemp = adj.temperature;
+  const setAdjustExposure = useCallback((v: number) => setAdjKey('exposure', v), [setAdjKey]);
+  const setAdjustContrast = useCallback((v: number) => setAdjKey('contrast', v), [setAdjKey]);
+  const setAdjustSaturation = useCallback((v: number) => setAdjKey('saturation', v), [setAdjKey]);
+  const setAdjustTemp = useCallback((v: number) => setAdjKey('temperature', v), [setAdjKey]);
+  const historyRef = useRef(new EditHistory<Adjustments>(NEUTRAL));
+  const applyingHistory = useRef(false);
+  const [historyTick, setHistoryTick] = useState(0);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [showCropRotate, setShowCropRotate] = useState(false);
   const [cropRatio, setCropRatio] = useState<'free' | '16:9' | '4:3' | '1:1' | '3:2'>('free');
   const [straightenAngle, setStraightenAngle] = useState(0);
@@ -583,9 +601,58 @@ export const Gallery: React.FC = () => {
       const names = c.sortedMedia.slice(0, 100).map((m) => m.name).join(', ');
       return `${c.sortedMedia.length} items in "${c.selectedAlbum}": ${names}`.slice(0, 4000);
     });
+    registerUkiAppAction('gallery', {
+      id: 'gallery.findMedia',
+      description: 'find photos and videos in the current album by name text, date range (YYYY-MM-DD), type (image/video), format or favourite; uses only metadata Gallery has.',
+      args: [
+        { name: 'text', type: 'string', optional: true },
+        { name: 'from', type: 'string', optional: true },
+        { name: 'to', type: 'string', optional: true },
+        { name: 'type', type: 'string', optional: true },
+        { name: 'format', type: 'string', optional: true },
+        { name: 'favorite', type: 'string', optional: true },
+      ],
+      example: '{"text": "beach", "from": "2026-06-01"}',
+      mutates: false,
+    }, (args) => {
+      const c = ukiCtxRef.current;
+      const text = String(args.text ?? '').trim().toLowerCase();
+      const parse = (v: unknown, end: boolean) => { const s = String(v ?? '').trim(); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null; const d = new Date(`${s}T${end ? '23:59:59' : '00:00:00'}`); return Number.isNaN(d.getTime()) ? null : d.getTime(); };
+      const from = parse(args.from, false), to = parse(args.to, true);
+      if ((args.from && from === null) || (args.to && to === null)) return 'Dates must be YYYY-MM-DD.';
+      const type = String(args.type ?? '').trim().toLowerCase();
+      const format = String(args.format ?? '').trim().toLowerCase().replace(/^\./, '');
+      const fav = String(args.favorite ?? '').trim().toLowerCase();
+      const hits = c.sortedMedia.filter((m) => {
+        const t = m.date instanceof Date ? m.date.getTime() : NaN;
+        if (text && !m.name.toLowerCase().includes(text)) return false;
+        if (from !== null && !(t >= from)) return false;
+        if (to !== null && !(t <= to)) return false;
+        if (type && m.type !== type) return false;
+        if (format && (m.format ?? m.name.split('.').pop() ?? '').toLowerCase() !== format) return false;
+        if ((fav === 'true' || fav === 'yes') && !m.favorite) return false;
+        return true;
+      });
+      if (!hits.length) return `No items in "${c.selectedAlbum}" match.`;
+      return `${hits.length} match in "${c.selectedAlbum}":\n` + hits.slice(0, 80).map((m) => `${m.name} · ${m.type}${m.width && m.height ? ` · ${m.width}×${m.height}` : ''} · ${m.date instanceof Date && !Number.isNaN(m.date.getTime()) ? m.date.toISOString().slice(0, 10) : 'no date'}${m.favorite ? ' · favourite' : ''}`).join('\n');
+    });
+    registerUkiAppAction('gallery', {
+      id: 'gallery.getSelection',
+      description: 'list the photos and videos the user has selected in Gallery.',
+      args: [],
+      example: '{}',
+      mutates: false,
+    }, () => {
+      const c = ukiCtxRef.current;
+      const picked = c.sortedMedia.filter((m) => c.selectedItems.has(m.id));
+      if (!picked.length) return 'Nothing is selected in Gallery.';
+      return picked.slice(0, 100).map((m) => `${m.name} · ${m.type} · ${m.src}`).join('\n').slice(0, 6000);
+    });
     return () => {
       unregisterUkiAppContext('gallery');
       unregisterUkiAppAction('gallery.listMedia');
+      unregisterUkiAppAction('gallery.findMedia');
+      unregisterUkiAppAction('gallery.getSelection');
     };
   }, []);
 
@@ -691,26 +758,84 @@ export const Gallery: React.FC = () => {
 
   // Restore cached adjustments when selecting a media item
   useEffect(() => {
-    if (cachedAdj) {
-      setAdjustExposure(cachedAdj.e ?? 0);
-      setAdjustContrast(cachedAdj.c ?? 0);
-      setAdjustSaturation(cachedAdj.s ?? 0);
-      setAdjustTemp(cachedAdj.t ?? 0);
-    } else {
-      setAdjustExposure(0); setAdjustContrast(0); setAdjustSaturation(0); setAdjustTemp(0);
-    }
+    const restored = normalizeAdjustments(cachedAdj);
+    applyingHistory.current = true;
+    setAdj(restored);
+    historyRef.current.reset(restored);
+    setHistoryTick((t) => t + 1);
+    setShowOriginal(false);
   }, [adjustCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Undo history: one step per pause in editing (a slider drag is one step).
+  useEffect(() => {
+    if (applyingHistory.current) { applyingHistory.current = false; return; }
+    const t = setTimeout(() => { historyRef.current.push(adj); setHistoryTick((n) => n + 1); }, 350);
+    return () => clearTimeout(t);
+  }, [adj]);
+  const undoEdit = useCallback(() => {
+    const prev = historyRef.current.undo();
+    if (prev) { applyingHistory.current = true; setAdj(prev); setHistoryTick((n) => n + 1); }
+  }, []);
+  const redoEdit = useCallback(() => {
+    const next = historyRef.current.redo();
+    if (next) { applyingHistory.current = true; setAdj(next); setHistoryTick((n) => n + 1); }
+  }, []);
+  void historyTick; // re-render so Undo/Redo enablement follows the history
 
   // Persist adjustments to localStorage when changed
   useEffect(() => {
     if (!adjustCacheKey) return;
-    const hasAdj = adjustExposure !== 0 || adjustContrast !== 0 || adjustSaturation !== 0 || adjustTemp !== 0;
-    if (hasAdj) {
-      persistOrWarn(adjustCacheKey, JSON.stringify({ e: adjustExposure, c: adjustContrast, s: adjustSaturation, t: adjustTemp }), 'your photo adjustments');
+    if (!isNeutral(adj)) {
+      persistOrWarn(adjustCacheKey, JSON.stringify(adj), 'your photo adjustments');
     } else {
       try { localStorage.removeItem(adjustCacheKey); } catch { /* nothing stored */ }
     }
-  }, [adjustCacheKey, adjustExposure, adjustContrast, adjustSaturation, adjustTemp]);
+  }, [adjustCacheKey, adj]);
+
+  /** Save an edited COPY (the original is never changed) through the native Save dialog. */
+  const saveEditedCopy = useCallback(async (withGeometry: boolean) => {
+    if (!selectedMedia?.src || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const blob = await renderEditedBlob(selectedMedia.src, withGeometry
+        ? { rotation: imgRotation, straighten: straightenAngle, flipH, flipV, ratio: cropRatio }
+        : { rotation: 0, straighten: 0, flipH: false, flipV: false, ratio: 'free' }, adj);
+      const base = selectedMedia.name.replace(/\.[^.]+$/, '');
+      if (hasNativeFiles()) {
+        const path = await pickSavePath(`${base}-edited.png`, [{ name: 'PNG image', extensions: ['png'] }], 'Save edited copy');
+        if (!path) return;
+        await writeBinaryFile(path, blob);
+        toast.success(`Saved ${path.split(/[\\/]/).pop()}`);
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${base}-edited.png`; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (e) {
+      toast.error(`Could not save the edited copy: ${(e as Error)?.message || 'error'}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [selectedMedia, savingEdit, imgRotation, straightenAngle, flipH, flipV, cropRatio, adj, toast]);
+
+  // Editing keys while the Adjust panel is open: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y,
+  // and hold \ to see the original.
+  useEffect(() => {
+    if (!showQuickAdjust) return undefined;
+    const down = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'gallery')) return; // a key meant for another app
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redoEdit(); else undoEdit(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redoEdit(); }
+      else if (e.key === '\\') { setShowOriginal(true); }
+    };
+    const up = (e: KeyboardEvent) => { if (!keyEventForApp(e, 'gallery')) return; if (e.key === '\\') setShowOriginal(false); };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, [showQuickAdjust, undoEdit, redoEdit]);
 
   const startSlideshow = useCallback(() => {
     setSlideshowIndex(0);
@@ -786,15 +911,6 @@ export const Gallery: React.FC = () => {
   const zoomReset = useCallback(() => { setImgZoom(1); setImgPan({ x: 0, y: 0 }); }, []);
   const rotateImage = useCallback(() => setImgRotation(prev => (prev + 90) % 360), []);
 
-  // Convert adjustment sliders to CSS filter string
-  const getAdjustmentFilter = useCallback(() => {
-    const parts: string[] = [];
-    if (adjustExposure !== 0) parts.push(`brightness(${1 + adjustExposure / 100})`);
-    if (adjustContrast !== 0) parts.push(`contrast(${1 + adjustContrast / 100})`);
-    if (adjustSaturation !== 0) parts.push(`saturate(${1 + adjustSaturation / 100})`);
-    if (adjustTemp !== 0) parts.push(adjustTemp > 0 ? `sepia(${adjustTemp / 200})` : `hue-rotate(${adjustTemp / 4}deg)`);
-    return parts.length > 0 ? parts.join(' ') : 'none';
-  }, [adjustExposure, adjustContrast, adjustSaturation, adjustTemp]);
 
   const copyImageToClipboard = useCallback(async () => {
     if (!selectedMedia?.src) return;
@@ -1651,38 +1767,28 @@ export const Gallery: React.FC = () => {
             <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowQuickAdjust(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            {[{ label: 'Exposure', value: adjustExposure, set: setAdjustExposure, min: -100, max: 100, color: 'var(--color-warning)' }, { label: 'Contrast', value: adjustContrast, set: setAdjustContrast, min: -100, max: 100, color: 'var(--color-accent)' }, { label: 'Saturation', value: adjustSaturation, set: setAdjustSaturation, min: -100, max: 100, color: 'var(--color-success)' }, { label: 'Temperature', value: adjustTemp, set: setAdjustTemp, min: -100, max: 100, color: 'var(--color-warning)' }].map(s => (
-              <div key={s.label} style={{ marginBottom: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value > 0 ? '+' : ''}{s.value}</span></div>
-                <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} aria-label={s.label} style={{ width: '100%', accentColor: s.color }} />
+            {([
+              ['exposure', 'Exposure'], ['brightness', 'Brightness'], ['contrast', 'Contrast'], ['highlights', 'Highlights'],
+              ['shadows', 'Shadows'], ['saturation', 'Saturation'], ['temperature', 'Temperature'], ['tint', 'Tint'],
+            ] as [keyof Adjustments, string][]).map(([key, label]) => (
+              <div key={key} style={{ marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</span>
+                  <span style={{ fontSize: 11, color: adj[key] ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{adj[key] > 0 ? '+' : ''}{adj[key]}</span>
+                </div>
+                <input type="range" min={-100} max={100} value={adj[key]} onChange={e => setAdjKey(key, Number(e.target.value))} onDoubleClick={() => setAdjKey(key, 0)} aria-label={label} title="Double-click to reset" style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
               </div>
             ))}
-            <button aria-label="Reset all adjustments" onClick={() => { setAdjustExposure(0); setAdjustContrast(0); setAdjustSaturation(0); setAdjustTemp(0); }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 4 }}>Reset All</button>
-            <button aria-label="Save edited image" onClick={() => {
-              if (!selectedMedia) return;
-              // Render adjusted image to canvas and trigger download
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                ctx.filter = getAdjustmentFilter();
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob(blob => {
-                  if (!blob) return;
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `edited_${selectedMedia.name}`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }, 'image/png');
-              };
-              img.src = selectedMedia.url;
-            }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Save Edited Image</button>
+            <div style={{ display: 'flex', gap: 4, margin: '6px 0' }}>
+              <button type="button" aria-label="Undo adjustment" title="Undo (Ctrl+Z)" disabled={!historyRef.current.canUndo} onClick={undoEdit} style={editBtn(!historyRef.current.canUndo)}><DexIcon name="undo" size={12} /> Undo</button>
+              <button type="button" aria-label="Redo adjustment" title="Redo (Ctrl+Shift+Z)" disabled={!historyRef.current.canRedo} onClick={redoEdit} style={editBtn(!historyRef.current.canRedo)}><DexIcon name="redo" size={12} /> Redo</button>
+              <button type="button" aria-label="Hold to see the original" title="Hold (or hold the \ key) to see the original" aria-pressed={showOriginal}
+                onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)}
+                style={editBtn(false)}>Original</button>
+            </div>
+            <button aria-label="Reset all adjustments" disabled={isNeutral(adj)} onClick={() => setAdj(NEUTRAL)} style={{ ...editBtn(isNeutral(adj)), width: '100%', marginBottom: 4 }}>Reset All</button>
+            <button aria-label="Save edited copy" disabled={savingEdit || isNeutral(adj)} onClick={() => { void saveEditedCopy(false); }} style={{ width: '100%', padding: '6px', borderRadius: 10, border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: savingEdit ? 'progress' : 'pointer', opacity: isNeutral(adj) ? 0.5 : 1 }}>{savingEdit ? 'Saving…' : 'Save Edited Copy'}</button>
+            <div style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', marginTop: 6, lineHeight: 1.4 }}>Edits are kept with this photo; the original file is never changed.</div>
           </div>
         </div>
       )}
@@ -1710,38 +1816,7 @@ export const Gallery: React.FC = () => {
               <button aria-label="Flip vertical" aria-pressed={flipV} onClick={() => setFlipV(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
               <button aria-label="Flip horizontal" aria-pressed={flipH} onClick={() => setFlipH(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
             </div>
-            <button aria-label="Save edited image as copy" onClick={async () => {
-              if (!selectedMedia?.src) return;
-              try {
-                const canvas = document.createElement('canvas');
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.src = selectedMedia.src;
-                await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
-                const rot = imgRotation % 360;
-                // 90° turns, straighten (cropped to the largest upright area),
-                // flips, then a centred crop to the chosen ratio.
-                const out = editedCanvasSize(img.width, img.height, rot, straightenAngle, cropRatio);
-                canvas.width = out.w;
-                canvas.height = out.h;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate(((rot + straightenAngle) * Math.PI) / 180);
-                ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-                ctx.filter = getAdjustmentFilter();
-                ctx.drawImage(img, -img.width / 2, -img.height / 2);
-                canvas.toBlob(blob => {
-                  if (!blob) return;
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `edited_${selectedMedia.name}`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }, 'image/png');
-              } catch { /* silent */ }
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Save Edited Copy</button>
+            <button aria-label="Save edited image as copy" disabled={savingEdit} onClick={() => { void saveEditedCopy(true); }} style={{ width: '100%', padding: '6px', borderRadius: 10, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>{savingEdit ? 'Saving…' : 'Save Edited Copy'}</button>
           </div>
         </div>
         </div>
@@ -1780,11 +1855,11 @@ export const Gallery: React.FC = () => {
           <div style={{ flex: 1, display: 'flex', gap: 2, padding: 'var(--space-3)' }}>
             <div style={{ flex: 1, borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>BEFORE</div>
-              {selectedMedia ? <div style={{ width: 60, height: 60, borderRadius: 4, background: getPlaceholderColor(selectedMedia.id) }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select image</span>}
+              {selectedMedia?.type === 'image' ? <img src={selectedMedia.src} alt="Original" style={{ maxWidth: '100%', maxHeight: 250, objectFit: 'contain', borderRadius: 6 }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select a photo</span>}
             </div>
             <div style={{ flex: 1, borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>AFTER</div>
-              {selectedMedia ? <div style={{ width: 60, height: 60, borderRadius: 4, background: getPlaceholderColor(selectedMedia.id), filter: `brightness(${1 + adjustExposure / 100}) contrast(${1 + adjustContrast / 100}) saturate(${1 + adjustSaturation / 100})` }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select image</span>}
+              {selectedMedia?.type === 'image' ? <AdjustedPreview src={selectedMedia.src} adj={adj} label="Edited" style={{ maxWidth: '100%', maxHeight: 250, objectFit: 'contain', borderRadius: 6 }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select a photo</span>}
             </div>
           </div>
         </div>
@@ -2071,6 +2146,19 @@ export const Gallery: React.FC = () => {
                     onPointerUp={handleImagePointerUp}
                     onDoubleClick={handleImageDoubleClick}
                   >
+                    {!isNeutral(adj) && !showOriginal ? (
+                      <AdjustedPreview
+                        src={selectedMedia.src}
+                        adj={adj}
+                        label={`${selectedMedia.name} (edited)`}
+                        style={{
+                          width: '100%', height: '100%', objectFit: 'contain',
+                          transform: `scale(${imgZoom}) translate(${imgPan.x / imgZoom}px, ${imgPan.y / imgZoom}px) rotate(${imgRotation + straightenAngle}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
+                          transition: imgDragging ? 'none' : 'transform 0.2s ease',
+                          willChange: 'transform',
+                        }}
+                      />
+                    ) : (
                     <img
                       src={selectedMedia.src}
                       alt={selectedMedia.name}
@@ -2080,10 +2168,13 @@ export const Gallery: React.FC = () => {
                         transform: `scale(${imgZoom}) translate(${imgPan.x / imgZoom}px, ${imgPan.y / imgZoom}px) rotate(${imgRotation + straightenAngle}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
                         transition: imgDragging ? 'none' : 'transform 0.2s ease',
                         willChange: 'transform',
-                        filter: getAdjustmentFilter(),
                       }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
+                    )}
+                    {showOriginal && !isNeutral(adj) && (
+                      <span style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', padding: '3px 10px', borderRadius: 9999, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 11, fontWeight: 600 }}>Original</span>
+                    )}
                     {/* Zoom toolbar - frosted glass */}
                     <div style={{
                       position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',

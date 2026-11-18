@@ -17,10 +17,12 @@ import { AutosaveIndicator, type AutosaveState } from '../../components/Autosave
 import { downloadText } from '../../improvements500/downloadBlob';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import {
-  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck,
+  loadWorkingDeck, saveWorkingDeck, parseDeck, serializeDeck, parseOutline, mergeOutlineSlides,
   historyStart, historyRecord, historyUndo, historyRedo, type DeckHistory,
 } from './presentationDeck';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { takeInboxSlides, SLIDES_IMPORT_EVENT } from './creativeStudio/boardToSlides';
+import { findMissingPictures } from './creativeStudio/resources';
 
 type BlockType = 'text' | 'image' | 'shape';
 
@@ -142,6 +144,11 @@ const makeSlideForLayout = (layout: SlideLayout, theme: Theme, title?: string, b
 
 const makeBlankSlide = (theme: Theme = THEMES[0]): Slide =>
   makeSlideForLayout('title-content', theme, 'Click to edit title');
+
+/** The starter slide nobody has edited yet (its default title, nothing else). */
+const isUntouchedStarter = (sl: Slide): boolean =>
+  !sl.notes && sl.blocks.every(b => b.type === 'text') && sl.blocks.some(b => b.content === 'Click to edit title')
+  && sl.blocks.every(b => b.content === 'Click to edit title' || !b.content.trim() || /^Click to /.test(b.content));
 
 // Backward-compatible migration: ensure notes/layout exist, keep stored blocks intact.
 const migrateSlide = (s: any): Slide => ({
@@ -374,10 +381,37 @@ const PresentationBuilder: React.FC = () => {
         return `${i + 1}. ${t.slice(0, 80)}`;
       }).join('\n');
     });
+    registerUkiAppAction('presentation', {
+      id: 'presentation.addSlides',
+      description: 'add slides from an outline: each unindented line is a slide title, indented or "- " lines are its bullets. Appends to the deck (undoable).',
+      args: [{ name: 'outline', type: 'string' }],
+      example: '{"outline": "Q3 review\\n- Revenue up\\n- Two launches\\nNext steps\\n- Hire"}',
+      mutates: true,
+    }, (args) => {
+      const n = addOutlineSlidesRef.current(String(args.outline ?? ''));
+      return n ? `Added ${n} slide${n === 1 ? '' : 's'} to the deck. The user can undo with Ctrl+Z.` : 'No slides: the outline had no lines.';
+    });
     return () => {
       unregisterUkiAppContext('presentation');
       unregisterUkiAppAction('presentation.outline');
+      unregisterUkiAppAction('presentation.addSlides');
     };
+  }, []);
+
+  // Slides sent from the board (Creative Studio › Send to Slides) are appended
+  // as normal, editable, undoable slides and the first one is shown.
+  useEffect(() => {
+    const take = () => {
+      const incoming = takeInboxSlides().map(migrateSlide);
+      if (!incoming.length) return;
+      setSlides((prev) => {
+        setCurrentIdx(prev.length);
+        return [...prev, ...incoming];
+      });
+    };
+    take();
+    window.addEventListener(SLIDES_IMPORT_EVENT, take);
+    return () => window.removeEventListener(SLIDES_IMPORT_EVENT, take);
   }, []);
 
   // ---- Slide ops ----
@@ -517,37 +551,32 @@ const PresentationBuilder: React.FC = () => {
   // ---- Outline import ----
   // Each non-indented / heading line becomes a slide title; indented or "- " /
   // "* " bullet lines become content on the current slide.
-  const importOutline = useCallback(() => {
-    const lines = outlineText.split(/\r?\n/);
-    const groups: { title: string; bullets: string[] }[] = [];
-    let cur: { title: string; bullets: string[] } | null = null;
-    for (const raw of lines) {
-      if (!raw.trim()) continue;
-      const indented = /^\s+/.test(raw) || /^\s*[-*•]\s+/.test(raw);
-      const text = raw.replace(/^\s*[-*•#]+\s*/, '').trim();
-      if (!text) continue;
-      if (!indented || !cur) {
-        cur = { title: text, bullets: [] };
-        groups.push(cur);
-      } else {
-        cur.bullets.push(text);
-      }
-    }
-    if (groups.length === 0) {
-      toast('error', 'No outline content found');
-      return;
-    }
+  // Outline → slides, appended (an untouched starter deck is replaced). Undoable.
+  const addOutlineSlides = useCallback((text: string): number => {
+    const groups = parseOutline(text);
+    if (!groups.length) return 0;
     const built = groups.map(g => {
       const body = g.bullets.map(b => `• ${b}`).join('\n');
       return makeSlideForLayout(g.bullets.length ? 'title-content' : 'title', theme, g.title, body || undefined);
     });
-    setSlides(built);
-    setCurrentIdx(0);
+    setSlides(prev => {
+      const m = mergeOutlineSlides(prev, built, isUntouchedStarter);
+      setCurrentIdx(m.firstNew);
+      return m.slides;
+    });
     setSelectedBlockId(null);
+    return built.length;
+  }, [theme]);
+  const addOutlineSlidesRef = useRef(addOutlineSlides);
+  addOutlineSlidesRef.current = addOutlineSlides;
+
+  const importOutline = useCallback(() => {
+    const n = addOutlineSlides(outlineText);
+    if (!n) { toast('error', 'No outline content found'); return; }
     setShowOutline(false);
     setOutlineText('');
-    toast('success', `Imported ${built.length} slide${built.length === 1 ? '' : 's'}`);
-  }, [outlineText, theme]);
+    toast('success', `Added ${n} slide${n === 1 ? '' : 's'} (Undo to remove them)`);
+  }, [outlineText, addOutlineSlides]);
 
   // ---- Block drag (canvas) ----
   const onBlockMouseDown = useCallback((e: React.MouseEvent, b: SlideBlock) => {
@@ -874,6 +903,15 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={() => addBlock('text')} style={toolbarBtn}>+ Text</button>
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
           <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
+          <button style={toolbarBtn} title="Find pictures given as web addresses that do not load now" data-testid="slides-check-pictures" onClick={async () => {
+            const r = await findMissingPictures(slides);
+            const say = (type: string, message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+            if (!r.checked) { say('info', 'All pictures are stored in the deck; nothing can go missing.'); return; }
+            if (!r.missing.length) { say('success', `All ${r.checked} web picture${r.checked > 1 ? 's' : ''} load.`); return; }
+            setCurrentIdx(r.missing[0].slide - 1);
+            setSelectedBlockId(r.missing[0].blockId);
+            say('warning', `${r.missing.length} picture${r.missing.length > 1 ? 's' : ''} did not load (slide${r.missing.length > 1 ? 's' : ''} ${[...new Set(r.missing.map((m) => m.slide))].join(', ')}). Choose a picture from this PC to embed it.`);
+          }}>Check pictures</button>
           <span style={{ width: 8 }} />
           <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
