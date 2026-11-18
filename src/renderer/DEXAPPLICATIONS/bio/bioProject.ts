@@ -33,6 +33,26 @@ export interface SavedResult {
   createdAt: number;
   /** Label → value with units, exactly as displayed when saved. */
   values: Record<string, string>;
+  /** Fingerprint of the residues the values were calculated from (reproducibility). */
+  inputDigest?: string;
+  /** DEX version that calculated them. */
+  appVersion?: string;
+}
+
+/** Stable FNV-1a fingerprint of a sequence's residues + topology. */
+export function sequenceDigest(seq: string, circular = false): string {
+  let h = 0x811c9dc5;
+  const text = `${circular ? 'c' : 'l'}:${seq}`;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return `${seq.length}-${h.toString(16).padStart(8, '0')}`;
+}
+
+/** True when a saved result no longer matches its sequence (edited or deleted). */
+export function resultIsStale(r: SavedResult, seqs: readonly BioSequence[]): 'changed' | 'deleted' | null {
+  const s = seqs.find((x) => x.id === r.sequenceId);
+  if (!s) return 'deleted';
+  if (r.inputDigest && r.inputDigest !== sequenceDigest(s.seq, !!s.circular)) return 'changed';
+  return null;
 }
 
 export interface BioProject {

@@ -173,7 +173,10 @@ export function unregisterUkiAppAction(id: string): void {
 
 function runningAppIds(): Set<string> {
   try {
-    return new Set(useRunningApps.getState().runningApps.map((a) => a.id));
+    const ids = new Set(useRunningApps.getState().runningApps.map((a) => a.id));
+    // Slides (app id 'presentation') runs inside the Creative Studio window ('canvas').
+    if (ids.has('canvas')) ids.add('presentation');
+    return ids;
   } catch {
     return new Set();
   }

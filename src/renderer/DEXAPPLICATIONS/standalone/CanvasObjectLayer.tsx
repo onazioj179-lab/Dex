@@ -12,7 +12,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  type BoardObject, STICKY_COLORS, MIN_SIZE, connectorEnds, paintOrder, removeObjects, snapValue, textOn, newObjectId,
+  type BoardObject, STICKY_COLORS, MIN_SIZE, connectorEnds, paintOrder, removeObjects, snapValue, textOn, newObjectId, smartSnap, type Guide,
 } from './canvasObjects';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 
@@ -37,6 +37,7 @@ const handle: React.CSSProperties = { position: 'absolute', right: -7, bottom: -
 
 export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, selectedId, onSelect, onLive, onCommit, connectFrom, onConnectPick, palette }) => {
   const [editing, setEditing] = useState<string | null>(null);
+  const [guides, setGuides] = useState<Guide[]>([]);
   const objsRef = useRef(objects);
   objsRef.current = objects;
   const byId = new Map(objects.map((o) => [o.id, o]));
@@ -53,6 +54,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
       const before = objsRef.current;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault(); e.stopPropagation();
+        if (before.find((x) => x.id === selectedId)?.locked) return; // locked: unlock first
         onCommit(before, removeObjects(before, new Set([selectedId])));
         onSelect(null);
       } else if (e.key === 'Escape') {
@@ -80,7 +82,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
     el.setPointerCapture(e.pointerId);
     const before = objsRef.current;
     const o0 = before.find((x) => x.id === id);
-    if (!o0) return;
+    if (!o0 || o0.locked) return; // locked objects stay put
     // Moving a frame carries the objects inside it.
     const carried = mode === 'move' && o0.kind === 'frame'
       ? new Set(before.filter((x) => x.kind !== 'connector' && x.id !== id && x.x + x.w / 2 >= o0.x && x.x + x.w / 2 <= o0.x + o0.w && x.y + x.h / 2 >= o0.y && x.y + x.h / 2 <= o0.y + o0.h).map((x) => x.id))
@@ -91,15 +93,22 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
       const dx = (ev.clientX - sx) / zoom, dy = (ev.clientY - sy) / zoom;
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return;
       moved = true;
+      // Smart guides: align edges/centres to other objects (hold Alt to place freely).
+      let gx = snapValue(o0.x + dx, snap), gy = snapValue(o0.y + dy, snap);
+      if (mode === 'move' && !ev.altKey) {
+        const others = before.filter((x) => x.kind !== 'connector' && x.id !== id && !carried.has(x.id));
+        const s2 = smartSnap({ x: gx, y: gy, w: o0.w, h: o0.h }, others, 6 / zoom);
+        gx += s2.dx; gy += s2.dy;
+        setGuides(s2.guides);
+      } else setGuides([]);
       last = before.map((x) => {
         if (x.id === id) {
           return mode === 'move'
-            ? { ...x, x: snapValue(o0.x + dx, snap), y: snapValue(o0.y + dy, snap) }
+            ? { ...x, x: gx, y: gy }
             : { ...x, w: Math.max(MIN_SIZE, snapValue(o0.w + dx, snap)), h: Math.max(MIN_SIZE, snapValue(o0.h + dy, snap)) };
         }
-        if (carried.has(x.id)) {
-          const nx = snapValue(o0.x + dx, snap) - o0.x, ny = snapValue(o0.y + dy, snap) - o0.y;
-          return { ...x, x: x.x + nx, y: x.y + ny };
+        if (carried.has(x.id) && !x.locked) {
+          return { ...x, x: x.x + (gx - o0.x), y: x.y + (gy - o0.y) };
         }
         return x;
       });
@@ -107,6 +116,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
     };
     const up = () => {
       el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('lostpointercapture', up);
+      setGuides([]);
       if (moved) onCommit(before, last);
     };
     el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('lostpointercapture', up);
@@ -129,6 +139,11 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
   return (
     <div aria-label="Board objects" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
       <div style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+        {guides.map((g, i) => (
+          <div key={i} aria-hidden="true" data-testid="canvas-guide" style={g.axis === 'x'
+            ? { position: 'absolute', left: g.at, top: -100000, width: 0, height: 200000, borderLeft: `${1 / zoom}px solid var(--color-accent, #0A84FF)`, pointerEvents: 'none', zIndex: 5 }
+            : { position: 'absolute', top: g.at, left: -100000, height: 0, width: 200000, borderTop: `${1 / zoom}px solid var(--color-accent, #0A84FF)`, pointerEvents: 'none', zIndex: 5 }} />
+        ))}
         <svg style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible' }} aria-hidden="true">
           <defs>
             {ordered.filter((o) => o.kind === 'connector').map((o) => (
@@ -204,17 +219,19 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
                 style={{ width: 20, height: 20, borderRadius: 9999, background: c, border: selected.color === c ? '2px solid var(--color-accent)' : '1px solid var(--color-border-control)', cursor: 'pointer', padding: 0 }} />
             ))}
             <span style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 2px' }} />
+            {selected.kind !== 'connector' && <button onClick={() => patchSelected({ locked: !selected.locked })} aria-pressed={!!selected.locked}
+              style={{ ...tbBtn, ...(selected.locked ? { color: 'var(--color-accent)', borderColor: 'var(--color-accent)' } : null) }} aria-label={selected.locked ? 'Unlock' : 'Lock position and size'}>{selected.locked ? 'Unlock' : 'Lock'}</button>}
             {selected.kind !== 'connector' && <button onClick={() => {
               const before = objsRef.current;
-              const copy = { ...selected, id: newObjectId(), x: selected.x + 24, y: selected.y + 24 };
+              const copy = { ...selected, id: newObjectId(), x: selected.x + 24, y: selected.y + 24, locked: false };
               onCommit(before, [...before, copy]); onSelect(copy.id);
             }} style={tbBtn} aria-label="Duplicate (Ctrl+D)">Duplicate</button>}
             {selected.kind !== 'connector' && <button onClick={() => {
               const before = objsRef.current;
               onCommit(before, [...before.filter((x) => x.id !== selected.id), selected]);
             }} style={tbBtn} aria-label="Bring to front">Front</button>}
-            <button onClick={() => { const before = objsRef.current; onCommit(before, removeObjects(before, new Set([selected.id]))); onSelect(null); }}
-              style={{ ...tbBtn, color: 'var(--color-error)' }} aria-label="Delete (Del)">Delete</button>
+            <button disabled={!!selected.locked} onClick={() => { const before = objsRef.current; onCommit(before, removeObjects(before, new Set([selected.id]))); onSelect(null); }}
+              style={{ ...tbBtn, color: 'var(--color-error)', opacity: selected.locked ? 0.4 : 1 }} aria-label={selected.locked ? 'Locked: unlock to delete' : 'Delete (Del)'}>Delete</button>
           </div>
         );
       })()}

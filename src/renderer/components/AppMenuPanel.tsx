@@ -53,17 +53,25 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   // DEX Search beyond apps: Settings, indexed files, notes, UKI commands --
   // real results from the shared Spotlight index (no AI provider needed).
   // Apps and app actions already come from the registry above.
+  const [indexTick, setIndexTick] = useState(0);
+  useEffect(() => spotlightEngine.subscribe(() => setIndexTick((t) => t + 1)), []);
   const more = useMemo<SpotlightResult[]>(() => {
     if (!q) return [];
     try {
       // The engine promotes its best hit to category "top", so filter on the
       // id; scores under 30 are loose fuzzy noise ("dark" -> "Password").
-      const KEEP = /^(setting-|file-|fs-|note-|cmd-|command-|dexcmd-)/;
-      return spotlightEngine.search(q)
-        .filter(r => r.score >= 30 && (KEEP.test(r.id) || ['settings', 'files', 'notes', 'commands'].includes(r.category)))
+      const KEEP = /^(setting-|file-|fs-|note-|cmd-|command-|dexcmd-|codeproject-)/;
+      const all = spotlightEngine.search(q);
+      const found = all
+        .filter(r => r.score >= 30 && (KEEP.test(r.id) || ['settings', 'files', 'notes', 'commands', 'projects'].includes(r.category)))
         .slice(0, 8);
+      // "Ask UKI" is always the last row: it only fills UKI's box.
+      const ask = all.find(r => r.id.startsWith('uki-ask-'));
+      return ask ? [...found, ask] : found;
     } catch { return []; }
-  }, [q]);
+    // indexTick: async sources (files, projects) arrived after the keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, indexTick]);
   const total = hits.length + more.length;
 
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(t); }, []);
@@ -255,6 +263,8 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           {more.map((m, k) => {
             const i = hits.length + k;
             const kind = m.category === 'settings' || m.id.startsWith('setting-') ? 'Setting'
+              : m.id.startsWith('codeproject-') || m.category === 'projects' ? 'Project'
+              : m.id.startsWith('uki-ask-') ? 'UKI'
               : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'File'
               : m.category === 'notes' || m.id.startsWith('note-') ? 'Note' : 'Command';
             return (

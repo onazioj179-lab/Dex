@@ -175,6 +175,32 @@ pub fn write_text(args: &Value) -> Value {
     }
 }
 
+/// `fs:writeBase64(path, base64)` — binary twin of `fs:writeText` (edited photos,
+/// exports). Same write-then-rename, so a failed write never leaves a torn file.
+/// The path comes from the native Save dialog, which already asked about
+/// replacing an existing file. Capped at 256 MB.
+pub fn write_base64(args: &Value) -> Value {
+    use base64::Engine;
+    let path = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    let data = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+    if path.is_empty() { return json!({ "ok": false, "error": "No file path." }); }
+    if data.len() > 350 * 1024 * 1024 { return json!({ "ok": false, "error": "The file is too large (over 256 MB)." }); }
+    let bytes = match base64::engine::general_purpose::STANDARD.decode(data.trim()) {
+        Ok(b) => b,
+        Err(_) => return json!({ "ok": false, "error": "The data is not valid base64." }),
+    };
+    let target = std::path::Path::new(path);
+    if !target.is_absolute() { return json!({ "ok": false, "error": "Use a full path." }); }
+    let tmp = target.with_extension(format!("{}.dex-tmp", target.extension().and_then(|e| e.to_str()).unwrap_or("")));
+    if let Err(e) = std::fs::write(&tmp, &bytes) {
+        return json!({ "ok": false, "error": e.to_string() });
+    }
+    match std::fs::rename(&tmp, target) {
+        Ok(()) => json!({ "ok": true, "bytes": bytes.len() }),
+        Err(e) => { let _ = std::fs::remove_file(&tmp); json!({ "ok": false, "error": e.to_string() }) }
+    }
+}
+
 /// Fire an OS notification toast (best-effort, additive). Used after the DB
 /// insert for `notification-center:send` so the renderer's notification center
 /// (DB-backed) AND the OS surface both reflect the notification, matching the
@@ -989,5 +1015,27 @@ mod note_import_tests {
         assert_eq!(note_read_import(&json!([dir.join("missing.md").to_string_lossy()]))["success"], false);
         assert_eq!(note_read_import(&json!([dir.to_string_lossy()]))["success"], false);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod write_base64_tests {
+    use super::write_base64;
+    use serde_json::json;
+
+    #[test]
+    fn writes_bytes_atomically_and_refuses_bad_input() {
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
+        std::fs::create_dir_all(&base).unwrap();
+        let d = tempfile::tempdir_in(&base).unwrap();
+        let p = d.path().join("photo-edited.png");
+        // "\x89PNG" + 2 bytes
+        let r = write_base64(&json!([p.to_string_lossy(), "iVBORwAB"]));
+        assert_eq!(r["ok"], true, "{r}");
+        assert_eq!(std::fs::read(&p).unwrap(), vec![0x89, b'P', b'N', b'G', 0x00, 0x01]);
+        assert!(std::fs::read_dir(d.path()).unwrap().all(|e| !e.unwrap().file_name().to_string_lossy().contains("dex-tmp")));
+        assert_eq!(write_base64(&json!([p.to_string_lossy(), "not base64!!"]))["ok"], false);
+        assert_eq!(write_base64(&json!(["relative.png", "iVBORwAB"]))["ok"], false);
+        assert_eq!(write_base64(&json!(["", "iVBORwAB"]))["ok"], false);
     }
 }

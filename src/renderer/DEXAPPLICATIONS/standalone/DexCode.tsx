@@ -1170,6 +1170,7 @@ const DexCode: React.FC = () => {
     { id: 'goto', label: 'Go to line…', shortcut: 'Ctrl+G', run: () => { setShowGoToLine(true); setGoToLineInput(''); requestAnimationFrame(() => goToLineRef.current?.focus()); } },
     { id: 'problems', label: 'Show problems', shortcut: 'Ctrl+Shift+M', run: () => openPanel('problems') },
     { id: 'terminal', label: 'Open terminal', shortcut: 'Ctrl+`', run: () => openPanel('terminal') },
+    { id: 'tests', label: 'Run project tests…', run: () => openPanel('tests') },
     { id: 'sidebar', label: 'Toggle sidebar', shortcut: 'Ctrl+B', run: toggleSidebar },
     { id: 'fullscreen', label: 'Toggle full screen', run: toggleFullscreen },
   ], [handleNewFile, handleOpenFile, openFolder, handleSaveFile, handleSaveAs, runCode, openPanel, toggleSidebar, toggleFullscreen]);
