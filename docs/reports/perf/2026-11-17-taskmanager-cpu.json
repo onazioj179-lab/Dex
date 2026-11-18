@@ -1,0 +1,8 @@
+{
+  "what": "Native host (dex-tauri.exe) CPU with Task Manager in front, settled samples (8 s each), release exe, isolated profile, i7-8665U / 16 GB / Windows 26300",
+  "method": "open Task Manager, measure 8 s windows repeatedly; last 4 samples after first-launch indexing settled",
+  "before_per_call_new_all_pct_of_core": [25.4, 24.5, 25.3, 24.1],
+  "after_persistent_sampler_pct_of_core": [4.4, 5.1, 12.4, 1.2],
+  "behind_other_apps_after_fix_pct_of_core": [0.0, 0.4, 0.2],
+  "behind_other_apps_before_fix_pct_of_core": [13.4, 15.0, 15.5]
+}
