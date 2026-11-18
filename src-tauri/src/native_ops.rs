@@ -175,6 +175,32 @@ pub fn write_text(args: &Value) -> Value {
     }
 }
 
+/// `fs:writeBase64(path, base64)` — binary twin of `fs:writeText` (edited photos,
+/// exports). Same write-then-rename, so a failed write never leaves a torn file.
+/// The path comes from the native Save dialog, which already asked about
+/// replacing an existing file. Capped at 256 MB.
+pub fn write_base64(args: &Value) -> Value {
+    use base64::Engine;
+    let path = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+    let data = args.get(1).and_then(|v| v.as_str()).unwrap_or("");
+    if path.is_empty() { return json!({ "ok": false, "error": "No file path." }); }
+    if data.len() > 350 * 1024 * 1024 { return json!({ "ok": false, "error": "The file is too large (over 256 MB)." }); }
+    let bytes = match base64::engine::general_purpose::STANDARD.decode(data.trim()) {
+        Ok(b) => b,
+        Err(_) => return json!({ "ok": false, "error": "The data is not valid base64." }),
+    };
+    let target = std::path::Path::new(path);
+    if !target.is_absolute() { return json!({ "ok": false, "error": "Use a full path." }); }
+    let tmp = target.with_extension(format!("{}.dex-tmp", target.extension().and_then(|e| e.to_str()).unwrap_or("")));
+    if let Err(e) = std::fs::write(&tmp, &bytes) {
+        return json!({ "ok": false, "error": e.to_string() });
+    }
+    match std::fs::rename(&tmp, target) {
+        Ok(()) => json!({ "ok": true, "bytes": bytes.len() }),
+        Err(e) => { let _ = std::fs::remove_file(&tmp); json!({ "ok": false, "error": e.to_string() }) }
+    }
+}
+
 /// Fire an OS notification toast (best-effort, additive). Used after the DB
 /// insert for `notification-center:send` so the renderer's notification center
 /// (DB-backed) AND the OS surface both reflect the notification, matching the
