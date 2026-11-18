@@ -28,6 +28,7 @@ import {
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
 import { useDexSetting, writeDexSetting } from '../../hooks/useDexSetting';
+import { AchievementBrowser } from './AchievementBrowser';
 
 // DEX Blue Modern tokens, so Trophies follows light/dark and the window
 // material like every other app (it used to be hard-coded near-black + gold).
@@ -313,6 +314,8 @@ const Achievements: React.FC = () => {
             </div>
           </section>
         )}
+
+        <AchievementBrowser unlocked={unlocked} unlockedAt={unlockedAt} stats={progressStats as UserStats} />
 
         <DailyChallengesBar challenges={challenges} />
       </div>
