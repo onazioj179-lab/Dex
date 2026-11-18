@@ -775,13 +775,14 @@ export const Gallery: React.FC = () => {
   useEffect(() => {
     if (!showQuickAdjust) return undefined;
     const down = (e: KeyboardEvent) => {
+      if (!keyEventForApp(e, 'gallery')) return; // a key meant for another app
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redoEdit(); else undoEdit(); }
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redoEdit(); }
       else if (e.key === '\\') { setShowOriginal(true); }
     };
-    const up = (e: KeyboardEvent) => { if (e.key === '\\') setShowOriginal(false); };
+    const up = (e: KeyboardEvent) => { if (!keyEventForApp(e, 'gallery')) return; if (e.key === '\\') setShowOriginal(false); };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };

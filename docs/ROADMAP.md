@@ -47,11 +47,16 @@
 >   token content) indexed by name only (`dex_search::is_sensitive_file`/`looks_like_secret`); project detection from
 >   manifests with only the test/build commands they declare; `umari:retrieve` = ranked, bounded excerpts with source
 >   path + project inside a caller-set character budget. UKI tools `find_context` (needs file-read) and `list_projects`.
-> - Not done in Part 24: Search capsule redesign (F), Gallery editing (G), Creative Studio (H), engineering/Bio (I),
->   DEX Code test runner UI (J; UKI can already run declared tests via list_projects → run_command), Files batch ops (K),
->   Browser (L), provider-reported token accounting in the context budget (E: `contextFit.ts` still estimates
->   ~4 chars/token), per-app context providers beyond `appContextRegistry`, cancellation of renderer-run app actions
->   from the Xack view (terminal tasks cancel natively).
+> - **Batch 2 (same PR):** Search: Umari code projects + an "Ask UKI" row (prefills UKI, sends nothing) in the
+>   App Menu search, engine listeners so async results reach every surface, Spotlight rows on capsule geometry (#352).
+>   Gallery: real pixel adjustments (8 controls) shared by preview and export, undo/redo, hold-to-see-original, real
+>   before/after (was placeholder squares), native Save dialog via new `fs:writeBase64` (#353). Context Budget Manager
+>   on every provider call (#354). DEX Code Tests tab via Umari + Xack (#355). Files batch Rename… (#356). Bio result
+>   fingerprints + stale flag (#357). Canvas smart guides + locking (#358).
+> - Still not done in Part 24: Creative Studio merge of Canvas/Design/Present (H, beyond guides/locking), component
+>   library, asset relinking, missing-font warnings, project packaging; Browser (L, audited: tabs/bookmarks/history/
+>   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
+>   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
 
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
