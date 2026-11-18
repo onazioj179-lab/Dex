@@ -1,18 +1,46 @@
 {
-  "at": "2026-11-18T08:39:17.074Z",
-  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p23b-exe/dex-tauri.exe",
-  "passed": 5,
-  "failed": 0,
+  "at": "2026-11-18T09:31:17.011Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/16c111f6-a01a-43cd-bea8-95f352fb8bc5/scratchpad/p23c-exe/dex-tauri.exe",
+  "passed": 7,
+  "failed": 1,
   "results": [
+    {
+      "name": "search indexing reports start and finish to Background tasks",
+      "pass": true,
+      "observed": {
+        "events": 3,
+        "final": {
+          "state": "completed",
+          "indexed": 23910,
+          "ms": 91783
+        }
+      }
+    },
+    {
+      "name": "download saved into the chosen folder",
+      "pass": false,
+      "observed": {
+        "path": "\\\\?\\C:\\Users\\onazi\\AppData\\Local\\Temp\\dex-apps-1wdZs5\\dl-dest\\dest-check.bin",
+        "size": 262144
+      }
+    },
+    {
+      "name": "download into a Windows folder is refused",
+      "pass": true,
+      "observed": {
+        "error": "Downloads can't be saved to Windows or program folders",
+        "success": false
+      }
+    },
     {
       "name": "process list carries real categories (dex includes DEX itself)",
       "pass": true,
       "observed": {
-        "total": 315,
+        "total": 321,
         "kinds": {
           "dex": 7,
-          "background": 300,
-          "app": 8
+          "app": 8,
+          "background": 306
         }
       }
     },

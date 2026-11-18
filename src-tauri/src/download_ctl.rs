@@ -169,7 +169,19 @@ fn run(app: &tauri::AppHandle, url: &str, dest: Option<PathBuf>, cancel: Option<
 /// ({ id, state: progressing|completed|failed|cancelled, received, total, percent, path?, fileName?, error? }).
 /// A chosen destination: absolute, existing, a folder, not a Windows/program folder.
 pub(crate) fn check_dest(dir: &str) -> Result<PathBuf, String> {
-    crate::uki_terminal::check_cwd(dir).map_err(|e| e.replace("UKI cannot run commands inside", "Downloads can't be saved to").replace("the working folder", "the download folder"))
+    let p = crate::uki_terminal::check_cwd(dir).map_err(|e| e.replace("UKI cannot run commands inside", "Downloads can't be saved to").replace("the working folder", "the download folder"))?;
+    Ok(strip_verbatim(p))
+}
+
+/// Validation canonicalizes the folder, which on Windows adds the verbatim
+/// prefix (\\?\C:\...). Shown paths, history, Open and Show in folder want the
+/// plain form; UNC shares (\\?\UNC\...) keep theirs.
+pub(crate) fn strip_verbatim(p: PathBuf) -> PathBuf {
+    let s = p.to_string_lossy();
+    match s.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC\\") => PathBuf::from(rest),
+        _ => p,
+    }
 }
 
 fn start_background(app: &tauri::AppHandle, url: &str, id: &str, dest: Option<PathBuf>) -> Value {
@@ -251,7 +263,9 @@ mod tests {
         assert!(check_dest(r"C:\definitely\missing\dex").is_err());
         let windir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
         assert!(check_dest(&windir).unwrap_err().contains("Downloads can't be saved to"));
-        assert!(check_dest(&std::env::temp_dir().to_string_lossy()).is_ok());
+        let ok = check_dest(&std::env::temp_dir().to_string_lossy()).unwrap();
+        assert!(!ok.to_string_lossy().starts_with(r"\\?\"), "no verbatim prefix: {}", ok.display());
+        assert_eq!(strip_verbatim(PathBuf::from(r"\\?\UNC\srv\share")), PathBuf::from(r"\\?\UNC\srv\share"));
     }
 
     #[test]
