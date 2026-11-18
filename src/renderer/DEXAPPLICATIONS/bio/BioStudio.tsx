@@ -16,6 +16,7 @@ import type { MenuGroup } from '../../components/appShell/menuTypes';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { colors, radius, fontStack } from '../../styles/tokens';
+import { APP_DEFINITIONS } from '../../store/runningApps';
 import { downloadText } from '../../improvements500/downloadBlob';
 import {
   parseSequence, parseFasta, toFasta, transcribe, reverseComplement, translate, findOrfs, gcContent,
@@ -28,7 +29,7 @@ import {
   type ConcUnit, type VolumeUnit, type MassUnit, type DilutionUnknown, type NucleicAcidType, type Orf,
 } from './bioScience';
 import {
-  loadProject, saveProject, historyInit, historyReducer, normalizeProject, toCsv, fileStem, emptyProject,
+  loadProject, saveProject, historyInit, historyReducer, normalizeProject, toCsv, fileStem, emptyProject, sequenceDigest, resultIsStale,
   type BioSequence, type SequenceSource,
 } from './bioProject';
 
@@ -283,7 +284,7 @@ const BioStudio: React.FC = () => {
       values['MW'] = `${fmt(analysis.mw, 2)} g/mol`;
       values['ε280 (reduced)'] = `${analysis.ext.reduced} M⁻¹cm⁻¹`;
     }
-    dispatch({ type: 'save-result', result: { sequenceId: active.id, sequenceName: active.name, title: `${active.name} — summary`, values } });
+    dispatch({ type: 'save-result', result: { sequenceId: active.id, sequenceName: active.name, title: `${active.name} — summary`, values, inputDigest: sequenceDigest(active.seq, !!active.circular), appVersion: APP_DEFINITIONS.bio?.version } });
     addLog('info', `Saved a result snapshot for ${active.name}.`);
   }, [active, isNuc, gc, tm, nnTm, circular, dna, minAa, orfs.length, sites.length, analysis, addLog]);
 
@@ -519,7 +520,12 @@ const BioStudio: React.FC = () => {
                 <details key={r.id} style={{ padding: '2px 12px', fontSize: 12 }}>
                   <summary style={{ cursor: 'pointer', color: colors.text.secondary }}>{r.title}</summary>
                   <div style={{ padding: '4px 0 6px', color: colors.text.secondary }}>
-                    <div style={{ color: colors.text.tertiary, fontSize: 10 }}>{new Date(r.createdAt).toLocaleString()} · Calculated</div>
+                    <div style={{ color: colors.text.tertiary, fontSize: 10 }}>{new Date(r.createdAt).toLocaleString()} · Calculated{r.appVersion ? ` by DEX ${r.appVersion}` : ''}{r.inputDigest ? ` · input ${r.inputDigest}` : ''}</div>
+                    {resultIsStale(r, project.sequences) && (
+                      <div style={{ color: colors.semantic.warning, fontSize: 11 }} data-testid="bio-result-stale">
+                        {resultIsStale(r, project.sequences) === 'deleted' ? 'The sequence was deleted; these values cannot be recalculated.' : 'The sequence changed since; these values describe the earlier version.'}
+                      </div>
+                    )}
                     {Object.entries(r.values).map(([k, v]) => <div key={k}>{k}: <span style={{ color: colors.text.primary }}>{v}</span></div>)}
                     <button style={{ ...btn, height: 22, marginTop: 4 }} onClick={() => dispatch({ type: 'remove-result', id: r.id })}>Remove</button>
                   </div>
