@@ -13,14 +13,45 @@
 >   session restore beyond the existing persisted list, Creative Studio windows, per-window document restore.
 > - **Batch 6 Browser tab scaling: SHIPPED (#327).** `services/browser/tabResidency.ts`; tier budget (Resource Saver =
 >   low = 2 live background tabs); Keep awake; 500-tab sessions. After-run on a new release build: see #327.
-> - **Open:** Resource Coordinator (batch 3), app passes (8–12), stress set (15), release (16).
+> - **Resource Coordinator (batch 3): SHIPPED** (#344 Browser tabs, #348 AXL GPU meshes). **Window restore:** opt-in Reopen apps and windows (#347).
+> - **Open:** app passes (8–12), stress set (15), release (16).
 >
 > **Part 22 (2026-11-17, security-first) status:** onboarding integrity in Rust (#330), UKI terminal broker with
 > risk classes and the "Run shell commands" grant (#331), Background tasks view (#332), native background
 > downloads (#333), DEX Capsule notifications (#334), tooltip audit (#335), idle-CPU fixes (#329). Packaged
 > security run: `scripts/perf/packaged-security.mjs` → `docs/reports/perf/2026-11-17-security.json`.
+> **Part 23 (2026-11-18, capsule UI + app completion) status:** shared capsule kit (`components/controls`:
+> capsuleTokens, SegmentedControl rebuilt, DexSwitch, DexCapsuleGroup/Button/FloatingSearch/DisclosureGroup) with
+> geometry tests; adopted in Task Manager (real process categories + Startup view, native), Settings, Notification
+> Center, Ledger (packaged-measured), Maps, Canvas, Kanban (List + CSV), Rewards (catalog browser), DEX Code
+> (palette, acorn diagnostics, docked terminal: packaged), Notes multi-window (per-window store), Browser download
+> destination, Presentation presenting keys + blanking, Imosion one-layer Escape, indexing in Background tasks.
+> Packaged checks: `scripts/perf/packaged-apps-check.mjs`. Rows #336-#343.
 > Not done: 90/120 Hz frame-time measurement on real high-refresh hardware (this PC is 60 Hz), C++ review
 > (owner decision #75/#143), ToS legal review (#19), signing (#30).
+>
+> **Part 24 (2026-11-18, UKI / Xack / Umari) status — batch 1 = phases B–D + E (part).** UKI plans; **Xack**
+> (`src-tauri/src/xack.rs`) decides and records; apps and native services act; **Umari** (`src-tauri/src/umari.rs`)
+> retrieves context. No new models: both are deterministic Rust. Shipped (#349–#351):
+> - Xack: one capability catalog (20 UKI core tools + `terminal.run` built in, app actions registered by running apps;
+>   classes read < modify < execute < external < privileged; confirm never / ask / always; a caller can raise a class,
+>   never lower it; the terminal's class comes from Xack's own classifier). Approvals are single-use tickets bound to
+>   the exact canonical arguments, expiring after 10 min; `ukiterm:run` refuses without one (Rust-enforced). Session
+>   permissions ("this exact command here" / "read-only commands in this folder"), revocable. Native history in
+>   `xack-history.jsonl` (bounded 2,000), shown in Security Center › Xack history & permissions. Schedules cannot
+>   pre-approve "always" actions (content-sharing, Recycle Bin).
+> - In-app approval sheet (`UkiApprovalHost`) replaces `window.confirm` for UKI tools and app actions: shows the command,
+>   folder and Xack class, with a Remember choice where the request allows one.
+> - Umari: user-picked extra folders (native picker only; drive roots, whole profile, Windows/Program Files/AppData
+>   refused), included in index rebuild/sync/watch; secret-looking files (keys, `.env*`, credentials, private-key or
+>   token content) indexed by name only (`dex_search::is_sensitive_file`/`looks_like_secret`); project detection from
+>   manifests with only the test/build commands they declare; `umari:retrieve` = ranked, bounded excerpts with source
+>   path + project inside a caller-set character budget. UKI tools `find_context` (needs file-read) and `list_projects`.
+> - Not done in Part 24: Search capsule redesign (F), Gallery editing (G), Creative Studio (H), engineering/Bio (I),
+>   DEX Code test runner UI (J; UKI can already run declared tests via list_projects → run_command), Files batch ops (K),
+>   Browser (L), provider-reported token accounting in the context budget (E: `contextFit.ts` still estimates
+>   ~4 chars/token), per-app context providers beyond `appContextRegistry`, cancellation of renderer-run app actions
+>   from the Xack view (terminal tasks cancel natively).
 
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native

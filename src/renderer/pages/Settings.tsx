@@ -56,6 +56,7 @@ import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
+import { UmariFoldersSection } from './settingsPanels/UmariFoldersSection';
 import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/settingsSearchIndex';
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { applyMotionDurations } from '../styles/motionDurations';
@@ -65,6 +66,7 @@ import { withViewTransition } from '../utils/viewTransition';
 import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
+import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 
 // ===========================================================================
 // TYPES
@@ -1670,6 +1672,7 @@ export const Settings: React.FC = () => {
 
   // Launch at Login reflects the real per-user Run entry, not a stored flag.
   const [launchAtLogin, setLaunchAtLogin] = useState({ supported: false, enabled: false, busy: false });
+  const reopenApps = useDexSetting<boolean>('session.reopenApps', false);
   useEffect(() => {
     let alive = true;
     (window as any).dex?.system?.getLaunchAtLogin?.()
@@ -2275,14 +2278,16 @@ export const Settings: React.FC = () => {
 
   const renderGeneralSettings = () => (
     <div style={styles.settingsContent}>
-      {launchAtLogin.supported && (
-        <>
-          <h3 style={styles.sectionTitleFirst}>Startup</h3>
-          {renderLiveToggle('Launch at Login', 'Start DEX when you sign in to Windows', launchAtLogin.enabled, toggleLaunchAtLogin, launchAtLogin.busy)}
-        </>
+      <h3 style={styles.sectionTitleFirst}>Startup</h3>
+      {launchAtLogin.supported && renderLiveToggle('Launch at Login', 'Start DEX when you sign in to Windows', launchAtLogin.enabled, toggleLaunchAtLogin, launchAtLogin.busy)}
+      {renderLiveToggle(
+        'Reopen apps and windows',
+        'When DEX starts, open the apps and extra windows (such as Notes 2) that were open when you last closed it. Up to 12. Not after an unexpected close.',
+        reopenApps,
+        () => writeDexSetting('session.reopenApps', !reopenApps),
       )}
 
-      <h3 style={launchAtLogin.supported ? styles.sectionTitle : styles.sectionTitleFirst}>Reset</h3>
+      <h3 style={styles.sectionTitle}>Reset</h3>
       <button
         style={styles.dangerBtn}
         aria-label="Reset all settings to defaults"
@@ -4005,6 +4010,8 @@ export const Settings: React.FC = () => {
       {renderToggle('ukiMemoryEnabled', 'Memory Recording', 'Allow UKI to remember conversations and learn from interactions')}
       {renderSlider('ukiRetentionDays', 'Retention Period', 'How long to keep memory records before cleanup', 1, 365, ' days')}
       {renderToggle('ukiAutoCleanup', 'Auto Cleanup', 'Automatically remove expired memory records')}
+
+      <UmariFoldersSection styles={styles} />
 
       <h3 style={styles.sectionTitle}>Memory Management</h3>
       <UkiArchiveStats styles={styles} />

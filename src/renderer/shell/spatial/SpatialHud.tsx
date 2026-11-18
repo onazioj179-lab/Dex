@@ -17,6 +17,7 @@
 //
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { SegmentedControl } from '../../components/controls';
 import { useSpatialStore, GROUP_COLORS, type SpatialWindow } from '../../store/spatialStore';
 import { boundsOf, viewRect, type ArrangeKind, type AlignKind } from './spatialMath';
 import { downloadText } from '../../improvements500/downloadBlob';
@@ -178,10 +179,17 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <div role="dialog" aria-label="Spatial desktop panel" style={{ ...panel, width: 340, maxHeight: '64vh', display: 'flex', flexDirection: 'column', pointerEvents: 'auto' }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
-      <div role="tablist" aria-label="Panel sections" style={{ display: 'flex', gap: 2, padding: 4, borderBottom: '1px solid var(--color-border)' }}>
-        {tabs.map(([t, label]) => (
-          <button key={t} role="tab" aria-selected={tab === t} aria-pressed={tab === t} className="dex-spatial-btn" style={{ ...btn, flex: 1 }} onClick={() => setTab(t)}>{label}</button>
-        ))}
+      <div style={{ padding: 4, borderBottom: '1px solid var(--color-border)' }}>
+        <SegmentedControl
+          semantics="tabs"
+          variant="subtle"
+          size="md"
+          fill
+          aria-label="Panel sections"
+          options={tabs.map(([t, label]) => ({ value: t, label }))}
+          value={tab}
+          onChange={(v) => setTab(v as typeof tab)}
+        />
       </div>
 
       {tab === 'windows' && (

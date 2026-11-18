@@ -22,6 +22,8 @@ import {
 } from '../../shared/uki/appActions';
 import type { ToolSpec } from '../../shared/uki/toolValidation';
 import { useRunningApps } from '../store/runningApps';
+import { xackRequest, xackDecide, xackBegin, xackFinish, xackRegister, type XackClass } from './xack';
+import { requestApproval } from './approvals';
 
 const registry = createAppActionRegistry();
 
@@ -31,11 +33,33 @@ export type ActionConfirmHandler = (
   args: Record<string, unknown>,
 ) => Promise<boolean> | boolean;
 
-let confirmHandler: ActionConfirmHandler | null = null;
+/** Default surface: the in-app approval sheet (UkiApprovalHost). */
+const sheetConfirm: ActionConfirmHandler = async (entry, args) => {
+  const facts = Object.entries(args).slice(0, 8).map(([k, v]) => ({ label: k, value: String(v).slice(0, 200) }));
+  const answer = await requestApproval({
+    title: entry.spec.sendsContent ? `share content from ${entry.appId}` : `change ${entry.appId}`,
+    subject: entry.spec.description,
+    facts,
+    cls: classOf(entry),
+    reason: entry.spec.sendsContent ? 'the content goes into the conversation, and to your AI provider if you use one' : undefined,
+  });
+  return answer.allow;
+};
 
-/** Wire (or clear) the confirmation surface for mutating actions. */
+let confirmHandler: ActionConfirmHandler | null = sheetConfirm;
+
+/** Xack's class for an app action: content-sharing is external, changes are modify. */
+function classOf(entry: AppActionEntry): XackClass {
+  return entry.spec.sendsContent ? 'external' : entry.spec.mutates ? 'modify' : 'read';
+}
+
+function registerWithXack(entries: AppActionEntry[]): Promise<number> {
+  return xackRegister(entries.map((e) => ({ id: e.spec.id, app: e.appId, description: e.spec.description, class: classOf(e) })));
+}
+
+/** Wire the confirmation surface for mutating actions (null = the approval sheet). */
 export function setUkiActionConfirmHandler(fn: ActionConfirmHandler | null): void {
-  confirmHandler = fn;
+  confirmHandler = fn ?? sheetConfirm;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +161,9 @@ export function registerUkiAppAction(
   spec: AppActionSpec,
   handler: AppActionHandler,
 ): void {
-  registerAppAction(registry, { appId, spec, handler });
+  const entry = { appId, spec, handler };
+  registerAppAction(registry, entry);
+  void registerWithXack([entry]);
 }
 
 /** Remove an action (call from effect cleanup). */
@@ -204,7 +230,22 @@ export async function runUkiAction(
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
     return result;
   }
-  if (entry.spec.mutates && !opts.preApproved) {
+  // Xack decides natively and keeps the record. null = no native broker (web
+  // preview): the renderer gate below is the only gate, as before.
+  let x = await xackRequest(id, args, { summary: entry.spec.description, class: classOf(entry) });
+  if (x?.decision === 'refuse' && /not a capability/.test(x.reason)) {
+    await registerWithXack([entry]); // registered before the broker was ready
+    x = await xackRequest(id, args, { summary: entry.spec.description, class: classOf(entry) });
+  }
+  if (x?.decision === 'refuse') {
+    const result = `"${id}" was refused: ${x.reason}. Not performed.`;
+    recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
+    return result;
+  }
+  // sendsContent (e.g. reading the open web page into the conversation) asks every
+  // time: a scheduled pre-approval cannot know what that content will be.
+  const scheduled = !!opts.preApproved && entry.spec.mutates && !entry.spec.sendsContent;
+  if (entry.spec.sendsContent || (entry.spec.mutates && !opts.preApproved) || (x?.decision === 'ask' && !scheduled)) {
     let allowed = false;
     if (confirmHandler) {
       try {
@@ -213,21 +254,45 @@ export async function runUkiAction(
         allowed = false;
       }
     }
+    if (x?.requestId && x.decision === 'ask') {
+      const d = await xackDecide(x.requestId, allowed);
+      if (allowed && !d.ok) allowed = false;
+    }
     if (!allowed) {
-      const result = `"${id}" changes ${entry.appId} and needs the user's confirmation, which was not given. Not performed.`;
+      const what = entry.spec.mutates ? `changes ${entry.appId}` : `shares content from ${entry.appId}`;
+      const result = `"${id}" ${what} and needs the user's confirmation, which was not given. Not performed.`;
       recordAudit({ id, appId: entry.appId, mutates: true, args: redacted, outcome: 'denied', result });
       return result;
     }
+  } else if (x?.requestId && x.decision === 'ask' && scheduled) {
+    const d = await xackDecide(x.requestId, true, 'once', 'schedule');
+    if (!d.ok) {
+      const result = `"${id}" was not run: ${d.error || 'the scheduled approval was not accepted'}.`;
+      recordAudit({ id, appId: entry.appId, mutates: true, args: redacted, outcome: 'blocked', result });
+      return result;
+    }
+  }
+  let execId: string | undefined;
+  if (x?.requestId) {
+    const b = await xackBegin(x.requestId, id, args);
+    if (!b.ok) {
+      const result = `"${id}" was not run: ${b.error || 'the approval was not valid'}.`;
+      recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'blocked', result });
+      return result;
+    }
+    execId = b.execId;
   }
   try {
     const out = await entry.handler(args);
     const text = typeof out === 'string' && out.trim() ? out : 'Done.';
     const result = entry.spec.mutates && opts.preApproved ? `${text} (approved when scheduled)` : text;
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'ran', result });
+    if (execId) void xackFinish(execId, 'ran', result);
     return result;
   } catch (e) {
     const result = `Action "${id}" failed: ${(e as Error)?.message || 'error'}`;
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'failed', result });
+    if (execId) void xackFinish(execId, 'failed', result);
     return result;
   }
 }

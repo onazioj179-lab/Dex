@@ -13,6 +13,7 @@ import { AppShell } from '../../components/appShell';
 import type { MenuGroup } from '../../components/appShell/menuTypes';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { registerAppIntentHandler } from '../../services/appIntents';
+import { registerLedgerUkiActions } from './ledgerUki';
 import { ledger, ledgerAvailable, LedgerUnavailableError, LedgerError, type LedgerStatus } from './ledgerApi';
 import { formatMoney, todayLocal } from './money';
 import { LedgerContext, LEDGER_CSS, useLedgerQuery, errText, Empty, Btn, type EditorRequest, type LedgerCtx, type Section } from './ledgerUi';
@@ -139,6 +140,9 @@ const LedgerApp: React.FC<{ status: LedgerStatus; confirm: LedgerCtx['confirm'];
   const live = statusQ.data || status;
   const currency = live.currency || 'USD';
   const digits = live.digits;
+
+  // UKI can read a summary (asks first: financial data) and add a line (asks first).
+  useEffect(() => registerLedgerUkiActions(currency, digits), [currency, digits]);
 
   useEffect(() => { try { localStorage.setItem(UI_KEY, JSON.stringify(prefs)); } catch { /* quota */ } }, [prefs]);
 

@@ -37,6 +37,12 @@ export async function pickOpenPath(filters?: FileFilter[], defaultPath?: string)
   return r && !r.canceled && Array.isArray(r.filePaths) && r.filePaths[0] ? String(r.filePaths[0]) : null;
 }
 
+/** Pick a folder. Null when the user cancels. */
+export async function pickFolder(title?: string, defaultPath?: string): Promise<string | null> {
+  const r = await need().invoke('dialog:showOpenDialog', { title, defaultPath, properties: ['openDirectory'] });
+  return r && !r.canceled && Array.isArray(r.filePaths) && r.filePaths[0] ? String(r.filePaths[0]) : null;
+}
+
 /** Ask where to save. Null when the user cancels. */
 export async function pickSavePath(defaultPath?: string, filters?: FileFilter[], title?: string): Promise<string | null> {
   const r = await need().invoke('dialog:showSaveDialog', { defaultPath, filters, title });

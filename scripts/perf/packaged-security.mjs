@@ -58,6 +58,14 @@ function connect(url) {
 }
 const kill = async () => { try { execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }); } catch {} await sleep(1500); };
 const inv = (cdp, ch, ...a) => cdp.ev(`window.dex.invoke(${JSON.stringify(ch)}, ...${JSON.stringify(a)}).catch(e => ({ thrown: String(e) }))`);
+// Xack: the terminal runs only with a ticket approved for this exact command in
+// this exact folder. This is what DEX's approval sheet does when the user says yes.
+const approve = async (cdp, command, cwd) => {
+  const r = await inv(cdp, 'xack:request', { action: 'terminal.run', args: { command, cwd }, scope: cwd, summary: command });
+  if (r?.decision === 'ask') await inv(cdp, 'xack:decide', { requestId: r.requestId, approve: true, remember: 'once' });
+  return r?.requestId ?? '';
+};
+const runApproved = async (cdp, a) => inv(cdp, 'ukiterm:run', { ...a, xackRequest: await approve(cdp, a.command, a.cwd) });
 
 try {
   let cdp = await launch();
@@ -97,22 +105,44 @@ try {
   const rel = await inv(cdp, 'ukiterm:run', { command: 'Get-ChildItem', cwd: 'relative' });
   check('relative working folder refused', rel?.ok === false, rel?.error);
 
-  const run = await inv(cdp, 'ukiterm:run', { command: 'Write-Output "DEX_UKI_OK"; Write-Output ("secret=" + $env:DEX_SECTEST_API_TOKEN); Write-Output ("task=" + $env:DEX_UKI_TASK)', cwd: work, label: 'sectest' });
+  // Xack tickets: none, a mismatched one, and a reused one are all refused.
+  const noTicket = await inv(cdp, 'ukiterm:run', { command: 'Write-Output hi', cwd: work });
+  check('Xack: a command without an approval ticket is refused', noTicket?.ok === false && noTicket?.needsApproval === true, noTicket?.error);
+  const otherTicket = await approve(cdp, 'Write-Output approved', work);
+  const swapped = await inv(cdp, 'ukiterm:run', { command: 'Write-Output swapped', cwd: work, xackRequest: otherTicket });
+  check('Xack: a ticket approved for another command is refused', swapped?.ok === false && /different arguments/.test(swapped?.error ?? ''), swapped?.error);
+  const pending = await inv(cdp, 'xack:request', { action: 'terminal.run', args: { command: 'Write-Output pending', cwd: work }, scope: work });
+  const unapproved = await inv(cdp, 'ukiterm:run', { command: 'Write-Output pending', cwd: work, xackRequest: pending?.requestId });
+  check('Xack: a requested but unapproved ticket is refused', pending?.decision === 'ask' && unapproved?.ok === false, unapproved?.error);
+  const once = await approve(cdp, 'Write-Output once', work);
+  const first = await inv(cdp, 'ukiterm:run', { command: 'Write-Output once', cwd: work, xackRequest: once });
+  const second = await inv(cdp, 'ukiterm:run', { command: 'Write-Output once', cwd: work, xackRequest: once });
+  check('Xack: a ticket runs once', first?.ok === true && second?.ok === false && /already used/.test(second?.error ?? ''), second?.error);
+  const privReq = await inv(cdp, 'xack:request', { action: 'terminal.run', args: { command: 'bcdedit /set x', cwd: work }, scope: work, class: 'read' });
+  check('Xack: a privileged command is refused at request time, whatever class the caller claims', privReq?.decision === 'refuse', privReq);
+
+  const run = await runApproved(cdp, { command: 'Write-Output "DEX_UKI_OK"; Write-Output ("secret=" + $env:DEX_SECTEST_API_TOKEN); Write-Output ("task=" + $env:DEX_UKI_TASK)', cwd: work, label: 'sectest' });
   let task;
   for (let i = 0; i < 60; i++) { await sleep(250); task = (await inv(cdp, 'ukiterm:get', run?.id))?.task; if (task && task.status !== 'running') break; }
   check('approved command runs and its output is captured', task?.status === 'completed' && /DEX_UKI_OK/.test(task?.output ?? ''), { status: task?.status, exit: task?.exitCode });
   check('secret-looking environment variables are not passed to the command', !/LEAKED-SECRET-VALUE/.test(task?.output ?? '') && /secret=\s*$/m.test(task?.output ?? ''), (task?.output ?? '').trim().split(/\r?\n/));
   check('task runs marked DEX_UKI_TASK=1', /task=1/.test(task?.output ?? ''), null);
 
-  const long = await inv(cdp, 'ukiterm:run', { command: 'Start-Sleep -Seconds 60', cwd: work });
+  const long = await runApproved(cdp, { command: 'Start-Sleep -Seconds 60', cwd: work });
   await sleep(1500);
   const can = await inv(cdp, 'ukiterm:cancel', long?.id);
   let lt; for (let i = 0; i < 40; i++) { await sleep(250); lt = (await inv(cdp, 'ukiterm:get', long?.id))?.task; if (lt && lt.status !== 'running') break; }
   check('cancel stops a running command', can?.ok && lt?.status === 'cancelled', lt?.status);
 
-  const tmo = await inv(cdp, 'ukiterm:run', { command: 'Start-Sleep -Seconds 60', cwd: work, timeoutSec: 5 });
+  const tmo = await runApproved(cdp, { command: 'Start-Sleep -Seconds 60', cwd: work, timeoutSec: 5 });
   let tt; for (let i = 0; i < 60; i++) { await sleep(250); tt = (await inv(cdp, 'ukiterm:get', tmo?.id))?.task; if (tt && tt.status !== 'running') break; }
   check('timeout stops a command that runs too long', tt?.status === 'timed-out', tt?.status);
+
+  const hist = await inv(cdp, 'xack:history', { limit: 100 });
+  const execs = (hist?.items ?? []).filter((e) => e.kind === 'exec' && e.action === 'terminal.run');
+  check('Xack: history records each run and how it ended (completed, cancelled, timed out)',
+    ['completed', 'cancelled', 'timed-out'].every((o) => execs.some((e) => e.outcome === o)) && execs.some((e) => e.outcome === 'refused'),
+    execs.map((e) => e.outcome));
 
   const list = await inv(cdp, 'ukiterm:list');
   check('history lists the tasks', (list?.tasks?.length ?? 0) >= 3, list?.tasks?.length);

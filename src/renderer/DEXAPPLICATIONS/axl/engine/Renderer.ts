@@ -730,6 +730,16 @@ interface GPUMesh {
 // the oldest once we exceed this.
 const MESH_CACHE_LIMIT = 48;
 
+/**
+ * Mesh-cache bound under DEX memory pressure (services/resourcePressure):
+ * normal 48, high 16, critical 0 spare. Never below what the last frame drew,
+ * so on-screen parts are never evicted and re-uploaded every frame.
+ */
+export function meshCacheLimit(level: 'normal' | 'high' | 'critical', drawnLastFrame: number): number {
+  const spare = level === 'critical' ? 0 : level === 'high' ? 16 : MESH_CACHE_LIMIT;
+  return Math.max(spare, drawnLastFrame);
+}
+
 // ── Main Renderer Class ──────────────────────────────────────────────────
 
 export interface RenderState {
@@ -753,6 +763,8 @@ export class AXLRenderer {
   private mainProgram: WebGLProgram | null = null;
   private gridProgram: WebGLProgram | null = null;
   private meshCache = new Map<string, GPUMesh>();
+  private pressure: 'normal' | 'high' | 'critical' = 'normal';
+  private drawnLastFrame = 0;
   private gridVAO: WebGLVertexArrayObject | null = null;
   private gridIndexCount = 0;
   private animFrame = 0;
@@ -929,16 +941,32 @@ export class AXLRenderer {
 
     // LRU eviction: Map preserves insertion order, so the first key is the
     // oldest. Free its GPU resources before dropping it from the cache.
-    if (this.meshCache.size > MESH_CACHE_LIMIT) {
-      const oldestKey = this.meshCache.keys().next().value as string | undefined;
-      if (oldestKey !== undefined) {
-        const stale = this.meshCache.get(oldestKey)!;
-        this.deleteGPUMesh(stale);
-        this.meshCache.delete(oldestKey);
-      }
-    }
+    this.trimMeshCache();
     return gpuMesh;
   }
+
+  /** Evict least-recently-used meshes above the current limit (frees their GPU buffers). */
+  private trimMeshCache(): number {
+    const limit = meshCacheLimit(this.pressure, this.drawnLastFrame);
+    let freed = 0;
+    while (this.meshCache.size > limit) {
+      const oldestKey = this.meshCache.keys().next().value as string | undefined;
+      if (oldestKey === undefined) break;
+      this.deleteGPUMesh(this.meshCache.get(oldestKey)!);
+      this.meshCache.delete(oldestKey);
+      freed++;
+    }
+    return freed;
+  }
+
+  /** DEX memory pressure changed: shrink (or relax) the GPU mesh cache now. */
+  setMemoryPressure(level: 'normal' | 'high' | 'critical'): number {
+    this.pressure = level;
+    return this.gl ? this.trimMeshCache() : 0;
+  }
+
+  /** Cached GPU meshes (diagnostics/tests). */
+  get cachedMeshCount(): number { return this.meshCache.size; }
 
   render(state: RenderState) {
     if (!this.useWebGL || !this.gl) {
@@ -1000,6 +1028,7 @@ export class AXLRenderer {
     const wireframe = state.viewMode === 'wireframe' || state.viewMode === 'hidden-line';
     const xray = state.viewMode === 'xray';
 
+    this.drawnLastFrame = state.project.assembly.parts.reduce((n, p) => n + (p.visible ? 1 : 0), 0);
     state.project.assembly.parts.forEach(part => {
       if (!part.visible) return;
 

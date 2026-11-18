@@ -391,6 +391,8 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
   // Visible/overflow selection via the shared, tested Notification Center model
   // (shared/notifications/center.ts) — one source of truth for priority ordering
   // and the "+N more" overflow, replacing the inline sort/slice.
+  // The stack can be expanded to show every waiting notification (§20).
+  const [stackOpen, setStackOpen] = useState(false);
   const { visible, overflow } = useMemo(() => {
     const records: NotificationRecord[] = notifications.map((n) => ({
       id: n.id,
@@ -400,13 +402,14 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
       priority: (n.priority || 'normal') as NotificationPriority,
       ts: n.timestamp || 0,
     }));
-    const sel = selectVisible(records, MAX_VISIBLE);
+    const sel = selectVisible(records, stackOpen ? Math.max(MAX_VISIBLE, records.length) : MAX_VISIBLE);
     const byId = new Map(notifications.map((n) => [n.id, n]));
     return {
       visible: sel.visible.map((r) => byId.get(r.id)).filter(Boolean) as BannerNotification[],
       overflow: sel.overflow,
     };
-  }, [notifications]);
+  }, [notifications, stackOpen]);
+  useEffect(() => { if (notifications.length <= MAX_VISIBLE) setStackOpen(false); }, [notifications.length]);
 
   if (visible.length === 0) return null;
 
@@ -426,6 +429,7 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
       alignItems: 'flex-end',
       gap: 'var(--space-2)',
       pointerEvents: 'auto',
+      ...(stackOpen ? { maxHeight: 'calc(100vh - 34px - var(--dex-reserved-top, 0px) - 24px)', overflowY: 'auto' as const, paddingRight: 2 } : null),
     }}>
       {visible.map((n, i) => (
         <Banner
@@ -437,15 +441,19 @@ export const NotificationBanners: React.FC<NotificationBannersProps> = ({
         />
       ))}
       {/* Show "+N more" indicator if there are hidden notifications */}
-      {overflow > 0 && (
-        <div style={{
-          fontSize: 11, color: 'var(--color-text-tertiary)',
-          textAlign: 'center', padding: '4px 0',
-          background: 'var(--color-bg-elevated)',
-          borderRadius: 6, opacity: 0.9,
-        }}>
-          +{overflow} more notification{overflow > 1 ? 's' : ''}
-        </div>
+      {(overflow > 0 || stackOpen) && notifications.length > MAX_VISIBLE && (
+        <button
+          type="button"
+          className="dex-liquid-glass"
+          aria-expanded={stackOpen}
+          onClick={() => setStackOpen(o => !o)}
+          style={{
+            height: 28, padding: '0 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
+            fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)',
+          }}
+        >
+          {stackOpen ? 'Show less' : `+${overflow} more notification${overflow > 1 ? 's' : ''}`}
+        </button>
       )}
     </div>
   );

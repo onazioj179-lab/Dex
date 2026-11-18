@@ -19,6 +19,8 @@ mod ledger_ctl;
 mod download_ctl;
 mod onboarding;
 mod uki_terminal;
+mod xack;
+mod umari;
 mod proc_classify;
 mod webview2;
 mod storage_ctl;
@@ -1573,6 +1575,10 @@ fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Val
 
 /// Clear + rebuild the index from the user's document folders.
 fn index_rebuild(app: &tauri::AppHandle) -> Value {
+    report_index_task(app, "rebuild", || index_rebuild_inner(app))
+}
+
+fn index_rebuild_inner(app: &tauri::AppHandle) -> Value {
     // Take a clone of the index handle, then DROP the lock before the multi-second
     // clear + walk so searches stay responsive during a rebuild. The clone shares
     // the same underlying Tantivy index (internally synchronized).
@@ -1588,12 +1594,8 @@ fn index_rebuild(app: &tauri::AppHandle) -> Value {
     if let Err(e) = idx.clear() {
         return json!({ "success": false, "error": e });
     }
-    let p = app.path();
     let mut total = 0usize;
-    for dir in [p.document_dir(), p.desktop_dir(), p.download_dir()]
-        .into_iter()
-        .flatten()
-    {
+    for dir in index_dirs(app) {
         if let Ok(n) = idx.index_path(&dir, 20000) {
             total += n;
         }
@@ -1684,7 +1686,35 @@ fn save_snapshot(app: &tauri::AppHandle, snap: &dex_scanner::Snapshot) {
     }
 }
 
+/// Search indexing is background work the user can see: Task Manager ›
+/// Background lists it (renderer: services/backgroundTasks.ts, `index:task`).
+fn report_index_task(app: &tauri::AppHandle, kind: &str, work: impl FnOnce() -> Value) -> Value {
+    let started = std::time::Instant::now();
+    crate::native_ops::emit_event(app, "index:task", &json!({ "state": "started", "kind": kind }));
+    let res = work();
+    let ok = res.get("success").and_then(|v| v.as_bool()) == Some(true);
+    crate::native_ops::emit_event(app, "index:task", &json!({
+        "state": if ok { "completed" } else { "failed" }, "kind": kind,
+        "indexed": res.get("indexed").cloned().unwrap_or(Value::Null),
+        "error": res.get("error").cloned().unwrap_or(Value::Null),
+        "ms": started.elapsed().as_millis() as u64,
+    }));
+    res
+}
+
+/// Folders the file index covers: Documents, Desktop, Downloads, plus the
+/// folders the user authorized in Umari (Settings › UKI › Indexed folders).
+fn index_dirs(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
+    let mut dirs = umari::default_folders(app);
+    dirs.extend(umari::authorized_folders(app));
+    dirs
+}
+
 fn index_sync(app: &tauri::AppHandle) -> Value {
+    report_index_task(app, "sync", || index_sync_inner(app))
+}
+
+fn index_sync_inner(app: &tauri::AppHandle) -> Value {
     // Clone the (Arc-backed) index handle and release the search lock immediately.
     let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
     let idx = {
@@ -1695,11 +1725,7 @@ fn index_sync(app: &tauri::AppHandle) -> Value {
         }
     };
 
-    let p = app.path();
-    let dirs: Vec<std::path::PathBuf> = [p.document_dir(), p.desktop_dir(), p.download_dir()]
-        .into_iter()
-        .flatten()
-        .collect();
+    let dirs: Vec<std::path::PathBuf> = index_dirs(app);
 
     // Hold the snapshot lock for the whole sync so two syncs can't interleave; it
     // is a different mutex from the search index, so queries stay responsive.
@@ -1803,13 +1829,7 @@ fn index_apply_paths(app: &tauri::AppHandle, paths: &std::collections::HashSet<s
 
 fn start_index_watcher(app: tauri::AppHandle) {
     use notify::Watcher;
-    let dirs: Vec<std::path::PathBuf> = {
-        let p = app.path();
-        [p.document_dir(), p.desktop_dir(), p.download_dir()]
-            .into_iter()
-            .flatten()
-            .collect()
-    };
+    let dirs: Vec<std::path::PathBuf> = index_dirs(&app);
     if dirs.is_empty() {
         return;
     }
@@ -2390,6 +2410,24 @@ async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, webview: tauri::W
         return tauri::async_runtime::spawn_blocking(move || {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| uki_terminal::dispatch(&app, &channel, &args)))
                 .unwrap_or_else(|_| json!({ "ok": false, "error": "the command broker hit an internal error" }))
+        })
+        .await
+        .unwrap_or(Value::Null);
+    }
+    // Xack (UKI's action broker) and Umari (authorized context): only DEX's own
+    // window. A web page in a browser tab can never ask for, approve or read
+    // UKI actions, nor read the user's authorized folders.
+    if channel.starts_with("xack:") || channel.starts_with("umari:") {
+        let own_webview = webview.label() == webview.window().label() && !webview.label().starts_with("dexbrowser-");
+        if !own_webview {
+            return json!({ "ok": false, "error": "not allowed from this view" });
+        }
+        let is_xack = channel.starts_with("xack:");
+        return tauri::async_runtime::spawn_blocking(move || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if is_xack { xack::dispatch(&app, &channel, &args) } else { umari::dispatch(&app, &channel, &args) }
+            }))
+            .unwrap_or_else(|_| json!({ "ok": false, "error": "internal error" }))
         })
         .await
         .unwrap_or(Value::Null);

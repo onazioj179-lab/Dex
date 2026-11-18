@@ -102,14 +102,17 @@ fn check_url(url: &str) -> Result<tauri::Url, Value> {
 }
 
 fn start(app: &tauri::AppHandle, url: &str) -> Value {
-    run(app, url, None, &mut |_, _| {})
+    run(app, url, None, None, &mut |_, _| {})
 }
 
-/// Download `url` into Downloads. `cancel` stops it (the .part file is
-/// removed); `progress(received, total)` is called as bytes arrive.
-fn run(app: &tauri::AppHandle, url: &str, cancel: Option<&AtomicBool>, progress: &mut dyn FnMut(u64, Option<u64>)) -> Value {
+/// Download `url` into `dest` (already validated) or Downloads. `cancel` stops
+/// it (the .part file is removed); `progress(received, total)` as bytes arrive.
+fn run(app: &tauri::AppHandle, url: &str, dest: Option<PathBuf>, cancel: Option<&AtomicBool>, progress: &mut dyn FnMut(u64, Option<u64>)) -> Value {
     let parsed = match check_url(url) { Ok(p) => p, Err(e) => return e };
-    let Ok(dir) = app.path().download_dir() else { return fail("couldn't find the Downloads folder") };
+    let dir = match dest {
+        Some(d) => d,
+        None => match app.path().download_dir() { Ok(d) => d, Err(_) => return fail("couldn't find the Downloads folder") },
+    };
     let _ = std::fs::create_dir_all(&dir);
 
     let resp = match ureq::get(parsed.as_str()).timeout(std::time::Duration::from_secs(60 * 30)).call() {
@@ -164,7 +167,24 @@ fn run(app: &tauri::AppHandle, url: &str, cancel: Option<&AtomicBool>, progress:
 
 /// Background download with live `download:progress` events
 /// ({ id, state: progressing|completed|failed|cancelled, received, total, percent, path?, fileName?, error? }).
-fn start_background(app: &tauri::AppHandle, url: &str, id: &str) -> Value {
+/// A chosen destination: absolute, existing, a folder, not a Windows/program folder.
+pub(crate) fn check_dest(dir: &str) -> Result<PathBuf, String> {
+    let p = crate::uki_terminal::check_cwd(dir).map_err(|e| e.replace("UKI cannot run commands inside", "Downloads can't be saved to").replace("the working folder", "the download folder"))?;
+    Ok(strip_verbatim(p))
+}
+
+/// Validation canonicalizes the folder, which on Windows adds the verbatim
+/// prefix (\\?\C:\...). Shown paths, history, Open and Show in folder want the
+/// plain form; UNC shares (\\?\UNC\...) keep theirs.
+pub(crate) fn strip_verbatim(p: PathBuf) -> PathBuf {
+    let s = p.to_string_lossy();
+    match s.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC\\") => PathBuf::from(rest),
+        _ => p,
+    }
+}
+
+fn start_background(app: &tauri::AppHandle, url: &str, id: &str, dest: Option<PathBuf>) -> Value {
     if let Err(e) = check_url(url) { return e; }
     let flag = Arc::new(AtomicBool::new(false));
     {
@@ -184,7 +204,7 @@ fn start_background(app: &tauri::AppHandle, url: &str, id: &str) -> Value {
                 "id": id, "state": "progressing", "received": received, "total": total, "percent": percent,
             }));
         };
-        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&app, &url, Some(&flag), &mut on_progress)))
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&app, &url, dest, Some(&flag), &mut on_progress)))
             .unwrap_or_else(|_| fail("the download stopped unexpectedly"));
         running().lock_safe().remove(&id);
         let state = if res.get("success").and_then(|v| v.as_bool()) == Some(true) { "completed" }
@@ -202,7 +222,14 @@ fn start_background(app: &tauri::AppHandle, url: &str, id: &str) -> Value {
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     match channel {
         "download:start" => match (args.get(0).and_then(|v| v.as_str()), args.get(1).and_then(|v| v.as_str())) {
-            (Some(url), Some(id)) if valid_id(id) => start_background(app, url, id),
+            (Some(url), Some(id)) if valid_id(id) => {
+                // Optional destination folder (third argument), validated here, never trusted.
+                let dest = match args.get(2).and_then(|v| v.as_str()).filter(|d| !d.trim().is_empty()) {
+                    Some(d) => match check_dest(d) { Ok(p) => Some(p), Err(e) => return fail(e) },
+                    None => None,
+                };
+                start_background(app, url, id, dest)
+            }
             (Some(_), Some(_)) => fail("invalid download id"),
             (Some(url), None) => start(app, url),
             _ => fail("missing url"),
@@ -228,6 +255,17 @@ mod tests {
         assert_eq!(file_name_for("https://x.com/", None), "download");
         assert_eq!(file_name_for("https://x.com/d", Some("attachment; filename=\"re:port?.pdf\"")), "re_port_.pdf");
         assert_eq!(file_name_for("https://x.com/..", None), "download");
+    }
+
+    #[test]
+    fn destinations_are_validated() {
+        assert!(check_dest(r"relative\dir").is_err());
+        assert!(check_dest(r"C:\definitely\missing\dex").is_err());
+        let windir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        assert!(check_dest(&windir).unwrap_err().contains("Downloads can't be saved to"));
+        let ok = check_dest(&std::env::temp_dir().to_string_lossy()).unwrap();
+        assert!(!ok.to_string_lossy().starts_with(r"\\?\"), "no verbatim prefix: {}", ok.display());
+        assert_eq!(strip_verbatim(PathBuf::from(r"\\?\UNC\srv\share")), PathBuf::from(r"\\?\UNC\srv\share"));
     }
 
     #[test]

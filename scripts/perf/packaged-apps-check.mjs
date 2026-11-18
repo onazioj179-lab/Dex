@@ -38,6 +38,33 @@ const ev = (e) => new Promise((r) => { const i = ++id; pend.set(i, (d) => r(d.re
 try {
   for (let i = 0; i < 300; i++) { if (await ev(`!!document.querySelector('[aria-label="Dock"]')`)) break; await sleep(50); }
 
+  // Background tasks: a search index run reports start and finish (index:task).
+  await ev(`window.__idx = []; window.dex.on && window.dex.on('index:task', (p) => window.__idx.push(p)); true`);
+  await ev(`window.dex.invoke('search:sync')`);
+  let idx = [];
+  for (let i = 0; i < 120; i++) { idx = (await ev('window.__idx')) || []; if (idx.some((e) => e.state !== 'started')) break; await sleep(250); }
+  const fin = idx.find((e) => e.state !== 'started');
+  check('search indexing reports start and finish to Background tasks', idx.some((e) => e.state === 'started') && fin?.state === 'completed', { events: idx.length, final: fin && { state: fin.state, indexed: fin.indexed, ms: fin.ms } });
+
+  // Downloads: a chosen destination folder is used; a Windows folder is refused.
+  {
+    const http = await import('node:http');
+    const payload = Buffer.alloc(256 * 1024, 3);
+    const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': payload.length }); r.end(payload); });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const destDir = join(prof, 'dl-dest'); mkdirSync(destDir);
+    const url = `http://127.0.0.1:${srv.address().port}/dest-check.bin`;
+    await ev(`window.__dl = []; window.dex.on && window.dex.on('download:progress', (p) => window.__dl.push(p)); true`);
+    const started = await ev(`window.dex.invoke('download:start', ${JSON.stringify(url)}, 'dl_dest_1', ${JSON.stringify(destDir)})`);
+    let done = null;
+    for (let i = 0; i < 60 && !done; i++) { done = ((await ev('window.__dl')) || []).find((e) => e.id === 'dl_dest_1' && e.state !== 'progressing'); if (!done) await sleep(250); }
+    const inDest = !!done?.path && done.path.toLowerCase().startsWith(destDir.toLowerCase());
+    check('download saved into the chosen folder', started?.started === true && done?.state === 'completed' && inDest, { path: done?.path, size: done?.size });
+    const refused = await ev(`window.dex.invoke('download:start', ${JSON.stringify(url)}, 'dl_dest_2', 'C:\\\\Windows')`);
+    check('download into a Windows folder is refused', refused?.success === false && /can't be saved/.test(String(refused?.error)), refused);
+    srv.close();
+  }
+
   // Task Manager data (native)
   const procs = await ev(`window.dex.invoke('system:getProcesses')`);
   const kinds = Array.isArray(procs) ? procs.reduce((a, p) => { a[p.kind] = (a[p.kind] || 0) + 1; return a; }, {}) : null;

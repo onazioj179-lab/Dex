@@ -39,19 +39,63 @@ import { getProcessingMode, getReasoningPreference } from './providers/modelPref
 import { listGrants } from './permissions';
 import { runFileTool, FILE_TOOL_NAMES } from './fileTools';
 import { runTerminalTool, TERMINAL_TOOL_NAMES, classifyCommand, commandConfirmReason } from './terminalTools';
+import { runUmariTool, UMARI_TOOL_NAMES } from './umari';
 import { scheduleTaskTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduleTools';
+import { xackRequest, xackDecide, xackBegin, xackFinish, type XackClass, type XackRemember } from './xack';
+import { requestApproval, type ApprovalAnswer } from './approvals';
 
-/** Asks the user to approve a risky core-tool call; resolves true to proceed. */
-export type ToolConfirmHandler = (tool: string, args: Record<string, unknown>, reason: string) => Promise<boolean> | boolean;
+/** What the approval surface knows beyond the tool and its arguments. */
+export interface ToolConfirmContext {
+  /** Xack's class for the request (null without the native broker). */
+  cls: XackClass | null;
+  /** Session-remember choices the request supports. */
+  remember: Exclude<XackRemember, 'once'>[];
+}
 
-let toolConfirm: ToolConfirmHandler = (tool, args, reason) => {
-  try {
-    const detail = Object.entries(args).map(([k, v]) => `${k}: ${String(v)}`).join('\n');
-    return window.confirm(`UKI wants to run ${tool} (${reason}).\n\n${detail}\n\nAllow?`);
-  } catch {
-    return false; // no confirm surface: deny
-  }
+/** Asks the user to approve a risky core-tool call. */
+export type ToolConfirmHandler = (
+  tool: string,
+  args: Record<string, unknown>,
+  reason: string,
+  ctx?: ToolConfirmContext,
+) => Promise<boolean | ApprovalAnswer> | boolean | ApprovalAnswer;
+
+const TOOL_TITLES: Record<string, string> = {
+  run_command: 'run a command',
+  trash_file: 'move a file to the Recycle Bin',
+  move_file: 'move a file',
+  rename_file: 'rename a file',
+  create_folder: 'create a folder',
+  schedule_task: 'schedule a task',
+  cancel_scheduled_task: 'delete a scheduled task',
+  cancel_command: 'stop a running command',
 };
+
+let toolConfirm: ToolConfirmHandler = (tool, args, reason, ctx) => {
+  if (tool === 'run_command') {
+    return requestApproval({
+      title: TOOL_TITLES.run_command,
+      subject: String(args.command ?? ''),
+      code: true,
+      facts: [{ label: 'Folder', value: String(args.cwd ?? '') }],
+      cls: ctx?.cls ?? null,
+      reason,
+      remember: ctx?.remember ?? [],
+    });
+  }
+  return requestApproval({
+    title: TOOL_TITLES[tool] ?? `use ${tool}`,
+    subject: Object.entries(args).map(([k, v]) => `${k}: ${String(v)}`).join('\n') || tool,
+    code: true,
+    cls: ctx?.cls ?? null,
+    reason,
+    remember: ctx?.remember ?? [],
+  });
+};
+
+function normalizeAnswer(a: boolean | ApprovalAnswer): ApprovalAnswer {
+  return typeof a === 'boolean' ? { allow: a, remember: 'once' } : { allow: !!a?.allow, remember: a?.remember ?? 'once' };
+}
 
 /** Replace the confirmation surface for risky core tools (UI or tests). */
 export function setUkiToolConfirmHandler(fn: ToolConfirmHandler): void {
@@ -60,6 +104,7 @@ export function setUkiToolConfirmHandler(fn: ToolConfirmHandler): void {
 
 const FILE_TOOLS: ReadonlySet<string> = new Set(FILE_TOOL_NAMES);
 const TERMINAL_TOOLS: ReadonlySet<string> = new Set(TERMINAL_TOOL_NAMES);
+const UMARI_TOOLS: ReadonlySet<string> = new Set(UMARI_TOOL_NAMES);
 
 async function grantedCapabilities(): Promise<Set<string>> {
   try {
@@ -152,6 +197,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
   }
   if (FILE_TOOLS.has(name)) return runFileTool(name, args);
   if (TERMINAL_TOOLS.has(name)) return runTerminalTool(name, args);
+  if (UMARI_TOOLS.has(name)) return runUmariTool(name, args);
   switch (name as ToolName) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
@@ -221,32 +267,76 @@ async function runGatedTool(name: string, args: Record<string, unknown>, signal:
   // A command is classified by the native broker before the user is asked, so
   // the prompt says what it does; privileged commands never reach the prompt.
   let reason = decision.kind === 'confirm' ? decision.reason : '';
-  if (name === 'run_command') {
-    const cls = await classifyCommand(String(args.command ?? ''));
+  const isCommand = name === 'run_command';
+  const command = String(args.command ?? '').trim();
+  const cwd = String(args.cwd ?? '').trim();
+  if (isCommand) {
+    const cls = await classifyCommand(command);
     if (!cls.ok || cls.risk === 'privileged') {
       const result = `Not performed: ${cls.risk === 'privileged' ? 'UKI does not run commands that need administrator rights or change system settings' : cls.error || 'the command was rejected'}.`;
       recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
       return result;
     }
-    reason = commandConfirmReason(cls.risk, String(args.cwd ?? ''));
+    reason = commandConfirmReason(cls.risk, cwd);
   }
-  if (decision.kind === 'confirm') {
-    const ok = await toolConfirm(name, args, reason);
-    if (!ok) {
+
+  // Xack decides natively (class, confirmation policy, session grants) and
+  // records the request. null = no native broker (web preview): the renderer
+  // policy above is the only gate, as before.
+  const xAction = isCommand ? 'terminal.run' : `uki.${name}`;
+  const xArgs = isCommand ? { command, cwd } : args;
+  const summary = isCommand ? command : `${name} ${Object.values(args).map((v) => String(v)).join(' ')}`.slice(0, 240);
+  const x = await xackRequest(xAction, xArgs, { summary, scope: isCommand ? cwd : '' });
+  if (x?.decision === 'refuse') {
+    const result = `Not performed: ${x.reason || 'Xack refused it'}.`;
+    recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
+    return result;
+  }
+  const grantedBySession = x?.decision === 'allow' && x.by === 'grant';
+  const mustAsk = !grantedBySession && (decision.kind === 'confirm' || x?.decision === 'ask');
+  if (mustAsk) {
+    const answer = normalizeAnswer(await toolConfirm(name, args, reason, {
+      cls: x?.class ?? null,
+      remember: isCommand ? (x?.class === 'read' ? ['exact', 'scope-read'] : ['exact']) : [],
+    }));
+    if (x?.requestId) {
+      const d = await xackDecide(x.requestId, answer.allow, answer.allow ? answer.remember : 'once');
+      if (answer.allow && !d.ok) {
+        const result = `Not performed: ${d.error || 'the approval could not be recorded'}.`;
+        recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
+        return result;
+      }
+    }
+    if (!answer.allow) {
       const result = `The user declined ${name}. Not performed.`;
       recordUkiToolAudit({ tool: name, args, outcome: 'denied', result, risk: spec.risk, mutates });
       return result;
     }
   }
   if (signal.aborted) throw new CancelledError();
+
+  // The terminal consumes its ticket natively; everything else opens an
+  // execution record here so the history shows what ran and how it ended.
+  let execId: string | undefined;
+  if (x?.requestId && !isCommand) {
+    const b = await xackBegin(x.requestId, xAction, xArgs);
+    if (!b.ok) {
+      const result = `Not performed: ${b.error || 'the approval was not valid'}.`;
+      recordUkiToolAudit({ tool: name, args, outcome: 'blocked', result, risk: spec.risk, mutates });
+      return result;
+    }
+    execId = b.execId;
+  }
   try {
-    const result = await runTool(name, args);
+    const result = isCommand ? await runTerminalTool(name, args, x?.requestId ?? undefined) : await runTool(name, args);
     const failed = /^(Could not|Not performed|File tool error|Unknown|Refusing|No allowed)/.test(result);
     recordUkiToolAudit({ tool: name, args, outcome: failed ? 'failed' : 'ran', result, risk: spec.risk, mutates });
+    if (execId) void xackFinish(execId, failed ? 'failed' : 'ran', result);
     return result;
   } catch (e) {
     const result = `Tool error: ${(e as Error)?.message || 'failed'}`;
     recordUkiToolAudit({ tool: name, args, outcome: 'failed', result, risk: spec.risk, mutates });
+    if (execId) void xackFinish(execId, 'failed', result);
     return result;
   }
 }
@@ -271,7 +361,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
     web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
-    find_files: 4, read_file: 6, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
+    find_files: 4, find_context: 4, list_projects: 2, read_file: 6, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
     schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
     run_command: 3, command_status: 6, cancel_command: 2,
   });

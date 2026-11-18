@@ -21,6 +21,8 @@ import {
 } from '../../uki/appActionRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { colors, radius, fontStack } from '../../styles/tokens';
+import { SegmentedControl } from '../../components/controls/SegmentedControl';
+import { XackHistoryView } from '../../components/XackHistoryView';
 
 const OUTCOME_COLOR: Record<UkiActionOutcome, string> = {
   ran: colors.semantic.success,
@@ -50,6 +52,7 @@ function fmtTime(ts: number): string {
 const SecurityCenter: React.FC = () => {
   const [entries, setEntries] = useState<readonly UkiActionAuditEntry[]>(() => getUkiActionAudit().slice());
   const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<'activity' | 'native'>('activity');
 
   // Live-update as the assistant runs actions.
   useEffect(() => {
@@ -121,6 +124,19 @@ const SecurityCenter: React.FC = () => {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, fontFamily: fontStack.ui }}>
+        <div style={{ padding: '10px 16px 0' }}>
+          <SegmentedControl
+            semantics="tabs"
+            aria-label="Security Center view"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'activity', label: 'App activity', testId: 'security-view-activity' },
+              { value: 'native', label: 'Xack history & permissions', testId: 'security-view-native' },
+            ]}
+          />
+        </div>
+        {view === 'native' ? <XackHistoryView /> : (<>
         {/* Filter chips */}
         <div style={{ display: 'flex', gap: 4, padding: '10px 16px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
           {FILTERS.map((f) => (
@@ -174,6 +190,7 @@ const SecurityCenter: React.FC = () => {
             </div>
           ))}
         </div>
+        </>)}
       </div>
     </AppShell>
   );

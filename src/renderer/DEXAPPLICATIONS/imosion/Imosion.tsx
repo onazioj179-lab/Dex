@@ -5161,19 +5161,39 @@ const Imosion: React.FC = () => {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
+  // Which panels/dialogs are open, read by Escape (a ref, so the key handler
+  // need not re-subscribe on every open/close).
+  const escapeLayersRef = useRef({ showSavePresetModal, showExportModal, showCollabModal, showPluginStore, showTemplates, showRouting, showClipEditor, showPluginBrowser, showSpectrum, showForge, showMasteringPanel, showFileMenu, showToolsMenu });
+  escapeLayersRef.current = { showSavePresetModal, showExportModal, showCollabModal, showPluginStore, showTemplates, showRouting, showClipEditor, showPluginBrowser, showSpectrum, showForge, showMasteringPanel, showFileMenu, showToolsMenu };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!keyEventForApp(e, 'imosion') || isTypingTarget(e.target)) return;
       const ctrl = e.ctrlKey || e.metaKey;
       switch (e.code) {
-        case 'Escape':
-          setShowMasteringPanel(false); setShowSavePresetModal(null); setShowExportModal(false);
-          setShowCollabModal(false); setShowClipEditor(false); setShowPluginBrowser(false);
-          setShowPluginStore(false); setShowTemplates(false); setShowRouting(false);
-          setShowSpectrum(false); setShowForge(false);
-          setShowFileMenu(false); setShowToolsMenu(false);
+        case 'Escape': {
+          // One layer per Escape, top-most first (dialogs, then panels, then
+          // menus). It used to close every open panel and dialog at once.
+          const o = escapeLayersRef.current;
+          const layers: [boolean, () => void][] = [
+            [!!o.showSavePresetModal, () => setShowSavePresetModal(null)],
+            [o.showExportModal, () => setShowExportModal(false)],
+            [o.showCollabModal, () => setShowCollabModal(false)],
+            [o.showPluginStore, () => setShowPluginStore(false)],
+            [o.showTemplates, () => setShowTemplates(false)],
+            [o.showRouting, () => setShowRouting(false)],
+            [o.showClipEditor, () => setShowClipEditor(false)],
+            [o.showPluginBrowser, () => setShowPluginBrowser(false)],
+            [o.showSpectrum, () => setShowSpectrum(false)],
+            [o.showForge, () => setShowForge(false)],
+            [o.showMasteringPanel, () => setShowMasteringPanel(false)],
+            [o.showFileMenu || o.showToolsMenu, () => { setShowFileMenu(false); setShowToolsMenu(false); }],
+          ];
+          const top = layers.find(([open]) => open);
+          if (top) { e.preventDefault(); top[1](); }
           break;
+        }
         case 'Space': e.preventDefault(); setIsPlaying(p => !p); break;
         case 'KeyR': if (!ctrl) { e.preventDefault(); isRecording ? stopRecording() : startRecording(); } break;
         case 'KeyS': if (!ctrl) { e.preventDefault(); setIsPlaying(false); setCurrentTime(0); if (isRecording) stopRecording(); } break;

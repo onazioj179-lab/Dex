@@ -10,6 +10,18 @@
 ---
 
 
+## Part 24 batch 1 — Xack + Umari (2026-11-18, `claude/part24-xack-umari`)
+
+- New native modules `src-tauri/src/xack.rs` (UKI action broker: catalog, decide, single-use tickets,
+  session grants, `xack-history.jsonl`) and `src-tauri/src/umari.rs` (authorized folders, project detection,
+  bounded retrieval). `xack:*`/`umari:*` are routed in `dex_ipc` like `ukiterm:*`: DEX's own window only.
+- `ukiterm:run` now needs `xackRequest` (a ticket approved for that exact command + folder). Any new caller of the
+  terminal broker must go through `xack:request` → `xack:decide` first (see `scripts/perf/packaged-security.mjs`).
+- `main.rs` `index_dirs()` = Documents/Desktop/Downloads + Umari folders, used by rebuild, sync and the watcher.
+- `core/dex-search`: `is_sensitive_file` / `looks_like_secret` keep credentials out of indexed content.
+- Renderer: `uki/xack.ts`, `uki/umari.ts`, `uki/approvals.ts` + `components/UkiApprovalHost.tsx` (mounted in
+  AppManager), Security Center › Xack history & permissions, Settings › UKI › Indexed folders.
+
 ## Desktop fit follow-ups (2026-11-17, `claude/dock-overlay-followup`)
 
 - Dock = overlay: `getShellWorkspace` passes reserve 0; `dockReserve()` still sizes the Dock's own band. Open Dock centred on the anchor (`placeDockAroundTrigger(..., openLen / 2, ...)`).

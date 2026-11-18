@@ -170,6 +170,9 @@ const PresentationBuilder: React.FC = () => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
+  // Presenter blanking (B / . = black, W = white), cleared by any navigation.
+  const [blank, setBlank] = useState<null | 'black' | 'white'>(null);
+  useEffect(() => { if (!presenting) setBlank(null); }, [presenting]);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [showOutline, setShowOutline] = useState(false);
   const [outlineText, setOutlineText] = useState('');
@@ -593,14 +596,19 @@ const PresentationBuilder: React.FC = () => {
     if (!presenting) return;
     const onKey = (e: KeyboardEvent) => {
       if (!keyEventForApp(e, 'presentation')) return; // key meant for another app
-      if (e.key === 'Escape') exitPresent();
-      else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-        e.preventDefault();
+      // The standard presenting keys (clickers send PageDown/PageUp; many also send "." or B).
+      const k = e.key;
+      if (k === 'Escape') { if (blank) { e.preventDefault(); setBlank(null); } else exitPresent(); return; }
+      if (k === 'b' || k === 'B' || k === '.') { e.preventDefault(); setBlank(v => (v === 'black' ? null : 'black')); return; }
+      if (k === 'w' || k === 'W' || k === ',') { e.preventDefault(); setBlank(v => (v === 'white' ? null : 'white')); return; }
+      if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter' || k === 'n' || k === 'N') {
+        e.preventDefault(); setBlank(null);
         setCurrentIdx(i => Math.min(slides.length - 1, i + 1));
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
+      } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace' || k === 'p' || k === 'P') {
+        e.preventDefault(); setBlank(null);
         setCurrentIdx(i => Math.max(0, i - 1));
-      }
+      } else if (k === 'Home') { e.preventDefault(); setBlank(null); setCurrentIdx(0); }
+      else if (k === 'End') { e.preventDefault(); setBlank(null); setCurrentIdx(Math.max(0, slides.length - 1)); }
     };
     const onFs = () => { if (!document.fullscreenElement) setPresenting(false); };
     window.addEventListener('keydown', onKey);
@@ -609,7 +617,7 @@ const PresentationBuilder: React.FC = () => {
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('fullscreenchange', onFs);
     };
-  }, [presenting, slides.length, exitPresent]);
+  }, [presenting, slides.length, exitPresent, blank]);
 
   // Presenter clock + elapsed ticker
   useEffect(() => {
@@ -784,6 +792,15 @@ const PresentationBuilder: React.FC = () => {
         >
           {currentSlide && renderSlide(currentSlide, screenScale)}
         </div>
+
+        {blank && (
+          <div
+            role="img"
+            aria-label={blank === 'black' ? 'Screen blanked (black). Press B or click to return.' : 'Screen blanked (white). Press W or click to return.'}
+            onClick={() => setBlank(null)}
+            style={{ position: 'absolute', inset: 0, zIndex: 5, background: blank === 'black' ? '#000' : '#fff', cursor: 'none' }}
+          />
+        )}
 
         {/* Speaker notes strip */}
         {notes && (

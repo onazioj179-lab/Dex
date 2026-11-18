@@ -274,6 +274,35 @@ export function readLastSession(): LastSessionRecord | null {
   }
 }
 
+/** Most windows a reopen brings back (a huge stale session must not stall boot). */
+export const REOPEN_MAX = 12;
+
+/**
+ * Which apps and windows to bring back from a session journal (opt-in
+ * Settings › General › "Reopen apps and windows"). Only clean sessions:
+ * after a crash nothing is reopened, so a failing app cannot crash-loop DEX.
+ * Unknown/retired apps and extra windows of single-window apps are dropped;
+ * names and icons come from the app definitions, not from storage.
+ */
+export function planReopen(rec: LastSessionRecord | null, max = REOPEN_MAX): { apps: Array<Pick<RunningApp, 'id' | 'name' | 'icon' | 'color'>>; current: string | null; skipped: 'none' | 'unclean' | 'empty' } {
+  if (!rec || !Array.isArray(rec.apps) || rec.apps.length === 0) return { apps: [], current: null, skipped: 'empty' };
+  if (!rec.clean) return { apps: [], current: null, skipped: 'unclean' };
+  const seen = new Set<string>();
+  const apps: Array<Pick<RunningApp, 'id' | 'name' | 'icon' | 'color'>> = [];
+  for (const a of rec.apps) {
+    const id = typeof a?.id === 'string' ? a.id : '';
+    const base = baseAppId(id);
+    const def = APP_DEFINITIONS_RAW[base];
+    if (!id || seen.has(id) || !def || RETIRED_APPS[base]) continue;
+    if (id !== base && !supportsMultipleWindows(base)) continue;
+    seen.add(id);
+    apps.push({ id, name: windowName(def.name, id), icon: def.icon, color: def.color });
+    if (apps.length >= max) break;
+  }
+  const current = rec.currentAppId && seen.has(rec.currentAppId) ? rec.currentAppId : (apps.at(-1)?.id ?? null);
+  return { apps, current, skipped: apps.length ? 'none' : 'empty' };
+}
+
 export function clearLastSession(): void {
   try { localStorage.removeItem(LAST_SESSION_KEY); } catch { /* ignore */ }
 }
