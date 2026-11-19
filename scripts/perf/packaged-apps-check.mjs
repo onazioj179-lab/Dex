@@ -159,12 +159,14 @@ try {
 
   // Calendar alert fires from the shell service with Calendar closed.
   {
-    const at = new Date(Date.now() + 15 * 60_000 + 25_000);
+    // Start on a whole minute so the alert time (start - 15 min) lands 40-100 s
+    // from now: strictly after the service's last check, never already past.
+    const at = new Date(Math.ceil((Date.now() + 15 * 60_000 + 40_000) / 60_000) * 60_000);
     const pad = (n) => String(n).padStart(2, '0');
     const ev1 = { id: 'pkg-alert', title: 'Packaged alert probe', date: `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`, time: `${pad(at.getHours())}:${pad(at.getMinutes())}`, endTime: '23:59', color: '#0A84FF', description: '', alertMinutes: 15 };
     await ev(`localStorage.setItem('dex-calendar-events', ${JSON.stringify(JSON.stringify([ev1]))}); localStorage.removeItem('dex-calendar-alerts-fired'); true`);
     let fired = [];
-    for (let i = 0; i < 26 && !fired.length; i++) { await sleep(5000); fired = (await ev(`JSON.parse(localStorage.getItem('dex-calendar-alerts-fired') || '[]')`)) || []; }
+    for (let i = 0; i < 40 && !fired.length; i++) { await sleep(5000); fired = (await ev(`JSON.parse(localStorage.getItem('dex-calendar-alerts-fired') || '[]')`)) || []; }
     check('Calendar alert fires with Calendar closed', fired.includes(`pkg-alert@${ev1.date}`), { fired });
   }
 } catch (e) {

@@ -275,9 +275,13 @@ fn retrieve(app: &tauri::AppHandle, query: &str, limit: usize, max_chars: usize,
         if is_file && !sensitive && h.size > 0 && h.size <= 262_144 {
             if let Ok(t) = std::fs::read_to_string(&path) { if !dex_search::looks_like_secret(&t) { text = snippet(&t, q, SNIPPET_CHARS); } }
         }
-        let budget_left = max_chars.saturating_sub(used);
+        // Hard cap: the entry's overhead (name + framing) counts too, and an
+        // entry whose overhead alone does not fit is left out.
+        let overhead = h.name.chars().count() + 16;
+        if used + overhead > max_chars { break; }
+        let budget_left = max_chars - used - overhead;
         if text.chars().count() > budget_left { text = text.chars().take(budget_left).collect(); }
-        used += text.chars().count() + h.name.len() + 16;
+        used += text.chars().count() + overhead;
         items.push(json!({
             "source": h.source, "id": h.id, "path": if is_file { json!(plain(&path)) } else { Value::Null }, "name": h.name,
             "modified": h.modified, "size": h.size, "score": h.score, "snippet": text, "contentWithheld": sensitive,
