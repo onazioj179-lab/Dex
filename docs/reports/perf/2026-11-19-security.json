@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-19T03:10:02.787Z",
+  "at": "2026-11-19T05:43:14.066Z",
   "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/190b2bff-6c41-41ae-bf6a-bf553b576a17/scratchpad/pkg-0119/dex-tauri.exe",
   "passed": 27,
   "failed": 0,
@@ -102,7 +102,7 @@
         "decision": "refuse",
         "ok": true,
         "reason": "UKI does not run actions that need administrator rights or change system settings",
-        "requestId": "xr_1a1f1c81bd9_4"
+        "requestId": "xr_1a1f2546d76_4"
       }
     },
     {
@@ -164,7 +164,7 @@
       "name": "web page in a Browser tab cannot reach DEX native IPC",
       "pass": true,
       "observed": {
-        "exposed": "{\"tauri\":\"undefined\",\"dex\":\"undefined\",\"ipc\":\"undefined\"}",
+        "exposed": "{\"tauri\":\"object\",\"dex\":\"undefined\",\"ipc\":\"object\"}",
         "tryIpc": "refused:Command dex_ipc not allowed by ACL"
       }
     },
@@ -184,14 +184,14 @@
         "events": 2,
         "final": {
           "size": 3145728,
-          "fileName": "dex-sectest-1795057800394.bin"
+          "fileName": "dex-sectest-1795066991866.bin"
         }
       }
     },
     {
       "name": "test download removed again",
       "pass": true,
-      "observed": "dex-sectest-1795057800394.bin"
+      "observed": "dex-sectest-1795066991866.bin"
     }
   ]
 }
