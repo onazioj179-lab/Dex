@@ -27,6 +27,8 @@ import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components
 import { openPiP } from '../components/PictureInPicture';
 import { NEUTRAL, ADJUSTMENT_KEYS, isNeutral, normalizeAdjustments, EditHistory, type Adjustments } from './galleryAdjust';
 import { AdjustedPreview, renderEditedBlob } from './galleryPreview';
+import { dexPrompt, dexConfirm } from '../components/dexConfirm';
+import { loadAlbums, addToAlbum, removeFromAlbum, pruneAlbums, ALBUMS_KEY, USER_ALBUM_PREFIX, type UserAlbum } from './galleryAlbums';
 import { hasNativeFiles, pickSavePath, writeBinaryFile } from '../services/nativeFiles';
 import { openWithShell } from '../utils/openWithShell';
 import { persistOrWarn } from '../utils/persistOrWarn';
@@ -323,7 +325,6 @@ const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 
 // Seconds -> clock via the shared canonical; keep the empty-string guard for images.
 import { formatClock } from '../../shared/format/units';
 import { keyEventForApp } from '../shell/input/appKeyScope';
-import { dexConfirm } from '../components/dexConfirm';
 import { toLocalDateInput } from '../utils/localDate';
 const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
@@ -395,6 +396,10 @@ export const Gallery: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const favoritesLoadedRef = useRef(false); // Track if favorites were loaded from storage
   const [selectedAlbum, setSelectedAlbum] = useState('all');
+  // User albums: named lists by media id (the file path); never move files.
+  const [userAlbums, setUserAlbums] = useState<UserAlbum[]>(() => loadAlbums());
+  useEffect(() => { try { localStorage.setItem(ALBUMS_KEY, JSON.stringify(userAlbums)); } catch { /* storage full */ } }, [userAlbums]);
+  const activeUserAlbum = selectedAlbum.startsWith(USER_ALBUM_PREFIX) ? userAlbums.find(a => USER_ALBUM_PREFIX + a.id === selectedAlbum) ?? null : null;
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(true);
@@ -544,7 +549,9 @@ export const Gallery: React.FC = () => {
           case 'favorites': return favorites.includes(item.id);
           case 'recent': return (now - item.date.getTime()) < sevenDays;
           case 'screenshots': return item.name?.toLowerCase().includes('screenshot');
-          default: return true;
+          default:
+            if (selectedAlbum.startsWith(USER_ALBUM_PREFIX)) return !!activeUserAlbum?.itemIds.includes(item.id);
+            return true;
         }
       })();
       if (!albumMatch) return false;
@@ -554,7 +561,7 @@ export const Gallery: React.FC = () => {
       }
       return true;
     });
-  }, [media, favorites, selectedAlbum, searchQuery, renameMap]);
+  }, [media, favorites, selectedAlbum, searchQuery, renameMap, activeUserAlbum]);
 
   // Sort by the active key/direction. Name uses the effective (renamed) name.
   const sortedMedia = useMemo(() => {
@@ -1130,6 +1137,27 @@ export const Gallery: React.FC = () => {
   }, [media]);
 
   // Album counts - single pass instead of 6 separate filter calls
+  useEffect(() => {
+    if (!media.length) return;
+    setUserAlbums(prev => pruneAlbums(prev, new Set(media.map(m => m.id))));
+  }, [media]);
+
+  const addItemsToAlbum = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    const names = userAlbums.map(a => a.name).join(', ');
+    const name = await dexPrompt({ title: `Add ${ids.length} item${ids.length > 1 ? 's' : ''} to an album`, label: names ? `Album name (existing: ${names})` : 'New album name', confirmLabel: 'Add' });
+    if (!name?.trim()) return;
+    const r = addToAlbum(userAlbums, name, ids);
+    setUserAlbums(r.albums);
+    toast.success(`${r.added ? `Added ${r.added}` : 'Already there'} · "${r.album.name}"`, 'Albums list photos; the files stay where they are.');
+  }, [userAlbums, toast]);
+
+  const deleteUserAlbum = useCallback(async (album: UserAlbum) => {
+    if (!(await dexConfirm({ title: `Delete album "${album.name}"?`, message: 'Only the album goes; the photos and videos stay in your library.', confirmLabel: 'Delete album', tone: 'destructive' }))) return;
+    setUserAlbums(prev => prev.filter(a => a.id !== album.id));
+    if (selectedAlbum === USER_ALBUM_PREFIX + album.id) setSelectedAlbum('all');
+  }, [selectedAlbum]);
+
   const albumCounts = useMemo(() => {
     const now = Date.now();
     const sevenDays = 7 * 24 * 3600 * 1000;
@@ -1217,7 +1245,9 @@ export const Gallery: React.FC = () => {
       const allFav = [...selectedItems].every(id => favorites.includes(id));
       return [
         { id: 'fav-sel', label: allFav ? `Unfavorite ${count} items` : `Favorite ${count} items`, icon: Icons.heart, onSelect: batchFavorite },
-        { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport, dividerAfter: true },
+        { id: 'export-sel', label: `Export ${count} items`, icon: Icons.download, onSelect: batchExport },
+        { id: 'album-sel', label: `Add ${count} items to album…`, icon: Icons.folder, onSelect: () => { void addItemsToAlbum([...selectedItems]); }, dividerAfter: !activeUserAlbum },
+        ...(activeUserAlbum ? [{ id: 'unalbum-sel', label: `Remove ${count} from "${activeUserAlbum.name}"`, icon: Icons.close, onSelect: () => setUserAlbums(prev => removeFromAlbum(prev, activeUserAlbum.id, [...selectedItems])), dividerAfter: true }] : []),
         { id: 'deselect', label: 'Clear selection', icon: Icons.close, onSelect: clearSelection, dividerAfter: true },
         { id: 'delete-sel', label: `Move ${count} items to Recycle Bin`, icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: batchDelete },
       ];
@@ -1235,10 +1265,12 @@ export const Gallery: React.FC = () => {
         { id: 'vinx', label: 'Edit in Vinx', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'videoeditor') },
         { id: 'forge', label: 'Send to Forge', icon: Icons.settings, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'forge') },
       ] : []),
+      { id: 'album', label: 'Add to album…', icon: Icons.folder, onSelect: () => { void addItemsToAlbum([item.id]); } },
+      ...(activeUserAlbum ? [{ id: 'unalbum', label: `Remove from "${activeUserAlbum.name}"`, icon: Icons.close, onSelect: () => setUserAlbums(prev => removeFromAlbum(prev, activeUserAlbum.id, [item.id])) }] : []),
       { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { void openWithShell('reveal', item.src, item.name); }, dividerAfter: true },
       { id: 'delete', label: 'Move to Recycle Bin', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
-  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
+  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename, addItemsToAlbum, activeUserAlbum]);
 
   // Lightbox keyboard nav + zoom. '+'/'=' zoom in, '-' zoom out, '0' fits.
   useEffect(() => {
@@ -1361,6 +1393,40 @@ export const Gallery: React.FC = () => {
               <span style={styles.albumCount}>{albumCounts[album.id as keyof typeof albumCounts] ?? 0}</span>
             </button>
           ))}
+          {userAlbums.map(album => (
+            <div key={album.id} style={{ display: 'flex', alignItems: 'center' }} className="dex-gallery-user-album">
+              <button
+                style={{
+                  ...styles.albumItem, flex: 1,
+                  background: selectedAlbum === USER_ALBUM_PREFIX + album.id ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent',
+                  color: selectedAlbum === USER_ALBUM_PREFIX + album.id ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                }}
+                aria-label={`Album ${album.name}`}
+                aria-pressed={selectedAlbum === USER_ALBUM_PREFIX + album.id}
+                onClick={() => setSelectedAlbum(USER_ALBUM_PREFIX + album.id)}
+                data-testid="gallery-user-album"
+              >
+                {albumIcon('screenshots')}
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.name}</span>
+                <span style={styles.albumCount}>{album.itemIds.length}</span>
+              </button>
+              <button type="button" onClick={() => { void deleteUserAlbum(album); }} aria-label={`Delete album ${album.name}`} title="Delete album (photos stay)"
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 4 }}>
+                <DexIcon name="close" size={12} />
+              </button>
+            </div>
+          ))}
+          <button type="button" style={{ ...styles.albumItem, color: 'var(--color-text-tertiary)' }} data-testid="gallery-new-album"
+            onClick={async () => {
+              const name = await dexPrompt({ title: 'New album', label: 'Name', confirmLabel: 'Create' });
+              if (!name?.trim()) return;
+              const r = addToAlbum(userAlbums, name, [...selectedItems]);
+              setUserAlbums(r.albums);
+              setSelectedAlbum(USER_ALBUM_PREFIX + r.album.id);
+            }}>
+            <DexIcon name="plus" size={14} />
+            <span style={{ flex: 1 }}>New album{selectedItems.size ? ` from ${selectedItems.size} selected` : ''}</span>
+          </button>
         </div>
         )}
         {sidebarCollapsed && (
