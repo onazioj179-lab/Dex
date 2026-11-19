@@ -666,6 +666,8 @@ ${text}
 
   // Searchable bookmark store — live filter text for the bookmarks panel.
   const [bookmarkQuery, setBookmarkQuery] = useState('');
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [historyShown, setHistoryShown] = useState(200);
 
   // Reading mode
   const [readingMode, setReadingMode] = useState(false);
@@ -1035,6 +1037,10 @@ ${text}
   const clearHistory = useCallback(() => {
     setHistory([]);
     localStorage.removeItem('dex-browser-history');
+  }, []);
+  // One entry out of history (the persist effect writes the shorter list).
+  const removeHistoryEntry = useCallback((id: string) => {
+    setHistory(prev => prev.filter(h => h.id !== id));
   }, []);
 
   // ---- Keychain CRUD ----
@@ -2034,7 +2040,11 @@ ${text}
     const yesterday = today - 86400000;
     const thisWeek = today - 6 * 86400000;
     const buckets: Record<string, HistoryEntry[]> = { Today: [], Yesterday: [], 'This Week': [], Older: [] };
-    for (const h of history.slice(0, 200)) {
+    // Search covers ALL stored history (up to HISTORY_LIMIT), not only the
+    // newest entries; without a query the list pages in 200 at a time.
+    const q = historyQuery.trim().toLowerCase();
+    const matching = q ? history.filter(h => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q)) : history;
+    for (const h of matching.slice(0, historyShown)) {
       if (h.visitedAt >= today) buckets['Today'].push(h);
       else if (h.visitedAt >= yesterday) buckets['Yesterday'].push(h);
       else if (h.visitedAt >= thisWeek) buckets['This Week'].push(h);
@@ -2044,7 +2054,11 @@ ${text}
       if (buckets[label].length > 0) groups.push({ label, entries: buckets[label] });
     }
     return groups;
-  }, [history]);
+  }, [history, historyQuery, historyShown]);
+  const historyMatchCount = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    return q ? history.filter(h => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q)).length : history.length;
+  }, [history, historyQuery]);
 
   // Searchable + folder-scoped bookmark list for the bookmarks panel.
   const filteredBookmarks = useMemo(() => {
@@ -2388,8 +2402,23 @@ ${text}
               <button style={styles.panelClose} onClick={() => setShowHistory(false)} aria-label="Close">{Icon.close}</button>
             </div>
           </div>
+          <div style={{ padding: '6px 10px 2px' }}>
+            <input
+              type="text"
+              value={historyQuery}
+              onChange={e => { setHistoryQuery(e.target.value); setHistoryShown(200); }}
+              placeholder={`Search ${history.length.toLocaleString()} visits...`}
+              aria-label="Search history"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '5px var(--space-2)',
+                borderRadius: 10, border: '1px solid var(--color-border-subtle)',
+                background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)',
+                fontSize: 12,
+              }}
+            />
+          </div>
           {groupedHistory.length === 0 ? (
-            <div style={styles.emptyPanel}>No browsing history</div>
+            <div style={styles.emptyPanel}>{historyQuery.trim() ? 'No visits match' : 'No browsing history'}</div>
           ) : (
             <div style={styles.panelList}>
               {groupedHistory.map(group => (
@@ -2405,12 +2434,26 @@ ${text}
                         <span style={styles.historyRowUrl}>{h.url}</span>
                       </div>
                       <span style={styles.historyRowTime}>
-                        {new Date(h.visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {group.label === 'Older' || group.label === 'This Week'
+                          ? new Date(h.visitedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                          : new Date(h.visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); removeHistoryEntry(h.id); }}
+                        aria-label={`Remove ${h.title || h.url} from history`}
+                        title="Remove from history"
+                        style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 4, flexShrink: 0 }}
+                      >{Icon.close}</button>
                     </div>
                   ))}
                 </div>
               ))}
+              {historyMatchCount > historyShown && (
+                <button type="button" style={{ ...styles.clearBtn, margin: '8px 12px' }} onClick={() => setHistoryShown(n => n + 200)}>
+                  Show more ({(historyMatchCount - historyShown).toLocaleString()} older)
+                </button>
+              )}
             </div>
           )}
         </div>
