@@ -87,7 +87,6 @@ On the canvas, `Ctrl/Cmd+Alt+Arrows` pan instead of tiling.
 | `Ctrl/Cmd+Alt+Backspace` | Previous view |
 | `Ctrl/Cmd+Alt+W` | Find a window (all windows and groups) |
 | `Ctrl/Cmd+Alt+G` | Group the windows in view |
-| `Ctrl/Cmd+Alt+M` | Minimap |
 | Wheel / two-finger scroll over the desktop | Pan |
 | `Ctrl`+wheel or pinch over the desktop, `Alt`+wheel anywhere | Zoom at the pointer |
 | Middle-drag, or `Space`+drag | Pan |
