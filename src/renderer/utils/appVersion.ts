@@ -32,3 +32,24 @@ export const formatDisplayVersion = (version: string, serial: string = getBuildS
   serial ? `${version} (${serial})` : version;
 
 export const getDisplayVersion = (): string => formatDisplayVersion(FALLBACK_VERSION);
+
+/** Build identity from scripts/build-info.mjs (same rule as src-tauri/build.rs). */
+export interface BuildInfo { version: string; serial: string; buildNumber: number; buildId: string; commit: string; channel: string; builtAt: string }
+
+export const getBuildInfo = (): BuildInfo => {
+  const raw = (import.meta.env.VITE_DEX_BUILD_INFO as unknown) ?? null;
+  const v = (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : raw) as Partial<BuildInfo> | null;
+  return {
+    version: v?.version || FALLBACK_VERSION,
+    serial: v?.serial ?? getBuildSerial(),
+    buildNumber: Number(v?.buildNumber) || 0,
+    buildId: v?.buildId || FALLBACK_VERSION,
+    commit: v?.commit || 'unknown',
+    channel: v?.channel || 'development',
+    builtAt: v?.builtAt || '',
+  };
+};
+
+/** One line for diagnostics and bug reports. */
+export const formatBuildInfo = (b: BuildInfo = getBuildInfo()): string =>
+  `DEX OS ${b.buildId}${b.serial ? ` (${b.serial})` : ''} · ${b.channel} · commit ${b.commit}${b.builtAt ? ` · built ${b.builtAt}` : ''}`;

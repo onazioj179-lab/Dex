@@ -11,7 +11,7 @@
 
 import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
-import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion } from '../utils/appVersion';
+import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion, getBuildInfo, formatBuildInfo } from '../utils/appVersion';
 import { openWithShell } from '../utils/openWithShell';
 import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
@@ -3367,7 +3367,24 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Build</span>
-          <span style={styles.aboutValue}>{import.meta.env.PROD ? 'Release' : 'Development'}</span>
+          <span style={{ ...styles.aboutValue, fontVariantNumeric: 'tabular-nums' }} data-testid="about-build-id">{getBuildInfo().buildId}{getBuildInfo().serial ? ` (${getBuildInfo().serial})` : ''}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Channel</span>
+          <span style={styles.aboutValue}>{getBuildInfo().channel[0].toUpperCase() + getBuildInfo().channel.slice(1)}{import.meta.env.PROD ? '' : ' (dev server)'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Commit</span>
+          <span style={{ ...styles.aboutValue, fontFamily: 'var(--font-mono, Consolas, monospace)' }}>{getBuildInfo().commit}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Built</span>
+          <span style={styles.aboutValue}>{getBuildInfo().builtAt ? `${getBuildInfo().builtAt.replace('T', ' ').replace('Z', ' UTC')}` : 'Unknown'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Build info</span>
+          <button type="button" style={styles.secondaryBtn} data-testid="about-copy-build"
+            onClick={() => { void navigator.clipboard?.writeText(formatBuildInfo()).then(() => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Build info copied' } })), () => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not copy' } }))); }}>Copy</button>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Platform</span>

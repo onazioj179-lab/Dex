@@ -9,6 +9,8 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
+// @ts-ignore -- plain ESM helper shared with CI (scripts/build-info.mjs)
+import { computeBuildInfo } from './scripts/build-info.mjs';
 
 /** package.json "dexBuild" (the build serial), or '' when absent/invalid. */
 function readDexBuild(): string {
@@ -87,6 +89,8 @@ export default defineConfig({
     // Build serial (package.json "dexBuild", e.g. "18a"): marks each update
     // while the version number stays put. See RELEASE.md "Build serials".
     'import.meta.env.VITE_DEX_BUILD': JSON.stringify(readDexBuild()),
+    // Build identity: 7.0.2+build.<n>, commit, channel, UTC time (scripts/build-info.mjs).
+    'import.meta.env.VITE_DEX_BUILD_INFO': JSON.stringify(computeBuildInfo()),
   },
   base: './',
   root: 'src/renderer',
