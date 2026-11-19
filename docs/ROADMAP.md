@@ -65,6 +65,15 @@
 >   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
 >   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
 
+> **Part 25 (2026-11-19, hardening + release prep) status (PR #157):** build identity `7.0.2+build.<n>` with serial,
+> commit, channel and UTC time in About and diagnostics (`scripts/build-info.mjs`, `build.rs`); safe cleanup
+> (`npm run clean` previews, `clean:confirm` deletes, never release builds or user data); security fixes found by
+> adversarial tests: compound commands are never read-class (#378), Umari rejects `..` paths (#379); unified window
+> chrome (#380: app toolbars in the window header for Task Manager, DEX Code, Files and the AppShell apps);
+> `DEX_7.0.2_VERIFICATION.md` (verdict NOT READY) and `DEX_7.0.2_RELEASE_NOTES.md`. Deferred by the owner until the
+> backlog pass is done: packaged/stress runs (Browser 10–500 tabs, multi-window, UKI terminal), installer, upgrade
+> and rollback tests. Not done: unified chrome for Settings and Terminal, an immersive mode for Maps/Gallery.
+
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native
 > Rust backend (`src-tauri` + `core/*`), **userspace** is everything that calls it over `dex_ipc` channels
