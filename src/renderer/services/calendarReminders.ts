@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// Calendar event alerts. Runs with the shell (like scheduled tasks), so an
+// Calendar event alerts and timed task alerts. Runs with the shell (like scheduled tasks), so an
 // alert arrives whether or not Calendar is open. Every 30 s it looks at the
 // events Calendar saves, including repeating ones, and notifies for each
 // occurrence whose alert time fell since the last check. An occurrence is
@@ -13,6 +13,7 @@
 // (DEX was closed) are not replayed. The due-check is pure; unit-tested.
 
 import { notify } from './notify';
+import { repairPickedDay } from '../utils/localDate';
 
 export interface ReminderEvent {
   id: string; title: string; date: string; time: string;
@@ -74,6 +75,28 @@ export function alertText(a: DueAlert, now: number): string {
   return `Tomorrow · ${at}`;
 }
 
+// ---- Tasks with a due time ------------------------------------------------------
+// A task with a date AND a time alerts at that time (date-only tasks do not, so
+// nobody gets a burst of notifications at midnight). Snoozed and done tasks never.
+
+export interface ReminderTask { id: string; title: string; completed?: boolean; dueDate?: string | null; dueTime?: string | null; snoozedUntil?: string | null }
+
+export function dueTaskAlerts(tasks: ReminderTask[], since: number, now: number, fired: Set<string>): { key: string; task: ReminderTask; dueAt: number }[] {
+  const from = Math.max(since, now - MISSED_GRACE_MS);
+  const out: { key: string; task: ReminderTask; dueAt: number }[] = [];
+  for (const t of tasks) {
+    if (!t || t.completed || !t.dueDate || !t.dueTime) continue;
+    if (t.snoozedUntil && new Date(t.snoozedUntil).getTime() > now) continue;
+    const day = repairPickedDay(t.dueDate);
+    const [h, m] = String(t.dueTime).split(':').map(Number);
+    if (!day || Number.isNaN(h) || Number.isNaN(m)) continue;
+    const dueAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m).getTime();
+    const key = `task:${t.id}@${dueAt}`;
+    if (dueAt > from && dueAt <= now && !fired.has(key)) out.push({ key, task: t, dueAt });
+  }
+  return out;
+}
+
 let timer: ReturnType<typeof setInterval> | null = null;
 let lastCheck = 0;
 
@@ -83,12 +106,12 @@ function readFired(): Set<string> {
 
 function check(): void {
   const now = Date.now();
-  let events: ReminderEvent[] = [];
-  try { const v = JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]'); events = Array.isArray(v) ? v : []; } catch { return; }
+  const read = <T,>(key: string): T[] => { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
   const fired = readFired();
-  const due = dueAlerts(events, lastCheck, now, fired);
+  const due = dueAlerts(read<ReminderEvent>(EVENTS_KEY), lastCheck, now, fired);
+  const dueTasks = dueTaskAlerts(read<ReminderTask>('dex-tasks'), lastCheck, now, fired);
   lastCheck = now;
-  if (!due.length) return;
+  if (!due.length && !dueTasks.length) return;
   for (const a of due) {
     fired.add(a.key);
     void notify({
@@ -98,6 +121,17 @@ function check(): void {
       icon: 'info',
       priority: 'high',
       actions: [{ label: 'Open Calendar', onClick: () => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'calendar' } })) }],
+    });
+  }
+  for (const d of dueTasks) {
+    fired.add(d.key);
+    void notify({
+      title: d.task.title || 'Task due',
+      body: `Task due now · ${new Date(d.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      source: 'Tasks',
+      icon: 'info',
+      priority: 'high',
+      actions: [{ label: 'Open Tasks', onClick: () => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'tasks' } })) }],
     });
   }
   try { localStorage.setItem(FIRED_KEY, JSON.stringify([...fired].slice(-500))); } catch { /* storage full: may alert again */ }

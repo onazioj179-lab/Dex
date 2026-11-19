@@ -34,3 +34,22 @@ describe('calendar alerts', () => {
     expect(occursOn({ ...weekly, recurUntil: '2026-11-20' }, new Date(2026, 10, 25))).toBe(false);
   });
 });
+
+import { dueTaskAlerts } from '../../src/renderer/services/calendarReminders';
+
+describe('task due alerts', () => {
+  const t = { id: 't1', title: 'Send invoice', dueDate: '2026-11-18', dueTime: '14:00' };
+  it('alerts at the due time once; date-only, done and snoozed tasks never', () => {
+    const now = new Date(2026, 10, 18, 14, 0, 20).getTime();
+    expect(dueTaskAlerts([t], now - 30_000, now, new Set()).map((d) => d.task.id)).toEqual(['t1']);
+    const key = dueTaskAlerts([t], now - 30_000, now, new Set())[0].key;
+    expect(dueTaskAlerts([t], now - 30_000, now, new Set([key]))).toEqual([]);
+    expect(dueTaskAlerts([{ ...t, dueTime: null }], 0, now, new Set())).toEqual([]);
+    expect(dueTaskAlerts([{ ...t, completed: true }], now - 30_000, now, new Set())).toEqual([]);
+    expect(dueTaskAlerts([{ ...t, snoozedUntil: new Date(2026, 10, 19).toISOString() }], now - 30_000, now, new Set())).toEqual([]);
+  });
+  it('reads dates saved by the old UTC-midnight bug as the picked day', () => {
+    const now = new Date(2026, 10, 18, 14, 0, 20).getTime();
+    expect(dueTaskAlerts([{ ...t, dueDate: '2026-11-18T00:00:00.000Z' }], now - 30_000, now, new Set())).toHaveLength(1);
+  });
+});
