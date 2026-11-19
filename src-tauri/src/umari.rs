@@ -237,7 +237,11 @@ pub fn snippet(text: &str, query: &str, max: usize) -> String {
     s
 }
 
+/// Is `path` inside one of the authorized `roots`? Used to drop index hits from
+/// folders the user has since removed. A path with `..` is never inside
+/// anything (`C:\work\..\secret` must not pass as `C:\work`).
 fn under_any(path: &Path, roots: &[PathBuf]) -> bool {
+    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) { return false; }
     let l = plain(path).to_ascii_lowercase();
     roots.iter().any(|r| { let r = plain(r).to_ascii_lowercase(); l == r || l.starts_with(&format!("{r}\\")) || l.starts_with(&format!("{r}/")) })
 }
@@ -345,6 +349,20 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removed_folders_and_lookalikes_never_count_as_authorized() {
+        let roots = vec![PathBuf::from(r"C:\Users\me\work"), PathBuf::from(r"C:\Users\me\Documents")];
+        assert!(under_any(Path::new(r"C:\Users\me\work\a.txt"), &roots));
+        assert!(under_any(Path::new(r"c:\users\ME\work\deep\b.rs"), &roots));
+        // A sibling whose name only starts the same is not inside.
+        assert!(!under_any(Path::new(r"C:\Users\me\workspace\secret.txt"), &roots));
+        // Traversal out of an authorized folder.
+        assert!(!under_any(Path::new(r"C:\Users\me\work\..\private\x.txt"), &roots));
+        // After the user removes a folder, its files are no longer authorized.
+        let after_removal = vec![PathBuf::from(r"C:\Users\me\Documents")];
+        assert!(!under_any(Path::new(r"C:\Users\me\work\a.txt"), &after_removal));
+    }
 
     #[test]
     fn detects_projects_and_only_the_commands_their_manifests_declare() {
