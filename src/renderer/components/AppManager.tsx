@@ -34,6 +34,7 @@ import { MorphingDock } from './dock/MorphingDock';
 import { useDockStore, dockReserve } from '../store/dockStore';
 import { computeWorkArea } from '../../shared/shell/workArea';
 import { spotlightEngine } from '../shell/SpotlightEngine';
+import { WindowChromeProvider, windowModeFor, NO_DRAG_SELECTOR } from '../shell/windowChrome';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
@@ -3950,6 +3951,17 @@ export const AppManager: React.FC = () => {
     };
   }, [spatialEnabled, splitMode]);
 
+  // Unified window chrome: each window header has a slot the app's toolbar
+  // can move into (shell/windowChrome.tsx). Element per window id.
+  const [chromeSlots, setChromeSlots] = useState<Record<string, HTMLElement | null>>({});
+  const chromeSlotRefs = useRef<Record<string, (el: HTMLElement | null) => void>>({});
+  const chromeSlotRef = useCallback((id: string) => {
+    if (!chromeSlotRefs.current[id]) {
+      chromeSlotRefs.current[id] = (el: HTMLElement | null) => setChromeSlots(prev => (prev[id] === el ? prev : { ...prev, [id]: el }));
+    }
+    return chromeSlotRefs.current[id];
+  }, []);
+
   // Spatial shortcuts (Ctrl+Alt / Cmd+Opt). Capture phase so on the canvas the
   // arrow keys pan instead of screen-tiling the focused window.
   const setSpatialRef = useRef(setSpatial);
@@ -4112,7 +4124,7 @@ export const AppManager: React.FC = () => {
               } as React.CSSProperties}
               onDoubleClick={() => { tileWindow(appId, 'maximize'); }}
               onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest('button')) return;
+                if ((e.target as HTMLElement).closest(NO_DRAG_SELECTOR)) return;
                 // A locked window (spatial Windows panel) neither moves nor resizes.
                 if (isWindowLocked(appId)) return;
                 e.preventDefault();
@@ -4339,7 +4351,13 @@ export const AppManager: React.FC = () => {
                   </button>
                 </div>
               )}
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{getLabel(appId)}</span>
+              {windowModeFor(appId, visibleBounds.w) === 'unified' ? (
+                // Unified: the app's own menus/toolbar render here (empty space still drags).
+                <div ref={chromeSlotRef(appId)} data-window-toolbar-slot={appId} aria-label={`${getLabel(appId)} toolbar`} role="group"
+                  style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', overflow: 'hidden' }} />
+              ) : (
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{getLabel(appId)}</span>
+              )}
               {/* System-style window controls (right side) -- flexShrink:0 + the
                   title's minWidth:0 above guarantee these are never pushed off the
                   right edge by a long title or a narrow/maximized window. */}
@@ -4414,7 +4432,9 @@ export const AppManager: React.FC = () => {
               )}
             </div>
             <div data-window-body="" style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
-              <AppBody appId={appId} />
+              <WindowChromeProvider mode={windowModeFor(appId, visibleBounds.w)} slot={chromeSlots[appId] ?? null}>
+                <AppBody appId={appId} />
+              </WindowChromeProvider>
             </div>
             {/* Resize handles -- all 4 edges + corners for proper OS-like resizing */}
             {!isMaximized && (
@@ -4948,7 +4968,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, immersive, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, immersive, chromeSlots, mountedAppsSafeSnapshot.join(',')]);
 
   // -- AppLifecycle phase emitter ------------------------------------------
   // Keep-alive never unmounts apps; instead we broadcast a per-app phase so

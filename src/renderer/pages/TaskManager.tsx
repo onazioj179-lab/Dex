@@ -33,6 +33,7 @@ import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { topApps, formatTopApps } from './taskManagerUki';
 import { LineChart, canvasColor } from '../components/telemetry/LineChart';
+import { WindowToolbar } from '../shell/windowChrome';
 
 // -- types + persisted preferences --------------------------------------------
 
@@ -370,7 +371,8 @@ const TaskManager: React.FC = () => {
 
       {/* Toolbar: views on the left, update controls on the right. */}
       {/* Floating capsule toolbar: views, then status and update controls. */}
-      <div style={S.toolbar}>
+      {/* Unified window: this bar lives in the window header (shell/windowChrome). */}
+      <WindowToolbar inline={(bar) => <div style={S.toolbar}>{bar}</div>}>
         <SegmentedControl
           semantics="tabs"
           size="md"
@@ -401,7 +403,7 @@ const TaskManager: React.FC = () => {
           <DexCapsuleButton size="md" onClick={exportSnapshot} disabled={processes.length === 0} aria-label="Send a snapshot to Notes" title="Send a snapshot of the top processes to Notes"
             icon={<CapsuleGlyph><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></CapsuleGlyph>} />
         </DexCapsuleGroup>
-      </div>
+      </WindowToolbar>
 
       {bridge === 'error' && lastError && (
         <div role="alert" style={S.errorBar}>

@@ -25,6 +25,7 @@ import { MenuBar } from './MenuBar';
 import { StatusBar } from '../StatusBar';
 import { colors, fontStack, hairline } from '../../styles/tokens';
 import type { MenuGroup } from './menuTypes';
+import { WindowToolbar } from '../../shell/windowChrome';
 
 export type AppShellSurface = 'glass' | 'creative-panel' | 'plain';
 
@@ -133,7 +134,8 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   return (
     <div className={cls} style={{ ...rootStyle, ...style }} data-app-shell={appId}>
-      <header style={chromeStyle}>
+      {/* In a unified window this bar lives in the window header (no second strip). */}
+      <WindowToolbar inline={(bar) => <header style={chromeStyle}>{bar}</header>}>
         {menus && menus.length > 0 && <MenuBar groups={menus} onSelect={onMenuSelect} />}
         {title && <span style={titleStyle}>{title}</span>}
         {toolbar && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{toolbar}</div>}
@@ -142,7 +144,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             {toolbarEnd}
           </div>
         )}
-      </header>
+      </WindowToolbar>
 
       <div style={bodyStyle}>
         <main style={mainStyle}>{children}</main>
