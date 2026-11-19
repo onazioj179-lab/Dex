@@ -1,0 +1,197 @@
+{
+  "at": "2026-11-19T03:10:02.787Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/190b2bff-6c41-41ae-bf6a-bf553b576a17/scratchpad/pkg-0119/dex-tauri.exe",
+  "passed": 27,
+  "failed": 0,
+  "results": [
+    {
+      "name": "fresh profile: onboarding not started",
+      "pass": true,
+      "observed": "not-started"
+    },
+    {
+      "name": "fresh profile: DDrop discovery refused (onboarding-required)",
+      "pass": true,
+      "observed": {
+        "error": "onboarding-required",
+        "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        "ok": false,
+        "success": false
+      }
+    },
+    {
+      "name": "fresh profile: UKI command refused (onboarding-required)",
+      "pass": true,
+      "observed": {
+        "error": "onboarding-required",
+        "message": "Review the Terms of Service and Privacy Notice in Setup to use this.",
+        "ok": false,
+        "success": false
+      }
+    },
+    {
+      "name": "complete refused without the required decision",
+      "pass": true,
+      "observed": {
+        "error": "the required decision is not on record",
+        "ok": false
+      }
+    },
+    {
+      "name": "tampered onboarding.json (claims done, no documents accepted) is not trusted",
+      "pass": true,
+      "observed": "not-started"
+    },
+    {
+      "name": "accepting stale document versions is refused",
+      "pass": true,
+      "observed": "the documents changed; review the current versions"
+    },
+    {
+      "name": "accepting the current versions records the decision",
+      "pass": true,
+      "observed": "in-progress"
+    },
+    {
+      "name": "privileged command refused",
+      "pass": true,
+      "observed": "UKI does not run commands that need administrator rights or change system settings. Run it yourself in Terminal if you mean to."
+    },
+    {
+      "name": "elevation (-Verb RunAs) refused",
+      "pass": true,
+      "observed": "UKI does not run commands that need administrator rights or change system settings. Run it yourself in Terminal if you mean to."
+    },
+    {
+      "name": "Windows folder refused as working folder",
+      "pass": true,
+      "observed": "UKI cannot run commands inside Windows or program folders"
+    },
+    {
+      "name": "relative working folder refused",
+      "pass": true,
+      "observed": "the working folder must be a full path"
+    },
+    {
+      "name": "Xack: a command without an approval ticket is refused",
+      "pass": true,
+      "observed": "not approved: no approval for this action"
+    },
+    {
+      "name": "Xack: a ticket approved for another command is refused",
+      "pass": true,
+      "observed": "not approved: the approval is for different arguments"
+    },
+    {
+      "name": "Xack: a requested but unapproved ticket is refused",
+      "pass": true,
+      "observed": "not approved: the action has not been approved"
+    },
+    {
+      "name": "Xack: a ticket runs once",
+      "pass": true,
+      "observed": "not approved: the approval was already used"
+    },
+    {
+      "name": "Xack: a privileged command is refused at request time, whatever class the caller claims",
+      "pass": true,
+      "observed": {
+        "by": "policy",
+        "class": "privileged",
+        "confirm": "always",
+        "decision": "refuse",
+        "ok": true,
+        "reason": "UKI does not run actions that need administrator rights or change system settings",
+        "requestId": "xr_1a1f1c81bd9_4"
+      }
+    },
+    {
+      "name": "approved command runs and its output is captured",
+      "pass": true,
+      "observed": {
+        "status": "completed",
+        "exit": 0
+      }
+    },
+    {
+      "name": "secret-looking environment variables are not passed to the command",
+      "pass": true,
+      "observed": [
+        "DEX_UKI_OK",
+        "secret=",
+        "task=1"
+      ]
+    },
+    {
+      "name": "task runs marked DEX_UKI_TASK=1",
+      "pass": true,
+      "observed": null
+    },
+    {
+      "name": "cancel stops a running command",
+      "pass": true,
+      "observed": "cancelled"
+    },
+    {
+      "name": "timeout stops a command that runs too long",
+      "pass": true,
+      "observed": "timed-out"
+    },
+    {
+      "name": "Xack: history records each run and how it ended (completed, cancelled, timed out)",
+      "pass": true,
+      "observed": [
+        "timed-out",
+        "started",
+        "cancelled",
+        "started",
+        "completed",
+        "completed",
+        "started",
+        "refused",
+        "started",
+        "refused",
+        "refused",
+        "refused"
+      ]
+    },
+    {
+      "name": "history lists the tasks",
+      "pass": true,
+      "observed": 4
+    },
+    {
+      "name": "web page in a Browser tab cannot reach DEX native IPC",
+      "pass": true,
+      "observed": {
+        "exposed": "{\"tauri\":\"undefined\",\"dex\":\"undefined\",\"ipc\":\"undefined\"}",
+        "tryIpc": "refused:Command dex_ipc not allowed by ACL"
+      }
+    },
+    {
+      "name": "download starts in the background and returns at once",
+      "pass": true,
+      "observed": {
+        "id": "dl_sectest_1",
+        "started": true,
+        "success": true
+      }
+    },
+    {
+      "name": "download reports progress and completes with the full size",
+      "pass": true,
+      "observed": {
+        "events": 2,
+        "final": {
+          "size": 3145728,
+          "fileName": "dex-sectest-1795057800394.bin"
+        }
+      }
+    },
+    {
+      "name": "test download removed again",
+      "pass": true,
+      "observed": "dex-sectest-1795057800394.bin"
+    }
+  ]
+}

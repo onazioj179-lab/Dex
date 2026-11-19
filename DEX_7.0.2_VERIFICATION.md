@@ -5,7 +5,7 @@
 
 Statuses: VERIFIED (evidence below) · UNIT (tests only) · PREVIEW (web preview only, no native) · NOT TESTED · BLOCKED. Only VERIFIED counts as a passed gate.
 
-**Release verdict: NOT READY.** Builds and tests pass, and the packaged security and app checks below passed on release executables, but several release gates have not been run on a build of the current head: installer install/upgrade/rollback, a packaged pass over the Part 24/25 changes, and code signing (no certificate). Nothing was published.
+**Release verdict: NOT READY.** Builds and tests pass, and the packaged security and app checks below passed on release executables, and on 2026-11-19 the release exe of 7.0.2+build.1023 (commit 943f7a53e716) passed packaged security 27/27, the packaged apps check 14/14 (including the Part 24/25 checks) and the 100/500-tab Browser probe. Gates still not run: installer install/upgrade/rollback, packaged multi-window stress, and code signing (no certificate). Nothing was published.
 
 ## Release gates
 
@@ -18,10 +18,10 @@ Statuses: VERIFIED (evidence below) · UNIT (tests only) · PREVIEW (web preview
 | Onboarding | VERIFIED (release exe) | Same security run: required decision enforced natively, stale versions refused |
 | UKI | UNIT + PREVIEW | Agent policy, Xack routing, context budget (`uki-context-budget`), per-app actions registered and run in preview (#360). Cloud model run needs a provider key (#4) |
 | Xack | VERIFIED (release exe) + UNIT | 6 packaged Xack checks above; 11 Rust unit tests in `xack.rs` |
-| Umari | UNIT | Rust tests in `umari.rs` and `dex-search` (secret files not content-indexed); folder picker click-through in the packaged app NOT TESTED (#350) |
-| Browser | VERIFIED (release exe, 2026-11-17) | 500 saved tabs: all 500 kept after restore, 1 live page, 574 MB private, 4.9% of a core (`2026-11-17-after-500tabs.json`) |
+| Umari | VERIFIED (release exe, 2026-11-19) + UNIT | packaged: 47 projects detected, retrieval stays inside its character budget (500/500; build 1022 overran it at 525/500, fixed in umari.rs `retrieve`); Rust tests in `umari.rs` and `dex-search` (secret files not content-indexed); folder picker click-through in the packaged app NOT TESTED (#350) |
+| Browser | VERIFIED (release exe, 2026-11-19) | 100 tabs: all kept, 1 live page after restore, 542 MB private, 1.6% of a core; after visiting 20 tabs 6 live pages, 917 MB (`2026-11-19-tabs100.json`). 500 tabs: all kept, 1 live page, 553 MB, 1.6%; the first 500-tab run reported 0 live page targets after visits (6 hosts mounted), the re-run 6/6 at 865 MB, recorded as a flaky probe reading, not investigated further (`2026-11-19-tabs500.json`) |
 | Multi-window | UNIT + PREVIEW | `appWindows`, session reopen tests; packaged multi-window stress NOT TESTED |
-| Apps | VERIFIED (release exe, 8 checks) / PREVIEW (Part 24/25 changes) | `2026-11-18-apps-check.json` 8/8; later Gallery, Studio, Calendar/Tasks alerts, Browser history checked in the web preview only |
+| Apps | VERIFIED (release exe, 14 checks, 2026-11-19) / PREVIEW (Gallery, Studio, Browser history) | `2026-11-19-apps-check.json` 14/14: build identity, fs:writeBase64, Xack read-only grant vs chained command and revoke, Umari, unified chrome, Calendar alert with Calendar closed, plus the 8 earlier checks; security `2026-11-19-security.json` 27/27. Calculator launch time is not measured by the probe (null) |
 | Installer | NOT TESTED for 7.0.2 | `npm run build:tauri` produces MSI + NSIS with the bundle gate; no install run on this head |
 | Upgrade | NOT TESTED | Needs an install of the previous build first |
 | Rollback | NOT TESTED | — |

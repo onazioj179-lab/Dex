@@ -1,0 +1,167 @@
+{
+  "at": "2026-11-19T05:32:19.971Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/190b2bff-6c41-41ae-bf6a-bf553b576a17/scratchpad/pkg-0119/dex-tauri.exe",
+  "passed": 14,
+  "failed": 0,
+  "results": [
+    {
+      "name": "search indexing reports start and finish to Background tasks",
+      "pass": true,
+      "observed": {
+        "events": 3,
+        "final": {
+          "state": "completed",
+          "indexed": 23910,
+          "ms": 21166
+        }
+      }
+    },
+    {
+      "name": "download saved into the chosen folder",
+      "pass": true,
+      "observed": {
+        "path": "C:\\Users\\onazi\\AppData\\Local\\Temp\\dex-apps-y1JyMn\\dl-dest\\dest-check.bin",
+        "size": 262144
+      }
+    },
+    {
+      "name": "download into a Windows folder is refused",
+      "pass": true,
+      "observed": {
+        "error": "Downloads can't be saved to Windows or program folders",
+        "success": false
+      }
+    },
+    {
+      "name": "process list carries real categories (dex includes DEX itself)",
+      "pass": true,
+      "observed": {
+        "total": 319,
+        "kinds": {
+          "dex": 7,
+          "background": 305,
+          "app": 7
+        }
+      }
+    },
+    {
+      "name": "startup items read from Windows",
+      "pass": true,
+      "observed": {
+        "count": 6
+      }
+    },
+    {
+      "name": "Ctrl+` opens the integrated terminal with a real shell prompt",
+      "pass": true,
+      "observed": {
+        "prompt": "PS C:\\Users\\onazi>"
+      }
+    },
+    {
+      "name": "Ledger segmented control is a pill with a concentric highlight",
+      "pass": true,
+      "observed": {
+        "outerH": 30,
+        "outerR": 15,
+        "innerR": 12,
+        "inset": 2.9,
+        "pill": true,
+        "concentric": true
+      }
+    },
+    {
+      "name": "Ledger month selector is one capsule with concentric buttons",
+      "pass": true,
+      "observed": {
+        "outerH": 34,
+        "outerR": 17,
+        "innerR": 14,
+        "inset": 2.9,
+        "pill": true,
+        "concentric": true
+      }
+    },
+    {
+      "name": "build identity: version+build.<n>, real commit, channel",
+      "pass": true,
+      "observed": {
+        "buildId": "7.0.2+build.1023",
+        "buildNumber": 1023,
+        "builtAtUnix": 1795058267,
+        "channel": "development",
+        "commit": "943f7a53e716",
+        "display": "7.0.2 (001z)",
+        "serial": "001z",
+        "version": "7.0.2"
+      }
+    },
+    {
+      "name": "fs:writeBase64 writes the exact bytes; relative paths refused",
+      "pass": true,
+      "observed": {
+        "w": {
+          "bytes": 6,
+          "ok": true
+        },
+        "rel": {
+          "error": "Use a full path.",
+          "ok": false
+        },
+        "bytes": [
+          137,
+          80,
+          78,
+          71,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "Xack: read-only grant covers plain reads, never a chained command; revoke ends it",
+      "pass": true,
+      "observed": {
+        "first": "ask",
+        "plainRead": [
+          "allow",
+          "grant"
+        ],
+        "chained": [
+          "ask",
+          "execute"
+        ],
+        "afterRevoke": "ask"
+      }
+    },
+    {
+      "name": "Umari: projects and bounded retrieval respond",
+      "pass": true,
+      "observed": {
+        "projects": 47,
+        "retrieve": {
+          "items": 2,
+          "chars": 500
+        }
+      }
+    },
+    {
+      "name": "unified chrome: Task Manager tabs in the window header, content right below it",
+      "pass": true,
+      "observed": {
+        "width": 1280,
+        "tabs": 7,
+        "bodyTop": 36
+      }
+    },
+    {
+      "name": "Calendar alert fires with Calendar closed",
+      "pass": true,
+      "observed": {
+        "fired": [
+          "pkg-alert@2026-11-18"
+        ]
+      }
+    }
+  ]
+}
