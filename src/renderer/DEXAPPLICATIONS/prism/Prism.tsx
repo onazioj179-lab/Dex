@@ -109,6 +109,8 @@ import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { colorInputValue } from '../../utils/canvasTheme';
 import { useSavedColors, saveColor, normalizeHex } from '../../services/sharedColors';
 import { ASSET_SHAPES, ASSET_PATTERNS, ASSET_GRADIENTS, GRADIENT_STOPS, renderAsset } from './assetRender';
+import { dexConfirm } from '../../components/dexConfirm';
+import { toLocalDateInput } from '../../utils/localDate';
 
 // Swatches must be real colours: the canvas cannot paint a CSS variable, so the
 // old `var(--color-error)` swatches left the brush colour unusable.
@@ -1376,7 +1378,7 @@ const Prism: React.FC = () => {
     }
     
     const link = document.createElement('a');
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const timestamp = toLocalDateInput(new Date());
     link.download = `prism-export-${timestamp}.${format}`;
     link.href = exportCanvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : format}`, quality / 100);
     link.click();
@@ -1431,7 +1433,7 @@ const Prism: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prism-project-${new Date().toISOString().slice(0, 10)}.prism.json`;
+    a.download = `prism-project-${toLocalDateInput(new Date())}.prism.json`;
     a.click();
     URL.revokeObjectURL(url);
     setIsDirty(false);
@@ -1477,7 +1479,7 @@ const Prism: React.FC = () => {
         const p = JSON.parse(await file.text());
         const okSize = p?.canvasSize && Number.isFinite(p.canvasSize.width) && Number.isFinite(p.canvasSize.height);
         if (!p || p.version !== 1 || !Array.isArray(p.layers) || p.layers.length === 0 || !okSize) throw new Error('not a Prism project');
-        if (layers.length > 0 && isDirty && !window.confirm('Replace the current image with this project? Unsaved changes will be lost.')) return;
+        if (layers.length > 0 && isDirty && !(await dexConfirm({ title: 'Replace the current image with this project?', message: 'Unsaved changes will be lost.', confirmLabel: 'Replace', tone: 'destructive' }))) return;
         const unembedded = applyPrismProject(p, 'Open Project');
         toast('success', `Opened ${file.name}${unembedded ? ` (${unembedded} layer picture(s) were not embedded in the file and were left out)` : ''}`);
       } catch {
@@ -3190,7 +3192,7 @@ const Prism: React.FC = () => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `prism-export-${new Date().toISOString().slice(0, 10)}.${val}`;
+                a.download = `prism-export-${toLocalDateInput(new Date())}.${val}`;
                 a.click();
                 URL.revokeObjectURL(url);
               } else {

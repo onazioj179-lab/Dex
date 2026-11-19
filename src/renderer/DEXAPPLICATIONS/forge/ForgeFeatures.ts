@@ -551,6 +551,7 @@ export const generateId = (prefix: string = 'job'): string => sharedGenerateId(p
 // Format file size
 import { formatBytes as formatFileSize } from '../../../shared/format/units';
 import { persistOrWarn } from '../../utils/persistOrWarn';
+import { toLocalDateInput } from '../../utils/localDate';
 export { formatFileSize };
 
 // Format duration
@@ -605,7 +606,7 @@ export const applyNamingPattern = (
     .replace('{filename}', filename)
     .replace('{ext}', ext)
     .replace('{preset}', preset.name.replace(/\s+/g, '_'))
-    .replace('{date}', now.toISOString().split('T')[0])
+    .replace('{date}', toLocalDateInput(now))
     .replace('{time}', now.toTimeString().split(' ')[0].replace(/:/g, '-'))
     .replace('{resolution}', preset.settings.resolution 
       ? `${preset.settings.resolution.width}x${preset.settings.resolution.height}` 

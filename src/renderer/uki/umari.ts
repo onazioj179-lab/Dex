@@ -1,3 +1,4 @@
+import { toLocalDateInput } from '../utils/localDate';
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
@@ -79,7 +80,7 @@ export async function umariRetrieve(query: string, opts: { limit?: number; maxCh
   return { items: r.items as UmariItem[], chars: Number(r.chars ?? 0), budget: Number(r.budget ?? 0) };
 }
 
-const day = (secs: number) => (secs > 0 ? new Date(secs * 1000).toISOString().slice(0, 10) : 'unknown date');
+const day = (secs: number) => (secs > 0 ? toLocalDateInput(new Date(secs * 1000)) : 'unknown date');
 
 /** Model-facing text for find_context results. Pure (exported for tests). */
 export function formatContext(query: string, items: UmariItem[], chars: number, budget: number): string {

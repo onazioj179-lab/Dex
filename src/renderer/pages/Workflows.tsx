@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
+import { notify } from '../services/notify';
 import { DexSwitch } from '../components/controls';
 import { DexLoader } from '../components/LoadingStates';
 import { useAppTracking } from '../services/usePatternLearning';
@@ -693,10 +694,23 @@ export const Workflows: React.FC = () => {
   }, [toast]);
 
   const deleteWorkflow = useCallback((id: string) => {
+    const at = workflows.findIndex(w => w.id === id);
+    const wf = workflows[at];
     setWorkflows(prev => prev.filter(w => w.id !== id));
     deleteWorkflowIPC(id);
     if (selectedWorkflow?.id === id) setSelectedWorkflow(null);
-  }, [selectedWorkflow]);
+    if (!wf) return;
+    // Recoverable: Undo saves the workflow back exactly as it was.
+    void notify({
+      title: 'Workflow deleted',
+      body: wf.name,
+      source: 'Workflows',
+      undo: () => {
+        void saveWorkflow(wf);
+        setWorkflows(prev => prev.some(w => w.id === wf.id) ? prev : [...prev.slice(0, at), wf, ...prev.slice(at)]);
+      },
+    });
+  }, [selectedWorkflow, workflows]);
 
   // Enable / disable a workflow without deleting it. Persisted immediately.
   const toggleWorkflowEnabled = useCallback((id: string) => {

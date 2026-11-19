@@ -32,6 +32,7 @@ import { searchLines } from '../../../shared/search/textSearch';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
 import SketchPad, { type SketchMode } from './SketchPad';
+import { dexPrompt } from '../../components/dexConfirm';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -585,8 +586,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   useEffect(() => {
     if (sessionBaseRef.current === null) sessionBaseRef.current = wdCount;
   }, [wdCount]);
-  const editGoal = useCallback(() => {
-    const v = window.prompt('Set a word-count goal (0 to clear):', String(wordGoal));
+  const editGoal = useCallback(async () => {
+    const v = await dexPrompt({ title: 'Word-count goal', label: 'Words (0 clears the goal)', defaultValue: String(wordGoal), confirmLabel: 'Set', allowEmpty: true });
     if (v === null) return;
     const n = Math.max(0, parseInt(v, 10) || 0);
     setWordGoal(n);
@@ -857,10 +858,15 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         break;
       }
       case 'link': {
-        const url = prompt('Enter URL:');
-        if (url) {
-          exec('createLink', url);
-        }
+        // The dialog takes focus, so keep the selection and put it back first.
+        const sel = window.getSelection();
+        const saved = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+        void dexPrompt({ title: 'Add link', label: 'Address', placeholder: 'https://', confirmLabel: 'Add link' }).then((url) => {
+          if (!url) return;
+          editorRef.current?.focus();
+          if (saved) { const s = window.getSelection(); s?.removeAllRanges(); s?.addRange(saved); }
+          exec('createLink', url.trim());
+        });
         break;
       }
       case 'formatBlock':

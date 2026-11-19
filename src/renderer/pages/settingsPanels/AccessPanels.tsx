@@ -23,6 +23,7 @@ import {
   type Capability,
   type CapabilityStatus,
 } from '../../uki/permissions';
+import { dexConfirm } from '../../components/dexConfirm';
 
 // ---------- Shared design tokens (kept inline to avoid prop drilling) ----------
 const PANEL: React.CSSProperties = {
@@ -165,7 +166,7 @@ const UkiAccessSection: React.FC = () => {
   const grantedCount = caps.filter(c => c.status === 'granted').length;
 
   const revokeAllUki = useCallback(async () => {
-    if (!confirm('Revoke every UKI assistant capability?')) return;
+    if (!(await dexConfirm({ title: 'Revoke every UKI assistant capability?', message: 'UKI will ask again before it can use any of them.', confirmLabel: 'Revoke all', tone: 'destructive' }))) return;
     setBusy(true);
     try {
       for (const c of caps) {

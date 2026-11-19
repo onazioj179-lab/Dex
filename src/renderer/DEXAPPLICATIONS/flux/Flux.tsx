@@ -44,6 +44,7 @@ import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
 import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
 import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
+import { dexConfirm } from '../../components/dexConfirm';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
 const FLUX_ACCENT = '#bf5af2';
@@ -2357,7 +2358,7 @@ const Flux: React.FC = () => {
       try {
         if (file.size > 100 * 1024 * 1024) throw new Error('The file is larger than 100 MB.');
         const { layers: opened, settings, warnings } = parseFluxProject<Layer>(await file.text());
-        if (isDirtyRef.current && !window.confirm('Replace the current composition with this project? Changes since your last Save Project will be lost.')) return;
+        if (isDirtyRef.current && !(await dexConfirm({ title: 'Replace the current composition?', message: 'Changes since your last Save Project will be lost.', confirmLabel: 'Replace', tone: 'destructive' }))) return;
         applyOpenedProject(opened, settings);
         toast(warnings.length ? 'warning' : 'success', `Opened ${file.name} (${opened.length} layer${opened.length === 1 ? '' : 's'}).${warnings.length ? ' ' + warnings.join(' ') : ''}`);
       } catch (err) {

@@ -43,6 +43,7 @@ import DexIcon from './DexIcon';
 import { DexLoader } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
 import { UkiApprovalHost } from './UkiApprovalHost';
+import { DexConfirmHost } from './dexConfirm';
 import AskUkiSelection from './AskUkiSelection';
 import AskUkiContextMenu from './AskUkiContextMenu';
 // Deep import (not the '../uki' barrel): AppManager only needs these two static
@@ -864,6 +865,8 @@ export const AppManager: React.FC = () => {
         priority: PRIOS.includes(d.priority) ? d.priority : 'normal',
         source: d.source != null ? String(d.source) : undefined,
         actions: Array.isArray(d.actions) ? d.actions : undefined,
+        undoAction: typeof d.undoAction === 'function' ? d.undoAction : undefined,
+        duration: typeof d.duration === 'number' ? d.duration : undefined,
       });
     };
     window.addEventListener('dex-notification', onNotify as EventListener);
@@ -5590,6 +5593,7 @@ export const AppManager: React.FC = () => {
       {ukiEnabled && <UkiOverlay />}
       {/* UKI approvals (Xack): always mounted so scheduled and Nexus runs can ask too. */}
       <UkiApprovalHost />
+      <DexConfirmHost />
       <AskUkiSelection />
 
       {/* FancyZones-style custom snap-zone editor (opens on dex-open-zone-editor) */}

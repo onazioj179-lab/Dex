@@ -136,11 +136,15 @@ const Timer: React.FC = () => {
 
   // Drive completion reconciliation centrally — fires toasts and freezes any
   // timer that crossed zero, including ones that elapsed while unmounted.
+  // Only while a timer is counting: the app stays mounted in the background,
+  // and a 500 ms wake-up with nothing running is wasted CPU.
+  const anyRunning = timers.some(t => t.running);
   useEffect(() => {
     tickTimers();
+    if (!anyRunning) return;
     const id = window.setInterval(tickTimers, 500);
     return () => clearInterval(id);
-  }, [tickTimers]);
+  }, [tickTimers, anyRunning]);
 
   const [customMin, setCustomMin] = useState(5);
   const [customSec, setCustomSec] = useState(0);

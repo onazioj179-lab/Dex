@@ -45,6 +45,7 @@ import { BottomPanel, type BottomTab } from './dexCode/BottomPanel';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../../services/appIntents';
 import { persistOrWarn } from '../../utils/persistOrWarn';
+import { dexConfirm } from '../../components/dexConfirm';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -313,11 +314,15 @@ const DexCode: React.FC = () => {
       return list;
     });
   }, [activeTab, snapshotActive, showTab]);
-  const closeTab = useCallback((key: string) => {
+  // Ask BEFORE touching state (a prompt inside a state updater would run twice
+  // in React's dev mode and blocks the render).
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const closeTab = useCallback(async (key: string) => {
+    const pending = snapshotActive(tabsRef.current).find(x => x.key === key);
+    if (pending?.modified && !(await dexConfirm({ title: `Close ${pending.name} without saving?`, message: 'Your changes to this file will be lost.', confirmLabel: 'Close without saving', tone: 'destructive' }))) return;
     setTabs(prev => {
       const list = snapshotActive(prev);
-      const t = list.find(x => x.key === key);
-      if (t?.modified && !window.confirm(`Close ${t.name} without saving?`)) return list;
       const rest = list.filter(x => x.key !== key);
       if (!rest.length) {
         const blank: EditorTab = { key: newKey(), path: null, name: 'untitled.dex', code: '', original: '', modified: false };
@@ -895,8 +900,10 @@ const DexCode: React.FC = () => {
   useEffect(() => registerAppIntentHandler('dexcode', (action) => {
     const r = intentRef.current;
     if (action === 'new-file') {
-      if (r.isModified && !window.confirm(`Discard unsaved changes to ${r.fileName}?`)) return true;
-      r.handleNewFile();
+      void (async () => {
+        if (r.isModified && !(await dexConfirm({ title: `Discard unsaved changes to ${r.fileName}?`, confirmLabel: 'Discard', tone: 'destructive' }))) return;
+        r.handleNewFile();
+      })();
       return true;
     }
     if (action === 'open-project') { void r.openFolder(); return true; }

@@ -1,3 +1,4 @@
+import { toLocalDateInput } from '../../utils/localDate';
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
@@ -30,7 +31,7 @@ export function boardToCsv(columns: ExportColumn[]): string {
       rows.push([
         c.title, col.title, c.priority, c.dueDate ?? '', c.labels.map((l) => l.text).join('; '),
         c.checklist.length ? `${done}/${c.checklist.length}` : '', c.recurrence && c.recurrence !== 'none' ? c.recurrence : '',
-        new Date(c.createdAt).toISOString().slice(0, 10), c.description,
+        toLocalDateInput(new Date(c.createdAt)), c.description,
       ].map(csvCell).join(','));
     }
   }

@@ -6,6 +6,7 @@
  * drag-to-create slots, recurring events, and ICS import/export.
  */
 import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
+import { notify } from '../../services/notify';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
@@ -29,7 +30,15 @@ interface CalendarEvent {
   category?: string;
   /** Recurrence end: stop repeating after this date (inclusive, YYYY-MM-DD). Empty = forever. */
   recurUntil?: string;
+  /** Alert this many minutes before the start (services/calendarReminders). Absent = no alert. */
+  alertMinutes?: number | null;
 }
+
+const ALERT_CHOICES: { value: number | null; label: string }[] = [
+  { value: null, label: 'No alert' }, { value: 0, label: 'At start' }, { value: 5, label: '5 min before' },
+  { value: 15, label: '15 min before' }, { value: 30, label: '30 min before' }, { value: 60, label: '1 hour before' },
+  { value: 1440, label: '1 day before' },
+];
 
 interface Category {
   id: string;
@@ -86,6 +95,7 @@ const Calendar: React.FC = () => {
     icon: '',
     category: 'general',
     recurUntil: '',
+    alertMinutes: null as number | null,
   });
 
   const colors = ['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff2d55', '#64d2ff'];
@@ -247,7 +257,7 @@ const Calendar: React.FC = () => {
 
   const resetNewEvent = () => setNewEvent({
     title: '', time: '09:00', endTime: '10:00', color: 'var(--color-accent)',
-    description: '', recurring: 'none', icon: '', category: 'general', recurUntil: '',
+    description: '', recurring: 'none', icon: '', category: 'general', recurUntil: '', alertMinutes: null,
   });
 
   // Open the inline editor pre-filled for a brand new event on `date`.
@@ -277,6 +287,7 @@ const Calendar: React.FC = () => {
       icon: e.icon || '',
       category: e.category || 'general',
       recurUntil: e.recurUntil || '',
+      alertMinutes: e.alertMinutes ?? null,
     });
     setShowEventModal(true);
   };
@@ -302,6 +313,7 @@ const Calendar: React.FC = () => {
       icon: newEvent.icon || undefined,
       category: newEvent.category,
       recurUntil: newEvent.recurring && newEvent.recurring !== 'none' ? (newEvent.recurUntil || undefined) : undefined,
+      alertMinutes: newEvent.alertMinutes ?? undefined,
     };
 
     if (editingId) {
@@ -326,8 +338,18 @@ const Calendar: React.FC = () => {
   };
 
   const deleteEvent = (id: string) => {
+    const idx = events.findIndex(e => e.id === id);
+    if (idx < 0) return;
+    const removed = events[idx];
     setEvents(prev => prev.filter(e => e.id !== id));
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event deleted' } }));
+    // Recoverable: Undo puts the event back.
+    void notify({
+      title: 'Event deleted',
+      body: removed.title,
+      source: 'Calendar',
+      priority: 'low',
+      undo: () => setEvents(prev => prev.some(e => e.id === removed.id) ? prev : [...prev.slice(0, idx), removed, ...prev.slice(idx)]),
+    });
   };
 
   const toggleCategory = (id: string) => {
@@ -1346,6 +1368,19 @@ const Calendar: React.FC = () => {
                   )}
                 </div>
               )}
+              <div style={styles.timeRow}>
+                <span style={styles.timeSep}>Alert</span>
+                <select
+                  style={styles.timeInput}
+                  value={newEvent.alertMinutes == null ? '' : String(newEvent.alertMinutes)}
+                  onChange={e => setNewEvent({ ...newEvent, alertMinutes: e.target.value === '' ? null : Number(e.target.value) })}
+                  aria-label="Alert"
+                  title="A notification before the event starts (also when Calendar is closed)"
+                  data-testid="calendar-alert"
+                >
+                  {ALERT_CHOICES.map(c => <option key={c.label} value={c.value == null ? '' : String(c.value)}>{c.label}</option>)}
+                </select>
+              </div>
               <div style={styles.iconPicker}>
                 <button
                   type="button"

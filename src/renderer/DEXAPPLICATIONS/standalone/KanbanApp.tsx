@@ -15,6 +15,7 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appCon
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
+import { parseLocalDate } from '../../utils/localDate';
 
 // -- Types --------------------------------------------------------------
 
@@ -310,7 +311,7 @@ const KanbanApp: React.FC = () => {
 
   const sortKey = useCallback((c: KanbanCard): number | string => {
     switch (sortField) {
-      case 'dueDate': return c.dueDate ? new Date(c.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      case 'dueDate': return parseLocalDate(c.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
       case 'priority': return priorityRank(c.priority);
       case 'createdAt': return c.createdAt;
       case 'title': return c.title.toLowerCase();
@@ -671,7 +672,9 @@ const KanbanApp: React.FC = () => {
           </div>
           {board.columns.flatMap(col => getDisplayCards(col).map(({ card, realIdx }) => {
             const done = card.checklist.filter(x => x.done).length;
-            const overdue = !!card.dueDate && new Date(card.dueDate).getTime() < Date.now() - 86400000;
+            const dueDay = parseLocalDate(card.dueDate);
+            // Overdue once the due day (local) has fully passed.
+            const overdue = !!dueDay && dueDay.getTime() + 86400000 <= Date.now();
             return (
               <div role="row" key={card.id} tabIndex={0} onClick={() => setEditingCard({ colId: col.id, cardIdx: realIdx })}
                 onKeyDown={(e) => { if (e.key === 'Enter') setEditingCard({ colId: col.id, cardIdx: realIdx }); }}

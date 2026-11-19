@@ -37,6 +37,7 @@ import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMen
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { toLocalDateInput } from '../../utils/localDate';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -2504,7 +2505,7 @@ const Forge: React.FC = () => {
             <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
+                {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', toLocalDateInput(new Date())).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
               </div>
             </div>
             <button onClick={() => {
@@ -2514,7 +2515,7 @@ const Forge: React.FC = () => {
                   .replace('{name}', j.name.replace(/\.[^.]+$/, ''))
                   .replace('{preset}', j.preset)
                   .replace('{format}', j.format)
-                  .replace('{date}', new Date().toISOString().split('T')[0])
+                  .replace('{date}', toLocalDateInput(new Date()))
                   .replace('{index}', String(i + 1).padStart(3, '0'))
                   .replace('{resolution}', presets.find(p => p.id === j.preset)?.height ? `${presets.find(p => p.id === j.preset)?.height}p` : 'original')
                   + '.' + (presets.find(p => p.id === j.preset)?.container || 'mp4'),

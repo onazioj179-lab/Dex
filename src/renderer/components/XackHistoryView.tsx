@@ -24,6 +24,7 @@ import {
   type XackHistoryItem,
 } from '../uki/xack';
 import { colors, radius, fontStack } from '../styles/tokens';
+import { dexConfirm } from './dexConfirm';
 
 const OUTCOME: Record<string, { label: string; color: string }> = {
   approved: { label: 'Approved', color: colors.accent.default },
@@ -107,7 +108,7 @@ export function XackHistoryView(): React.ReactElement {
           <button
             type="button"
             style={{ ...chipBtn, marginLeft: 'auto' }}
-            onClick={async () => { if (window.confirm('Clear UKI\'s native action history? This cannot be undone.')) { await xackClearHistory(); void refresh(); } }}
+            onClick={async () => { if (await dexConfirm({ title: 'Clear UKI\'s action history?', message: 'This cannot be undone.', confirmLabel: 'Clear', tone: 'destructive' })) { await xackClearHistory(); void refresh(); } }}
           >Clear history</button>
         )}
       </div>

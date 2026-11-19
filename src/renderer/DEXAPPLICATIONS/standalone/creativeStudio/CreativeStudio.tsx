@@ -15,11 +15,62 @@
 
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { SegmentedControl } from '../../../components/controls/SegmentedControl';
-import Canvas from '../Canvas';
 
+// Both editors load lazily: Canvas and Slides import this folder's helpers,
+// so a static import here would make a chunk cycle.
+const Canvas = lazy(() => import('../Canvas'));
 const PresentationBuilder = lazy(() => import('../PresentationBuilder'));
 
 import { setStudioMode, storedStudioMode as storedMode, STUDIO_MODE_EVENT, type StudioMode } from './studioMode';
+import { serializeStudioProject, parseStudioProject } from './studioProject';
+import { getLiveBoard, importBoardIntoCanvas } from '../canvasBoards';
+import { sendSlidesToPresentation } from './boardToSlides';
+import { hasNativeFiles, pickSavePath, pickOpenPath, writeTextFile, readTextFile } from '../../../services/nativeFiles';
+import { DexCapsuleButton } from '../../../components/controls';
+
+const toast = (type: 'success' | 'error' | 'info', message: string) => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
+
+/** The deck as Slides last saved it (it autosaves every change). */
+function workingDeck(): { slides: unknown[]; theme: string | null } | null {
+  try {
+    const raw = localStorage.getItem('dex-presentations-current');
+    const v = raw ? JSON.parse(raw) : null;
+    const slides = Array.isArray(v) ? v : Array.isArray(v?.slides) ? v.slides : null;
+    return slides && slides.length ? { slides, theme: localStorage.getItem('dex-presentations-theme') } : null;
+  } catch { return null; }
+}
+
+async function saveProject(): Promise<void> {
+  const board = getLiveBoard();
+  const deck = workingDeck();
+  if (!board && !deck) { toast('info', 'Nothing to save yet: open the Board or Slides first.'); return; }
+  const text = serializeStudioProject(board, deck);
+  const base = (board?.name || 'Creative Studio').replace(/[^A-Za-z0-9 ._-]+/g, '_');
+  try {
+    if (hasNativeFiles()) {
+      const path = await pickSavePath(`${base}.dexstudio`, [{ name: 'Creative Studio project', extensions: ['dexstudio'] }], 'Save Creative Studio project');
+      if (!path) return;
+      await writeTextFile(path, text);
+      toast('success', `Saved ${path.split(/[\\/]/).pop()}${board ? '' : ' (slides only)'}${deck ? '' : ' (board only)'}`);
+    } else {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = `${base}.dexstudio`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } catch (e) { toast('error', `Could not save the project: ${(e as Error).message}`); }
+}
+
+async function openProject(): Promise<void> {
+  try {
+    if (!hasNativeFiles()) { toast('info', 'Opening projects needs the DEX desktop app.'); return; }
+    const path = await pickOpenPath([{ name: 'Creative Studio project', extensions: ['dexstudio'] }]);
+    if (!path) return;
+    const p = parseStudioProject(await readTextFile(path));
+    if (p.board) { setStudioMode('board'); importBoardIntoCanvas(p.board.name, p.board.payload); }
+    if (p.deck) sendSlidesToPresentation(p.deck.slides as never[]);
+    toast('success', `Opened: ${[p.board ? `board "${p.board.name}" added` : '', p.deck ? `${p.deck.slides.length} slide(s) added after yours` : ''].filter(Boolean).join(', ')}.`);
+  } catch (e) { toast('error', `Could not open the project: ${(e as Error).message}`); }
+}
 
 const CreativeStudio: React.FC = () => {
   const [mode, setMode] = useState<StudioMode>(storedMode);
@@ -38,7 +89,7 @@ const CreativeStudio: React.FC = () => {
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }} data-testid="creative-studio">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px', flexShrink: 0, position: 'relative' }}>
         <SegmentedControl
           semantics="tabs"
           size="sm"
@@ -50,11 +101,17 @@ const CreativeStudio: React.FC = () => {
             { value: 'slides', label: 'Slides', title: 'Build and present slide decks', testId: 'studio-mode-slides' },
           ]}
         />
+        <div style={{ position: 'absolute', right: 10, display: 'flex', gap: 6 }}>
+          <DexCapsuleButton size="sm" onClick={() => { void openProject(); }} title="Add a .dexstudio project's board and slides (nothing is replaced)" data-testid="studio-open-project">Open Project…</DexCapsuleButton>
+          <DexCapsuleButton size="sm" onClick={() => { void saveProject(); }} title="Save the board and the slides as one .dexstudio file" data-testid="studio-save-project">Save Project…</DexCapsuleButton>
+        </div>
       </div>
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
         {mounted.board && (
           <div hidden={mode !== 'board'} style={{ position: 'absolute', inset: 0 }}>
-            <Canvas />
+            <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>Opening Board…</div>}>
+              <Canvas />
+            </Suspense>
           </div>
         )}
         {mounted.slides && (

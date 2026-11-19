@@ -56,6 +56,7 @@ import { initLearningWiring } from './services/learningWiring';
 import LearnOverlay from './components/LearnOverlay';
 import { registerBuiltinLearn } from './services/learnRegistry';
 import { scheduledTaskRunner } from './services/scheduledTaskRunner';
+import { calendarReminders } from './services/calendarReminders';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
@@ -241,6 +242,8 @@ export const App: React.FC = () => {
   useEffect(() => { startLocalMetrics(); requestAnimationFrame(() => requestAnimationFrame(markShellReady)); }, []);
   // Background scheduler: fire due recurring UKI tasks on the shared heartbeat.
   useEffect(() => { scheduledTaskRunner.start(); return () => scheduledTaskRunner.stop(); }, []);
+  // Calendar alerts arrive whether or not Calendar is open.
+  useEffect(() => { calendarReminders.start(); return () => calendarReminders.stop(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();

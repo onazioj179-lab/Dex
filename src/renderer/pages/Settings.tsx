@@ -67,6 +67,8 @@ import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
+import { dexConfirm } from '../components/dexConfirm';
+import { toLocalDateInput } from '../utils/localDate';
 
 // ===========================================================================
 // TYPES
@@ -775,7 +777,7 @@ const exportSettings = (settings: Record<string, unknown>): void => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dex-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `dex-settings-${toLocalDateInput(new Date())}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1416,7 +1418,7 @@ const UkiMemoryViewer: React.FC<{ styles: any }> = ({ styles }) => {
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `uki-memory-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `uki-memory-${toLocalDateInput(new Date())}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`Exported ${data.turns.length} remembered exchanges`);
@@ -1474,7 +1476,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleClear = async () => {
-    if (!confirm('Clear all compressed memory archives? This removes the warm/cold history but keeps the rolling window.')) return;
+    if (!(await dexConfirm({ title: 'Clear all compressed memory archives?', message: 'This removes the warm and cold history but keeps the rolling window.', confirmLabel: 'Clear', tone: 'destructive' }))) return;
     setBusy(true);
     try {
       const mod = await import('../uki/compressedMemory');

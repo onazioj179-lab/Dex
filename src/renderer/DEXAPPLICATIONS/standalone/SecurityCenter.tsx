@@ -23,6 +23,7 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appCon
 import { colors, radius, fontStack } from '../../styles/tokens';
 import { SegmentedControl } from '../../components/controls/SegmentedControl';
 import { XackHistoryView } from '../../components/XackHistoryView';
+import { dexConfirm } from '../../components/dexConfirm';
 
 const OUTCOME_COLOR: Record<UkiActionOutcome, string> = {
   ran: colors.semantic.success,
@@ -152,7 +153,7 @@ const SecurityCenter: React.FC = () => {
           ))}
           {stats.total > 0 && (
             <button
-              onClick={() => { if (window.confirm('Clear the UKI activity log? This cannot be undone.')) clearUkiActionAudit(); }}
+              onClick={async () => { if (await dexConfirm({ title: 'Clear the UKI activity log?', message: 'This cannot be undone.', confirmLabel: 'Clear', tone: 'destructive' })) clearUkiActionAudit(); }}
               aria-label="Clear UKI activity log"
               style={{
                 marginLeft: 'auto', height: 26, padding: '0 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: radius.md,
