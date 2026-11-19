@@ -186,6 +186,9 @@ export default defineConfig({
           // nearly every app AND by shared code (WordSuggestions). Left unpinned,
           // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // shell/windowChrome is used by AppManager, AppShell and apps (Task
+          // Manager); unpinned it landed in the Nexus chunk and made a cycle.
+          if (/[\\/]renderer[\\/]shell[\\/]windowChrome/.test(id)) return 'dex-app-core';
           // improvements500 helpers (downloadBlob, ...) are shared by shell code
           // (SpatialHud) and apps (Bio Studio); left unpinned they landed in
           // app-bio and made dex-app-core <-> app-bio a cycle.
