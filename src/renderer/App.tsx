@@ -57,6 +57,7 @@ import LearnOverlay from './components/LearnOverlay';
 import { registerBuiltinLearn } from './services/learnRegistry';
 import { scheduledTaskRunner } from './services/scheduledTaskRunner';
 import { calendarReminders } from './services/calendarReminders';
+import { installTooltipSuppression } from './services/tooltips';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
@@ -244,6 +245,7 @@ export const App: React.FC = () => {
   useEffect(() => { scheduledTaskRunner.start(); return () => scheduledTaskRunner.stop(); }, []);
   // Calendar alerts arrive whether or not Calendar is open.
   useEffect(() => { calendarReminders.start(); return () => calendarReminders.stop(); }, []);
+  useEffect(() => { installTooltipSuppression(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();

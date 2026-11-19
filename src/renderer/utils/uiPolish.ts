@@ -123,6 +123,9 @@ const TOOLTIP_STYLES = `
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   letter-spacing: 0.01em;
 }
+html:not([data-dex-tooltips]) [data-tip]::after {
+  display: none !important;
+}
 [data-tip]:focus-visible::after {
   opacity: 1;
   transition-delay: 0ms;

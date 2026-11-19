@@ -17,6 +17,7 @@ import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
+import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
 import { DexSwitch, CAPSULE_SELECTED_BG } from '../components/controls';
@@ -282,13 +283,13 @@ const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'touch', 'window', 'snap', 'files'] },
+  { label: 'Productivity', ids: ['notifications', 'touch', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
   { label: 'AI', ids: ['aiproviders', 'uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Developer', ids: ['developer', 'plugins'] },
   { label: 'Extensions', ids: ['nexus'] },
-  { label: 'Info', ids: ['updates', 'about'] },
+  { label: 'Info', ids: ['keyboard', 'updates', 'about'] },
   { label: 'Account', ids: ['account'] },
   { label: 'Owner', ids: ['creator'] },
 ];
@@ -3915,6 +3916,7 @@ export const Settings: React.FC = () => {
   // all wrong (Ctrl+Shift+P did nothing; Ctrl+Shift+S is split view, not a
   // screenshot) and pointed to a customization screen that does not exist.
   // Keep this list in sync when a handler changes.
+  const [showTips, setShowTips] = useState(tooltipsEnabled);
   const renderKeyboardSettings = () => {
     const groups: { title: string; rows: [string, string][] }[] = [
       { title: 'Everywhere', rows: [
@@ -3960,11 +3962,33 @@ export const Settings: React.FC = () => {
       fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
       fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
     };
+    const tips: [string, string][] = [
+      ['Find anything', `${_M}+K opens the command palette; ${_M}+Shift+F searches files, notes and settings.`],
+      ['Undo and redo', `${_M}+Z undoes and ${_M}+Shift+Z (or ${_M}+Y) redoes in the app you are using.`],
+      ['Windows', 'Double-click a window header to maximize it; drag the header to move it; drag an edge to resize.'],
+      ['Ask UKI', 'UKI can open apps, find files and run tasks; anything that changes your system asks first.'],
+    ];
     return (
       <div style={styles.settingsContent}>
-        {groups.map((g, gi) => (
+        <h3 style={styles.sectionTitleFirst}>Getting around</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Show tooltips</span>
+            <span style={styles.settingDesc}>Little labels that pop up when the pointer rests on a control. Off: what they said is here in Help.</span>
+          </div>
+          <input type="checkbox" checked={showTips} onChange={(e) => { setTooltipsEnabled(e.target.checked); setShowTips(e.target.checked); }} aria-label="Show tooltips" />
+        </div>
+        {tips.map(([label, desc]) => (
+          <div key={label} style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>{label}</span>
+              <span style={styles.settingDesc}>{desc}</span>
+            </div>
+          </div>
+        ))}
+        {groups.map((g) => (
           <React.Fragment key={g.title}>
-            <h3 style={gi === 0 ? styles.sectionTitleFirst : styles.sectionTitle}>{g.title}</h3>
+            <h3 style={styles.sectionTitle}>{g.title}</h3>
             {g.rows.map(([keys, action]) => (
               <div key={keys} style={styles.settingRow}>
                 <div style={styles.settingInfo}>
