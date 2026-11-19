@@ -36,6 +36,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 import { keyEventForApp, isTypingTarget } from '../shell/input/appKeyScope';
 import { toLocalDateInput } from '../utils/localDate';
+import { WindowToolbar } from '../shell/windowChrome';
 
 // ===========================================================================
 // TYPES
@@ -1764,7 +1765,7 @@ export const Files: React.FC = () => {
       {/* Main Content */}
       <div style={styles.main}>
         {/* Toolbar */}
-        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">
+        <WindowToolbar inline={(bar) => <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">{bar}</div>}>
           <div style={styles.navButtons}>
             <button
               className="dex-toolbtn"
@@ -1955,7 +1956,7 @@ export const Files: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </WindowToolbar>
 
         {/* Filter Bar */}
         {showFilters && (

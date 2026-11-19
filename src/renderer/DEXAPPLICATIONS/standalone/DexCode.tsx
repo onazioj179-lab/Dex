@@ -46,6 +46,7 @@ import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../../services/appIntents';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { dexConfirm } from '../../components/dexConfirm';
+import { WindowToolbar } from '../../shell/windowChrome';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -1565,7 +1566,7 @@ const DexCode: React.FC = () => {
       {/* Main workspace */}
       <section ref={workspaceRef} style={S.workspace}>
         {/* Top bar */}
-        <div className="dex-liquid-glass-strong" style={S.topBar}>
+        <WindowToolbar inline={(bar) => <div className="dex-liquid-glass-strong" style={S.topBar}>{bar}</div>}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <input
               value={fileName + (isModified ? ' •' : '')}
@@ -1679,7 +1680,7 @@ const DexCode: React.FC = () => {
             </button>
             <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Ctrl+Enter to run</span>
           </div>
-        </div>
+        </WindowToolbar>
 
         {/* Editor tabs */}
         {tabs.length > 1 && (

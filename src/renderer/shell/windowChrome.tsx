@@ -27,7 +27,7 @@ export type WindowMode = 'standard' | 'unified';
 
 /** Apps whose chrome fits one header. Others stay standard. */
 const UNIFIED_APPS = new Set([
-  'taskmanager', 'ledger', 'bio', 'health', 'security',
+  'taskmanager', 'ledger', 'bio', 'health', 'security', 'dexcode', 'files',
 ]);
 
 /** Below this width the app's controls would not fit beside the window controls. */
