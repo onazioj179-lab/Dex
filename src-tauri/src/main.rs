@@ -32,6 +32,7 @@ mod ssh;
 mod fs_ops;
 mod file_mutations;
 mod compact_window;
+mod cover_taskbar;
 mod watch;
 mod analytics;
 mod power;
@@ -3357,6 +3358,11 @@ fn main() {
             // Answer DEX's own clipboard/MIDI/camera permission requests from the
             // saved policy instead of a WebView2 prompt every time.
             webview_permissions::install(app.handle());
+            // Maximized DEX fills the whole monitor, over the Windows taskbar.
+            if let Some(w) = app.get_webview_window("main") {
+                let ok = cover_taskbar::install(&w);
+                startup_timeline::mark(if ok { "Maximize covers the taskbar" } else { "Maximize: taskbar cover unavailable" });
+            }
             startup_timeline::mark("Native setup complete");
             Ok(())
         })
