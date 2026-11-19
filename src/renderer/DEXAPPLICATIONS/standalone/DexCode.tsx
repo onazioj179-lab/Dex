@@ -47,6 +47,7 @@ import { registerAppIntentHandler } from '../../services/appIntents';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { dexConfirm } from '../../components/dexConfirm';
 import { WindowToolbar } from '../../shell/windowChrome';
+import { useTextHistory } from '../../hooks/useTextHistory';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -975,7 +976,14 @@ const DexCode: React.FC = () => {
     searchProject(project, w).then(hits => { setWorkspaceHits(hits); setWorkspaceBusy(false); });
   }, [project]);
 
+  // Undo/redo: the editor rewrites its own text (Tab, auto-indent, brackets,
+  // replace), which wipes the browser's undo stack, so history lives here,
+  // one per editor tab.
+  const history = useTextHistory(code, setCode, activeTab, editorRef);
+  const historyKey = history.handleKey;
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (historyKey(e)) return;
     const ta = e.currentTarget;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
@@ -1083,7 +1091,7 @@ const DexCode: React.FC = () => {
         return;
       }
     }
-  }, [code, identifierAt, gotoDefinition, findReferences]);
+  }, [code, identifierAt, gotoDefinition, findReferences, historyKey]);
 
   const highlighted = useMemo(() => highlightDexScript(code), [code]);
 
