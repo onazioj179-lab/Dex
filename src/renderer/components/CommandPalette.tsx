@@ -31,13 +31,8 @@ import { executeDexCommand } from '../services/dexCommandRunner';
 import { DexSearchInput } from '../styles/components';
 import { dexConfirm, dexPrompt } from './dexConfirm';
 
-/** Real window fullscreen in the app (DOM fullscreen only fills the window). */
-function toggleWindowFullscreen(): void {
-  const invoke = (window as unknown as { dex?: { invoke?: (c: string) => Promise<unknown> } }).dex?.invoke;
-  if (invoke) { void invoke('window:toggleFullscreen'); return; }
-  if (document.fullscreenElement) void document.exitFullscreen();
-  else void document.documentElement.requestFullscreen?.();
-}
+// Real window fullscreen (shared: the shell shows the exit capsule and handles Esc).
+import { toggleWindowFullscreen } from '../shell/FullscreenExit';
 
 // Catalog ACTION commands the palette does NOT already cover (split / arrange /
 // lock / fullscreen exist above). Adding only the gaps keeps the catalog the one

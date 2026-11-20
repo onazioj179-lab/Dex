@@ -3013,6 +3013,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
             });
             json!({ "success": ok, "fullscreen": next })
         }
+        "window:isFullscreen" => json!({ "fullscreen": window.is_fullscreen().unwrap_or(false), "maximized": window.is_maximized().unwrap_or(false) }),
         "window:maximize" => {
             // The renderer treats this as a toggle.
             match window.is_maximized() {

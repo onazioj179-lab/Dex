@@ -59,6 +59,7 @@ import { scheduledTaskRunner } from './services/scheduledTaskRunner';
 import { calendarReminders } from './services/calendarReminders';
 import { installTooltipSuppression } from './services/tooltips';
 import { installDownloadCapture } from './services/nativeSave';
+import { FullscreenExit } from './shell/FullscreenExit';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
@@ -574,6 +575,7 @@ export const App: React.FC = () => {
         <FeedbackPanel />
         <TaskQueueStrip />
         <KeyboardShortcuts />
+        <FullscreenExit />
         <WorkspacePresetsPanel />
         <PermissionCenter />
       </Suspense>

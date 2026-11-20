@@ -1913,6 +1913,7 @@
     "window:enterCompact",
     "window:exitCompact",
     "window:hide",
+    "window:isFullscreen",
     "window:maximize",
     "window:minimize",
     "window:setTitleBarOverlay",
