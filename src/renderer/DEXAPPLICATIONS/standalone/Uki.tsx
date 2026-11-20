@@ -794,7 +794,8 @@ const S: Record<string, React.CSSProperties> = {
   sidebarHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px var(--space-2)' },
   brand: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)' },
   newBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  searchInput: { margin: '0 var(--space-3) 10px' },
+  // fullWidth is 100%: the side margins come off the width, or it overran the sidebar.
+  searchInput: { margin: '0 var(--space-3) 10px', width: 'calc(100% - 2 * var(--space-3))', boxSizing: 'border-box' },
   convList: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 var(--space-2) var(--space-2)' },
   convEmpty: { padding: 'var(--space-3) var(--space-2)', color: 'var(--color-text-tertiary)', fontSize: 12 },
   convItem: { display: 'flex', alignItems: 'center', gap: 6, padding: 'var(--space-2) 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 2 },
