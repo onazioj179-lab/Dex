@@ -49,7 +49,9 @@ describe('macOS Blue Modern palette', () => {
     expect(token(light, '--color-bg-surface')).toBe('#FFFFFF');
     expect(token(light, '--color-bg-secondary')).toBe('#F2F2F7');
     expect(token(light, '--color-text-primary')).toBe('#1D1D1F');
-    expect(token(light, '--color-text-secondary')).toBe('#636366');
+    // Table says #636366; it fell to ~4.4:1 on the grey fills (#DCDCE0), so DEX
+    // uses #545458 (theme-contrast.test.ts checks every fill).
+    expect(token(light, '--color-text-secondary')).toBe('#545458');
     expect(token(light, '--color-border')).toBe('#D1D1D6');
     // Table says #007AFF; on white that is 4.02:1, so DEX uses #0066CC (5.57:1).
     expect(ratio('#007AFF', '#FFFFFF')).toBeLessThan(4.5);
