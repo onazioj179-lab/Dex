@@ -906,7 +906,7 @@ fn open_with_os(target: &str) -> Value {
 }
 
 /// `shell:openExternal` — open an allow-listed URI with the OS default handler.
-fn shell_open_external(target: &str) -> Value {
+pub(crate) fn shell_open_external(target: &str) -> Value {
     match check_external_url(target) {
         Ok(()) => open_with_os(target.trim()),
         Err(error) => json!({ "success": false, "error": error }),
@@ -915,7 +915,7 @@ fn shell_open_external(target: &str) -> Value {
 
 /// `shell:openPath` / `fileIntel:openFile` / `media:openWithSystem` — open an
 /// existing, non-executable file or folder (aliases like "pictures" resolve).
-fn shell_open_path(app: &tauri::AppHandle, target: &str) -> Value {
+pub(crate) fn shell_open_path(app: &tauri::AppHandle, target: &str) -> Value {
     let resolved = resolve_path(app, target);
     match check_open_path(&resolved) {
         Ok(()) => open_with_os(&resolved.to_string_lossy()),

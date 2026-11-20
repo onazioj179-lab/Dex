@@ -58,6 +58,7 @@ import { registerBuiltinLearn } from './services/learnRegistry';
 import { scheduledTaskRunner } from './services/scheduledTaskRunner';
 import { calendarReminders } from './services/calendarReminders';
 import { installTooltipSuppression } from './services/tooltips';
+import { installDownloadCapture } from './services/nativeSave';
 import QuickActionsMenu from './components/QuickActionsMenu';
 import { useThemeScheduleStore } from './store/featureSuiteStore';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
@@ -246,6 +247,9 @@ export const App: React.FC = () => {
   // Calendar alerts arrive whether or not Calendar is open.
   useEffect(() => { calendarReminders.start(); return () => calendarReminders.stop(); }, []);
   useEffect(() => { installTooltipSuppression(); }, []);
+  // Every <a download> in DEX saves through the native dialog / download manager
+  // (the WebView's own download panel popped up for VINX, Imosion, ...).
+  useEffect(() => { installDownloadCapture(); }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();

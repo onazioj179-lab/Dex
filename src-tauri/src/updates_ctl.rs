@@ -110,29 +110,11 @@ fn current_version(app: &tauri::AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
-// Open a URL with the OS default handler (shell.openExternal parity). Uses
-// `cmd /c start` on Windows with the console window hidden (precedent: power.rs
-// `run` / os_lock), falling back to xdg-open / open elsewhere. Returns whether
-// the spawn was accepted by the OS.
+// Open a URL with the OS default handler (shell.openExternal parity). Only
+// https URLs; through the `open` crate (ShellExecute on Windows), never
+// `cmd /c start`, where `&` in a URL would start a second command.
 fn open_external(url: &str) -> bool {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // The empty "" is the (ignored) window-title arg `start` consumes first.
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
-            .spawn()
-            .is_ok()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open").arg(url).spawn().is_ok()
-    }
-    #[cfg(all(not(windows), not(target_os = "macos")))]
-    {
-        std::process::Command::new("xdg-open").arg(url).spawn().is_ok()
-    }
+    url.starts_with("https://") && !url.chars().any(|c| c.is_control()) && open::that(url).is_ok()
 }
 
 // ReleaseManager.loadConfig(): DEFAULT_CONFIG spread over persisted JSON, then
