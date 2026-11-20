@@ -162,7 +162,9 @@ const migrateSlide = (s: any): Slide => ({
 
 const safeStorage = (): Storage | null => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 
-const PresentationBuilder: React.FC = () => {
+/** inStudio: shown inside Creative Studio, whose Open/Save Project already
+ *  covers the slides, so the deck-only Open/Save buttons are hidden there. */
+const PresentationBuilder: React.FC<{ inStudio?: boolean }> = ({ inStudio = false }) => {
   // A stored deck that cannot be read is moved aside, never overwritten by the next save.
   const initialLoad = useRef<{ slides: Slide[] | null; movedAside: string | null } | null>(null);
   if (!initialLoad.current) initialLoad.current = loadWorkingDeck(safeStorage(), STORAGE_KEY, migrateSlide);
@@ -915,8 +917,10 @@ const PresentationBuilder: React.FC = () => {
           <span style={{ width: 8 }} />
           <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
-          <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
-          <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
+          {!inStudio && <>
+            <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
+            <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
+          </>}
           <button onClick={saveCheckpointNow} style={toolbarBtn} title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
           <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={async e => {
