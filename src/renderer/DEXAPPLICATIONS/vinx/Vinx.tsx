@@ -1752,7 +1752,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Project Templates Dialog */}
       {showTemplateDialog && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleTemplateDialog}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleTemplateDialog}>
           <div className="dex-creative-panel-strong" style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: 'min(80vh, calc(100% - 32px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Project Templates</span>
@@ -1787,7 +1787,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Batch Export Panel */}
       {showBatchExport && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleBatchExport}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleBatchExport}>
           <div className="dex-creative-panel-strong" style={{ width: 'min(480px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Batch Export</span>
@@ -2280,7 +2280,7 @@ const VinxEditor: React.FC = () => {
 
       {/* EDL/XML Export Panel */}
       {showEDLExport && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleEDLExport}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleEDLExport}>
           <div className="dex-creative-panel-strong" style={{ width: 'min(400px, calc(100vw - 48px))', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>EDL/XML Export</span>
@@ -2334,7 +2334,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Keyboard Shortcuts Editor */}
       {showShortcutsEditor && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleShortcutsEditor}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseDown={toggleShortcutsEditor}>
           <div className="dex-creative-panel-strong" style={{ width: 'min(560px, calc(100vw - 48px))', maxHeight: '80vh', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--pg-shadow-modal)', overflow: 'hidden' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Keyboard Shortcuts</span>
@@ -2364,7 +2364,7 @@ const VinxEditor: React.FC = () => {
 
       {/* Timecode Overlay (HUD in viewer) */}
       {timecodeOverlayEnabled && (
-        <div style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px var(--space-3)', background: 'rgba(0,0,0,0.7)', borderRadius: 4, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', zIndex: 90, pointerEvents: 'none' }}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', top: 90, left: '50%', transform: 'translateX(-50%)', padding: '4px var(--space-3)', background: 'rgba(0,0,0,0.7)', borderRadius: 4, fontSize: 14, fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', zIndex: 90, pointerEvents: 'none' }}>
           {formatTimecode(currentFrame, project.frameRate)}
         </div>
       )}

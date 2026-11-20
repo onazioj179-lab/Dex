@@ -10320,7 +10320,7 @@ const Imosion: React.FC = () => {
                 style={{ width: '100%', height: '100%', display: 'block', cursor: 'crosshair' }}
               />
               {/* Time ruler at bottom */}
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '20px', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)' }}>
+              <div className="dex-theme-dark" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '20px', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)' }}>
                 {Array.from({ length: 11 }).map((_, i) => (
                   <span key={i} style={{ position: 'absolute', left: `${i * 10}%`, fontSize: '8px', color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>{(forgeClip.clip.duration * i / 10).toFixed(2)}s</span>
                 ))}
@@ -10347,7 +10347,7 @@ const Imosion: React.FC = () => {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ width: '400px', background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: '10px', overflow: 'hidden' }}>
             <div style={{ padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.export} Export Project</span>
@@ -10429,7 +10429,7 @@ const Imosion: React.FC = () => {
 
       {/* Collaboration Modal */}
       {showCollabModal && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+        <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ width: '500px', background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: '10px', overflow: 'hidden', maxHeight: '80%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '14px var(--space-4)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>{Icon.users} Online Collaboration</span>
