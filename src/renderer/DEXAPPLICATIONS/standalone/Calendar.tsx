@@ -951,7 +951,7 @@ const Calendar: React.FC = () => {
                           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                         </svg>
                         <div>No events for this day</div>
-                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>Click the + button to add one</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Click the + button to add one</div>
                       </div>
                     ) : (
                       getEventsForDate(selectedDate).map(event => (
@@ -1340,7 +1340,7 @@ const Calendar: React.FC = () => {
                       border: '1px solid ' + (newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
                       fontSize: 12,
                       background: newEvent.recurring === r ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
-                      color: newEvent.recurring === r ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                      color: newEvent.recurring === r ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                     }}
@@ -1905,7 +1905,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignSelf: 'flex-start',
   },
   dayNumberToday: {
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
     fontWeight: 700,
     background: 'var(--color-accent-fill)',
     borderRadius: '50%',
@@ -1961,7 +1961,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   weekViewDayNumToday: {
     background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
     width: '28px',
     height: '28px',
     borderRadius: '50%',
@@ -2030,7 +2030,7 @@ const styles: Record<string, React.CSSProperties> = {
   weekViewEventTitle: {
     fontSize: '10px',
     fontWeight: 600,
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
     display: 'block',
     overflow: 'hidden',
     textOverflow: 'ellipsis',

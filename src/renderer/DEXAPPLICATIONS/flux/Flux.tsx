@@ -47,7 +47,9 @@ import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, 
 import { dexConfirm } from '../../components/dexConfirm';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
-const FLUX_ACCENT = '#bf5af2';
+// Theme-aware: #BF5AF2 on dark; a deeper purple on light so accent text and
+// white-on-accent labels stay >= 4.5:1 (the light value is set in .flux-root below).
+const FLUX_ACCENT = 'var(--flux-accent, #bf5af2)';
 /** No move, 100% scale: a group with this draws its layers exactly where they were. */
 const IDENTITY_TRANSFORM = { x: 0, y: 0, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 };
 /** The accent at `pct` percent opacity. */
@@ -2593,7 +2595,7 @@ const Flux: React.FC = () => {
     logo: { fontSize: '12px', fontWeight: 700, color: FLUX_ACCENT, letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: FLUX_ACCENT, color: '#fff', border: `1px solid ${FLUX_ACCENT}`, borderRadius: '9999px' },
+    btnPrimary: { background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', border: `1px solid ${FLUX_ACCENT}`, borderRadius: '9999px' },
     workspace: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px' },
     toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer' },
@@ -2715,6 +2717,8 @@ const Flux: React.FC = () => {
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop assets to import</div>}
       <style>{`
         /* === FLUX - PROFESSIONAL UI === */
+        .flux-root { --flux-accent: #bf5af2; --flux-on-accent: #000; }
+        [data-theme="light"] .flux-root { --flux-accent: #8a2bb9; --flux-on-accent: #fff; }
         :where(.flux-root) button { font-family: inherit; transition: all 0.12s ease; }
         :where(.flux-root) button:active { transform: scale(0.97); }
         .flux-ctx-item:hover { background: var(--color-bg-hover) !important; }

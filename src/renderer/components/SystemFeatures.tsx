@@ -346,7 +346,7 @@ const GlobalSearchOverlay: React.FC<GlobalSearchOverlayProps> = memo(({ onClose,
                 {item.name[0]}
               </span>
               <span>{item.name}</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 11 }}>{item.type}</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 11 }}>{item.type}</span>
             </button>
           ))}
         </div>

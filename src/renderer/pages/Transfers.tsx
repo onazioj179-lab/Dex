@@ -917,7 +917,7 @@ const Transfers: React.FC = () => {
             {tab.badge !== undefined && tab.badge > 0 && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
-                background: activeTab === tab.id ? 'var(--color-accent-fill)' : 'var(--color-text-muted)', color: 'var(--color-text-inverse)',
+                background: activeTab === tab.id ? 'var(--color-accent-fill)' : 'var(--color-text-muted)', color: activeTab === tab.id ? 'var(--color-accent-text, #fff)' : 'var(--color-text-inverse)',
               }}>
                 {tab.badge}
               </span>
@@ -952,7 +952,7 @@ const Transfers: React.FC = () => {
               <div style={{ textAlign: 'center', padding: '60px var(--space-5)', color: 'var(--color-text-muted)', fontSize: 14 }}>
                 <div style={{ marginBottom: 'var(--space-2)' }}>{Icons.wifi}</div>
                 <div>Scanning for nearby DEX devices...</div>
-                <div style={{ fontSize: 12, marginTop: 6, opacity: 0.7 }}>Make sure other devices have DEX running and are on the same network</div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>Make sure other devices have DEX running and are on the same network</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -1123,7 +1123,7 @@ const Transfers: React.FC = () => {
                 </div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>No active transfers</div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 'var(--space-3)' }}>Pick a device, then the files to send</div>
-                <button onClick={() => setActiveTab('devices')} style={{ padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Choose a Device</button>
+                <button onClick={() => setActiveTab('devices')} style={{ padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Choose a Device</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

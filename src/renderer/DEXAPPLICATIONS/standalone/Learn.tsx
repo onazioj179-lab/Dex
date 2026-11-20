@@ -311,7 +311,7 @@ const CARD: React.CSSProperties = {
 const ROW_DIVIDER = '1px solid var(--color-border-subtle, rgba(255,255,255,.04))';
 const CARD_TITLE: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, textTransform: 'none' as const,
-  letterSpacing: '0.01em', opacity: 0.5, marginBottom: 'var(--space-3)',
+  letterSpacing: '0.01em', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)',
 };
 const STAT_ROW: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -646,7 +646,7 @@ const Learn: React.FC = () => {
             <div style={{ fontSize: 13, fontWeight: 500, opacity: done ? 0.55 : 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               {lesson.title}
             </div>
-            <div style={{ fontSize: 11, opacity: 0.45, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               {lesson.summary}
             </div>
           </div>
@@ -655,7 +655,7 @@ const Learn: React.FC = () => {
               Done
             </span>
           )}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, opacity: 0.4, flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
             <DexIcon name="clock" size={11} />{lesson.minutes}m
           </span>
           <button
@@ -729,7 +729,7 @@ const Learn: React.FC = () => {
             </div>
             <div>
               <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>Learn</h1>
-              <p style={{ fontSize: 11, margin: 0, opacity: 0.45 }}>
+              <p style={{ fontSize: 11, margin: 0, color: 'var(--color-text-secondary)' }}>
                 Shortcuts, tips & activity intelligence
               </p>
             </div>
@@ -772,7 +772,7 @@ const Learn: React.FC = () => {
                 <div key={s.label} style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: s.color, opacity: 0.6 }} />
                   <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -782,9 +782,9 @@ const Learn: React.FC = () => {
               <div style={CARD}>
                 <div style={CARD_TITLE}>Session Stats</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 13 }}>
-                  <div><div style={{ opacity: 0.5, fontSize: 11 }}>Average Session</div><div style={{ fontWeight: 600 }}>{fmtMs(sessionStats.average)}</div></div>
-                  <div><div style={{ opacity: 0.5, fontSize: 11 }}>Total Time</div><div style={{ fontWeight: 600 }}>{fmtMs(sessionStats.total)}</div></div>
-                  <div><div style={{ opacity: 0.5, fontSize: 11 }}>Sessions</div><div style={{ fontWeight: 600 }}>{sessionStats.count}</div></div>
+                  <div><div style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>Average Session</div><div style={{ fontWeight: 600 }}>{fmtMs(sessionStats.average)}</div></div>
+                  <div><div style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>Total Time</div><div style={{ fontWeight: 600 }}>{fmtMs(sessionStats.total)}</div></div>
+                  <div><div style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>Sessions</div><div style={{ fontWeight: 600 }}>{sessionStats.count}</div></div>
                 </div>
               </div>
             )}
@@ -799,7 +799,7 @@ const Learn: React.FC = () => {
                     <div style={BAR_BG}>
                       <div style={{ width: `${(count / maxPageVisits) * 100}%`, height: '100%', borderRadius: 2, background: '#5e5ce6' }} />
                     </div>
-                    <span style={{ minWidth: 28, textAlign: 'right' as const, opacity: 0.5, fontSize: 12 }}>{count}</span>
+                    <span style={{ minWidth: 28, textAlign: 'right' as const, color: 'var(--color-text-tertiary)', fontSize: 12 }}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -815,7 +815,7 @@ const Learn: React.FC = () => {
                     <div style={BAR_BG}>
                       <div style={{ width: `${(count / maxActionFreq) * 100}%`, height: '100%', borderRadius: 2, background: '#64d2ff' }} />
                     </div>
-                    <span style={{ minWidth: 28, textAlign: 'right' as const, opacity: 0.5, fontSize: 12 }}>{count}</span>
+                    <span style={{ minWidth: 28, textAlign: 'right' as const, color: 'var(--color-text-tertiary)', fontSize: 12 }}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -839,9 +839,9 @@ const Learn: React.FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</div>
-                      <div style={{ fontSize: 11, opacity: 0.45 }}>{s.reason}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.reason}</div>
                     </div>
-                    <div style={{ fontSize: 10, opacity: 0.4, padding: '2px 6px', background: 'var(--color-bg-hover, rgba(255,255,255,.04))', borderRadius: 4 }}>{s.type}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '2px 6px', background: 'var(--color-bg-hover, rgba(255,255,255,.04))', borderRadius: 4 }}>{s.type}</div>
                   </div>
                 ))}
               </div>
@@ -854,7 +854,7 @@ const Learn: React.FC = () => {
                   <DexIcon name="activity" size={32} color="currentColor" />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Start exploring DEX</div>
-                <div style={{ fontSize: 12, opacity: 0.45, maxWidth: 280, margin: '0 auto' }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 280, margin: '0 auto' }}>
                   Open apps, browse files, and create projects. Your activity data will appear here as you use DEX.
                 </div>
               </div>
@@ -872,19 +872,19 @@ const Learn: React.FC = () => {
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <DexIcon name="flame" size={20} color="#FF9500" />{streak.current}
                 </div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Day Streak</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Day Streak</div>
               </div>
               <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#30D158', opacity: 0.7 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>
                   {streak.todayCount}<span style={{ fontSize: 14, opacity: 0.4 }}>/{DAILY_GOAL}</span>
                 </div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Today's Goal</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Today's Goal</div>
               </div>
               <div style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#5e5ce6', opacity: 0.7 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{completedCount}<span style={{ fontSize: 14, opacity: 0.4 }}>/{TOTAL_LESSON_COUNT}</span></div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Lessons Done</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Lessons Done</div>
               </div>
             </div>
 
@@ -912,7 +912,7 @@ const Learn: React.FC = () => {
               <div style={CARD}>
                 <div style={CARD_TITLE}>{courseResults.length} Result{courseResults.length === 1 ? '' : 's'}</div>
                 {courseResults.length === 0 ? (
-                  <div style={{ fontSize: 12, opacity: 0.45, padding: '8px 0' }}>No lessons match "{courseQuery}".</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '8px 0' }}>No lessons match "{courseQuery}".</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {courseResults.map(l => renderLesson(l, LESSON_MODULE[l.id].color))}
@@ -942,7 +942,7 @@ const Learn: React.FC = () => {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600 }}>{next.title}</div>
-                            <div style={{ fontSize: 11, opacity: 0.5 }}>{mod.title} · {next.minutes} min</div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{mod.title} · {next.minutes} min</div>
                           </div>
                           <DexIcon name="chevron-right" size={16} color="currentColor" />
                         </button>
@@ -974,7 +974,7 @@ const Learn: React.FC = () => {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: mod.color }}>{mod.title}</div>
-                          <div style={{ fontSize: 11, opacity: 0.5 }}>{mod.description}</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{mod.description}</div>
                         </div>
                         {mp.pct === 100 && (
                           <span title="Module complete" style={{ display: 'inline-flex' }}>
@@ -988,7 +988,7 @@ const Learn: React.FC = () => {
                         <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'var(--color-bg-inset, rgba(255,255,255,.06))', overflow: 'hidden' }}>
                           <div style={{ width: `${mp.pct}%`, height: '100%', borderRadius: 4, background: mod.color, transition: 'width .25s ease' }} />
                         </div>
-                        <span style={{ fontSize: 11, opacity: 0.5, minWidth: 64, textAlign: 'right' as const }}>{mp.done}/{mp.total} · {mp.pct}%</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', minWidth: 64, textAlign: 'right' as const }}>{mp.done}/{mp.total} · {mp.pct}%</span>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1020,7 +1020,7 @@ const Learn: React.FC = () => {
                         {item.keys.split('+').length > 1 ? (
                           item.keys.split('+').map((key, ki) => (
                             <React.Fragment key={ki}>
-                              {ki > 0 && <span style={{ fontSize: 10, opacity: 0.3, lineHeight: '22px' }}>+</span>}
+                              {ki > 0 && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', lineHeight: '22px' }}>+</span>}
                               <span style={{
                                 padding: '2px var(--space-2)', fontSize: 11, fontWeight: 600,
                                 background: 'var(--color-bg-hover, rgba(255,255,255,.08))', borderRadius: 4,
@@ -1069,7 +1069,7 @@ const Learn: React.FC = () => {
                       padding: '5px 0',
                       borderBottom: i < app.tips.length - 1 ? ROW_DIVIDER : 'none',
                     }}>
-                      <span style={{ fontSize: 10, opacity: 0.3, marginTop: 2, flexShrink: 0 }}>•</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2, flexShrink: 0 }}>•</span>
                       <span style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{tip}</span>
                     </div>
                   ))}
@@ -1089,7 +1089,7 @@ const Learn: React.FC = () => {
                       <div style={BAR_BG}>
                         <div style={{ width: `${(f.count / maxCount) * 100}%`, height: '100%', borderRadius: 2, background: 'var(--color-success)' }} />
                       </div>
-                      <span style={{ minWidth: 28, textAlign: 'right' as const, opacity: 0.5, fontSize: 12 }}>{f.count}</span>
+                      <span style={{ minWidth: 28, textAlign: 'right' as const, color: 'var(--color-text-tertiary)', fontSize: 12 }}>{f.count}</span>
                     </div>
                   );
                 })}
@@ -1106,7 +1106,7 @@ const Learn: React.FC = () => {
                     <div style={BAR_BG}>
                       <div style={{ width: `${(ms / maxPageTime) * 100}%`, height: '100%', borderRadius: 2, background: 'var(--color-warning)' }} />
                     </div>
-                    <span style={{ minWidth: 44, textAlign: 'right' as const, opacity: 0.5, fontSize: 12 }}>{fmtMs(ms)}</span>
+                    <span style={{ minWidth: 44, textAlign: 'right' as const, color: 'var(--color-text-tertiary)', fontSize: 12 }}>{fmtMs(ms)}</span>
                   </div>
                 ))}
               </div>
@@ -1158,7 +1158,7 @@ const Learn: React.FC = () => {
                             height: `${Math.max(4, (total / maxTotal) * 100)}%`,
                           }} />
                         </div>
-                        <div style={{ fontSize: 10, opacity: 0.4, marginTop: 4 }}>{day}</div>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 4 }}>{day}</div>
                       </div>
                     );
                   })}
@@ -1188,9 +1188,9 @@ const Learn: React.FC = () => {
                   })}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                  <span style={{ fontSize: 10, opacity: 0.3 }}>0:00</span>
-                  <span style={{ fontSize: 10, opacity: 0.3 }}>12:00</span>
-                  <span style={{ fontSize: 10, opacity: 0.3 }}>23:00</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>0:00</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>12:00</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>23:00</span>
                 </div>
               </div>
             )}
@@ -1222,9 +1222,9 @@ const Learn: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 500 }}>{s.target}</span>
                       <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(94,92,230,.15)', color: '#7d7aff' }}>{s.type}</span>
-                      <span style={{ fontSize: 10, opacity: 0.4, marginLeft: 'auto' }}>{Math.round(s.confidence * 100)}%</span>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>{Math.round(s.confidence * 100)}%</span>
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.5 }}>{s.reason}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{s.reason}</div>
                   </div>
                 ))}
               </div>
@@ -1264,17 +1264,17 @@ const Learn: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div style={{ ...CARD, textAlign: 'center' as const }}>
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{batteryLevel === null ? '—' : `${batteryLevel}%`}</div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
                   {batteryLevel === null ? (isCharging ? 'On AC power' : 'No battery data') : isCharging ? 'Battery · charging' : 'Battery'}
                 </div>
               </div>
               <div style={{ ...CARD, textAlign: 'center' as const }}>
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{cpuUsage === null ? '—' : `${cpuUsage}%`}</div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>CPU</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>CPU</div>
               </div>
               <div style={{ ...CARD, textAlign: 'center' as const }}>
                 <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{memoryUsage === null ? '—' : `${memoryUsage}%`}</div>
-                <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>Memory</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>Memory</div>
               </div>
             </div>
             <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 12 }}>

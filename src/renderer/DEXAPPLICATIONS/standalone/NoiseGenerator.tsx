@@ -803,7 +803,8 @@ const NoiseGenerator: React.FC = () => {
                 aria-pressed={isActive}
               >
                 <span style={{ fontSize: 22 }}>{l.icon}</span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: isActive ? l.color : 'var(--color-text-secondary)' }}>{l.label}</span>
+                {/* Label stays theme text (White Noise's #e8e8e8 vanished on light); the border carries the layer colour. */}
+                <span style={{ fontSize: 11, fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>{l.label}</span>
               </button>
               {isActive && (
                 <input
@@ -850,7 +851,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   playBtn: {
     width: 56, height: 56, borderRadius: '50%', border: 'none',
-    color: 'var(--color-text-inverse, #fff)', fontSize: 20, cursor: 'pointer',
+    color: 'var(--color-accent-text, #fff)', fontSize: 20, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
   },
@@ -885,7 +886,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   savePresetBtn: {
     padding: '6px var(--space-4)', borderRadius: 10, border: 'none',
-    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
+    background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetChips: { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' },
