@@ -22,7 +22,20 @@ Statuses: VERIFIED (evidence below) · UNIT (tests only) · PREVIEW (web preview
 | Unit tests | 3079 passed, 0 failed (one palette pin updated for the new light secondary) | vitest |
 | Contrast | light failures 178 to ~40, dark mostly brand-blue text on tints (owner decision pending) | `scripts/ui/contrast-audit.js` |
 
-Still NOT READY: installer install/upgrade/rollback not run; build not signed (no certificate); packaged Save-dialog export not exercised.
+### Installer (DEX_7.0.2_x64-setup.exe from build 1038, 2026-11-20, on the owner's PC with a verified backup)
+
+| Step | Result |
+|---|---|
+| Static | 15.2 MB, version 7.0.2, per-user install, SHA-256 matches SHA256SUMS-7.0.2.txt; NOT SIGNED (SmartScreen will warn); product name "DEX" (renaming to "DEX OS" would change the install folder/registration and leave 7.0.1 installed beside it, so it needs a migration step first) |
+| Backup | data (1744 files, 163,495,998 bytes), 7.0.1 app folder, uninstall + HKCU\Software keys, 2 shortcuts; copies verified identical |
+| Upgrade 7.0.1 -> 7.0.2 (`/S`) | exit 0 in 3 s; one "DEX" uninstall entry (no duplicate), 7.0.2, same folder; data unchanged (same files and bytes) |
+| 7.0.2 on the existing data | starts (log: `7.0.2+build.1038 ... starting`, WebView2 ok), window up for 10+ s, closes cleanly |
+| Uninstall 7.0.2 (`/S`) | exit 0; app folder, uninstall entry and both shortcuts removed; data kept (1756 files: 12 added by the 7.0.2 run) |
+| Rollback to 7.0.1 (restore from backup) | registered 7.0.1, shortcuts back, app folder hash-identical to the original; 7.0.1 starts on the data 7.0.2 used and closes cleanly |
+
+Not covered: a rollback by running a 7.0.1 installer (none on disk; the restore used the backed-up 7.0.1 files), an elevated / all-users install, another Windows account.
+
+Still NOT READY: build not signed (no certificate); packaged Save-dialog export not exercised.
 
 ## Release gates
 
