@@ -1,7 +1,4 @@
-# DEX - Electron App Browser Targets
-# Only targeting Chromium (Electron's rendering engine)
-# This silences all Safari/Firefox compatibility warnings
-
-# Electron 28 uses Chromium 120
-electron >= 28
+# DEX runs in Tauri on the system WebView: WebView2 (Chromium/Edge) on Windows.
+# Target that engine only; Safari/Firefox warnings do not apply.
 chrome >= 120
+edge >= 120

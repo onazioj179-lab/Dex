@@ -1214,7 +1214,7 @@ const DexNotesInner: React.FC = () => {
                     onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>All Notes</button>
                   {path.map(f => (
                     <React.Fragment key={f.id}>
-                      <span style={{ opacity: 0.4, fontSize: 11 }}>/</span>
+                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>/</span>
                       <button style={crumb} onClick={() => store.selectFolder(f.id)}
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}>{f.name}</button>

@@ -65,7 +65,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           <li key={s.id} style={{ marginBottom: 4 }}>
             <span style={{ color: riskColor[s.risk] || 'inherit' }}>•</span>{' '}
             {s.label}{' '}
-            <code style={{ opacity: 0.55, fontSize: 11 }}>{s.action}</code>
+            <code style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>{s.action}</code>
           </li>
         ))}
       </ol>

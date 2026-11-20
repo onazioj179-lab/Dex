@@ -2390,8 +2390,10 @@ const Prism: React.FC = () => {
         }
       }
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-        if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+        // With Shift held the key is "Z", so compare lowercase (Ctrl+Shift+Z redo never fired).
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+        if (e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+        if (e.key === 'o' && !e.shiftKey) { e.preventDefault(); openImage(); return; }
         if (e.key === 'y') { e.preventDefault(); redo(); }
         if (e.key === 's') { e.preventDefault(); saveProject(); }
         if (e.key === 'e') { e.preventDefault(); exportImage('png'); }
@@ -2415,7 +2417,7 @@ const Prism: React.FC = () => {
       if (e.key === 'l') setActiveTool('lasso');
       if (e.key === 's' && !e.ctrlKey && !e.metaKey) setActiveTool('clone');
       if (e.key === 'j') setActiveTool('heal');
-      if (e.key === 'o') setActiveTool('dodge');
+      if (e.key === 'o' && !e.ctrlKey && !e.metaKey) setActiveTool('dodge');
       if (e.key === 'O' && e.shiftKey) setActiveTool('burn');
       if (e.key === 'x' && !e.ctrlKey && !e.metaKey) { const fg = foregroundColor; setForegroundColor(backgroundColor); setBackgroundColor(fg); }
       if (e.key === '[') setBrushSize(prev => Math.max(1, prev - 5));
@@ -2480,7 +2482,7 @@ const Prism: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, saveProject, exportImage, canvasSize, selection, selectedLayerId, layers, penPath, foregroundColor, backgroundColor, brushSize, pushHistory, activeTool, textPosition, textInput, textFontSize]);
+  }, [undo, redo, saveProject, exportImage, openImage, canvasSize, selection, selectedLayerId, layers, penPath, foregroundColor, backgroundColor, brushSize, pushHistory, activeTool, textPosition, textInput, textFontSize]);
 
   // Marching ants animation timer (gated by perf tier)
   useEffect(() => {
@@ -2976,13 +2978,13 @@ const Prism: React.FC = () => {
 
   // ===== STYLES - CSS VARIABLE BASED FOR THEME SUPPORT =====
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
-    container: { ['--prism-accent' as any]: '#ff375f', display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
+    container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
     logo: { fontSize: '12px', fontWeight: 600, color: 'var(--prism-accent)', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: 'var(--prism-accent)', border: '1px solid var(--prism-accent)', color: '#fff', fontWeight: 700, borderRadius: '9999px' },
+    btnPrimary: { background: 'var(--prism-accent)', border: '1px solid var(--prism-accent)', color: 'var(--prism-on-accent, #fff)', fontWeight: 700, borderRadius: '9999px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px', overflow: 'auto' },
     toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.12s ease' },
@@ -3020,6 +3022,23 @@ const Prism: React.FC = () => {
   // Declarative Features menu (replaces the old hand-rolled dropdown). Sections
   // become caps-label groups; `checked` reflects each panel's open state.
   const featureMenus: MenuGroup[] = [{
+    // File actions (were four header buttons).
+    id: 'file',
+    label: 'File',
+    sections: [
+      { id: 'open', items: [
+        { id: 'openImage', label: 'Open Image…', shortcut: 'Ctrl+O', run: () => openImage() },
+        { id: 'openProject', label: 'Open Project…', run: () => openProject() },
+      ] },
+      { id: 'save', items: [
+        { id: 'saveProject', label: 'Save Project', shortcut: 'Ctrl+S', run: () => saveProject() },
+        { id: 'checkpoint', label: 'Save Checkpoint', run: () => saveCheckpointNow() },
+      ] },
+      { id: 'export', items: [
+        { id: 'exportPng', label: 'Export PNG', run: () => exportImage('png') },
+      ] },
+    ],
+  }, {
     id: 'features',
     label: 'Features',
     sections: [
@@ -3086,6 +3105,9 @@ const Prism: React.FC = () => {
       {dropOverlayStyle && <div style={dropOverlayStyle}>Drop images to import</div>}
       <style>{`
         /* === PRISM - PROFESSIONAL UI === */
+        /* Accent: #FF375F on dark; deeper on light so accent text and white-on-accent pass 4.5:1. */
+        .prism-root { --prism-accent: #ff375f; --prism-on-accent: #000; }
+        [data-theme="light"] .prism-root { --prism-accent: #d1173d; --prism-on-accent: #fff; }
         :where(.prism-root) button { font-family: inherit; }
         :where(.prism-root) button:active { transform: scale(0.97); }
         .prism-btn-primary:hover { background: color-mix(in srgb, var(--prism-accent) 88%, #fff) !important; }
@@ -3120,10 +3142,7 @@ const Prism: React.FC = () => {
           <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 700, letterSpacing: '1px' }}>IMAGE</span>
         </div>
         <div style={styles.headerCenter}>
-          <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
-          <button className="prism-btn" style={styles.btn} onClick={openProject} aria-label="Open project" title="Open a .prism.json project saved with Save">{Icons.folder} Open Project</button>
-          <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project" title="Save the project as a .prism.json file (Ctrl+S)">{Icons.save} Save</button>
-          <button className="prism-btn" style={styles.btn} onClick={saveCheckpointNow} aria-label="Save checkpoint" title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
+          {/* Open / Save / Checkpoint are in the File menu; Export stays the main button. */}
           <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
             <AutosaveIndicator
               state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}

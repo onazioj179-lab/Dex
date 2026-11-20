@@ -717,7 +717,7 @@ const KanbanApp: React.FC = () => {
 
             <div style={styles.cardList}>
               {col.cards.length === 0 && addingToCol !== col.id && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-5) var(--space-3)', color: 'var(--color-text-muted)', fontSize: 11, textAlign: 'center', opacity: 0.6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-5) var(--space-3)', color: 'var(--color-text-tertiary)', fontSize: 11, textAlign: 'center' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: 6, opacity: 0.4 }}>
                     <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
                   </svg>
@@ -899,7 +899,7 @@ const styles: Record<string, React.CSSProperties> = {
   colCountAtLimit: { color: 'var(--color-warning)', background: 'rgba(255,159,10,0.14)' },
   colCountOver: { color: 'var(--color-error)', background: 'rgba(255,59,48,0.14)' },
   wipFull: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 'var(--space-2) var(--space-3)', borderRadius: 6, border: '1px dashed var(--color-warning)', color: 'var(--color-warning)', fontSize: 11, fontWeight: 600, background: 'rgba(255,159,10,0.06)', margin: 2 },
-  colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, opacity: 0.4 },
+  colDeleteBtn: { background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 2 },
   cardList: { flex: 1, padding: 'var(--space-2) var(--space-2)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 },
   card: { padding: 14, background: 'var(--color-bg-surface-solid, #141414)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s cubic-bezier(0.4,0,0.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' },
   cardTitle: { fontSize: 13, fontWeight: 600, lineHeight: 1.4, overflowWrap: 'anywhere', minWidth: 0 },

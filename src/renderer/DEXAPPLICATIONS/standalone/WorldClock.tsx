@@ -693,7 +693,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBtn: {
     width: 28, height: 28, borderRadius: 10, border: 'none',
-    background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)', fontSize: 16, cursor: 'pointer',
+    background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)', fontSize: 16, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   addPanel: {
@@ -771,7 +771,7 @@ const s: Record<string, React.CSSProperties> = {
   emptyHint: { fontSize: 12, color: 'var(--color-text-tertiary)', maxWidth: 260 },
   emptyCta: {
     marginTop: 'var(--space-2)', padding: '7px 16px', borderRadius: 10,
-    border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-text-inverse, #fff)',
+    border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)',
     fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
 };

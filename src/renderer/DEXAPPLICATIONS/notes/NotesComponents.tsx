@@ -547,10 +547,11 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
                 <button
                   key={m}
                   aria-label={`${m} view`}
+                  aria-pressed={viewMode === m}
                   onClick={() => onViewModeChange(m)}
                   style={{
-                    background: viewMode === m ? 'var(--color-border-subtle)' : 'transparent',
-                    border: 'none', color: viewMode === m ? '#fff' : colors.textDim,
+                    background: viewMode === m ? 'var(--color-bg-active)' : 'transparent',
+                    border: 'none', color: viewMode === m ? 'var(--color-text-primary)' : colors.textDim,
                     cursor: 'pointer', fontSize: 10, padding: '2px 5px', borderRadius: 2,
                   }}
                 >{m === 'list'

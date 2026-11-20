@@ -1305,7 +1305,7 @@ const DexCode: React.FC = () => {
             >
               <DexIcon name="plus" size={12} />
               <span>New File</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+N</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>Ctrl+N</span>
             </button>
             <button
               onClick={handleOpenFile}
@@ -1315,7 +1315,7 @@ const DexCode: React.FC = () => {
             >
               <DexIcon name="folder-open" size={12} />
               <span>Open File</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+O</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>Ctrl+O</span>
             </button>
             <button
               onClick={handleSaveFile}
@@ -1325,7 +1325,7 @@ const DexCode: React.FC = () => {
             >
               <DexIcon name="save" size={12} />
               <span>Save{isModified ? ' *' : ''}</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+S</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>Ctrl+S</span>
             </button>
             <button
               onClick={handleSaveAs}
@@ -1335,7 +1335,7 @@ const DexCode: React.FC = () => {
             >
               <DexIcon name="download" size={12} />
               <span>Save As</span>
-              <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>Ctrl+Shift+S</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>Ctrl+Shift+S</span>
             </button>
           </div>
           )}
@@ -1354,7 +1354,7 @@ const DexCode: React.FC = () => {
           >
             <DexIcon name={showProject ? 'chevron-down' : 'chevron-right'} size={10} />
             Project
-            {project && <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{project.files.length}</span>}
+            {project && <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>{project.files.length}</span>}
           </div>
           {showProject && (
             !project ? (
@@ -1383,10 +1383,10 @@ const DexCode: React.FC = () => {
                   aria-label="Search in project"
                   style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none' }}
                 />
-                {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{searchPhrase}…</div>}
+                {workspaceBusy && <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)' }}>{searchPhrase}…</div>}
                 {workspaceHits.length > 0 ? (
                   <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
-                    <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
                     {workspaceHits.map((h, i) => (
                       <button
                         key={`${h.path}-${h.line}-${i}`}
@@ -1397,7 +1397,7 @@ const DexCode: React.FC = () => {
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         <span style={{ fontSize: 10, opacity: 0.7 }}>{h.name}:{h.line}</span>
-                        <span style={{ fontSize: 10, opacity: 0.5, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{h.text}</span>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{h.text}</span>
                       </button>
                     ))}
                   </div>
@@ -1438,7 +1438,7 @@ const DexCode: React.FC = () => {
           >
             <DexIcon name={showOutline ? 'chevron-down' : 'chevron-right'} size={10} />
             Outline
-            <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{symbols.length}</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>{symbols.length}</span>
           </div>
           {showOutline && (
             symbols.length === 0 ? (
@@ -1469,7 +1469,7 @@ const DexCode: React.FC = () => {
                       >
                         <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, width: 22, flexShrink: 0, textTransform: 'none' }}>{SYMBOL_TAG[s.kind]}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                        <span style={{ marginLeft: 'auto', opacity: 0.4, fontSize: 10 }}>{s.line}</span>
+                        <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>{s.line}</span>
                       </button>
                     ))}
                   </div>
@@ -1528,7 +1528,7 @@ const DexCode: React.FC = () => {
           >
             <DexIcon name={showTemplates ? 'chevron-down' : 'chevron-right'} size={10} />
             Templates
-            <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: 10 }}>{TEMPLATES.length}</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>{TEMPLATES.length}</span>
           </div>
           {showTemplates && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>

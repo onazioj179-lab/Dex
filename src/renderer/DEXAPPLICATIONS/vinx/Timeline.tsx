@@ -1017,7 +1017,7 @@ export const Timeline: React.FC<{
         e.preventDefault();
         useVinxStore.getState().undo();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.shiftKey) {
         e.preventDefault();
         useVinxStore.getState().redo();
       }

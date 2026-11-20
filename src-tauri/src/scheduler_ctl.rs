@@ -295,8 +295,11 @@ fn execute_action(app: &tauri::AppHandle, action: &Value) {
 
     match atype {
         "open-app" => {
+            // Same policy as shell:openPath: files, folders and aliases open;
+            // programs and scripts are refused (this used `cmd /c start`, so a
+            // scheduled task could launch anything, bypassing the run-script block).
             if !target.is_empty() {
-                run_detached_open(target);
+                let _ = crate::shell_open_path(app, target);
             }
         }
         "open-url" => {
@@ -310,7 +313,7 @@ fn execute_action(app: &tauri::AppHandle, action: &Value) {
             if internal {
                 crate::native_ops::emit_event(app, "browser:navigate", &json!(target));
             } else if target.starts_with("http://") || target.starts_with("https://") {
-                run_detached_open(target);
+                let _ = crate::shell_open_external(target);
             }
         }
         "run-workflow" => {
@@ -362,26 +365,6 @@ fn execute_action(app: &tauri::AppHandle, action: &Value) {
     }
 }
 
-// Open a path/app/URL via the OS, hiding any console window on Windows
-// (precedent: power.rs `run`). Mirrors Electron shell.openPath/openExternal.
-fn run_detached_open(target: &str) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let mut cmd = std::process::Command::new("cmd");
-        cmd.args(["/C", "start", "", target]);
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        let _ = cmd.spawn();
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("open").arg(target).spawn();
-    }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        let _ = std::process::Command::new("xdg-open").arg(target).spawn();
-    }
-}
 
 // scheduler:execute-trigger(id) -> boolean
 // Native port of SmartScheduler.executeTrigger: gate on enabled/cooldown/

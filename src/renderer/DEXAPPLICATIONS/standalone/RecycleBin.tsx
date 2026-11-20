@@ -133,7 +133,7 @@ const btnSmall: React.CSSProperties = {
 };
 const emptyState: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-  flex: 1, gap: 'var(--space-3)', opacity: 0.5,
+  flex: 1, gap: 'var(--space-3)', color: 'var(--color-text-secondary)',
 };
 
 // ── Row component ──────────────────────────────────────────────

@@ -26,7 +26,7 @@ const TerminalApp: React.FC = () => {
   }, [open]);
   if (!open) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#0a0a0a', color: 'var(--color-text-secondary, #b8b8bd)', fontSize: 12 }}>
+      <div className="dex-theme-dark" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#0a0a0a', color: 'var(--color-text-secondary, #b8b8bd)', fontSize: 12 }}>
         <span>All sessions are closed.</span>
         <button type="button" onClick={() => { setGen((g) => g + 1); setOpen(true); }}
           style={{ height: 26, padding: '0 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: '#e0e0e0', cursor: 'pointer' }}>
@@ -36,7 +36,9 @@ const TerminalApp: React.FC = () => {
     );
   }
   return (
-    <div style={{ height: '100%', display: 'flex', background: '#0a0a0a' }}>
+    // Terminals stay dark in both themes: dex-theme-dark gives everything inside
+    // the dark text tokens (light-theme ink was 1.1:1 on this background).
+    <div className="dex-theme-dark" style={{ height: '100%', display: 'flex', background: '#0a0a0a' }}>
       <TerminalTabs key={gen} acceptOpenRequests onClose={() => setOpen(false)} />
     </div>
   );

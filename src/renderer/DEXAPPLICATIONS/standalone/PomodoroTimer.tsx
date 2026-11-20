@@ -148,7 +148,7 @@ const PomodoroTimer: React.FC = () => {
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
               </svg>
             </button>
-            <button onClick={() => (running ? pausePomodoro() : startPomodoro())} className="pomo-primary-btn" style={{ ...s.primaryBtn, background: accentColor }}>
+            <button onClick={() => (running ? pausePomodoro() : startPomodoro())} className="pomo-primary-btn" style={{ ...s.primaryBtn, background: `color-mix(in srgb, ${accentColor} 55%, #000)` }}>  {/* deeper than the ring colour so the white label passes 4.5:1 (bright red/cyan did not) */}
               {running ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
               ) : (
@@ -254,7 +254,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   primaryBtn: {
     minWidth: 140, height: 52, borderRadius: 24, border: 'none',
-    color: 'var(--color-text-inverse, #fff)', fontSize: 16, fontWeight: 600, cursor: 'pointer',
+    color: 'var(--color-accent-text, #fff)', fontSize: 16, fontWeight: 600, cursor: 'pointer',
     transition: 'transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease', fontFamily: 'var(--font-family)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 22px',
   },
@@ -301,7 +301,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   doneBtn: {
     marginTop: 'var(--space-2)', padding: '10px', background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
+    color: 'var(--color-accent-text, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
 };

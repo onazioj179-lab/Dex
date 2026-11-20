@@ -246,7 +246,7 @@ const s: Record<string, React.CSSProperties> = {
   inputColon: { fontSize: 20, color: 'var(--color-text-tertiary)', marginBottom: 14 },
   addBtn: {
     padding: '10px var(--space-5)', background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
+    color: 'var(--color-accent-text, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   presetsRow: { display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' },
@@ -292,7 +292,7 @@ const s: Record<string, React.CSSProperties> = {
   primaryBtn: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     padding: '10px var(--space-4)', background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse, #fff)', border: 'none', borderRadius: 10,
+    color: 'var(--color-accent-text, #fff)', border: 'none', borderRadius: 10,
     fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
   },
   secondaryBtn: {

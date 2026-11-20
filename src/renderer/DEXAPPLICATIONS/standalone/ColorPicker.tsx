@@ -128,7 +128,9 @@ const ColorPicker: React.FC = () => {
     }
   }, []);
 
-  const previewOnDark = relLuminance(hex) > 0.35;
+  // Black or white, whichever contrasts more (crossover at luminance ~0.18;
+  // the old 0.35 put white on mid blues at 2.9:1).
+  const previewOnDark = relLuminance(hex) > 0.179;
   // Shared library (AssetLibrary 'palette'): saved here, shown in PRISM, kept in dex.db.
   const saved = useSavedColors();
   const isSaved = saved.includes(hex.toLowerCase());
