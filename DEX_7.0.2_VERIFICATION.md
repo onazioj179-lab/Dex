@@ -7,6 +7,23 @@ Statuses: VERIFIED (evidence below) · UNIT (tests only) · PREVIEW (web preview
 
 **Release verdict: NOT READY.** Builds and tests pass, and the packaged security and app checks below passed on release executables, and on 2026-11-19 the release exe of 7.0.2+build.1023 (commit 943f7a53e716) passed packaged security 27/27, the packaged apps check 14/14 (including the Part 24/25 checks) and the 100/500-tab Browser probe. Gates still not run: installer install/upgrade/rollback, packaged multi-window stress, and code signing (no certificate). Nothing was published.
 
+## Part 26 (release exe 7.0.2+build.1038, commit 1feb0345, Windows x64, 2026-11-20)
+
+| Check | Result | Evidence |
+|---|---|---|
+| Electron runtime | NONE: no Electron package or launcher; `.browserslistrc` retargeted to the WebView2 engine; two unreferenced Electron-era scripts removed (one wiped `%APPDATA%\Electron`) | `package.json`, repo audit |
+| WebView2 runtime | kept; bundle gate: loader statically linked, no WebView2Loader.dll import | `npm run build:tauri` verify-bundle |
+| Downloads in apps | every `<a download>` goes through the native Save dialog + atomic write, or the native download manager for web files; the WebView download panel is not reached. VERIFIED: unit (capture, immediate-revoke race, window.open) + packaged check that the capture is installed. NOT TESTED packaged: an actual VINX/Imosion export through the Save dialog (needs a person to pick the location) | `tests/unit/native-save.test.ts`, apps check |
+| Fullscreen exit | VERIFIED packaged: enters, the Exit capsule shows, leaves to the previous state | `2026-11-20-apps-check-rerun.json` |
+| Maximize | covers the monitor incl. taskbar (debug exe measurement 2026-11-19); window controls stay in the DEX top bar | Win32 rects |
+| Apps check | 16/16 on rerun; the first run had 3 load-related failures (terminal prompt, Ledger control, Task Manager window 360 px) with search indexing taking 80 s vs 21 s, all passed on rerun | `2026-11-20-apps-check.json`, `...-rerun.json` |
+| Security | 27/27; plus fixes: scheduler `open-app`/`open-url` no longer `cmd /c start` (could launch any program), update links via the `open` crate | `2026-11-20-security.json` |
+| All apps stress | 61/61 alone, all 61 at once: 0 crashes, p99 lag 6.9 ms; heap 28 to 31 MB over 3 rounds | `2026-11-20-apps-stress.json` |
+| Unit tests | 3079 passed, 0 failed (one palette pin updated for the new light secondary) | vitest |
+| Contrast | light failures 178 to ~40, dark mostly brand-blue text on tints (owner decision pending) | `scripts/ui/contrast-audit.js` |
+
+Still NOT READY: installer install/upgrade/rollback not run; build not signed (no certificate); packaged Save-dialog export not exercised.
+
 ## Release gates
 
 | Gate | Status | Evidence |

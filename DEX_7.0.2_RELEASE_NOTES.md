@@ -19,6 +19,10 @@
 - **Pixel Art**: undo and redo. **Project Dashboard**: status report into Notes.
 
 ## Everywhere
+- Saving and exporting from VINX, Imosion, Forge, Prism, Flux, Gallery and other apps uses the Windows Save dialog and a DEX notification (Open, Show in folder, Retry) instead of a browser download panel. Links open in your browser instead of a bare window.
+- Full screen shows an Exit full screen control; Esc leaves full screen. Maximized DEX covers the whole screen, taskbar included.
+- Light and dark mode text is clearer: greys, success green and button labels meet contrast guidelines; dark-only colors in several apps fixed.
+- Tooltips are off by default; Settings > Help has the tips and a switch to turn them back on.
 - Confirmations and name prompts use DEX's own dialog instead of the system box.
 - "Today" is your local day everywhere (daily challenges and streaks no longer roll over in the afternoon).
 - About shows the full build: `7.0.2+build.<n>`, serial, commit, channel and build time.

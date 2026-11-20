@@ -1,0 +1,423 @@
+{
+  "at": "2026-11-20T09:19:45.328Z",
+  "exe": "C:/Users/onazi/AppData/Local/Temp/claude/24313e1d24a9db2f/190b2bff-6c41-41ae-bf6a-bf553b576a17/scratchpad/pkg-0119/dex-tauri.exe",
+  "apps": 61,
+  "perApp": [
+    {
+      "id": "files",
+      "launchMs": 62,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "browser",
+      "launchMs": 37,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "settings",
+      "launchMs": 33,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "taskmanager",
+      "launchMs": 33,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "liveactivity",
+      "launchMs": 30,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "transfers",
+      "launchMs": 27,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "notes",
+      "launchMs": 32,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "tasks",
+      "launchMs": 31,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "power",
+      "launchMs": 61,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "workflows",
+      "launchMs": 30,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "gallery",
+      "launchMs": 33,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "audio",
+      "launchMs": 35,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "store",
+      "launchMs": 32,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "games",
+      "launchMs": 30,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "videoeditor",
+      "launchMs": 31,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "imosion",
+      "launchMs": 29,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "prism",
+      "launchMs": 25,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "flux",
+      "launchMs": 23,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "forge",
+      "launchMs": 26,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "uki",
+      "launchMs": 30,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "calculator",
+      "launchMs": 42,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "calendar",
+      "launchMs": 23,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "passwordgenerator",
+      "launchMs": 52,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "kanban",
+      "launchMs": 26,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "achievements",
+      "launchMs": 34,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "recyclebin",
+      "launchMs": 26,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "powerrename",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "axl",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "stopwatch",
+      "launchMs": 27,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "unitconverter",
+      "launchMs": 42,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "pomodoro",
+      "launchMs": 40,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "qrcode",
+      "launchMs": 47,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "colorpicker",
+      "launchMs": 46,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "weather",
+      "launchMs": 44,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "worldclock",
+      "launchMs": 48,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "noisegenerator",
+      "launchMs": 42,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "dexcode",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "nexus",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "learn",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "collabhub",
+      "launchMs": 18,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "canvas",
+      "launchMs": 19,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "creativehub",
+      "launchMs": 25,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "timer",
+      "launchMs": 43,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "screenrecorder",
+      "launchMs": 22,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "presentation",
+      "launchMs": 21,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "pdfviewer",
+      "launchMs": 20,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "pixelart",
+      "launchMs": 27,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "maps",
+      "launchMs": 15,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "git",
+      "launchMs": 26,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "env",
+      "launchMs": 52,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "ssh",
+      "launchMs": 36,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "spaces",
+      "launchMs": 32,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "inbox",
+      "launchMs": 28,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "projectdash",
+      "launchMs": 48,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "backup",
+      "launchMs": 77,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "extensions",
+      "launchMs": 35,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "health",
+      "launchMs": 30,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "bio",
+      "launchMs": 29,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "ledger",
+      "launchMs": 38,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "terminal",
+      "launchMs": 24,
+      "crashed": false,
+      "errors": 0
+    },
+    {
+      "id": "security",
+      "launchMs": 33,
+      "crashed": false,
+      "errors": 0
+    }
+  ],
+  "allOpen": {
+    "openedMs": 45928,
+    "mounted": 62,
+    "crashed": [],
+    "errors": 0,
+    "lag": {
+      "p50": 4.5,
+      "p99": 6.9,
+      "max": 38
+    },
+    "heapMB": 39,
+    "domNodes": 24121,
+    "listeners": 3202
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "errors": 0,
+      "heapMB": 28,
+      "domNodes": 301,
+      "listeners": 365
+    },
+    {
+      "round": 2,
+      "errors": 0,
+      "heapMB": 30,
+      "domNodes": 301,
+      "listeners": 366
+    },
+    {
+      "round": 3,
+      "errors": 0,
+      "heapMB": 31,
+      "domNodes": 301,
+      "listeners": 366
+    }
+  ],
+  "failures": [],
+  "baseline": {
+    "heapMB": 8,
+    "domNodes": 211,
+    "listeners": 359
+  },
+  "verdict": {
+    "appsPassed": 61,
+    "appsFailed": 0,
+    "allOpenCrashes": 0,
+    "allOpenLagP99": 6.9,
+    "heapGrowthAcrossRoundsMB": 3
+  }
+}

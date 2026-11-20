@@ -169,6 +169,26 @@ try {
     for (let i = 0; i < 40 && !fired.length; i++) { await sleep(5000); fired = (await ev(`JSON.parse(localStorage.getItem('dex-calendar-alerts-fired') || '[]')`)) || []; }
     check('Calendar alert fires with Calendar closed', fired.includes(`pkg-alert@${ev1.date}`), { fired });
   }
+
+  // Part 26: downloads are captured natively (the WebView's download panel is
+  // never reached) and window.open of web links does not make a window.
+  {
+    const r = await ev(`({ anchor: !/\\[native code\\]/.test(HTMLAnchorElement.prototype.click.toString()), open: !/\\[native code\\]/.test(window.open.toString()) })`);
+    check('download capture and window.open guard installed', r?.anchor === true && r?.open === true, r);
+  }
+
+  // Part 26: fullscreen round trip with an exit capsule; leaving restores the window.
+  {
+    const before = await ev(`window.dex.invoke('window:isFullscreen')`);
+    await ev(`window.dex.invoke('window:toggleFullscreen').then(r => window.dispatchEvent(new CustomEvent('dex-fullscreen-changed', { detail: { fullscreen: !!r.fullscreen } })))`);
+    await sleep(900);
+    const during = await ev(`window.dex.invoke('window:isFullscreen')`);
+    const capsule = await ev(`!![...document.querySelectorAll('[role="status"]')].find(e => e.textContent.includes('Exit full screen'))`);
+    await ev(`window.dex.invoke('window:toggleFullscreen')`);
+    await sleep(900);
+    const after = await ev(`window.dex.invoke('window:isFullscreen')`);
+    check('fullscreen enters, shows its exit, and leaves to the previous state', before?.fullscreen === false && during?.fullscreen === true && capsule === true && after?.fullscreen === false && after?.maximized === before?.maximized, { before, during, capsule, after });
+  }
 } catch (e) {
   check('apps check completed', false, String(e?.stack || e).slice(0, 300));
 } finally {
