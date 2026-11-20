@@ -168,7 +168,8 @@ const LAUNCH_ONE = (id) => `(async () => {
   s.launchApp({ id: ${JSON.stringify(id)}, name: ${JSON.stringify(id)}, icon: ${JSON.stringify(id)} });
   const end = t + 15000;
   while (performance.now() < end) {
-    const el = document.querySelector('[data-app-id="${id}"]');
+    // Compact utilities open as floating windows, the rest as tabs.
+    const el = document.querySelector('[data-app-id="${id}"], [data-floating-window="${id}"]');
     // textContent, not innerText or rAF: both stall or read empty while the
     // DEX window is covered by another window.
     if (el && el.textContent && el.textContent.trim().length > 0) return Math.round(performance.now() - t);

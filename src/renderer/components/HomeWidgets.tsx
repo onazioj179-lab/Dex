@@ -24,6 +24,7 @@ import { platform } from '../utils';
 import { formatBytes as sharedFormatBytes } from '../../shared/format/units';
 import { space, radius, fontSize, zIndex } from '../styles/tokens';
 import { loadActiveWeather, ageLabel, WEATHER_ICONS } from '../DEXAPPLICATIONS/standalone/weatherData';
+import { parseLocalDate } from '../utils/localDate';
 
 // ======================================================================
 // WIDGET CONTENT RENDERERS
@@ -1445,9 +1446,8 @@ const PRIORITY_COLOR: Record<DashTask['priority'], string> = {
 };
 
 function formatDueShort(due: string | null): string | undefined {
-  if (!due) return undefined;
-  const d = new Date(due);
-  if (!Number.isFinite(d.getTime())) return undefined;
+  const d = parseLocalDate(due);
+  if (!d) return undefined;
   const today = new Date();
   if (d.toDateString() === today.toDateString()) return 'Today';
   const tom = new Date(today); tom.setDate(tom.getDate() + 1);
@@ -1471,8 +1471,8 @@ const CurrentTasksWidget: React.FC = () => {
     return tasks
       .filter(t => !t.completed)
       .sort((a, b) => {
-        const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        const da = parseLocalDate(a.dueDate)?.getTime() ?? Infinity;
+        const db = parseLocalDate(b.dueDate)?.getTime() ?? Infinity;
         if (da !== db) return da - db;
         return (pOrder[a.priority] ?? 2) - (pOrder[b.priority] ?? 2);
       })

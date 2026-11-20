@@ -37,7 +37,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'snap', name: 'Frame Snapping', keywords: 'snap zones fancyzones tiling magnetism' },
   { id: 'permissions', name: 'Permissions', keywords: 'access camera mic location files grant' },
   { id: 'creator', name: 'Creator Access', keywords: 'developer creator unlock advanced' },
-  { id: 'keyboard', name: 'Keyboard Shortcuts', keywords: 'hotkeys shortcuts keybindings keys' },
+  { id: 'keyboard', name: 'Help', keywords: 'help shortcuts hotkeys keybindings keys guide how to tips gestures' },
   { id: 'touch', name: 'Touch & Pen', keywords: 'touchscreen multitouch fingers pen stylus gestures haptics vibration' },
   { id: 'files', name: 'Files', keywords: 'finder explorer storage default folder' },
   { id: 'storage', name: 'Storage & Data', keywords: 'disk space cache clear data usage' },

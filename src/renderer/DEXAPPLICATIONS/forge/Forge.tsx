@@ -37,6 +37,7 @@ import CreativeMenuBar, { type CreativeMenu } from '../../components/CreativeMen
 import { notificationsAllowed } from '../../utils/notificationsAllowed';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { toLocalDateInput } from '../../utils/localDate';
 
 // ===========================================================================
 // DEX FORGE - Professional Media Encoder
@@ -475,7 +476,6 @@ const Forge: React.FC = () => {
   conditionalRulesRef.current = conditionalRules;
 
   // === NEW PRO FEATURES ===
-  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showBatchRename, setShowBatchRename] = useState(false);
   const [batchRenamePattern, setBatchRenamePattern] = useState('{name}_{preset}');
@@ -553,18 +553,6 @@ const Forge: React.FC = () => {
     setJobs(prev => { const fit = MAX_QUEUE_JOBS - prev.length; return fit > 0 ? [...prev, ...newJobs.slice(0, fit)] : prev; });
     if (newJobs.length > 0) setSelectedJobId(newJobs[0].id);
   }, [selectedPreset, presets, customOutputDir]);
-
-  // Close tools menu on outside click or Escape key
-  useEffect(() => {
-    const handleClick = () => setShowToolsMenu(false);
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowToolsMenu(false); };
-    window.addEventListener('click', handleClick);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
 
   useEffect(() => {
     if (previewSourceUrlRef.current) {
@@ -1338,7 +1326,7 @@ const Forge: React.FC = () => {
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     sidebar: { width: '220px', flexShrink: 0, borderRadius: 0, borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
-    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
+    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: '2px solid transparent', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
     tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
     sidebarContent: { flex: 1, minHeight: 0, overflow: 'auto', padding: '10px' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg-inset)' },
@@ -1533,8 +1521,6 @@ const Forge: React.FC = () => {
         .forge-dropdown-item { transition: background 0.12s ease; }
         .forge-dropdown-item:hover { background: var(--color-bg-hover) !important; }
         .forge-dropdown-item:active { background: var(--color-bg-active) !important; }
-        .forge-tools-btn { transition: background 0.12s ease, color 0.12s ease; }
-        .forge-tools-btn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; }
       `}</style>
       {/* Standardized menu bar (File / Edit / Queue / Tools with submenus) */}
       <CreativeMenuBar menus={forgeMenus} accent="var(--color-accent)" />
@@ -1571,49 +1557,7 @@ const Forge: React.FC = () => {
               <DexIcon name="user-plus" size={14} /> Share
             </button>
           )}
-          <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button aria-label="Tools menu" className="forge-tools-btn" onClick={(e) => { e.stopPropagation(); setShowToolsMenu(v => !v); }} style={{ background: showToolsMenu ? 'var(--color-bg-active)' : 'transparent', border: 'none', fontSize: '11px', color: showToolsMenu ? 'var(--color-text-primary)' : 'var(--color-text-muted)', cursor: 'pointer', padding: '4px var(--space-2)', borderRadius: '9999px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>Tools <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4"/></svg></button>
-            {showToolsMenu && (
-              <div className="dex-creative-panel-strong" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', minWidth: '220px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'min(420px, calc(100vh - 72px))', overflow: 'auto', borderRadius: '14px', boxShadow: '0 16px 48px rgba(0,0,0,0.55)', zIndex: 'var(--z-modal)', padding: '4px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PROCESSING</div>
-                {[
-                  { label: 'Trim / Split', active: showTrimSplit, fn: () => setShowTrimSplit(v => !v) },
-                  { label: 'Crop & Pad', active: showCropPad, fn: () => setShowCropPad(v => !v) },
-                  { label: 'Watermark', active: showWatermark, fn: () => setShowWatermark(v => !v) },
-                  { label: 'Subtitle Burn-in', active: showSubBurnIn, fn: () => setShowSubBurnIn(v => !v) },
-                  { label: 'Normalize Audio', active: audioNormalize, fn: () => setAudioNormalize(v => !v) },
-                  { label: 'Concatenate', active: showConcat, fn: () => { setShowConcat(v => !v); setConcatOrder(jobs.map(j => j.id)); } },
-                ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>PREVIEW</div>
-                {[
-                  { label: 'Preview', active: showPreview, fn: () => { if (selectedJob) setShowPreview(v => !v); } },
-                  { label: 'A/B Compare', active: showABCompare, fn: () => { if (selectedJob?.outputBlobUrl) setShowABCompare(v => !v); } },
-                ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>EXPORT</div>
-                {[
-                  { label: 'Image Sequence', active: showImageSequence, fn: () => setShowImageSequence(v => !v) },
-                  { label: 'Audio Extract', active: showAudioExtract, fn: () => setShowAudioExtract(v => !v) },
-                  { label: 'Batch Rename', active: showBatchRename, fn: () => setShowBatchRename(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                ))}
-                <div style={{ height: '1px', background: 'var(--color-bg-hover)', margin: '4px var(--space-2)' }} />
-                <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 2px' }}>AUTOMATION</div>
-                {[
-                  { label: 'Auto Rules', active: showConditionalRules, fn: () => setShowConditionalRules(v => !v) },
-                ].map(item => (
-                  <div key={item.label} className="forge-dropdown-item" style={{ padding: '6px var(--space-3)', fontSize: '11px', color: item.active ? 'var(--color-accent)' : 'var(--color-text-primary)', cursor: 'pointer', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} onClick={() => { item.fn(); setShowToolsMenu(false); }}>{item.label}{item.active && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>ON</span>}</div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Tools live in the Tools menu (the separate Tools dropdown repeated it). */}
         </div>
 
       </div>
@@ -2504,7 +2448,7 @@ const Forge: React.FC = () => {
             <div style={{ padding: 'var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border-subtle)', marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Preview</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', new Date().toISOString().split('T')[0]).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
+                {batchRenamePattern.replace('{name}', 'video').replace('{preset}', selectedPreset).replace('{format}', presets.find(p => p.id === selectedPreset)?.format || 'H.264').replace('{date}', toLocalDateInput(new Date())).replace('{index}', '001').replace('{resolution}', '1080p')}.{presets.find(p => p.id === selectedPreset)?.container || 'mp4'}
               </div>
             </div>
             <button onClick={() => {
@@ -2514,7 +2458,7 @@ const Forge: React.FC = () => {
                   .replace('{name}', j.name.replace(/\.[^.]+$/, ''))
                   .replace('{preset}', j.preset)
                   .replace('{format}', j.format)
-                  .replace('{date}', new Date().toISOString().split('T')[0])
+                  .replace('{date}', toLocalDateInput(new Date()))
                   .replace('{index}', String(i + 1).padStart(3, '0'))
                   .replace('{resolution}', presets.find(p => p.id === j.preset)?.height ? `${presets.find(p => p.id === j.preset)?.height}p` : 'original')
                   + '.' + (presets.find(p => p.id === j.preset)?.container || 'mp4'),

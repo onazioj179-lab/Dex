@@ -7350,8 +7350,7 @@ const Imosion: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {/* No "Import" button in the timeline toolbar -- real DAWs import via
                   File > Import Audio or drag-and-drop, both of which still work. */}
-              <button aria-label="Export" onClick={() => setShowExportModal(true)} className="btn" style={{ color: 'var(--color-accent)' }}>{Icon.download} Export</button>
-              <div className="divider" />
+              {/* Export is in the top bar (a second Export here repeated it). */}
               {/* Bus-creation actions collapsed into one dropdown. */}
               <details className="bus-add-dd" style={{ position: 'relative' }}>
                 <summary className="btn" style={{ listStyle: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{Icon.bus} Bus <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>

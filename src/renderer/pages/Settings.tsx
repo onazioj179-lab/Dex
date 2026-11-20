@@ -11,12 +11,13 @@
 
 import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
 import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
-import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion } from '../utils/appVersion';
+import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion, getBuildInfo, formatBuildInfo } from '../utils/appVersion';
 import { openWithShell } from '../utils/openWithShell';
 import { isTauri } from '../services/platform/tauriCompat';
 import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
+import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
 import { DexSwitch, CAPSULE_SELECTED_BG } from '../components/controls';
@@ -67,6 +68,8 @@ import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
+import { dexConfirm } from '../components/dexConfirm';
+import { toLocalDateInput } from '../utils/localDate';
 
 // ===========================================================================
 // TYPES
@@ -280,13 +283,13 @@ const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
 const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
   { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
   { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'touch', 'window', 'snap', 'files'] },
+  { label: 'Productivity', ids: ['notifications', 'touch', 'window', 'snap', 'files'] },
   { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
   { label: 'AI', ids: ['aiproviders', 'uki'] },
   { label: 'Creative Suite', ids: ['creativeapps'] },
   { label: 'Developer', ids: ['developer', 'plugins'] },
   { label: 'Extensions', ids: ['nexus'] },
-  { label: 'Info', ids: ['updates', 'about'] },
+  { label: 'Info', ids: ['keyboard', 'updates', 'about'] },
   { label: 'Account', ids: ['account'] },
   { label: 'Owner', ids: ['creator'] },
 ];
@@ -775,7 +778,7 @@ const exportSettings = (settings: Record<string, unknown>): void => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dex-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `dex-settings-${toLocalDateInput(new Date())}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1416,7 +1419,7 @@ const UkiMemoryViewer: React.FC<{ styles: any }> = ({ styles }) => {
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `uki-memory-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `uki-memory-${toLocalDateInput(new Date())}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`Exported ${data.turns.length} remembered exchanges`);
@@ -1474,7 +1477,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleClear = async () => {
-    if (!confirm('Clear all compressed memory archives? This removes the warm/cold history but keeps the rolling window.')) return;
+    if (!(await dexConfirm({ title: 'Clear all compressed memory archives?', message: 'This removes the warm and cold history but keeps the rolling window.', confirmLabel: 'Clear', tone: 'destructive' }))) return;
     setBusy(true);
     try {
       const mod = await import('../uki/compressedMemory');
@@ -3365,7 +3368,24 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Build</span>
-          <span style={styles.aboutValue}>{import.meta.env.PROD ? 'Release' : 'Development'}</span>
+          <span style={{ ...styles.aboutValue, fontVariantNumeric: 'tabular-nums' }} data-testid="about-build-id">{getBuildInfo().buildId}{getBuildInfo().serial ? ` (${getBuildInfo().serial})` : ''}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Channel</span>
+          <span style={styles.aboutValue}>{getBuildInfo().channel[0].toUpperCase() + getBuildInfo().channel.slice(1)}{import.meta.env.PROD ? '' : ' (dev server)'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Commit</span>
+          <span style={{ ...styles.aboutValue, fontFamily: 'var(--font-mono, Consolas, monospace)' }}>{getBuildInfo().commit}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Built</span>
+          <span style={styles.aboutValue}>{getBuildInfo().builtAt ? `${getBuildInfo().builtAt.replace('T', ' ').replace('Z', ' UTC')}` : 'Unknown'}</span>
+        </div>
+        <div style={styles.aboutRow}>
+          <span style={styles.aboutLabel}>Build info</span>
+          <button type="button" style={styles.secondaryBtn} data-testid="about-copy-build"
+            onClick={() => { void navigator.clipboard?.writeText(formatBuildInfo()).then(() => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Build info copied' } })), () => window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not copy' } }))); }}>Copy</button>
         </div>
         <div style={styles.aboutRow}>
           <span style={styles.aboutLabel}>Platform</span>
@@ -3896,6 +3916,7 @@ export const Settings: React.FC = () => {
   // all wrong (Ctrl+Shift+P did nothing; Ctrl+Shift+S is split view, not a
   // screenshot) and pointed to a customization screen that does not exist.
   // Keep this list in sync when a handler changes.
+  const [showTips, setShowTips] = useState(tooltipsEnabled);
   const renderKeyboardSettings = () => {
     const groups: { title: string; rows: [string, string][] }[] = [
       { title: 'Everywhere', rows: [
@@ -3941,11 +3962,33 @@ export const Settings: React.FC = () => {
       fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)',
       fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
     };
+    const tips: [string, string][] = [
+      ['Find anything', `${_M}+K opens the command palette; ${_M}+Shift+F searches files, notes and settings.`],
+      ['Undo and redo', `${_M}+Z undoes and ${_M}+Shift+Z (or ${_M}+Y) redoes in the app you are using.`],
+      ['Windows', 'Double-click a window header to maximize it; drag the header to move it; drag an edge to resize.'],
+      ['Ask UKI', 'UKI can open apps, find files and run tasks; anything that changes your system asks first.'],
+    ];
     return (
       <div style={styles.settingsContent}>
-        {groups.map((g, gi) => (
+        <h3 style={styles.sectionTitleFirst}>Getting around</h3>
+        <div style={styles.settingRow}>
+          <div style={styles.settingInfo}>
+            <span style={styles.settingLabel}>Show tooltips</span>
+            <span style={styles.settingDesc}>Little labels that pop up when the pointer rests on a control. Off: what they said is here in Help.</span>
+          </div>
+          <input type="checkbox" checked={showTips} onChange={(e) => { setTooltipsEnabled(e.target.checked); setShowTips(e.target.checked); }} aria-label="Show tooltips" />
+        </div>
+        {tips.map(([label, desc]) => (
+          <div key={label} style={styles.settingRow}>
+            <div style={styles.settingInfo}>
+              <span style={styles.settingLabel}>{label}</span>
+              <span style={styles.settingDesc}>{desc}</span>
+            </div>
+          </div>
+        ))}
+        {groups.map((g) => (
           <React.Fragment key={g.title}>
-            <h3 style={gi === 0 ? styles.sectionTitleFirst : styles.sectionTitle}>{g.title}</h3>
+            <h3 style={styles.sectionTitle}>{g.title}</h3>
             {g.rows.map(([keys, action]) => (
               <div key={keys} style={styles.settingRow}>
                 <div style={styles.settingInfo}>

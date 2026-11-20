@@ -27,6 +27,7 @@ import {
   pushResourceSample, getResourceSamples, samplesInRange, capacityFor, summarise, niceCeil, phaseWaterfall,
 } from '../services/diagnostics/resourceHistory';
 import { LineChart } from './telemetry/LineChart';
+import { getBuildInfo } from '../utils/appVersion';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
 // Looked up when the view mounts, not at module load: in the packaged build this
@@ -343,6 +344,7 @@ const NexusDiagnostics: React.FC = () => {
               <Stat k="Crashes in this version" v={crashes ? String(crashes.crashesSinceUpdate) : invoke ? '—' : 'n/a'} />
               <Stat k="Crashes recorded" v={crashes ? String(crashes.totalCrashes) : invoke ? '—' : 'n/a'} />
               <Stat k="Interface errors" v={String(local.errors.count)} warn={local.errors.count > 0} />
+              <Stat k="Build" v={`${getBuildInfo().buildId} · ${getBuildInfo().channel} · ${getBuildInfo().commit}`} />
             </dl>
             <h3 style={S.h3}>Recent</h3>
             {recentCrashes.length === 0 && local.errors.recent.length === 0 ? (

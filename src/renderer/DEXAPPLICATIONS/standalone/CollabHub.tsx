@@ -30,6 +30,7 @@ import {
 } from '../../services/collabSession';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
+import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
 
 // ---------------------------------------------------------------------------
 // STYLES
@@ -609,11 +610,11 @@ const CollabHub: React.FC = () => {
     ].slice(-200),
   });
 
-  const handleCreateRoom = useCallback(() => {
-    const name = prompt('Room name:');
+  const handleCreateRoom = useCallback(async () => {
+    const name = await dexPrompt({ title: 'New room', label: 'Room name', confirmLabel: 'Next' });
     if (!name || !name.trim()) return;
-    const topic = prompt('Topic (optional):') || '';
-    const appId = (prompt('Linked app (vinx, imosion, prism, flux, forge, axl):') || 'prism')
+    const topic = (await dexPrompt({ title: 'New room', label: 'Topic (optional)', confirmLabel: 'Next', allowEmpty: true })) || '';
+    const appId = ((await dexPrompt({ title: 'New room', label: 'Linked app (vinx, imosion, prism, flux, forge, axl)', defaultValue: 'prism', confirmLabel: 'Create room' })) || 'prism')
       .trim()
       .toLowerCase();
 
@@ -1074,11 +1075,11 @@ const CollabHub: React.FC = () => {
     }
   }, [handleAccessRequest]);
 
-  const handleCreateProject = useCallback(() => {
-    const name = prompt('Project name:');
+  const handleCreateProject = useCallback(async () => {
+    const name = await dexPrompt({ title: 'New project', label: 'Project name', confirmLabel: 'Next' });
     if (!name) return;
-    
-    const appId = prompt('App (vinx, imosion, prism, flux, forge, axl):') || 'prism';
+
+    const appId = (await dexPrompt({ title: 'New project', label: 'App (vinx, imosion, prism, flux, forge, axl)', defaultValue: 'prism', confirmLabel: 'Create project' })) || 'prism';
     const project = createProject(name, appId);
     setActiveProject(project.id);
     
@@ -1459,7 +1460,7 @@ const CollabHub: React.FC = () => {
                       style={styles.cardActionBtn}
                       title="Delete"
                       aria-label={`Delete ${cp.name}`}
-                      onClick={() => { if (window.confirm(`Delete checkpoint "${cp.name}"? This cannot be undone.`)) deleteCheckpoint(cp.id); }}
+                      onClick={async () => { if (await dexConfirm({ title: `Delete checkpoint "${cp.name}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'destructive' })) deleteCheckpoint(cp.id); }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>

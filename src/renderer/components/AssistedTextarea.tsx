@@ -82,8 +82,12 @@ export const AssistedTextarea = React.forwardRef<HTMLTextAreaElement, AssistedTe
       // The trie stores lowercase; insert only the remainder past what's typed.
       const remainder = word.length > last.length ? word.slice(last.length) : '';
       if (!remainder) { close(); return; }
-      const next = el.value.slice(0, caret) + remainder + el.value.slice(caret);
-      setNativeTextareaValue(el, next);
+      // insertText goes through the browser's edit stack, so Ctrl+Z undoes the
+      // completion like typed text (a direct value write would wipe undo).
+      el.focus();
+      el.setSelectionRange(caret, caret);
+      const inserted = typeof document.execCommand === 'function' && document.execCommand('insertText', false, remainder);
+      if (!inserted) setNativeTextareaValue(el, el.value.slice(0, caret) + remainder + el.value.slice(caret));
       const newCaret = caret + remainder.length;
       requestAnimationFrame(() => { try { el.setSelectionRange(newCaret, newCaret); } catch { /* noop */ } });
       close();

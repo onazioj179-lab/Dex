@@ -35,6 +35,8 @@ import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContex
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
 import { keyEventForApp, isTypingTarget } from '../shell/input/appKeyScope';
+import { toLocalDateInput } from '../utils/localDate';
+import { WindowToolbar } from '../shell/windowChrome';
 
 // ===========================================================================
 // TYPES
@@ -560,7 +562,7 @@ export const Files: React.FC = () => {
       const c = ukiCtxRef.current;
       const picked = c.files.filter((f) => c.selectedFiles.has(f.path) || f.path === c.selectedFile);
       if (!picked.length) return 'Nothing is selected in Files.';
-      return picked.slice(0, 200).map((f) => `${f.isDirectory ? 'folder' : f.extension || 'file'} · ${f.path} · ${f.isDirectory ? '' : `${f.size} bytes · `}modified ${f.modified instanceof Date && !Number.isNaN(f.modified.getTime()) ? f.modified.toISOString().slice(0, 10) : 'unknown'}`).join('\n').slice(0, 6000);
+      return picked.slice(0, 200).map((f) => `${f.isDirectory ? 'folder' : f.extension || 'file'} · ${f.path} · ${f.isDirectory ? '' : `${f.size} bytes · `}modified ${f.modified instanceof Date && !Number.isNaN(f.modified.getTime()) ? toLocalDateInput(f.modified) : 'unknown'}`).join('\n').slice(0, 6000);
     });
     return () => {
       unregisterUkiAppContext('files');
@@ -1763,7 +1765,7 @@ export const Files: React.FC = () => {
       {/* Main Content */}
       <div style={styles.main}>
         {/* Toolbar */}
-        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">
+        <WindowToolbar inline={(bar) => <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">{bar}</div>}>
           <div style={styles.navButtons}>
             <button
               className="dex-toolbtn"
@@ -1954,7 +1956,7 @@ export const Files: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </WindowToolbar>
 
         {/* Filter Bar */}
         {showFilters && (

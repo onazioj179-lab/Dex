@@ -21,6 +21,7 @@ import { listPresets, deletePreset, renamePreset, type WorkspacePreset } from '.
 import { useStageStore, STAGE_KIND_META, STAGE_KINDS, STAGE_DEFAULT_ID, type StageKind } from '../store/stageStore';
 import { openWorkflowSpace, WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../services/projectSpaces';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { dexPrompt } from './dexConfirm';
 
 // -- Project Spaces (DEX 5.6) ---------------------------------------------
 // The active workspace context (a Stage with a semantic kind). Lives alongside
@@ -34,8 +35,8 @@ const ProjectSpacesSection: React.FC<{ btn: React.CSSProperties }> = memo(({ btn
   const createStage = useStageStore((s) => s.createStage);
   const deleteStage = useStageStore((s) => s.deleteStage);
 
-  const addSpace = useCallback(() => {
-    const name = window.prompt('Name this project space:');
+  const addSpace = useCallback(async () => {
+    const name = await dexPrompt({ title: 'New project space', label: 'Name', placeholder: 'e.g. Client launch', confirmLabel: 'Create' });
     if (name && name.trim()) setActiveStage(createStage({ name: name.trim() }));
   }, [createStage, setActiveStage]);
 

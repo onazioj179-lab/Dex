@@ -106,6 +106,69 @@ try {
   let month = null;
   for (let i = 0; i < 40 && !month; i++) { month = await ev(geo('.lg-month')); if (!month) await sleep(250); }
   check('Ledger month selector is one capsule with concentric buttons', month?.pill && month?.concentric, month);
+
+  // ---- Part 24/25 native work ----------------------------------------------
+  // Build identity reaches the native side.
+  const build = await ev(`window.dex.invoke('corepc:getBuild')`);
+  check('build identity: version+build.<n>, real commit, channel', /^\d+\.\d+\.\d+\+build\.\d+$/.test(String(build?.buildId)) && /^[0-9a-f]{12}(\+dirty)?$/.test(String(build?.commit)) && !!build?.channel, build);
+
+  // fs:writeBase64 writes exact bytes atomically; a relative path is refused.
+  {
+    const target = join(prof, 'edited-copy.png').replace(/\\/g, '\\\\');
+    const w = await ev(`window.dex.invoke('fs:writeBase64', '${target}', 'iVBORwAB')`);
+    const rel = await ev(`window.dex.invoke('fs:writeBase64', 'relative.png', 'iVBORwAB')`);
+    const { readFileSync } = await import('node:fs');
+    let bytes = null; try { bytes = [...readFileSync(join(prof, 'edited-copy.png'))]; } catch {}
+    check('fs:writeBase64 writes the exact bytes; relative paths refused', w?.ok === true && JSON.stringify(bytes) === JSON.stringify([0x89, 0x50, 0x4e, 0x47, 0, 1]) && rel?.ok === false, { w, rel, bytes });
+  }
+
+  // Xack: a read-only grant for a folder must not cover a chained command (#378).
+  {
+    const work = join(prof, 'xw'); mkdirSync(work);
+    const cwd = JSON.stringify(work);
+    const first = await ev(`window.dex.invoke('xack:request', { action: 'terminal.run', args: { command: 'git status', cwd: ${cwd} }, scope: ${cwd} })`);
+    const dec = await ev(`window.dex.invoke('xack:decide', { requestId: ${JSON.stringify(first?.requestId)}, approve: true, remember: 'scope-read' })`);
+    const plainRead = await ev(`window.dex.invoke('xack:request', { action: 'terminal.run', args: { command: 'dir', cwd: ${cwd} }, scope: ${cwd} })`);
+    const chained = await ev(`window.dex.invoke('xack:request', { action: 'terminal.run', args: { command: 'dir; ri build -Recurse', cwd: ${cwd} }, scope: ${cwd} })`);
+    await ev(`window.dex.invoke('xack:revoke', {})`);
+    const afterRevoke = await ev(`window.dex.invoke('xack:request', { action: 'terminal.run', args: { command: 'dir', cwd: ${cwd} }, scope: ${cwd} })`);
+    check('Xack: read-only grant covers plain reads, never a chained command; revoke ends it',
+      first?.decision === 'ask' && dec?.ok && plainRead?.decision === 'allow' && plainRead?.by === 'grant' && chained?.decision === 'ask' && chained?.class !== 'read' && afterRevoke?.decision === 'ask',
+      { first: first?.decision, plainRead: [plainRead?.decision, plainRead?.by], chained: [chained?.decision, chained?.class], afterRevoke: afterRevoke?.decision });
+  }
+
+  // Umari answers natively (projects list; retrieval or an honest not-ready).
+  {
+    const pr = await ev(`window.dex.invoke('umari:projects')`);
+    const rt = await ev(`window.dex.invoke('umari:retrieve', { query: 'readme', limit: 3, maxChars: 500 })`);
+    check('Umari: projects and bounded retrieval respond', pr?.ok === true && Array.isArray(pr.projects) && (rt?.ok === true ? rt.chars <= 500 : /index/.test(String(rt?.error))), { projects: pr?.projects?.length, retrieve: rt?.ok ? { items: rt.items.length, chars: rt.chars } : rt?.error });
+  }
+
+  // Unified window chrome: Task Manager's tabs live in the floating window's header.
+  {
+    await ev(`window.__dexRunningApps.getState().launchApp({ id: 'taskmanager', name: 'Task Manager', icon: 'taskmanager' }); true`);
+    await sleep(2000);
+    await ev(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })); true`);
+    let uc = null;
+    for (let i = 0; i < 40 && !uc?.tabs; i++) {
+      uc = await ev(`(() => { const w = document.querySelector('[data-floating-window="taskmanager"]'); if (!w) return null; const s = w.querySelector('[data-window-toolbar-slot]'); const body = w.querySelector('[data-window-body]'); return { width: Math.round(w.getBoundingClientRect().width), tabs: s ? s.querySelectorAll('[role="tab"]').length : 0, bodyTop: body ? Math.round(body.getBoundingClientRect().top - w.getBoundingClientRect().top) : null }; })()`);
+      if (!uc?.tabs) await sleep(250);
+    }
+    check('unified chrome: Task Manager tabs in the window header, content right below it', (uc?.tabs ?? 0) >= 5 && uc?.bodyTop === 36, uc);
+  }
+
+  // Calendar alert fires from the shell service with Calendar closed.
+  {
+    // Start on a whole minute so the alert time (start - 15 min) lands 40-100 s
+    // from now: strictly after the service's last check, never already past.
+    const at = new Date(Math.ceil((Date.now() + 15 * 60_000 + 40_000) / 60_000) * 60_000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const ev1 = { id: 'pkg-alert', title: 'Packaged alert probe', date: `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`, time: `${pad(at.getHours())}:${pad(at.getMinutes())}`, endTime: '23:59', color: '#0A84FF', description: '', alertMinutes: 15 };
+    await ev(`localStorage.setItem('dex-calendar-events', ${JSON.stringify(JSON.stringify([ev1]))}); localStorage.removeItem('dex-calendar-alerts-fired'); true`);
+    let fired = [];
+    for (let i = 0; i < 40 && !fired.length; i++) { await sleep(5000); fired = (await ev(`JSON.parse(localStorage.getItem('dex-calendar-alerts-fired') || '[]')`)) || []; }
+    check('Calendar alert fires with Calendar closed', fired.includes(`pkg-alert@${ev1.date}`), { fired });
+  }
 } catch (e) {
   check('apps check completed', false, String(e?.stack || e).slice(0, 300));
 } finally {

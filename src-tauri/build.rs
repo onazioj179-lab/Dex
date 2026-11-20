@@ -1,6 +1,7 @@
 fn main() {
     guard_windows_gnu_release();
     emit_build_serial();
+    emit_build_identity();
     tauri_build::build();
 }
 
@@ -28,6 +29,29 @@ fn guard_windows_gnu_release() {
         );
         std::process::exit(1);
     }
+}
+
+/// Build identity, same rule as scripts/build-info.mjs: DEX_BUILD_NUMBER or the
+/// commit count of HEAD, the 12-char commit (+dirty), DEX_CHANNEL and UTC time.
+fn emit_build_identity() {
+    println!("cargo:rerun-if-env-changed=DEX_BUILD_NUMBER");
+    println!("cargo:rerun-if-env-changed=DEX_CHANNEL");
+    println!("cargo:rerun-if-changed=../.git/HEAD");
+    let git = |args: &[&str]| -> String {
+        std::process::Command::new("git").args(args).current_dir("..").output().ok()
+            .filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default()
+    };
+    let number = std::env::var("DEX_BUILD_NUMBER").ok().and_then(|v| v.parse::<u64>().ok()).filter(|n| *n > 0)
+        .or_else(|| git(&["rev-list", "--count", "HEAD"]).parse::<u64>().ok()).unwrap_or(0);
+    let sha = git(&["rev-parse", "--short=12", "HEAD"]);
+    let dirty = !git(&["status", "--porcelain", "--untracked-files=no"]).is_empty();
+    let commit = if sha.is_empty() { "unknown".to_string() } else if dirty { format!("{sha}+dirty") } else { sha };
+    let channel = match std::env::var("DEX_CHANNEL").unwrap_or_default().as_str() { c @ ("development" | "preview" | "stable") => c.to_string(), _ => "development".into() };
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    println!("cargo:rustc-env=DEX_BUILD_NUMBER={number}");
+    println!("cargo:rustc-env=DEX_BUILD_COMMIT={commit}");
+    println!("cargo:rustc-env=DEX_BUILD_CHANNEL={channel}");
+    println!("cargo:rustc-env=DEX_BUILD_UNIX={secs}");
 }
 
 /// Expose package.json "dexBuild" (the build serial, e.g. "18a") as

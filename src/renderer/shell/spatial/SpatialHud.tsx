@@ -21,6 +21,7 @@ import { SegmentedControl } from '../../components/controls';
 import { useSpatialStore, GROUP_COLORS, type SpatialWindow } from '../../store/spatialStore';
 import { boundsOf, viewRect, type ArrangeKind, type AlignKind } from './spatialMath';
 import { downloadText } from '../../improvements500/downloadBlob';
+import { toLocalDateInput } from '../../utils/localDate';
 
 const btn: React.CSSProperties = {
   height: 28, minWidth: 28, padding: '0 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -160,7 +161,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const exportLayout = () => {
     const data = st().exportLayout();
-    downloadText(`dex-spatial-layout-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json');
+    downloadText(`dex-spatial-layout-${toLocalDateInput(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json');
     setMsg('Layout exported to your downloads.');
   };
   const importLayout = async (f: File | undefined) => {

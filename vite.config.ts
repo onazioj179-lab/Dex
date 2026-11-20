@@ -9,6 +9,8 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
+// @ts-ignore -- plain ESM helper shared with CI (scripts/build-info.mjs)
+import { computeBuildInfo } from './scripts/build-info.mjs';
 
 /** package.json "dexBuild" (the build serial), or '' when absent/invalid. */
 function readDexBuild(): string {
@@ -87,6 +89,8 @@ export default defineConfig({
     // Build serial (package.json "dexBuild", e.g. "18a"): marks each update
     // while the version number stays put. See RELEASE.md "Build serials".
     'import.meta.env.VITE_DEX_BUILD': JSON.stringify(readDexBuild()),
+    // Build identity: 7.0.2+build.<n>, commit, channel, UTC time (scripts/build-info.mjs).
+    'import.meta.env.VITE_DEX_BUILD_INFO': JSON.stringify(computeBuildInfo()),
   },
   base: './',
   root: 'src/renderer',
@@ -182,6 +186,9 @@ export default defineConfig({
           // nearly every app AND by shared code (WordSuggestions). Left unpinned,
           // Rollup put it in app-axl: dex-app-core -> app-axl -> dex-app-core.
           if (/[\\/]renderer[\\/]shell[\\/]input[\\/]/.test(id)) return 'dex-app-core';
+          // shell/windowChrome is used by AppManager, AppShell and apps (Task
+          // Manager); unpinned it landed in the Nexus chunk and made a cycle.
+          if (/[\\/]renderer[\\/]shell[\\/]windowChrome/.test(id)) return 'dex-app-core';
           // improvements500 helpers (downloadBlob, ...) are shared by shell code
           // (SpatialHud) and apps (Bio Studio); left unpinned they landed in
           // app-bio and made dex-app-core <-> app-bio a cycle.

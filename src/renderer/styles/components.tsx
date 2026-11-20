@@ -708,6 +708,8 @@ export const DexTooltip: React.FC<DexTooltipProps> = ({
     ...positionStyles[position],
   };
 
+  // Tooltips are off unless turned on in Settings > Help (services/tooltips).
+  if (typeof document !== 'undefined' && !document.documentElement.hasAttribute('data-dex-tooltips')) return children;
   return (
     <span
       style={{ position: 'relative', display: 'inline-flex' }}

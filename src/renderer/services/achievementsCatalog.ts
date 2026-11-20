@@ -1,3 +1,4 @@
+import { toLocalDateInput } from '../utils/localDate';
 // =============================================================================
 // DEX Platform
 // Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
@@ -298,8 +299,8 @@ export interface UserStats {
 
 export const DEFAULT_STATS: UserStats = {
   totalSessions: 0, appsUsed: [], currentStreak: 0, longestStreak: 0,
-  totalMinutes: 0, firstLaunch: new Date().toISOString().split('T')[0],
-  lastActive: new Date().toISOString().split('T')[0],
+  totalMinutes: 0, firstLaunch: toLocalDateInput(new Date()),
+  lastActive: toLocalDateInput(new Date()),
   notesCreated: 0, tasksCompleted: 0, tasksCreated: 0, filesOpened: 0,
   filesUploaded: 0, workflowsCreated: 0, workflowsRun: 0,
   calendarEventsCreated: 0, kanbanCardsCreated: 0, passwordsGenerated: 0,

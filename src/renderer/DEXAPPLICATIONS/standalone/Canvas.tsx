@@ -12,7 +12,7 @@ import {
   type BoardsIndex, type BoardPayload, UNFILED,
   loadIndex, saveIndex, loadBoard, saveBoard, deleteBoardData,
   addBoard, renameBoard, moveBoard, touchBoard, removeBoard, groupByFolder,
-  takeCanvasRequest, CANVAS_REQUEST_EVENT,
+  takeCanvasRequest, CANVAS_REQUEST_EVENT, setLiveBoardSource, takePendingBoardImport,
 } from './canvasBoards';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
 import AutosaveIndicator from '../../components/AutosaveIndicator';
@@ -20,6 +20,8 @@ import { useUnsavedGuard } from '../../utils/useUnsavedGuard';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { colorInputValue } from '../../utils/canvasTheme';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
+import { collectComponent, instantiateComponent, loadComponents, saveComponents, newComponentId, type BoardComponent } from './creativeStudio/componentLibrary';
+import { dexPrompt as askName } from '../../components/dexConfirm';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -133,6 +135,8 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, a: Point, b: Point, size: 
 
 import { boardToSlides, describeNotCarried, sendSlidesToPresentation } from './creativeStudio/boardToSlides';
 import { setStudioMode } from './creativeStudio/studioMode';
+import { dexConfirm, dexPrompt } from '../../components/dexConfirm';
+import { toLocalDateInput } from '../../utils/localDate';
 
 /** True when a drawing layer has any painted pixel (checked only on demand). */
 function hasInk(c: HTMLCanvasElement): boolean {
@@ -352,6 +356,8 @@ const Canvas: React.FC = () => {
   const saveSeqRef = useRef(0);
   const [saveState, setSaveState] = useState<{ pending: boolean; savedAt: number | null; error: string | null }>({ pending: false, savedAt: null, error: null });
   useUnsavedGuard(saveState.pending || saveState.error !== null);
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const persist = useCallback(() => {
     const idx = boardsRef.current;
     if (!idx || !idx.activeId) return;
@@ -506,7 +512,7 @@ const Canvas: React.FC = () => {
     const idx = boardsRef.current;
     if (!idx) return;
     const current = idx.boards.find(b => b.id === idx.activeId);
-    if (!current || !window.confirm(`Delete board "${current.name}"? This can't be undone.`)) return;
+    if (!current || !(await dexConfirm({ title: `Delete board "${current.name}"?`, message: "This can't be undone.", confirmLabel: 'Delete', tone: 'destructive' }))) return;
     let next = removeBoard(idx, current.id);
     if (next.boards.length === 0) next = addBoard(next, 'My canvas');
     boardsRef.current = next;
@@ -598,6 +604,31 @@ const Canvas: React.FC = () => {
     return { x: Math.min(CANVAS_W - 60, Math.max(60, (w / 2 - p.x) / z)), y: Math.min(CANVAS_H - 60, Math.max(60, (h / 2 - p.y) / z)) };
   };
 
+  // ---- Component library (reusable objects across boards) --------------------
+  const [components, setComponents] = useState<BoardComponent[]>([]);
+  useEffect(() => { void loadComponents().then(setComponents); }, []);
+  const saveSelectionAsComponent = async () => {
+    if (!selectedObj) return;
+    const objs = collectComponent(objectsRef.current, selectedObj);
+    if (!objs.length) return;
+    const root = objectsRef.current.find(o => o.id === selectedObj);
+    const name = await askName({ title: 'Save as component', label: 'Name', defaultValue: root?.text?.trim().slice(0, 40) || 'Component', confirmLabel: 'Save' });
+    if (!name?.trim()) return;
+    const next = [{ id: newComponentId(), name: name.trim().slice(0, 60), createdAt: Date.now(), objects: objs }, ...components];
+    try { await saveComponents(next); setComponents(next); toast('success', `Saved component "${name.trim()}" (${objs.length} object${objs.length > 1 ? 's' : ''})`); }
+    catch { toast('error', 'Could not save the component (storage is full or unavailable)'); }
+  };
+  const insertComponent = (c: BoardComponent) => {
+    const at = viewCenter();
+    const placed = instantiateComponent(c, { x: Math.round(at.x - 60), y: Math.round(at.y - 60) });
+    commitObjects(objectsRef.current, [...objectsRef.current, ...placed]);
+    setSelectedObj(placed.find(o => o.kind !== 'connector')?.id ?? null);
+  };
+  const deleteComponent = async (id: string) => {
+    const next = components.filter(c => c.id !== id);
+    try { await saveComponents(next); setComponents(next); } catch { toast('error', 'Could not update the library'); }
+  };
+
   const addObject = (kind: 'sticky' | 'text' | 'rect' | 'ellipse' | 'frame') => {
     const c = viewCenter();
     const jitter = (objectsRef.current.length % 6) * 16;
@@ -659,6 +690,16 @@ const Canvas: React.FC = () => {
     };
   }, []);
 
+  // Creative Studio project export reads the board as it is on screen.
+  useEffect(() => {
+    setLiveBoardSource(() => {
+      const idx = boardsRef.current;
+      if (!idx) return null;
+      return { name: idx.boards.find(b => b.id === idx.activeId)?.name ?? 'Board', payload: snapshotRef.current() };
+    });
+    return () => setLiveBoardSource(null);
+  }, []);
+
   // Requests from the Creative Hub: open a board, or start one from a template.
   const handleRequestRef = useRef<() => Promise<void>>(async () => {});
   handleRequestRef.current = async () => {
@@ -667,6 +708,24 @@ const Canvas: React.FC = () => {
     if (!req) return;
     if (req.boardId && boardsRef.current.boards.some(b => b.id === req.boardId)) {
       await switchBoard(req.boardId);
+      return;
+    }
+    if (req.importBoard) {
+      const imp = takePendingBoardImport();
+      if (!imp) return;
+      await newBoard();
+      const idx2 = boardsRef.current;
+      if (idx2) {
+        const named = renameBoard(idx2, idx2.activeId, imp.name);
+        boardsRef.current = named;
+        setBoards(named);
+        await saveIndexReported(named);
+        // Store it now: restoring only loads it into the editor, and nothing
+        // would write it until the next edit.
+        try { await saveBoard(named.activeId, imp.payload); }
+        catch { toast('error', "Couldn't store the imported board (storage is full or unavailable)."); }
+      }
+      restorePayloadRef.current(imp.payload);
       return;
     }
     const tpl = req.templateId ? BOARD_TEMPLATES.find(t => t.id === req.templateId) : undefined;
@@ -772,7 +831,7 @@ const Canvas: React.FC = () => {
 
     // Text tool: place text immediately on click.
     if (toolRef.current === 'text') {
-      placeText(pt);
+      void placeText(pt);
       return;
     }
 
@@ -875,18 +934,13 @@ const Canvas: React.FC = () => {
   };
 
   // Text placement via a transient prompt.
-  const placeText = (pt: Point) => {
+  const placeText = async (pt: Point) => {
     const layer = getActiveLayer();
     if (!layer || !layer.visible) {
       toast('info', 'Active layer is hidden');
       return;
     }
-    let text: string | null = null;
-    try {
-      text = window.prompt('Enter text');
-    } catch {
-      text = null;
-    }
+    const text = await dexPrompt({ title: 'Add text', label: 'Text', confirmLabel: 'Add' });
     if (!text) return;
     const ctx = layer.canvas.getContext('2d');
     if (!ctx) return;
@@ -1020,10 +1074,9 @@ const Canvas: React.FC = () => {
     persist();
   };
 
-  const renameLayer = (id: string) => {
+  const renameLayer = async (id: string) => {
     const current = layersRef.current.find(l => l.id === id);
-    let name: string | null = null;
-    try { name = window.prompt('Layer name', current?.name || ''); } catch { name = null; }
+    const name = await dexPrompt({ title: 'Rename layer', label: 'Name', defaultValue: current?.name || '', confirmLabel: 'Rename' });
     if (name == null) return;
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -1076,7 +1129,7 @@ const Canvas: React.FC = () => {
       const url = flat.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = `canvas-${new Date().toISOString().slice(0, 10)}.png`;
+      a.download = `canvas-${toLocalDateInput(new Date())}.png`;
       a.click();
       toast('success', 'Exported PNG');
     } catch {
@@ -1449,6 +1502,22 @@ const Canvas: React.FC = () => {
               )}
             </div>
           )}
+          <div style={s.layersHeader}>
+            <span style={s.layersTitle}>Components</span>
+            <button style={s.smallBtn} onClick={() => void saveSelectionAsComponent()} disabled={!selectedObj} title={selectedObj ? 'Save the selected object as a component (a frame brings what is inside it)' : 'Select an object to save it as a component'} aria-label="Save selection as component" data-testid="canvas-save-component">
+              <DexIcon name="plus" size={14} />
+            </button>
+          </div>
+          <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 160, overflowY: 'auto' }} data-testid="canvas-components">
+            {components.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '2px 2px 4px' }}>Select an object (or a frame) and press + to reuse it on any board.</div>
+            ) : components.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button style={{ ...s.textBtn, flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => insertComponent(c)} title={`Insert "${c.name}" (${c.objects.length} objects)`} aria-label={`Insert component ${c.name}`}>{c.name}</button>
+                <button style={s.smallBtn} onClick={() => void deleteComponent(c.id)} title="Remove from the library" aria-label={`Remove component ${c.name}`}><DexIcon name="close" size={12} /></button>
+              </div>
+            ))}
+          </div>
           <div style={s.layersHeader}>
             <span style={s.layersTitle}>Layers</span>
             <button style={s.smallBtn} onClick={addLayer} title="Add layer" aria-label="Add layer">

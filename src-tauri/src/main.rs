@@ -32,6 +32,7 @@ mod ssh;
 mod fs_ops;
 mod file_mutations;
 mod compact_window;
+mod cover_taskbar;
 mod watch;
 mod analytics;
 mod power;
@@ -3246,7 +3247,7 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 fn main() {
     startup_timeline::anchor();
     webview2::install_panic_logger();
-    webview2::log(&format!("DEX {} (build {}) starting", env!("CARGO_PKG_VERSION"), env!("DEX_BUILD_SERIAL")));
+    webview2::log(&format!("DEX {}+build.{} ({}) {} commit {} starting", env!("CARGO_PKG_VERSION"), env!("DEX_BUILD_NUMBER"), env!("DEX_BUILD_SERIAL"), env!("DEX_BUILD_CHANNEL"), env!("DEX_BUILD_COMMIT")));
     // Must run before WebView2 opens its cache files (see storage_ctl.rs).
     storage_ctl::run_pending_cache_clear();
     // Fail loudly and helpfully when no WebView2 runtime exists, instead of
@@ -3357,6 +3358,11 @@ fn main() {
             // Answer DEX's own clipboard/MIDI/camera permission requests from the
             // saved policy instead of a WebView2 prompt every time.
             webview_permissions::install(app.handle());
+            // Maximized DEX fills the whole monitor, over the Windows taskbar.
+            if let Some(w) = app.get_webview_window("main") {
+                let ok = cover_taskbar::install(&w);
+                startup_timeline::mark(if ok { "Maximize covers the taskbar" } else { "Maximize: taskbar cover unavailable" });
+            }
             startup_timeline::mark("Native setup complete");
             Ok(())
         })

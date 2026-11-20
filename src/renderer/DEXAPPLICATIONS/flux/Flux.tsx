@@ -44,6 +44,7 @@ import { ShaderPool, SHADER_PRESETS, type ShaderSpec } from './shaderLayer';
 import { type TextAnimator, type TextAnimPreset, TEXT_ANIM_PRESETS, drawAnimatedText } from './textAnimator';
 import { ancestorChain, applyParentTransform, fromParentSpace, reparentPosition, wouldCycle, type ParentTransform } from './parenting';
 import { type CameraSettings, type CameraView, DEFAULT_CAMERA, applyCameraView, dofBlur, focalLength, fovZoom, perspectiveScale } from './fluxCamera';
+import { dexConfirm } from '../../components/dexConfirm';
 
 /** Flux's accent colour: change it here (e.g. to 'var(--color-accent)' for DEX Blue). */
 const FLUX_ACCENT = '#bf5af2';
@@ -552,6 +553,15 @@ const Flux: React.FC = () => {
   // no pan). Same zoom math as before, now de-duplicated via useCanvasZoomPan.
   const { zoom: viewScale, setZoom: setViewScale, zoomAtCursor: zoomCanvas } = useCanvasZoomPan({ min: 10, max: 200, initial: 50 });
   const [is3DMode, setIs3DMode] = useState(false);
+  // Fit to view: the scale at which the whole composition fits the viewer
+  // (was a fixed 50%, which overflowed small windows and wasted big ones).
+  const fitToView = useCallback(() => {
+    const viewer = canvasRef.current?.closest('[data-testid="flux-viewer"]');
+    const r = viewer?.getBoundingClientRect();
+    if (!r || r.width < 50 || r.height < 50) { setViewScale(50); return; }
+    const fit = Math.min((r.width - 32) / canvasSize.width, (r.height - 32) / canvasSize.height) * 100;
+    setViewScale(Math.max(10, Math.min(200, Math.floor(fit))));
+  }, [canvasSize.width, canvasSize.height, setViewScale]);
   const [hardwareTier, setHardwareTier] = useState<'low' | 'mid' | 'high'>('mid');
   
   // Hardware-gated 3D mode setter — blocks on low-tier hardware
@@ -971,7 +981,7 @@ const Flux: React.FC = () => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === '=' || e.key === '+') { e.preventDefault(); setViewScale(z => Math.min(200, Math.round(z * 1.15))); }
         if (e.key === '-' || e.key === '_') { e.preventDefault(); setViewScale(z => Math.max(10, Math.round(z / 1.15))); }
-        if (e.key === '0') { e.preventDefault(); setViewScale(50); }
+        if (e.key === '0') { e.preventDefault(); fitToView(); }
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedLayerId && !(document.activeElement instanceof HTMLInputElement) && !(document.activeElement instanceof HTMLTextAreaElement)) {
@@ -982,7 +992,7 @@ const Flux: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedLayerId, layers]);
+  }, [selectedLayerId, layers, fitToView]);
 
   // ===== ANIMATION PLAYBACK =====
   useEffect(() => {
@@ -2357,7 +2367,7 @@ const Flux: React.FC = () => {
       try {
         if (file.size > 100 * 1024 * 1024) throw new Error('The file is larger than 100 MB.');
         const { layers: opened, settings, warnings } = parseFluxProject<Layer>(await file.text());
-        if (isDirtyRef.current && !window.confirm('Replace the current composition with this project? Changes since your last Save Project will be lost.')) return;
+        if (isDirtyRef.current && !(await dexConfirm({ title: 'Replace the current composition?', message: 'Changes since your last Save Project will be lost.', confirmLabel: 'Replace', tone: 'destructive' }))) return;
         applyOpenedProject(opened, settings);
         toast(warnings.length ? 'warning' : 'success', `Opened ${file.name} (${opened.length} layer${opened.length === 1 ? '' : 's'}).${warnings.length ? ' ' + warnings.join(' ') : ''}`);
       } catch (err) {
@@ -2594,7 +2604,7 @@ const Flux: React.FC = () => {
     canvas: { background: '#000', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', borderRadius: '2px' },
     sidebar: { width: '100%', height: '100%', background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     tabs: { display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-surface)' },
-    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
+    tab: { flex: 1, padding: 'var(--space-2)', background: 'transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: '2px solid transparent', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px' },
     tabActive: { color: 'var(--color-text-primary)', borderBottom: '2px solid var(--dex-focus-color, #fff)' },
     panelContent: { flex: 1, minHeight: 0, padding: '10px', overflow: 'auto', scrollbarWidth: 'thin' } as any,
     timeline: { position: 'relative', height: showTimeline ? timelineHeight : 32, flexShrink: 0, background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', transition: isTimelineResizing ? 'none' : 'height 0.2s ease' },
@@ -2735,9 +2745,7 @@ const Flux: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <div style={styles.logo}>FLUX</div>
           <div style={{ width: 1, height: 18, background: 'var(--color-border-subtle)' }} />
-          <button style={styles.btn} onClick={importMedia} aria-label="Import media">{Icons.upload} Import</button>
-          <button style={styles.btn} onClick={openProject} aria-label="Open project">{Icons.folder} Open</button>
-          <button style={styles.btn} onClick={saveProject} aria-label="Save project">{Icons.save} Save</button>
+          {/* Import / Open / Save live in the File menu (Ctrl+I / O / S); Export stays the one main button. */}
           <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
             <AutosaveIndicator
               state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}
@@ -2952,7 +2960,7 @@ const Flux: React.FC = () => {
                 />
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.min(200, viewScale + 10))} aria-label="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <span style={{ padding: '4px var(--space-2)', background: 'var(--color-border-subtle)', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '40px', textAlign: 'center' }}>{Math.round(viewScale)}%</span>
-                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(50)} aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
+                <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={fitToView} aria-label="Fit to view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg></button>
               </div>
             </div>
 

@@ -60,9 +60,19 @@
 >   cannot hold (connectors, ellipse outlines, freehand ink). Slides › "Check pictures" finds web-address pictures
 >   that do not load, by slide. There is no separate "Design" app to merge; fonts are the system UI font (no
 >   missing-font case); board and from-PC pictures are embedded (no relinking case).
-> - Still not done in Part 24: reusable component library, a single Studio project file (board + deck); Browser (L, audited: tabs/bookmarks/history/
+> - **Batch 4 (#156):** UKI actions in six more apps (#360), recoverable deletes (#363-#365), in-app confirm/prompt everywhere (#366-#367), Studio project files `.dexstudio` (#368) and component library (#369).
+> - Still not done in Part 24: Browser (L, audited: tabs/bookmarks/history/
 >   downloads/sessions/suspension already shipped in Parts 21–23); semantic search; per-app context providers beyond
 >   `appContextRegistry`; packaged runs of the Gallery save dialog, DEX Code Tests and the Umari folder picker.
+
+> **Part 25 (2026-11-19, hardening + release prep) status (PR #157):** build identity `7.0.2+build.<n>` with serial,
+> commit, channel and UTC time in About and diagnostics (`scripts/build-info.mjs`, `build.rs`); safe cleanup
+> (`npm run clean` previews, `clean:confirm` deletes, never release builds or user data); security fixes found by
+> adversarial tests: compound commands are never read-class (#378), Umari rejects `..` paths (#379); unified window
+> chrome (#380: app toolbars in the window header for Task Manager, DEX Code, Files and the AppShell apps);
+> `DEX_7.0.2_VERIFICATION.md` (verdict NOT READY) and `DEX_7.0.2_RELEASE_NOTES.md`. Deferred by the owner until the
+> backlog pass is done: packaged/stress runs (Browser 10–500 tabs, multi-window, UKI terminal), installer, upgrade
+> and rollback tests. Not done: unified chrome for Settings and Terminal, an immersive mode for Maps/Gallery.
 
 > **GOAL (2026-11-12) — Owner roadmap "v7.0.2 (001z)": WE DO NOT BREAK USERSPACE + B001–B018 (all HIGH).**
 > Decoded for DEX as it is (a Windows Tauri app, no Linux; see memory "No Linux"): the **kernel** is the native

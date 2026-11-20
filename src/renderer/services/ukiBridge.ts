@@ -15,6 +15,7 @@ import { checkPermissionAccess, usePermissionStore } from '../store/permissionSt
 import { useRunningApps } from '../store/runningApps';
 import { readDexSetting } from '../hooks/useDexSetting';
 import { isTauri } from './platform/tauriCompat';
+import { dexConfirm } from '../components/dexConfirm';
 
 let initialized = false;
 let recognition: any = null;
@@ -457,11 +458,11 @@ export function initUkiRendererBridge(): void {
       case 'delete':
         // Never a permanent delete from an assistant command: Recycle Bin only,
         // and only after the user confirms the exact path.
-        if (typeof c.target === 'string' && c.target.length <= 500
-          && window.confirm(`Move this to the Recycle Bin?
-
-${c.target}`)) {
-          Promise.resolve(dex?.invoke?.('files:trash', c.target)).catch(() => notify('Could not move it to the Recycle Bin'));
+        if (typeof c.target === 'string' && c.target.length <= 500) {
+          const target = c.target;
+          void dexConfirm({ title: 'Move this to the Recycle Bin?', message: target, confirmLabel: 'Move to Recycle Bin', tone: 'destructive' }).then((ok) => {
+            if (ok) Promise.resolve(dex?.invoke?.('files:trash', target)).catch(() => notify('Could not move it to the Recycle Bin'));
+          });
         }
         break;
       case 'rename':

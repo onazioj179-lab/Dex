@@ -371,7 +371,11 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "corepc:getBuild" => {
             let serial = env!("DEX_BUILD_SERIAL");
             let v = env!("CARGO_PKG_VERSION");
-            json!({ "version": v, "serial": serial, "display": if serial.is_empty() { v.to_string() } else { format!("{v} ({serial})") } })
+            let number: u64 = env!("DEX_BUILD_NUMBER").parse().unwrap_or(0);
+            json!({ "version": v, "serial": serial, "display": if serial.is_empty() { v.to_string() } else { format!("{v} ({serial})") },
+                    "buildNumber": number, "buildId": if number > 0 { format!("{v}+build.{number}") } else { v.to_string() },
+                    "commit": env!("DEX_BUILD_COMMIT"), "channel": env!("DEX_BUILD_CHANNEL"),
+                    "builtAtUnix": env!("DEX_BUILD_UNIX").parse::<u64>().unwrap_or(0) })
         }
         "corepc:verify" => verify(app),
         "corepc:query" => query(app, &a0),
