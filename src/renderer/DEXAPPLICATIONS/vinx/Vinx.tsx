@@ -172,14 +172,6 @@ const ExportIcon = (
   </svg>
 );
 
-const LayoutIcon = (
-  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2">
-    <rect x="2" y="2" width="12" height="12" rx="1" />
-    <path d="M6 2v12M2 9h12" />
-  </svg>
-);
-
-
 const ZoomInIcon = (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
     <circle cx="8" cy="8" r="6" /><path d="M5.5 8h5M8 5.5v5" />
@@ -1288,38 +1280,19 @@ const VinxEditor: React.FC = () => {
 
         <div style={toolbarSeparatorStyle} />
 
-        {/* Playback speed */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {speeds.map(s => (
-            <button
-              key={s}
-              style={playbackSpeedBtnStyle(playbackSpeed === s)}
-              aria-label={`Set playback speed to ${s}x`}
-              aria-pressed={playbackSpeed === s}
-              onClick={() => {
-                setPlaybackSpeed(s);
-                if (engineRef.current) engineRef.current.setPlaybackSpeed(s);
-              }}
-            >
-              {s}x
-            </button>
-          ))}
-        </div>
-
-        <div style={{ width: 8, flexShrink: 0 }} />
-
-        {/* Layout presets */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('edit')} aria-label="Edit layout preset">
-            {LayoutIcon} Edit
-          </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('color')} aria-label="Color layout preset">
-            <DexIcon name="palette" size={10} /> Color
-          </button>
-          <button style={toolbarBtnStyle} onClick={() => resetPanelToPreset('audio')} aria-label="Audio layout preset">
-            <DexIcon name="volume" size={10} /> Audio
-          </button>
-        </div>
+        {/* Playback speed: one picker (was five buttons). Layouts live in View > Layout. */}
+        <select
+          aria-label="Playback speed"
+          value={speeds.includes(playbackSpeed) ? playbackSpeed : 1}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setPlaybackSpeed(v);
+            if (engineRef.current) engineRef.current.setPlaybackSpeed(v);
+          }}
+          style={{ ...playbackSpeedBtnStyle(playbackSpeed !== 1), cursor: 'pointer' }}
+        >
+          {speeds.map(v => <option key={v} value={v}>{v}x</option>)}
+        </select>
 
         <div style={toolbarSeparatorStyle} />
 
@@ -1344,15 +1317,14 @@ const VinxEditor: React.FC = () => {
           {ExportIcon} Export
         </button>
 
-        {/* Quick Export (WebM) — real captureStream + MediaRecorder render */}
-        <button
-          style={quickExport.active ? toolbarBtnActiveStyle : toolbarBtnStyle}
-          onClick={quickExport.active ? handleCancelQuickExport : handleQuickExport}
-          aria-label={quickExport.active ? 'Cancel Quick Export' : 'Quick Export to WebM'}
-        >
-          {ExportIcon}
-          {quickExport.active ? `Recording ${quickExport.percent}%` : 'Quick WebM'}
-        </button>
+        {/* Quick Export (WebM) starts from File > Quick Export; while it runs,
+            this shows progress and cancels it. */}
+        {quickExport.active && (
+          <button style={toolbarBtnActiveStyle} onClick={handleCancelQuickExport} aria-label="Cancel Quick Export">
+            {ExportIcon}
+            {`Recording ${quickExport.percent}%`}
+          </button>
+        )}
 
         {/* Send To */}
         <SendToMenu sourceApp="videoeditor" assetKind="video" getAsset={() => {
