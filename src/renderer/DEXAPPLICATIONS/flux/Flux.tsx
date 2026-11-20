@@ -2599,7 +2599,7 @@ const Flux: React.FC = () => {
     workspace: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     toolbar: { width: '44px', flexShrink: 0, background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: 'var(--space-2) 4px', gap: '4px' },
     toolBtn: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: '9999px', color: 'var(--color-text-muted)', cursor: 'pointer' },
-    toolBtnActive: { background: FLUX_ACCENT, color: '#fff' },
+    toolBtnActive: { background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)' },
     mainArea: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
     canvasArea: { flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' },
     canvasContainer: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg-inset)', position: 'relative' },
@@ -2622,7 +2622,7 @@ const Flux: React.FC = () => {
     layerName: { flex: 1, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 },
     trackArea: { flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative', background: 'var(--color-bg-inset)' },
     track: { height: '28px', position: 'relative', borderBottom: '1px solid var(--color-border-subtle)' },
-    trackClip: { position: 'absolute', top: '3px', height: '22px', background: FLUX_ACCENT, borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: '#fff' },
+    trackClip: { position: 'absolute', top: '3px', height: '22px', background: FLUX_ACCENT, borderRadius: '4px', display: 'flex', alignItems: 'center', padding: '0 var(--space-2)', fontSize: '11px', cursor: 'grab', fontWeight: 600, color: 'var(--flux-on-accent, #fff)' },
     playhead: { position: 'absolute', top: 0, width: '1px', background: 'var(--color-error)', zIndex: 50 },
     ruler: { height: '20px', background: 'var(--color-bg-inset)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'flex-end' },
     behaviorItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: '10px', marginBottom: '6px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
@@ -2946,13 +2946,13 @@ const Flux: React.FC = () => {
                 style={{ ...styles.canvas, transform: `scale(${viewScale / 100})`, cursor: activeTool === 'move' ? 'grab' : activeTool === 'rotate' ? 'crosshair' : 'default', touchAction: 'none' }}
               />
               {canvasError && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', gap: 'var(--space-3)' }}>
+                <div className="dex-theme-dark" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', gap: 'var(--space-3)' }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center', maxWidth: 260 }}>Canvas unavailable. Try restarting DEX or updating your graphics driver.</span>
                 </div>
               )}
               {/* Overlay UI - Canvas Zoom Controls */}
-              <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '10px', padding: '6px var(--space-3)' }}>
+              <div className="dex-theme-dark" style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.75)', borderRadius: '10px', padding: '6px var(--space-3)' }}>
                 <button style={{ ...styles.btn, padding: '4px var(--space-2)' }} onClick={() => setViewScale(Math.max(10, viewScale - 10))} aria-label="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
                 <input 
                   type="range" 
@@ -4126,7 +4126,7 @@ const Flux: React.FC = () => {
                 Closed Path
               </label>
             </div>
-            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotationZ', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
+            <button aria-label="Apply motion path to selected layer" onClick={() => { if (!selectedLayerId) return; const pathData = { id: 'mp-' + Date.now(), points: [ { x: 40, y: 120, handleIn: { x: 0, y: 0 }, handleOut: { x: 40, y: -80 }, type: 'smooth' as const }, { x: 260, y: 100, handleIn: { x: -80, y: -60 }, handleOut: { x: 0, y: 0 }, type: 'smooth' as const } ], closed: motionPathClosed }; const dur = layers.find(l => l.id === selectedLayerId)?.duration || duration; const kfs: { time: number; value: number; easing: typeof motionPathEase }[] = []; for (let f = 0; f <= dur; f += 5) { const t = f / dur; const pt = getPointOnPath(pathData, t); kfs.push({ time: f, value: pt.x, easing: motionPathEase }); } const rotKfs = kfs.map((k, i) => { const t0 = i / (kfs.length - 1); const t1 = Math.min(1, t0 + 0.02); const p0 = getPointOnPath(pathData, t0); const p1 = getPointOnPath(pathData, t1); return { ...k, value: Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI }; }); setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, animations: [...(l.animations || []), { property: 'x', keyframes: kfs }, { property: 'y', keyframes: kfs.map((k, i) => ({ ...k, value: getPointOnPath(pathData, i / (kfs.length - 1)).y })) }, ...(motionPathOrient ? [{ property: 'rotationZ', keyframes: rotKfs }] : [])] } : l)); setShowMotionPath(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 'var(--space-2)' }}>Apply Motion Path</button>
           </div>
         </div>
       )}
@@ -4359,7 +4359,7 @@ const Flux: React.FC = () => {
               <option value="">None</option>
               {layers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
+            <button aria-label="Apply track matte" onClick={() => { if (!selectedLayerId || !matteLayerSelect) return; setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, matteLayerId: matteLayerSelect, matteType } : l)); setShowTrackMattes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Matte</button>
           </div>
         </div>
       )}
@@ -4404,7 +4404,7 @@ const Flux: React.FC = () => {
               setLayers(prev => [groupLayer, ...prev.filter(l => l.id !== selectedLayerId)]);
               setSelectedLayerId(groupLayer.id);
               setShowPrecompose(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Pre-compose</button>
           </div>
         </div>
       )}
@@ -4433,7 +4433,7 @@ const Flux: React.FC = () => {
               <input type="range" min="0" max="100" value={morphProgress} onChange={e => setMorphProgress(Number(e.target.value))} style={{ flex: 1, accentColor: FLUX_ACCENT }} />
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', width: 24, textAlign: 'right' }}>{morphProgress}%</span>
             </div>
-            <button aria-label="Apply shape morph" onClick={() => { if (!selectedLayerId) return; const circle = MORPH_SHAPES.circle(0, 0, 40); const square = MORPH_SHAPES.square(0, 0, 80); const morphed = morphPaths(circle, square, morphProgress / 100); const shapeLayer: Layer = { id: `layer-morph-${Date.now()}`, name: `Morph ${morphProgress}%`, type: 'shape', visible: true, locked: false, solo: false, startTime: 0, duration: duration, inPoint: 0, outPoint: duration, transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 }, behaviors: [], filters: [], shapeStyle: { fill: FLUX_ACCENT, stroke: FLUX_ACCENT, strokeWidth: 2, type: 'ellipse' }, content: JSON.stringify(morphed.points) }; setLayers(prev => [shapeLayer, ...prev]); setShowMorphShapes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Morph Animation</button>
+            <button aria-label="Apply shape morph" onClick={() => { if (!selectedLayerId) return; const circle = MORPH_SHAPES.circle(0, 0, 40); const square = MORPH_SHAPES.square(0, 0, 80); const morphed = morphPaths(circle, square, morphProgress / 100); const shapeLayer: Layer = { id: `layer-morph-${Date.now()}`, name: `Morph ${morphProgress}%`, type: 'shape', visible: true, locked: false, solo: false, startTime: 0, duration: duration, inPoint: 0, outPoint: duration, transform: { x: canvasSize.width / 2, y: canvasSize.height / 2, z: 0, scaleX: 100, scaleY: 100, scaleZ: 100, rotationX: 0, rotationY: 0, rotationZ: 0, anchorX: 0, anchorY: 0, opacity: 100 }, behaviors: [], filters: [], shapeStyle: { fill: FLUX_ACCENT, stroke: FLUX_ACCENT, strokeWidth: 2, type: 'ellipse' }, content: JSON.stringify(morphed.points) }; setLayers(prev => [shapeLayer, ...prev]); setShowMorphShapes(false); }} style={{ width: '100%', padding: '7px', borderRadius: 4, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Create Morph Animation</button>
           </div>
         </div>
       )}
@@ -4497,7 +4497,7 @@ const Flux: React.FC = () => {
                   : b),
               } : l));
               setShowAutoWiggle(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Wiggle</button>
           </div>
         </div>
       )}
@@ -4611,7 +4611,7 @@ const Flux: React.FC = () => {
               setSelectedLayerId(rigLayer.id);
               window.dispatchEvent(new CustomEvent('dex-toast', { detail: { message: `Camera added: it now frames the view (FOV ${cameraFov}°${cameraDof ? `, focus at ${cameraFocusDistance}` : ''}). Move or keyframe it to move the shot.`, type: 'success' } }));
               setShowCameraRig(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>Create Rig</button>
           </div>
         </div>
       )}
@@ -4866,7 +4866,7 @@ const Flux: React.FC = () => {
                 startTime: l.startTime + staggerOffset * i,
               })));
               setShowStagger(false);
-            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
+            }} style={{ width: '100%', padding: '7px', borderRadius: 9999, border: 'none', background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Apply Stagger</button>
           </div>
         </div>
       )}
