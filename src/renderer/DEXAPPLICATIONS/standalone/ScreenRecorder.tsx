@@ -559,7 +559,8 @@ const ScreenRecorder: React.FC = () => {
               }}
             />
             {(state === 'idle' || state === 'countdown') && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--color-text-muted)' }}>
+              // The preview well is black in both themes; dark text tokens here.
+              <div className="dex-theme-dark" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--color-text-muted)', background: 'transparent' }}>
                 {state === 'countdown' ? (
                   <span style={{ fontSize: 72, fontWeight: 700, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                     {countdown}
@@ -592,7 +593,7 @@ const ScreenRecorder: React.FC = () => {
             <button
               onClick={handleStart}
               disabled={startDisabled}
-              style={controlButtonStyle(startDisabled, 'var(--color-error)')}
+              style={controlButtonStyle(startDisabled, 'color-mix(in srgb, var(--color-error) 80%, #000)')}  /* white on the plain dark-theme red was 3.4:1 */
             >Start</button>
             <button
               onClick={handlePause}
@@ -608,7 +609,7 @@ const ScreenRecorder: React.FC = () => {
             <button
               onClick={() => captureStill('download')}
               disabled={busy || !supported}
-              style={controlButtonStyle(busy || !supported, 'var(--color-accent)')}
+              style={controlButtonStyle(busy || !supported, 'var(--color-accent-fill)')}
             >Screenshot</button>
             <button
               onClick={() => captureStill('clipboard')}
@@ -650,7 +651,7 @@ const ScreenRecorder: React.FC = () => {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
                       onClick={() => triggerDownload(item.url, item.name)}
-                      style={miniButtonStyle('var(--color-accent)')}
+                      style={miniButtonStyle('var(--color-accent-fill)')}
                     >Download</button>
                     <button
                       onClick={() => removeRecent(item.id)}

@@ -31,12 +31,12 @@ interface SourceItem {
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff',
+  width: '100%', padding: '7px 10px', background: 'var(--color-surface-2)',
+  border: '1px solid var(--color-border)', borderRadius: 10, color: 'var(--color-text-primary)',
   fontSize: 13, outline: 'none',
 };
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+  fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)',
   textTransform: 'none', letterSpacing: '0.01em', marginBottom: 5, display: 'block',
 };
 
@@ -46,9 +46,9 @@ const Toggle: React.FC<{ on: boolean; onClick: () => void; label: string }> = ({
     aria-pressed={on}
     style={{
       padding: '6px 11px', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-      border: `1px solid ${on ? 'var(--color-accent, #0A84FF)' : 'rgba(255,255,255,0.14)'}`,
-      background: on ? 'rgba(10,132,255,0.18)' : 'rgba(255,255,255,0.04)',
-      color: on ? 'var(--color-accent, #4A9EFF)' : 'rgba(255,255,255,0.75)',
+      border: `1px solid ${on ? 'var(--color-accent, #0A84FF)' : 'var(--color-border)'}`,
+      background: on ? 'var(--color-accent-light)' : 'var(--color-surface-1)',
+      color: on ? 'var(--color-accent)' : 'var(--color-text-secondary)',
       transition: 'all 0.12s ease',
     }}
   >{label}</button>
@@ -149,25 +149,25 @@ const PowerRename: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FF375F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <DexIcon name="wand" size={18} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>PowerRename</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
             {items.length === 0 ? 'Batch rename with patterns, regex, and numbering'
               : `${items.length} file${items.length === 1 ? '' : 's'} · ${changeCount} will change${errorCount ? ` · ${errorCount} issue${errorCount === 1 ? '' : 's'}` : ''}`}
           </div>
         </div>
         {items.length > 0 && (
-          <button onClick={() => setItems([])} style={{ ...inputStyle, width: 'auto', cursor: 'pointer', color: 'rgba(255,255,255,0.7)' }}>Clear</button>
+          <button onClick={() => setItems([])} style={{ ...inputStyle, width: 'auto', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>Clear</button>
         )}
       </div>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* Controls */}
-        <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.08)', padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--color-border-subtle)', padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Find</label>
             <input style={inputStyle} value={cfg.find} placeholder={cfg.useRegex ? 'regex e.g. IMG_(\\d+)' : 'text to find'} onChange={e => set('find', e.target.value)} />
@@ -254,12 +254,12 @@ const PowerRename: React.FC = () => {
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={onDrop}
-              style={{ flex: 1, margin: 18, borderRadius: 14, border: `2px dashed ${dragOver ? 'var(--color-accent, #0A84FF)' : 'rgba(255,255,255,0.16)'}`, background: dragOver ? 'rgba(10,132,255,0.08)' : 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, textAlign: 'center', transition: 'all 0.15s ease' }}
+              style={{ flex: 1, margin: 18, borderRadius: 14, border: `2px dashed ${dragOver ? 'var(--color-accent, #0A84FF)' : 'var(--color-border)'}`, background: dragOver ? 'rgba(10,132,255,0.08)' : 'var(--color-surface-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, textAlign: 'center', transition: 'all 0.15s ease' }}
             >
-              <DexIcon name="folder-open" size={40} color="rgba(255,255,255,0.4)" />
+              <DexIcon name="folder-open" size={40} color="var(--color-text-tertiary)" />
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>Drop files here to rename</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>or load a folder, or paste a list of names</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>or load a folder, or paste a list of names</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <input style={{ ...inputStyle, width: 220 }} placeholder="C:\\path\\to\\folder" value={folderPath} onChange={e => setFolderPath(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') loadFolder(folderPath); }} />
@@ -280,13 +280,13 @@ const PowerRename: React.FC = () => {
           ) : (
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
               {results.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 18px', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)' }}>{r.original}</span>
-                  <DexIcon name="arrow-right" size={13} color="rgba(255,255,255,0.3)" />
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)', color: r.error ? '#FF6482' : r.changed ? '#30D158' : 'rgba(255,255,255,0.4)' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 18px', fontSize: 13, borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <span style={{ flex: 1, minWidth: 0, color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)' }}>{r.original}</span>
+                  <DexIcon name="arrow-right" size={13} color="var(--color-text-tertiary)" />
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)', color: r.error ? 'var(--color-error)' : r.changed ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>
                     {r.error ? `${r.next}  (${r.error})` : r.next}
                   </span>
-                  {!items[i]?.path && !r.error && <span title="Preview only — no file path" style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>preview</span>}
+                  {!items[i]?.path && !r.error && <span title="Preview only — no file path" style={{ fontSize: 10, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>preview</span>}
                 </div>
               ))}
             </div>
@@ -294,8 +294,8 @@ const PowerRename: React.FC = () => {
 
           {/* Footer */}
           {items.length > 0 && (
-            <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary)' }}>
                 {errorCount > 0 ? `${errorCount} name${errorCount === 1 ? '' : 's'} need attention`
                   : realCount === 0 ? 'Preview only — drop real files or load a folder to apply'
                   : `${changeCount} of ${items.length} will be renamed`}
@@ -306,8 +306,8 @@ const PowerRename: React.FC = () => {
                 style={{
                   padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                   border: 'none', cursor: canApply ? 'pointer' : 'not-allowed',
-                  background: canApply ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                  color: canApply ? '#fff' : 'var(--color-text-tertiary)', transition: 'background 0.12s ease',
+                  background: canApply ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',
+                  color: canApply ? 'var(--color-accent-text, #fff)' : 'var(--color-text-tertiary)', transition: 'background 0.12s ease',
                 }}
               >{applying ? 'Renaming…' : `Apply Rename${realCount > 0 && changeCount > 0 ? ` (${changeCount})` : ''}`}</button>
             </div>

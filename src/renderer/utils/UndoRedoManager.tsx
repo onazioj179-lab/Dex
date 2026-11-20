@@ -453,7 +453,7 @@ const panelStyles: Record<string, React.CSSProperties> = {
   },
   itemActive: {
     background: 'var(--color-accent-fill)',
-    color: 'var(--color-text-inverse)',
+    color: 'var(--color-accent-text, #fff)',
   },
   itemFuture: {
     opacity: 0.5,

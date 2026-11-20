@@ -46,11 +46,12 @@ function formatPlaytime(totalSec: number): string {
   return `${h}h${m ? ` ${m}m` : ''} played`;
 }
 
-// True-black SOLID theme (no glass) — matches the Trophies dashboard direction.
-const G_PANEL = '#101012';
-const G_PANEL2 = '#16161a';
-const G_BORDER = '#26262b';
-const G_DIM = '#8a8a90';
+// Solid panels from the theme tokens (were fixed dark hexes, so the page's
+// cream text vanished on the light theme).
+const G_PANEL = 'var(--color-bg-surface)';
+const G_PANEL2 = 'var(--color-bg-hover)';
+const G_BORDER = 'var(--color-border)';
+const G_DIM = 'var(--color-text-tertiary)';
 
 function formatHours(totalSec: number): string {
   if (totalSec < 3600) return `${Math.round(totalSec / 60)}m`;
@@ -82,7 +83,7 @@ const actionButton = (disabled: boolean): React.CSSProperties => ({
   borderRadius: 10,
   background: G_PANEL2,
   border: `1px solid ${G_BORDER}`,
-  color: '#f1ece5',
+  color: 'var(--color-text-primary)',
   opacity: disabled ? 0.5 : 1,
   cursor: disabled ? 'not-allowed' : 'pointer',
 });
@@ -263,7 +264,7 @@ export default function Games(): React.ReactElement {
   };
 
   return (
-    <div className="p-6 h-full overflow-auto" style={{ borderRadius: 0, background: 'transparent', color: '#f1ece5' }}>
+    <div className="p-6 h-full overflow-auto" style={{ borderRadius: 0, background: 'transparent', color: 'var(--color-text-primary)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
         <div>
           <h1 className="text-2xl font-semibold">Games</h1>

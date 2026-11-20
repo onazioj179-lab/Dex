@@ -1704,7 +1704,7 @@ const Forge: React.FC = () => {
           )}
           {jobs.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ color: 'var(--color-border-subtle)', fontSize: 11 }}>Drop files to encode</div>
+              <div style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>Drop files to encode</div>
             </div>
           ) : (
           <>
