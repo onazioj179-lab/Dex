@@ -968,7 +968,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     }
 
     // Redo
-    if (ctrl && (e.shiftKey && e.key === 'z' || e.key === 'y')) {
+    if (ctrl && (e.shiftKey && e.key.toLowerCase() === 'z' || e.key === 'y')) {
       e.preventDefault();
       if (!editorRef.current) return;
       const html = editorRef.current.innerHTML;

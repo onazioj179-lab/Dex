@@ -118,7 +118,7 @@ const CreativeStudio: React.FC = () => {
           // Its own app id, so its shortcuts and UKI actions stay its own.
           <div hidden={mode !== 'slides'} data-app-id="presentation" style={{ position: 'absolute', inset: 0 }}>
             <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>Opening Slides…</div>}>
-              <PresentationBuilder />
+              <PresentationBuilder inStudio />
             </Suspense>
           </div>
         )}

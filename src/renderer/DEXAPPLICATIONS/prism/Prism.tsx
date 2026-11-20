@@ -2390,8 +2390,10 @@ const Prism: React.FC = () => {
         }
       }
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-        if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+        // With Shift held the key is "Z", so compare lowercase (Ctrl+Shift+Z redo never fired).
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+        if (e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+        if (e.key === 'o' && !e.shiftKey) { e.preventDefault(); openImage(); return; }
         if (e.key === 'y') { e.preventDefault(); redo(); }
         if (e.key === 's') { e.preventDefault(); saveProject(); }
         if (e.key === 'e') { e.preventDefault(); exportImage('png'); }
@@ -2415,7 +2417,7 @@ const Prism: React.FC = () => {
       if (e.key === 'l') setActiveTool('lasso');
       if (e.key === 's' && !e.ctrlKey && !e.metaKey) setActiveTool('clone');
       if (e.key === 'j') setActiveTool('heal');
-      if (e.key === 'o') setActiveTool('dodge');
+      if (e.key === 'o' && !e.ctrlKey && !e.metaKey) setActiveTool('dodge');
       if (e.key === 'O' && e.shiftKey) setActiveTool('burn');
       if (e.key === 'x' && !e.ctrlKey && !e.metaKey) { const fg = foregroundColor; setForegroundColor(backgroundColor); setBackgroundColor(fg); }
       if (e.key === '[') setBrushSize(prev => Math.max(1, prev - 5));
@@ -2480,7 +2482,7 @@ const Prism: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, saveProject, exportImage, canvasSize, selection, selectedLayerId, layers, penPath, foregroundColor, backgroundColor, brushSize, pushHistory, activeTool, textPosition, textInput, textFontSize]);
+  }, [undo, redo, saveProject, exportImage, openImage, canvasSize, selection, selectedLayerId, layers, penPath, foregroundColor, backgroundColor, brushSize, pushHistory, activeTool, textPosition, textInput, textFontSize]);
 
   // Marching ants animation timer (gated by perf tier)
   useEffect(() => {
@@ -3020,6 +3022,23 @@ const Prism: React.FC = () => {
   // Declarative Features menu (replaces the old hand-rolled dropdown). Sections
   // become caps-label groups; `checked` reflects each panel's open state.
   const featureMenus: MenuGroup[] = [{
+    // File actions (were four header buttons).
+    id: 'file',
+    label: 'File',
+    sections: [
+      { id: 'open', items: [
+        { id: 'openImage', label: 'Open Image…', shortcut: 'Ctrl+O', run: () => openImage() },
+        { id: 'openProject', label: 'Open Project…', run: () => openProject() },
+      ] },
+      { id: 'save', items: [
+        { id: 'saveProject', label: 'Save Project', shortcut: 'Ctrl+S', run: () => saveProject() },
+        { id: 'checkpoint', label: 'Save Checkpoint', run: () => saveCheckpointNow() },
+      ] },
+      { id: 'export', items: [
+        { id: 'exportPng', label: 'Export PNG', run: () => exportImage('png') },
+      ] },
+    ],
+  }, {
     id: 'features',
     label: 'Features',
     sections: [
@@ -3120,10 +3139,7 @@ const Prism: React.FC = () => {
           <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: 700, letterSpacing: '1px' }}>IMAGE</span>
         </div>
         <div style={styles.headerCenter}>
-          <button className="prism-btn" style={styles.btn} onClick={openImage} aria-label="Open image">{Icons.folder} Open</button>
-          <button className="prism-btn" style={styles.btn} onClick={openProject} aria-label="Open project" title="Open a .prism.json project saved with Save">{Icons.folder} Open Project</button>
-          <button className="prism-btn" style={styles.btn} onClick={saveProject} aria-label="Save project" title="Save the project as a .prism.json file (Ctrl+S)">{Icons.save} Save</button>
-          <button className="prism-btn" style={styles.btn} onClick={saveCheckpointNow} aria-label="Save checkpoint" title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
+          {/* Open / Save / Checkpoint are in the File menu; Export stays the main button. */}
           <span title={autosaveError ?? 'Crash-recovery copy kept by DEX'}>
             <AutosaveIndicator
               state={autosaveError ? 'error' : changedSinceAutosave ? 'idle' : autosaveState}

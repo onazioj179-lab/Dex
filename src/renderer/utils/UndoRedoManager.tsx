@@ -324,7 +324,7 @@ export function useUndoRedoShortcuts(
       if (modifier && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
-      } else if (modifier && e.key === 'z' && e.shiftKey) {
+      } else if (modifier && e.key.toLowerCase() === 'z' && e.shiftKey) {
         e.preventDefault();
         redo();
       } else if (modifier && e.key === 'y') {
