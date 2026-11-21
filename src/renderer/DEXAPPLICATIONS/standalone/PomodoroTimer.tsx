@@ -8,9 +8,12 @@
  */
 import React, { useState, useRef, useEffect, memo } from 'react';
 import {
-  useTimerStore, pomodoroRemaining,
+  useTimerStore, pomodoroRemaining, summarizeFocus,
   type PomoPhase,
 } from '../../store/timerStore';
+
+const focusDayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const focusDayTitle = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
 const PHASE_LABELS: Record<PomoPhase, string> = {
   work: 'Focus',
@@ -62,6 +65,8 @@ const PomodoroTimer: React.FC = () => {
     return () => clearInterval(intervalRef.current);
   }, [tick]);
 
+  const focus = summarizeFocus(log);
+  const maxDailyFocus = Math.max(1, ...focus.days.map(day => day.minutes));
   const remainingSecs = Math.ceil(pomodoroRemaining(pomodoro, config) / 1000);
   const totalSecs = (phase === 'work' ? config.workMin : phase === 'shortBreak' ? config.shortBreakMin : config.longBreakMin) * 60;
   const progress = totalSecs > 0 ? 1 - remainingSecs / totalSecs : 0;
@@ -156,7 +161,7 @@ const PomodoroTimer: React.FC = () => {
               )}
               <span>{running ? 'Pause' : idle ? 'Start' : 'Resume'}</span>
             </button>
-            <button onClick={() => advance({ silent: true })} className="pomo-icon-btn" style={s.secondaryBtn} title={phase === 'work' ? 'Skip' : 'Skip break'} aria-label={phase === 'work' ? 'Skip' : 'Skip break'}>
+            <button onClick={() => advance({ silent: true, skip: true })} className="pomo-icon-btn" style={s.secondaryBtn} title={phase === 'work' ? 'Skip' : 'Skip break'} aria-label={phase === 'work' ? 'Skip' : 'Skip break'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" />
               </svg>
@@ -185,6 +190,27 @@ const PomodoroTimer: React.FC = () => {
               {log.sessions} session{log.sessions !== 1 ? 's' : ''} &middot; {log.focusMin} min focused today
             </div>
           </div>
+
+          <section aria-label="Weekly focus" style={{ ...s.logSection, display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+              <span style={s.logHeading}>Last 7 days · {focus.weekMinutes} min</span>
+              <span style={s.logMeta}>{focus.streak} day{focus.streak === 1 ? '' : 's'} streak</span>
+            </div>
+            <ul style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', listStyle: 'none', padding: 0, margin: 0, gap: 6 }}>
+              {focus.days.map(({ date, minutes }) => (
+                <li key={date.getTime()} style={{ textAlign: 'center', minWidth: 0 }}>
+                  <span style={{ ...s.logMeta, fontVariantNumeric: 'tabular-nums' }}>
+                    <span className="sr-only">{focusDayTitle.format(date)}: </span>{minutes}<span className="sr-only"> min</span>
+                  </span>
+                  <div aria-hidden="true" style={{ height: 44, display: 'flex', alignItems: 'end', margin: '4px 0' }}>
+                    <div style={{ width: '100%', height: Math.max(3, 44 * minutes / maxDailyFocus), borderRadius: 4,
+                      background: minutes > 0 ? PHASE_COLORS.work : 'var(--color-border)' }} />
+                  </div>
+                  <span aria-hidden="true" style={s.logMeta}>{focusDayLabel.format(date)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           {/* Session log */}
           {log.entries.length > 0 && (

@@ -204,6 +204,7 @@ interface UpcomingCalendarEvent {
   color?: string;
   description?: string;
   recurring?: string;
+  excludedDates?: string[];
 }
 
 function readUpcomingCalendarEvents(limit: number): UpcomingCalendarEvent[] {
@@ -218,7 +219,7 @@ function readUpcomingCalendarEvents(limit: number): UpcomingCalendarEvent[] {
   for (const item of parsed) {
     if (!item || typeof item !== 'object') continue;
     const ev = item as UpcomingCalendarEvent;
-    if (!ev.date || typeof ev.date !== 'string') continue;
+    if (!ev.date || typeof ev.date !== 'string' || ev.excludedDates?.includes(ev.date)) continue;
     const time = typeof ev.time === 'string' && /^\d{2}:\d{2}$/.test(ev.time) ? ev.time : '00:00';
     const ts = new Date(`${ev.date}T${time}:00`).getTime();
     if (!Number.isFinite(ts) || ts < now.getTime()) continue;

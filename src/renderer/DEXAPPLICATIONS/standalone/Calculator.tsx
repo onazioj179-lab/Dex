@@ -7,8 +7,10 @@ import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { evaluateCalendarMath } from '../../../shared/time/naturalCalendar';
+import { openUtilityInput, useUtilityInput } from '../../services/utilityInput';
 import {
-  appendDigit, applyOperator, backspaceEntry, evaluateNatural, formatEntry, formatResult, parseDisplay,
+  appendDigit, applyOperator, backspaceEntry, CALCULATOR_CONSTANTS, evaluateNatural, formatEntry, formatResult, parseDisplay,
   type BinaryOp,
 } from './calculatorEngine';
 
@@ -23,7 +25,22 @@ export { evaluateNatural } from './calculatorEngine';
 
 const OP_SYMBOL: Record<BinaryOp, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 
+const ASCII_OPERATOR: Record<string, string> = { '×': '*', '÷': '/', '−': '-' };
+
 type KeyVariant = 'num' | 'op' | 'func' | 'equal';
+interface HistoryItem { id: string; expr: string; result: string; pinned?: boolean; date?: boolean; input?: string }
+const HISTORY_KEY = 'dex-calculator-history';
+const MAX_HISTORY = 50;
+
+function readHistory(): HistoryItem[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
+    if (Array.isArray(parsed)) return parsed.slice(0, MAX_HISTORY)
+      .filter(item => typeof item?.expr === 'string' && typeof item.result === 'string')
+      .map((item, index) => ({ ...item, id: item.id ?? 'calc-old-' + index }));
+  } catch { /* Use an empty tape when storage is unavailable. */ }
+  return [];
+}
 
 // Defined outside Calculator so keys keep their identity (and focus) across renders.
 const Key: React.FC<{
@@ -50,8 +67,24 @@ const Calculator: React.FC = () => {
   // result after an operation; it is grouped for display either way.
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
-  const [memory, setMemory] = useState(0);
-  const [history, setHistory] = useState<{ id: string; expr: string; result: string }[]>([]);
+  const [memorySlots, setMemorySlots] = useState([0, 0, 0, 0]);
+  const [memoryIndex, setMemoryIndex] = useState(0);
+  const memory = memorySlots[memoryIndex];
+  const setMemory = (value: number) => setMemorySlots(slots => slots.map((slot, index) => index === memoryIndex ? value : slot));
+  const [history, setHistory] = useState(readHistory);
+  const [showTools, setShowTools] = useState(false);
+  const [dateResult, setDateResult] = useState('');
+  const [rate, setRate] = useState('15');
+  const [precision, setPrecision] = useState(() => {
+    try {
+      const digits = localStorage.getItem('dex-calculator-precision');
+      const value = digits === null ? 10 : Number(digits);
+      return Number.isInteger(value) && value >= 0 && value <= 10 ? value : 10;
+    } catch { return 10; }
+  });
+  const [groupDigits, setGroupDigits] = useState(() => {
+    try { return localStorage.getItem('dex-calculator-grouping') !== 'off'; } catch { return true; }
+  });
   const [mode, setMode] = useState<'basic' | 'scientific'>('basic');
   const [showHistory, setShowHistory] = useState(false);
   const [lastOperator, setLastOperator] = useState<BinaryOp | null>(null);
@@ -60,42 +93,47 @@ const Calculator: React.FC = () => {
   // Pressing = again repeats the last operation (5 + 2 = = gives 9).
   const repeatRef = useRef<{ op: BinaryOp; operand: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const formatted = waitingForOperand && Number.isFinite(parseDisplay(display)) && precision !== 10
+    ? new Intl.NumberFormat('en-US', { maximumFractionDigits: precision, notation: /e[-+]?\d/i.test(display) ? 'scientific' : 'standard' }).format(parseDisplay(display))
+    : waitingForOperand || display === 'Error' ? display : formatEntry(display);
+  const shown = dateResult || (groupDigits ? formatted : formatted.replace(/,/g, ''));
+
+  useUtilityInput('calculator', value => { setNaturalInput(value); setDateResult(''); }, !isExtraWindow(winId));
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('dex-calculator-history');
-      if (saved) {
-        // Backfill stable ids for entries persisted before ids existed.
-        const parsed = JSON.parse(saved) as { id?: string; expr: string; result: string }[];
-        setHistory(parsed.map((h, i) => ({ id: h.id ?? `calc-old-${i}`, expr: h.expr, result: h.result })));
-      }
-    } catch (e) {
-      console.warn('[Calculator] Failed to load history:', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('dex-calculator-history', JSON.stringify(history.slice(0, 50)));
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     } catch (e) {
       console.warn('[Calculator] Failed to save history:', e);
     }
   }, [history]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('dex-calculator-precision', String(precision));
+      localStorage.setItem('dex-calculator-grouping', groupDigits ? 'on' : 'off');
+    } catch { /* Display settings remain available in memory. */ }
+  }, [precision, groupDigits]);
 
-  const pushHistory = (expr: string, result: string) => {
+  const pushHistory = (expr: string, result: string, extra?: Pick<HistoryItem, 'date' | 'input'>) => {
     if (result === 'Error') return;
-    // Cap the in-memory array (not just the persisted copy) so a long session
-    // of calculations can't grow history without bound.
-    setHistory(prev => [{ id: `calc-${Date.now()}`, expr, result }, ...prev].slice(0, 50));
+    const item = { id: globalThis.crypto?.randomUUID?.() ?? 'calc-' + Date.now() + '-' + Math.random(), expr, result, ...extra };
+    setHistory(previous => [
+      ...previous.filter(entry => entry.pinned),
+      item,
+      ...previous.filter(entry => !entry.pinned),
+    ].slice(0, MAX_HISTORY));
   };
 
   const showValue = (n: number) => {
+    setDateResult('');
     setDisplay(formatResult(n));
     setWaitingForOperand(true);
   };
 
   const inputDigit = (digit: string) => {
-    if (waitingForOperand || display === 'Error') {
+    if (dateResult) setExpression('');
+    setDateResult('');
+    if (dateResult || waitingForOperand || display === 'Error') {
       setDisplay(digit);
       setWaitingForOperand(false);
     } else {
@@ -104,7 +142,9 @@ const Calculator: React.FC = () => {
   };
 
   const inputDecimal = () => {
-    if (waitingForOperand || display === 'Error') {
+    if (dateResult) setExpression('');
+    setDateResult('');
+    if (dateResult || waitingForOperand || display === 'Error') {
       setDisplay('0.');
       setWaitingForOperand(false);
     } else if (!display.includes('.')) {
@@ -113,6 +153,7 @@ const Calculator: React.FC = () => {
   };
 
   const clearAll = () => {
+    setDateResult('');
     setDisplay('0');
     setExpression('');
     setLastOperator(null);
@@ -124,23 +165,24 @@ const Calculator: React.FC = () => {
   // "C" clears only the current entry; "AC" resets everything.
   const entryActive = !waitingForOperand && display !== '0';
   const clearKey = () => {
-    if (entryActive) setDisplay('0');
+    if (!dateResult && entryActive) setDisplay('0');
     else clearAll();
   };
 
   const backspace = () => {
-    if (waitingForOperand) return; // results are not editable, like macOS
+    if (dateResult || waitingForOperand) return; // results are not editable, like macOS
     setDisplay(backspaceEntry(display.replace(/,/g, '')));
   };
 
   const toggleSign = () => {
-    if (display === 'Error') return;
+    if (display === 'Error' || dateResult) return;
     const raw = display.replace(/,/g, '');
     if (waitingForOperand) { showValue(-parseDisplay(raw)); return; }
     setDisplay(raw.startsWith('-') ? raw.slice(1) : raw === '0' ? '-0' : '-' + raw);
   };
 
   const percentage = () => {
+    if (dateResult) return;
     const value = parseDisplay(display);
     if (!isFinite(value)) return;
     // With a pending + or −, % means "percent of the first operand" (100 + 10% = 110).
@@ -151,6 +193,7 @@ const Calculator: React.FC = () => {
   };
 
   const performOperation = (op: BinaryOp) => {
+    if (dateResult) return;
     const value = parseDisplay(display);
     if (!isFinite(value)) return;
     repeatRef.current = null;
@@ -230,26 +273,39 @@ const Calculator: React.FC = () => {
   // blocked (insecure context / permissions) and must never throw into the UI.
   const copyResult = useCallback(() => {
     try {
-      void navigator.clipboard?.writeText(display).catch(() => { /* clipboard blocked */ });
+      void navigator.clipboard?.writeText(shown).catch(() => { /* clipboard blocked */ });
       // DEX ecosystem: the result also lands in the Omni Clipboard (typed as a
       // number), so it's reusable + sendable across DEX.
-      (window as any).__dexClipboardStore?.getState?.().add(display, { sourceAppId: 'calculator', sourceAppName: 'Calculator' });
+      (window as any).__dexClipboardStore?.getState?.().add(shown, { sourceAppId: 'calculator', sourceAppName: 'Calculator' });
     } catch { /* clipboard unavailable */ }
-  }, [display]);
+  }, [shown]);
 
   // Send the latest result anywhere via DEX Flow (universal handoff) — Notes,
   // DexCode, the Browser, etc. — instead of being hard-wired to Notes only.
   const sendResult = useCallback(() => {
-    const text = expression ? `${expression} ${display}` : display;
+    const text = expression ? `${expression} ${shown}` : shown;
     try {
       window.dispatchEvent(new CustomEvent('dex-flow-open', { detail: { payload: { kind: 'text', content: text, source: 'calculator', label: 'Calculator result' } } }));
     } catch {
       try { void navigator.clipboard?.writeText(text).catch(() => { /* clipboard blocked */ }); } catch { /* clipboard unavailable */ }
     }
-  }, [display, expression]);
+  }, [shown, expression]);
 
   // Natural-language entry: evaluate the typed query, show the result, and log it.
   const runNatural = () => {
+    const calendar = evaluateCalendarMath(naturalInput);
+    if (calendar !== null) {
+      const isDate = /^\d{4,}-/.test(calendar);
+      pushHistory(naturalInput.trim(), calendar, { date: isDate });
+      setExpression(naturalInput.trim());
+      if (isDate) setDateResult(calendar);
+      else showValue(Number(calendar));
+      setNaturalInput('');
+      setPreviousValue(null);
+      setLastOperator(null);
+      repeatRef.current = null;
+      return;
+    }
     const res = evaluateNatural(naturalInput);
     if (!res) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Could not parse that' } }));
@@ -258,18 +314,21 @@ const Calculator: React.FC = () => {
     const resultStr = formatResult(res.value);
     pushHistory(res.expr, resultStr);
     setDisplay(resultStr);
+    setDateResult('');
     setExpression(res.expr);
     setNaturalInput('');
     setPreviousValue(null);
     setLastOperator(null);
     setWaitingForOperand(true);
+    repeatRef.current = null;
   };
 
   // Keyboard support while the calculator has focus. Handled keys call
   // preventDefault so Enter on a focused key doesn't also "click" it.
   const onKeyDown = (e: React.KeyboardEvent) => {
     const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.key === 'Enter' && (e.target as HTMLElement)?.closest('[data-calculator-tools], [aria-label="Calculation history"]')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') copyResult();
       return;
@@ -294,8 +353,8 @@ const Calculator: React.FC = () => {
   // UKI app-context: expose the current expression, displayed value (last
   // result), and the active mode so the assistant knows what the user is
   // computing. A ref keeps the resolver reading live state — register once.
-  const ukiCtxRef = useRef({ display, expression, mode });
-  ukiCtxRef.current = { display, expression, mode };
+  const ukiCtxRef = useRef({ display: shown, expression, mode });
+  ukiCtxRef.current = { display: shown, expression, mode };
   useEffect(() => {
     if (isExtraWindow(winId)) return; // UKI hooks belong to the app's first window
     registerUkiAppContext('calculator', () => {
@@ -312,7 +371,19 @@ const Calculator: React.FC = () => {
     return () => unregisterUkiAppContext('calculator');
   }, [winId]);
 
-  const shown = waitingForOperand || display === 'Error' ? display : formatEntry(display);
+  const applyRate = (kind: 'Tip' | 'Tax' | 'Markup') => {
+    const amount = parseDisplay(display);
+    const percent = Number(rate);
+    const total = amount * (1 + percent / 100);
+    if (!rate.trim() || !Number.isFinite(total) || percent < 0 || percent > 10000) return;
+    const label = kind + ' ' + percent + '% on ' + formatResult(amount);
+    pushHistory(label, formatResult(total), { input: amount + ' * (1 + ' + percent + ' / 100)' });
+    showValue(total);
+    setExpression(label);
+    setPreviousValue(null);
+    setLastOperator(null);
+    repeatRef.current = null;
+  };
   const displaySize = shown.length > 14 ? 24 : shown.length > 10 ? 30 : 40;
 
   const opKey = (op: BinaryOp, label: string) => (
@@ -341,6 +412,8 @@ const Calculator: React.FC = () => {
           >Scientific</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button type="button" className="dex-calc-icon" aria-pressed={showTools} onClick={() => setShowTools(value => !value)}
+            aria-label="Calculator tools" title="Calculator tools">•••</button>
           <button type="button" className="dex-calc-icon" onClick={copyResult} aria-label="Copy result" title="Copy result">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -367,7 +440,7 @@ const Calculator: React.FC = () => {
             value={naturalInput}
             onChange={e => setNaturalInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') runNatural(); }}
-            placeholder="Try: 5 km in mi · 20% of 80 · sqrt(2)"
+            placeholder="Try 5 km in mi or today + 30d"
             aria-label="Natural calculation input"
           />
           <button type="button" className="dex-calc-key dex-calc-key--equal" onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ width: 44, minHeight: 36 }}>=</button>
@@ -380,6 +453,34 @@ const Calculator: React.FC = () => {
         </div>
 
         {/* Keypad */}
+        {showTools && <div data-calculator-tools style={{ display: 'grid', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <label>Decimals <select aria-label="Calculator precision" value={precision} onChange={event => setPrecision(Number(event.target.value))}>
+              {Array.from({ length: 11 }, (_, digits) => <option key={digits}>{digits}</option>)}
+            </select></label>
+            <label><input type="checkbox" checked={groupDigits} onChange={event => setGroupDigits(event.target.checked)} /> Thousands separator</label>
+            <button type="button" className="dex-calc-seg" disabled={!!dateResult || !Number.isFinite(parseDisplay(display))}
+              onClick={() => openUtilityInput('unitconverter', String(parseDisplay(display)))}>Open in Unit Converter</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <label>Memory slot <select aria-label="Memory slot" value={memoryIndex} onChange={event => setMemoryIndex(Number(event.target.value))}>
+              {memorySlots.map((value, index) => <option key={index} value={index}>M{index + 1} · {formatResult(value)}</option>)}
+            </select></label>
+            <button type="button" className="dex-calc-seg" onClick={() => { const value = parseDisplay(display); if (!dateResult && Number.isFinite(value)) setMemory(value); }}>Store</button>
+            <button type="button" className="dex-calc-seg" onClick={() => showValue(memory)}>Recall</button>
+            <button type="button" className="dex-calc-seg" onClick={() => setMemory(0)}>Clear slot</button>
+          </div>
+          <div role="group" aria-label="Percentage helpers" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <label>Rate % <input type="number" min={0} max={10000} value={rate} onChange={event => setRate(event.target.value)} style={{ width: 64 }} /></label>
+            {(['Tip', 'Tax', 'Markup'] as const).map(kind => <button className="dex-calc-seg" type="button" key={kind} disabled={!!dateResult} onClick={() => applyRate(kind)}>{kind}</button>)}
+          </div>
+          <div role="group" aria-label="Insert a constant" style={{ display: 'flex', gap: 6 }}>
+            {Object.entries(CALCULATOR_CONSTANTS).map(([name, value]) => (
+              <button className="dex-calc-seg" type="button" key={name} title={String(value)} aria-label={'Insert ' + name}
+                onClick={() => setNaturalInput(input => input + name)}>{name === 'pi' ? 'π' : name}</button>
+            ))}
+          </div>
+        </div>}
         <div style={{ ...styles.keypad, gridTemplateColumns: sci ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)' }}>
           {sci && (
             <>
@@ -434,18 +535,33 @@ const Calculator: React.FC = () => {
           <div style={styles.historyHeader}>
             <span className="dex-label-caps">History</span>
             {history.length > 0 && (
-              <button type="button" className="dex-calc-link" onClick={() => setHistory([])} aria-label="Clear history">Clear</button>
+              <button type="button" className="dex-calc-link" onClick={() => setHistory(previous => previous.filter(item => item.pinned))} aria-label="Clear unpinned calculations">Clear</button>
             )}
           </div>
           <div style={styles.historyList}>
             {history.length === 0 ? (
               <div style={styles.emptyHistory}>No calculations yet</div>
             ) : (
-              history.map((item) => (
-                <button type="button" key={item.id} className="dex-calc-history-item" title={`${item.expr} = ${item.result}`} aria-label={`Reuse result ${item.result}`} onClick={() => { setDisplay(item.result); setWaitingForOperand(true); }}>
-                  <div style={styles.historyExpr}>{item.expr}</div>
-                  <div style={styles.historyResult}>= {item.result}</div>
-                </button>
+              [...history].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned)).map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center' }}>
+                  <button type="button" className="dex-calc-history-item" aria-label={'Reuse expression ' + item.expr}
+                    style={{ flex: 1 }} onClick={() => {
+                      setNaturalInput(item.input ?? item.expr.replace(/[×÷−]/g, match => (ASCII_OPERATOR[match] ?? match)).replace(/,(?=\d{3}(?:\D|$))/g, ''));
+                      if (item.date) setDateResult(item.result);
+                      else showValue(parseDisplay(item.result));
+                      setExpression(item.expr);
+                      setPreviousValue(null);
+                      setLastOperator(null);
+                      repeatRef.current = null;
+                    }}>
+                    <div style={styles.historyExpr}>{item.expr}</div><div style={styles.historyResult}>= {item.result}</div>
+                  </button>
+                  <button type="button" className="dex-calc-icon" aria-label={(item.pinned ? 'Unpin ' : 'Pin ') + item.expr}
+                    aria-pressed={!!item.pinned} disabled={!item.pinned && history.filter(entry => entry.pinned).length >= 12}
+                    onClick={() => setHistory(previous => previous.map(entry => entry.id === item.id ? { ...entry, pinned: !entry.pinned } : entry))}>
+                    {item.pinned ? '★' : '☆'}
+                  </button>
+                </div>
               ))
             )}
           </div>
@@ -525,7 +641,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     fontFamily: 'var(--dex-font-ui)',
     position: 'relative',
-    overflow: 'hidden',
+    overflowX: 'hidden',
+    overflowY: 'auto',
   },
   header: {
     display: 'flex',
@@ -545,7 +662,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   main: {
     flex: 1,
-    minHeight: 0,
+    minHeight: 'min-content',
     display: 'flex',
     flexDirection: 'column',
     gap: 'var(--space-3)',

@@ -19,6 +19,8 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { DexSearchInput } from '../styles/components';
+import { Button } from '../ui/Button';
+import { captureTextPasteTarget, insertPlainText, transformClipboardText, type TextPasteTarget, type TextTransform } from '../utils/clipboardText';
 import {
   useClipboardEntries,
   useClipboardActions,
@@ -83,12 +85,22 @@ function matchesFilter(entry: ClipEntry, filter: FilterKey): boolean {
 interface ClipboardHistoryProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (content: string) => void;
+}
+interface Snippet { id: string; name: string; text: string }
+const SNIPPET_KEY = 'dex-clipboard-snippets';
+
+function loadSnippets(): Snippet[] {
+  try {
+    const items = JSON.parse(localStorage.getItem(SNIPPET_KEY) ?? '[]');
+    if (Array.isArray(items)) return items.filter(item => typeof item?.id === 'string' && typeof item.name === 'string'
+      && typeof item.text === 'string' && item.text.length <= 16_000).slice(0, 50);
+  } catch { /* Keep the library usable with in-memory data. */ }
+  return [];
 }
 
 // ==================== COMPONENT ====================
 
-export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onClose, onSelect }) => {
+export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onClose }) => {
   const entries = useClipboardEntries();
   const { remove, togglePin, clearUnpinned } = useClipboardActions();
   const captureOtherApps = useClipboardStore(s => s.captureOtherApps);
@@ -98,17 +110,34 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pasteTarget = useRef<TextPasteTarget | null>(null);
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergedIds, setMergedIds] = useState<string[]>([]);
+  const [showTools, setShowTools] = useState(false);
+  const [showSnippets, setShowSnippets] = useState(false);
+  const [snippetName, setSnippetName] = useState('');
+  const [snippets, setSnippets] = useState(loadSnippets);
+  const [transform, setTransform] = useState<TextTransform>('trim');
 
   // Reset transient UI each time the panel opens.
   useEffect(() => {
     if (isOpen) {
+      pasteTarget.current = captureTextPasteTarget();
       setQuery('');
       setFilter('all');
       setSelectedIndex(0);
+      setMergeMode(false);
+      setMergedIds([]);
+      setShowTools(false);
+      setShowSnippets(false);
+      setSnippetName('');
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
   }, [isOpen]);
+  useEffect(() => {
+    try { localStorage.setItem(SNIPPET_KEY, JSON.stringify(snippets)); } catch { /* In-memory snippets still work. */ }
+  }, [snippets]);
 
   // Filter (type chip) + search (content / source / language), pinned first.
   const visible = useMemo(() => {
@@ -127,13 +156,39 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     setSelectedIndex(i => Math.min(i, Math.max(0, visible.length - 1)));
   }, [visible.length]);
 
-  const handleSelect = useCallback(async (entry: ClipEntry) => {
-    await writeEntryToClipboard(entry);
-    // Pasting a data URL into a text field is meaningless; for images we just
-    // put the image back on the clipboard so the user can paste it elsewhere.
-    if (entry.kind !== 'image') onSelect(entry.content);
+  const pasteText = useCallback(async (text: string) => {
+    if (!insertPlainText(pasteTarget.current, text)) {
+      try {
+        await navigator.clipboard.writeText(text);
+        window.dispatchEvent(new CustomEvent('dex-toast', {
+          detail: { type: 'info', message: 'Copied as plain text. Paste it into your destination.' },
+        }));
+      }
+      catch { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Could not copy text to the clipboard' } })); return; }
+    }
     onClose();
-  }, [onSelect, onClose]);
+  }, [onClose]);
+
+  const handleSelect = useCallback(async (entry: ClipEntry) => {
+    if (entry.kind !== 'image') { await pasteText(entry.content); return; }
+    await writeEntryToClipboard(entry);
+    onClose();
+  }, [pasteText, onClose]);
+
+  const currentEntry = visible[selectedIndex];
+  const mergeEntries = mergedIds.map(id => entries.find(entry => entry.id === id)).filter((entry): entry is ClipEntry => !!entry);
+  const mergedText = mergeEntries.map(entry => entry.content).join('\n');
+  const selectedText = mergeMode ? mergedText : currentEntry?.kind !== 'image' && currentEntry?.kind !== 'file' ? currentEntry?.content ?? '' : '';
+  const transformedText = selectedText ? transformClipboardText(selectedText, transform) : '';
+  const toggleMerged = (id: string) => setMergedIds(previous => previous.includes(id)
+    ? previous.filter(key => key !== id) : [...previous, id]);
+  const saveSnippet = () => {
+    const name = snippetName.trim();
+    if (!name || !selectedText || selectedText.length > 16_000 || snippets.length >= 50) return;
+    const id = globalThis.crypto?.randomUUID?.() ?? String(Date.now()) + Math.random();
+    setSnippets(previous => [{ id, name, text: selectedText }, ...previous]);
+    setSnippetName('');
+  };
 
   const handleCopyOnly = useCallback(async (entry: ClipEntry) => {
     await writeEntryToClipboard(entry);
@@ -154,7 +209,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(i => Math.min(i + 1, visible.length - 1));
+        setSelectedIndex(i => Math.max(0, Math.min(i + 1, visible.length - 1)));
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -162,7 +217,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
         break;
       case 'Enter':
         e.preventDefault();
-        if (visible[selectedIndex]) void handleSelect(visible[selectedIndex]);
+        if (mergeMode) { if (mergeEntries.length > 1) void pasteText(mergedText); }
+        else if (visible[selectedIndex]) void handleSelect(visible[selectedIndex]);
         break;
       case 'Escape':
         e.preventDefault();
@@ -178,13 +234,13 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
         break;
       }
     }
-  }, [visible, selectedIndex, onClose, handleSelect, remove]);
+  }, [visible, selectedIndex, onClose, handleSelect, remove, mergeMode, mergeEntries.length, pasteText, mergedText]);
 
   if (!isOpen) return null;
 
   const styles: Record<string, React.CSSProperties> = {
     overlay: { position: 'fixed', inset: 0, background: 'var(--color-bg-elevated)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '15vh' },
-    container: { width: '100%', maxWidth: '520px', background: 'var(--color-bg-elevated)', borderRadius: '10px', border: '1px solid var(--color-border)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+    container: { width: '100%', maxWidth: '520px', maxHeight: '80vh', background: 'var(--color-bg-elevated)', borderRadius: '10px', border: '1px solid var(--color-border)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
     header: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' },
     headerIcon: { color: 'var(--color-text-muted)' },
     title: { flex: 1, fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' },
@@ -250,6 +306,34 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
           ))}
         </div>
 
+        <div style={{ ...styles.chips, display: 'flex', flexWrap: 'wrap' }}>
+          <Button size="sm" variant="subtle" disabled={!selectedText} onClick={() => void pasteText(selectedText)}>Paste plain text</Button>
+          <Button size="sm" variant="subtle" aria-pressed={mergeMode} onClick={() => { setMergeMode(value => !value); setMergedIds([]); }}>Merge clips</Button>
+          <Button size="sm" variant="subtle" aria-pressed={showTools} onClick={() => setShowTools(value => !value)}>Transform</Button>
+          <Button size="sm" variant="subtle" aria-pressed={showSnippets} onClick={() => setShowSnippets(value => !value)}>Snippets</Button>
+          {mergeMode && <Button size="sm" disabled={mergeEntries.length < 2} onClick={() => void pasteText(mergedText)}>
+            Paste {mergeEntries.length} clips
+          </Button>}
+        </div>
+        {showTools && <div style={{ ...styles.chips, alignItems: 'center' }}>
+          <select aria-label="Text transform" value={transform} onChange={event => setTransform(event.target.value as TextTransform)}>
+            <option value="trim">Trim</option><option value="uppercase">Uppercase</option>
+            <option value="lowercase">Lowercase</option><option value="slug">Slug</option>
+          </select>
+          <Button size="sm" disabled={!transformedText} onClick={() => void pasteText(transformedText)}>Paste transformed text</Button>
+        </div>}
+        {showSnippets && <div aria-label="Saved snippets" role="region" style={{ padding: '8px 16px', maxHeight: 160, overflow: 'auto', display: 'grid', gap: 6 }}>
+          <form style={{ display: 'flex', gap: 6 }} onSubmit={event => { event.preventDefault(); saveSnippet(); }}>
+            <input aria-label="Snippet name" placeholder="Snippet name" maxLength={60} value={snippetName} onChange={event => setSnippetName(event.target.value)} />
+            <Button type="submit" size="sm" disabled={!snippetName.trim() || !selectedText || selectedText.length > 16000 || snippets.length >= 50}>Save selected text</Button>
+          </form>
+          {snippets.map(snippet => <div key={snippet.id} style={{ display: 'flex', gap: 6 }}>
+            <Button size="sm" onClick={() => void pasteText(snippet.text)}>{snippet.name}</Button>
+            <Button size="sm" variant="ghost" aria-label={'Remove snippet ' + snippet.name}
+              onClick={() => setSnippets(previous => previous.filter(item => item.id !== snippet.id))}>Remove</Button>
+          </div>)}
+        </div>}
+
         <div style={styles.list}>
           {visible.length === 0 ? (
             <div style={styles.empty}>
@@ -268,10 +352,14 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
               return (
                 <div
                   key={item.id}
+                  onFocus={() => setSelectedIndex(index)}
                   style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
-                  onClick={() => handleSelect(item)}
+                  onClick={() => { if (mergeMode) { if (item.kind !== 'image' && item.kind !== 'file') toggleMerged(item.id); } else void handleSelect(item); }}
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
+                  {mergeMode && <input type="checkbox" aria-label={'Include ' + item.preview}
+                    checked={mergedIds.includes(item.id)} disabled={item.kind === 'image' || item.kind === 'file'}
+                    onClick={event => event.stopPropagation()} onChange={() => toggleMerged(item.id)} />}
                   {item.kind === 'color' ? (
                     <div style={{ ...styles.swatch, background: item.content }} title={item.content} />
                   ) : item.kind === 'image' ? (

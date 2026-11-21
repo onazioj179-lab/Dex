@@ -108,7 +108,8 @@ const FUNCTIONS: Record<string, (x: number) => number> = {
   log2: Math.log2, ln: Math.log, abs: Math.abs, round: Math.round, floor: Math.floor,
   ceil: Math.ceil, exp: Math.exp, sign: Math.sign,
 };
-const CONSTANTS: Record<string, number> = { pi: Math.PI, e: Math.E };
+export const CALCULATOR_CONSTANTS = { pi: Math.PI, e: Math.E, c: 299792458, g: 9.80665 } as const;
+const CONSTANTS: Record<string, number> = CALCULATOR_CONSTANTS;
 
 /** Grammar (lowest to highest precedence):
  *    expr   := term (('+' | '-') term)*

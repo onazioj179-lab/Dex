@@ -14,11 +14,11 @@
 
 import { notify } from './notify';
 import { repairPickedDay } from '../utils/localDate';
+import { occursOn, type RecurringDate } from '../../shared/calendar/recurrence';
+import { calendarDayKey } from '../../shared/time/naturalCalendar';
 
-export interface ReminderEvent {
-  id: string; title: string; date: string; time: string;
-  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
-  recurUntil?: string;
+export interface ReminderEvent extends RecurringDate {
+  id: string; title: string; time: string;
   /** Minutes before the start to alert; undefined/null = no alert. */
   alertMinutes?: number | null;
 }
@@ -27,22 +27,7 @@ const EVENTS_KEY = 'dex-calendar-events';
 const FIRED_KEY = 'dex-calendar-alerts-fired';
 const MISSED_GRACE_MS = 10 * 60_000;
 
-const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-/** Same rule as Calendar's eventOccursOn (local days). */
-export function occursOn(e: ReminderEvent, day: Date): boolean {
-  const ds = ymd(day);
-  if (e.date === ds) return true;
-  if (!e.recurring || e.recurring === 'none') return false;
-  const start = new Date(e.date + 'T00:00:00');
-  if (start > day) return false;
-  if (e.recurUntil && ds > e.recurUntil) return false;
-  if (e.recurring === 'daily') return true;
-  if (e.recurring === 'weekly') return start.getDay() === day.getDay();
-  if (e.recurring === 'monthly') return start.getDate() === day.getDate();
-  if (e.recurring === 'yearly') return start.getMonth() === day.getMonth() && start.getDate() === day.getDate();
-  return false;
-}
+export { occursOn };
 
 export interface DueAlert { key: string; event: ReminderEvent; startsAt: number; alertAt: number }
 
@@ -59,7 +44,7 @@ export function dueAlerts(events: ReminderEvent[], since: number, now: number, f
       if (!occursOn(e, day)) continue;
       const startsAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0).getTime();
       const alertAt = startsAt - e.alertMinutes * 60_000;
-      const key = `${e.id}@${ymd(day)}`;
+      const key = `${e.id}@${calendarDayKey(day)}`;
       if (alertAt > from && alertAt <= now && !fired.has(key)) out.push({ key, event: e, startsAt, alertAt });
     }
   }

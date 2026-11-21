@@ -7,6 +7,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { computeLapStats } from '../../../shared/format/lapStats';
 import { saveBlobAs } from '../../services/nativeSave';
+import { sendFlow } from '../../services/FlowTransfer';
 import { useTimerStore, stopwatchElapsed } from '../../store/timerStore';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 
@@ -84,6 +85,21 @@ const Stopwatch: React.FC = () => {
     }
   }, [laps, splits, exporting]);
 
+  const [sendingSession, setSendingSession] = useState(false);
+  const sendSession = async () => {
+    if (running || stopwatchElapsed(stopwatch) <= 0 || sendingSession) return;
+    setSendingSession(true);
+    const lines = ['Stopwatch session', 'Elapsed: ' + fmt(stopwatchElapsed(stopwatch))];
+    for (let index = laps.length - 1; index >= 0; index--) {
+      lines.push('Lap ' + (laps.length - index) + ' · ' + fmt(splits[index]) + ' split · ' + fmt(laps[index]) + ' elapsed');
+    }
+    try {
+      await sendFlow('notes', { kind: 'text', content: lines.join('\n'), source: 'stopwatch', label: 'Stopwatch session' });
+    } finally {
+      setSendingSession(false);
+    }
+  };
+
   const [savingCsv, setSavingCsv] = useState(false);
   const saveCsv = async () => {
     if (!laps.length || savingCsv) return;
@@ -135,6 +151,11 @@ const Stopwatch: React.FC = () => {
         {running && <> &middot; <kbd style={s.kbd}>L</kbd> lap</>}
         {!running && elapsed > 0 && <> &middot; <kbd style={s.kbd}>R</kbd> reset</>}
       </div>
+
+      {!running && elapsed > 0 && (
+        <button style={{ ...s.exportBtn, alignSelf: 'center' }} disabled={sendingSession}
+          onClick={() => void sendSession()}>Send session to Notes</button>
+      )}
 
       {laps.length > 0 && (
         <div style={s.lapsContainer}>

@@ -22,6 +22,7 @@
  */
 
 import { create } from 'zustand';
+import { calendarDayKey } from '../../shared/time/naturalCalendar';
 
 // ---------------------------------------------------------------------------
 // Storage keys
@@ -54,14 +55,6 @@ function loadJSON<T>(key: string, fallback: T): T {
 
 function saveJSON(key: string, value: unknown): void {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
-}
-
-/** Local calendar day "YYYY-MM-DD" — daily focus totals roll over at midnight. */
-function todayKey(d: Date = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 /** Fire a DEX toast. Used by all three apps on completion. */
@@ -170,6 +163,7 @@ export interface PomodoroLog {
   focusMin: number;
   /** Recent completed phases (capped). */
   entries: PomodoroLogEntry[];
+  pastFocusMin?: Record<string, number>;
 }
 
 function phaseMinutes(cfg: PomodoroConfig, phase: PomoPhase): number {
@@ -194,13 +188,32 @@ export function pomodoroRemaining(rt: PomodoroRuntime, cfg: PomodoroConfig): num
 const LOG_CAP = 50;
 
 function freshLog(): PomodoroLog {
-  return { date: todayKey(), sessions: 0, focusMin: 0, entries: [] };
+  return { date: calendarDayKey(new Date()), sessions: 0, focusMin: 0, entries: [] };
 }
 
-/** Roll the log over to today if the stored day is stale. */
+function pruneFocusDays(days: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(Object.keys(days).sort().slice(-366).map(day => [day, days[day]]));
+}
+
+/** Preserve the previous day's focus total when clearing the daily session list. */
 function rolloverLog(log: PomodoroLog): PomodoroLog {
-  if (log.date !== todayKey()) return freshLog();
-  return log;
+  const today = freshLog();
+  if (log.date === today.date) return log;
+  const pastFocusMin = { ...log.pastFocusMin };
+  if (log.focusMin > 0) pastFocusMin[log.date] = log.focusMin;
+  today.focusMin = pastFocusMin[today.date] ?? 0;
+  delete pastFocusMin[today.date];
+  return { ...today, pastFocusMin: pruneFocusDays(pastFocusMin) };
+}
+
+export function summarizeFocus(log: PomodoroLog, now = new Date()) {
+  const minutesByDay = { ...log.pastFocusMin, [log.date]: log.focusMin };
+  const dayAt = (offset: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+  const minutesAt = (offset: number) => minutesByDay[calendarDayKey(dayAt(offset))] || 0;
+  const days = Array.from({ length: 7 }, (_, index) => ({ date: dayAt(index - 6), minutes: minutesAt(index - 6) }));
+  let streak = 0;
+  for (let offset = minutesAt(0) > 0 ? 0 : -1; minutesAt(offset) > 0; offset--) streak++;
+  return { days, streak, weekMinutes: days.reduce((sum, day) => sum + day.minutes, 0) };
 }
 
 // ===========================================================================
@@ -238,7 +251,7 @@ interface TimerStoreState {
   resetPomodoro: () => void;
   setPomodoroPhase: (phase: PomoPhase) => void;
   /** Complete the current phase now (skip / natural completion). */
-  advancePomodoro: (opts?: { silent?: boolean }) => void;
+  advancePomodoro: (opts?: { silent?: boolean; skip?: boolean; completedAt?: number }) => void;
   setPomodoroConfig: (patch: Partial<PomodoroConfig>) => void;
   /** Reconcile if the active phase elapsed while unmounted; fires toasts. */
   tickPomodoro: () => void;
@@ -451,21 +464,30 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
 
       // Log + daily totals (work phases count toward focus minutes).
       let log = rolloverLog(pomodoroLog);
-      const entry: PomodoroLogEntry = { phase: completedPhase, at: Date.now(), minutes };
-      log = {
-        ...log,
-        entries: [entry, ...log.entries].slice(0, LOG_CAP),
-        sessions: completedPhase === 'work' ? log.sessions + 1 : log.sessions,
-        focusMin: completedPhase === 'work' ? log.focusMin + minutes : log.focusMin,
-      };
+      if (!opts?.skip) {
+        const entry: PomodoroLogEntry = { phase: completedPhase, at: opts?.completedAt ?? Date.now(), minutes };
+        const entryDay = calendarDayKey(new Date(entry.at));
+        if (entryDay === log.date) {
+          log = {
+            ...log,
+            entries: [entry, ...log.entries].slice(0, LOG_CAP),
+            sessions: log.sessions + (completedPhase === 'work' ? 1 : 0),
+            focusMin: log.focusMin + (completedPhase === 'work' ? minutes : 0),
+          };
+        } else if (completedPhase === 'work') {
+          const pastFocusMin = { ...log.pastFocusMin };
+          pastFocusMin[entryDay] = (pastFocusMin[entryDay] ?? 0) + minutes;
+          log = { ...log, pastFocusMin: pruneFocusDays(pastFocusMin) };
+        }
+      }
 
       // Decide the next phase.
       let nextPhase: PomoPhase;
       let completedSessions = rt.completedSessions;
       if (completedPhase === 'work') {
-        completedSessions += 1;
+        if (!opts?.skip) completedSessions += 1;
         const every = Math.max(1, cfg.longBreakEvery);
-        nextPhase = completedSessions % every === 0 ? 'longBreak' : 'shortBreak';
+        nextPhase = !opts?.skip && completedSessions % every === 0 ? 'longBreak' : 'shortBreak';
       } else {
         nextPhase = 'work';
       }
@@ -518,7 +540,9 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
       }
       if (!rt.running) return;
       if (pomodoroRemaining(rt, cfg) <= 0) {
-        get().advancePomodoro();
+        const completedAt = rt.startedAt == null
+          ? Date.now() : rt.startedAt + Math.max(0, phaseDurationMs(cfg, rt.phase) - rt.accumulatedMs);
+        get().advancePomodoro({ completedAt });
       }
     },
   };
