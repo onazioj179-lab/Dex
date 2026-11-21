@@ -210,55 +210,71 @@ const ALBUMS: Album[] = [
 
 const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|bmp|webp|svg|tiff|heic|heif)$/i;
+const IMPORT_FILTERS = [
+  { name: 'Photos and videos', extensions: ['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp', 'avif', 'bmp', 'ico', 'mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv'] },
+];
+
+interface ImportedMedia {
+  path: string;
+  filename: string;
+  extension: string;
+  modifiedAt: number;
+  size: number;
+  width?: number;
+  height?: number;
+}
 
 const loadAllMedia = async (): Promise<MediaItem[]> => {
   const allMedia: MediaItem[] = [];
 
-  try {
-    if (window.dex?.invoke) {
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+  if (window.dex?.invoke) {
+    // The shared resource controls the timeout and exposes retry.
+    const [pictureFiles, videoFiles, imported] = await Promise.all([
+      window.dex.invoke('media:getMediaFiles', 'pictures'),
+      window.dex.invoke('media:getMediaFiles', 'videos'),
+      window.dex.invoke('gallery:getImportedMedia'),
+    ]);
 
-      // Load pictures and videos in parallel
-      const [pictureFiles, videoFiles] = await Promise.all([
-        Promise.race([window.dex.invoke('media:getMediaFiles', 'pictures'), timeout]),
-        Promise.race([window.dex.invoke('media:getMediaFiles', 'videos'), timeout]),
-      ]);
+    const processFiles = (files: Array<{ path?: string; name?: string; extension?: string; modified?: number; size?: number; duration?: number }>, fallbackType: 'image' | 'video') => {
+      if (!files || !Array.isArray(files)) return;
+      for (const f of files) {
+        const ext = (f.extension || f.name?.split('.').pop() || '').toLowerCase();
+        const isVideo = VIDEO_EXTENSIONS.test(`.${ext}`);
+        const isImage = IMAGE_EXTENSIONS.test(`.${ext}`);
+        const type: 'image' | 'video' = isVideo ? 'video' : isImage ? 'image' : fallbackType;
 
-      const processFiles = (files: Array<{ path?: string; name?: string; extension?: string; modified?: number; size?: number; duration?: number }>, fallbackType: 'image' | 'video') => {
-        if (!files || !Array.isArray(files)) return;
-        for (const f of files) {
-          const ext = (f.extension || f.name?.split('.').pop() || '').toLowerCase();
-          const isVideo = VIDEO_EXTENSIONS.test(`.${ext}`);
-          const isImage = IMAGE_EXTENSIONS.test(`.${ext}`);
-          const type: 'image' | 'video' = isVideo ? 'video' : isImage ? 'image' : fallbackType;
+        // dexmedia in the desktop app (file:// is blocked there); see utils/mediaUrl.
+        const filePath = f.path ? toMediaUrl(f.path) : '';
+        allMedia.push({
+          id: f.path || `media-${allMedia.length}`,
+          type,
+          src: filePath,
+          url: filePath,
+          thumbnail: filePath,
+          name: f.name || `media-${allMedia.length}`,
+          date: new Date(f.modified || Date.now()),
+          size: f.size || 0,
+          duration: f.duration || undefined,
+          favorite: false,
+          format: ext.toUpperCase() || undefined,
+          width: (f as any).width || undefined,
+          height: (f as any).height || undefined,
+          fps: (f as any).fps || undefined,
+          codec: (f as any).codec || undefined,
+        });
+      }
+    };
 
-          // dexmedia in the desktop app (file:// is blocked there); see utils/mediaUrl.
-          const filePath = f.path ? toMediaUrl(f.path) : '';
-          allMedia.push({
-            id: f.path || `media-${allMedia.length}`,
-            type,
-            src: filePath,
-            url: filePath,
-            thumbnail: filePath,
-            name: f.name || `media-${allMedia.length}`,
-            date: new Date(f.modified || Date.now()),
-            size: f.size || 0,
-            duration: f.duration || undefined,
-            favorite: false,
-            format: ext.toUpperCase() || undefined,
-            width: (f as any).width || undefined,
-            height: (f as any).height || undefined,
-            fps: (f as any).fps || undefined,
-            codec: (f as any).codec || undefined,
-          });
-        }
-      };
-
-      processFiles((pictureFiles ?? []) as Parameters<typeof processFiles>[0], 'image');
-      processFiles((videoFiles ?? []) as Parameters<typeof processFiles>[0], 'video');
+    processFiles((pictureFiles ?? []) as Parameters<typeof processFiles>[0], 'image');
+    processFiles((videoFiles ?? []) as Parameters<typeof processFiles>[0], 'video');
+    if (Array.isArray(imported)) {
+      for (const item of imported as ImportedMedia[]) {
+        if (!item.path || !item.filename || typeof item.extension !== 'string') continue;
+        const extension = item.extension.replace(/^\./, '');
+        processFiles([{ ...item, name: item.filename, extension, modified: item.modifiedAt }],
+          extension === 'ogv' ? 'video' : 'image');
+      }
     }
-  } catch (err) {
-    console.warn('Failed to load media from system:', err);
   }
 
   // Fallback to localStorage
@@ -474,15 +490,26 @@ export const Gallery: React.FC = () => {
   }, [toast]);
   const [tagInput, setTagInput] = useState('');
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
-  const adjustCacheKey = selectedMedia ? `dex-gallery-adj-${selectedMedia.id}` : null;
-  const cachedAdj = useMemo(() => {
-    if (!adjustCacheKey) return null;
-    try { return JSON.parse(localStorage.getItem(adjustCacheKey) || 'null'); } catch { return null; }
+  const adjustCacheKey = selectedMedia?.type === 'image' ? `dex-gallery-adj-${selectedMedia.id}` : null;
+  const savedAdj = useMemo(() => {
+    if (!adjustCacheKey) return NEUTRAL;
+    try { return normalizeAdjustments(JSON.parse(localStorage.getItem(adjustCacheKey) || 'null')); }
+    catch { return NEUTRAL; }
   }, [adjustCacheKey]);
   // Non-destructive edits: parameters per photo, applied by the same pixel
   // pipeline for the live preview and the saved copy (galleryAdjust.ts).
-  const [adj, setAdj] = useState<Adjustments>(NEUTRAL);
-  const setAdjKey = useCallback((k: keyof Adjustments, v: number) => setAdj((a) => ({ ...a, [k]: v })), []);
+  const [editDraft, setEditDraft] = useState<{ key: string; value: Adjustments } | null>(null);
+  const adj = editDraft?.key === adjustCacheKey ? editDraft.value : savedAdj;
+  const setAdj = useCallback((update: React.SetStateAction<Adjustments>) => {
+    if (!adjustCacheKey) return;
+    setEditDraft(previous => ({
+      key: adjustCacheKey,
+      value: typeof update === 'function'
+        ? update(previous?.key === adjustCacheKey ? previous.value : savedAdj)
+        : update,
+    }));
+  }, [adjustCacheKey, savedAdj]);
+  const setAdjKey = useCallback((k: keyof Adjustments, v: number) => setAdj((a) => ({ ...a, [k]: v })), [setAdj]);
   const adjustExposure = adj.exposure, adjustContrast = adj.contrast, adjustSaturation = adj.saturation, adjustTemp = adj.temperature;
   const setAdjustExposure = useCallback((v: number) => setAdjKey('exposure', v), [setAdjKey]);
   const setAdjustContrast = useCallback((v: number) => setAdjKey('contrast', v), [setAdjKey]);
@@ -823,39 +850,38 @@ export const Gallery: React.FC = () => {
 
   // Restore cached adjustments when selecting a media item
   useEffect(() => {
-    const restored = normalizeAdjustments(cachedAdj);
     applyingHistory.current = true;
-    setAdj(restored);
-    historyRef.current.reset(restored);
+    setEditDraft(null);
+    historyRef.current.reset(savedAdj);
     setHistoryTick((t) => t + 1);
     setShowOriginal(false);
-  }, [adjustCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [adjustCacheKey, savedAdj]);
 
   // Undo history: one step per pause in editing (a slider drag is one step).
   useEffect(() => {
     if (applyingHistory.current) { applyingHistory.current = false; return; }
     const t = setTimeout(() => { historyRef.current.push(adj); setHistoryTick((n) => n + 1); }, 350);
     return () => clearTimeout(t);
-  }, [adj]);
+  }, [adjustCacheKey, adj]);
   const undoEdit = useCallback(() => {
     const prev = historyRef.current.undo();
     if (prev) { applyingHistory.current = true; setAdj(prev); setHistoryTick((n) => n + 1); }
-  }, []);
+  }, [setAdj]);
   const redoEdit = useCallback(() => {
     const next = historyRef.current.redo();
     if (next) { applyingHistory.current = true; setAdj(next); setHistoryTick((n) => n + 1); }
-  }, []);
+  }, [setAdj]);
   void historyTick; // re-render so Undo/Redo enablement follows the history
 
   // Persist adjustments to localStorage when changed
   useEffect(() => {
-    if (!adjustCacheKey) return;
+    if (!adjustCacheKey || editDraft?.key !== adjustCacheKey) return;
     if (!isNeutral(adj)) {
       persistOrWarn(adjustCacheKey, JSON.stringify(adj), 'your photo adjustments');
     } else {
       try { localStorage.removeItem(adjustCacheKey); } catch { /* nothing stored */ }
     }
-  }, [adjustCacheKey, adj]);
+  }, [adjustCacheKey, adj, editDraft]);
 
   /** Save an edited COPY (the original is never changed) through the native Save dialog. */
   const saveEditedCopy = useCallback(async (withGeometry: boolean) => {
@@ -917,6 +943,10 @@ export const Gallery: React.FC = () => {
     setImgZoom(1);
     setImgPan({ x: 0, y: 0 });
     setImgRotation(0);
+    setCropRatio('free');
+    setStraightenAngle(0);
+    setFlipH(false);
+    setFlipV(false);
     setShowMediaInfo(false);
   }, [selectedMedia?.id]);
 
@@ -1100,7 +1130,7 @@ export const Gallery: React.FC = () => {
   // timeout, AbortController, and set-after-unmount safety that this used to
   // hand-roll). The loader pulls media + favorites together; the apply effects
   // fan the result into the existing state.
-  const { data: loadedGallery, loading: galleryLoading, error: galleryError } = useAsyncResource(
+  const { data: loadedGallery, loading: galleryLoading, error: galleryError, reload } = useAsyncResource(
     async (signal) => {
       const [media, favorites] = await Promise.all([loadAllMedia(), loadFavorites()]);
       return signal.aborted ? null : { media, favorites };
@@ -1111,10 +1141,46 @@ export const Gallery: React.FC = () => {
   useEffect(() => {
     if (!loadedGallery) return;
     setMedia(loadedGallery.media);
-    setFavorites(loadedGallery.favorites);
+    if (!favoritesLoadedRef.current) setFavorites(loadedGallery.favorites);
     favoritesLoadedRef.current = true; // Mark initial load complete
   }, [loadedGallery]);
   useEffect(() => { if (galleryError) toast.error('Failed to load gallery'); }, [galleryError]);
+
+  const importingRef = useRef(false);
+  const [importing, setImporting] = useState(false);
+  const importMedia = async () => {
+    const bridge = window.dex;
+    if (!bridge?.invoke || importingRef.current) return;
+    importingRef.current = true;
+    setImporting(true);
+    try {
+      const picked = await bridge.invoke('dialog:showOpenDialog', {
+        filters: IMPORT_FILTERS, properties: ['openFile', 'multiSelections'],
+      });
+      if (picked?.canceled) return;
+      if (!Array.isArray(picked?.filePaths)) throw new Error('Could not open the file picker.');
+      let importedCount = 0;
+      for (const path of new Set<string>(picked.filePaths)) {
+        const extension = path.split('.').pop()?.toLowerCase() ?? '';
+        if (!IMPORT_FILTERS[0].extensions.includes(extension)) continue;
+        const item = await bridge.invoke('gallery:loadImage', path).catch(() => null);
+        if (item?.path) importedCount++;
+      }
+      if (!importedCount) throw new Error('No supported files could be imported.');
+      if (importedCount < picked.filePaths.length) toast.info('Some files could not be imported.');
+      setSelectedAlbum('all');
+      setSearchQuery('');
+      setFolderFilter('');
+      setTagFilter('');
+      setDuplicateFilter(false);
+      reload();
+    } catch (error) {
+      toast.error('Import failed', error instanceof Error ? error.message : undefined);
+    } finally {
+      importingRef.current = false;
+      setImporting(false);
+    }
+  };
 
   // Save favorites to storage (only after initial load)
   useEffect(() => { 
@@ -1507,6 +1573,10 @@ export const Gallery: React.FC = () => {
         <div style={styles.toolbar}>
           <h2 style={styles.title}>{activeUserAlbum?.name ?? ALBUMS.find(a => a.id === selectedAlbum)?.name ?? 'All Media'}</h2>
           <div style={styles.toolbarRight}>
+            {hasNativeFiles() && <button type="button" style={{ ...styles.viewBtn, width: 'auto' }}
+              disabled={importing} onClick={() => void importMedia()}>{importing ? 'Importing…' : 'Import'}</button>}
+            {galleryError && <button type="button" style={{ ...styles.viewBtn, width: 'auto' }}
+              onClick={reload}>Retry</button>}
             <button type="button" style={{ ...styles.viewBtn, width: 'auto' }} aria-expanded={folderTree}
               onClick={() => setFolderTree(value => !value)}>Filters</button>
             {/* Search within the current album */}

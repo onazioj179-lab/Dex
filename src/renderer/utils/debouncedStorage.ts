@@ -22,9 +22,17 @@
 
 import { createJSONStorage } from 'zustand/middleware';
 import type { StateStorage } from 'zustand/middleware';
+import { persistOrWarn } from './persistOrWarn';
 
-export function debouncedStorage(delayMs = 250): StateStorage {
+export function debouncedStorage(delayMs = 250): StateStorage & { flush(): void } {
   const pending = new Map<string, { value: string; timer: ReturnType<typeof setTimeout> }>();
+  const write = (name: string) => {
+    const entry = pending.get(name);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pending.delete(name);
+    persistOrWarn(name, entry.value, 'your recent workspace changes');
+  };
 
   return {
     getItem(name: string): string | null {
@@ -40,22 +48,7 @@ export function debouncedStorage(delayMs = 250): StateStorage {
       const existing = pending.get(name);
       if (existing) clearTimeout(existing.timer);
 
-      const timer = setTimeout(() => {
-        pending.delete(name);
-        try {
-          localStorage.setItem(name, value);
-        } catch (e) {
-          // Storage full — try to free space by removing oldest DEX keys
-          if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-            pruneOldestDexKeys(1);
-            try {
-              localStorage.setItem(name, value);
-            } catch {
-              // Give up silently — app will still work from memory
-            }
-          }
-        }
-      }, delayMs);
+      const timer = setTimeout(() => write(name), delayMs);
 
       pending.set(name, { value, timer });
     },
@@ -70,24 +63,18 @@ export function debouncedStorage(delayMs = 250): StateStorage {
         localStorage.removeItem(name);
       } catch { /* ignore */ }
     },
+    flush(): void {
+      for (const name of [...pending.keys()]) write(name);
+    },
   };
-}
-
-/** Remove the oldest dex-* key(s) to free localStorage space */
-function pruneOldestDexKeys(count: number): void {
-  const dexKeys: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith('dex-')) dexKeys.push(key);
-  }
-  // Sort by estimated age (localStorage doesn't track timestamps, so just take first N)
-  dexKeys.slice(0, count).forEach((k) => {
-    try { localStorage.removeItem(k); } catch { /* ignore */ }
-  });
 }
 
 /** Singleton: shared 250ms debounced storage instance */
 export const sharedDebouncedStorage = debouncedStorage(250);
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', sharedDebouncedStorage.flush);
+  window.addEventListener('pagehide', sharedDebouncedStorage.flush);
+}
 
 /** Ready-to-use Zustand JSON storage with debouncing */
 export const debouncedJsonStorage = createJSONStorage(() => sharedDebouncedStorage);

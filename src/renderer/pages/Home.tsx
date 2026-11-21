@@ -576,6 +576,7 @@ export const Home: React.FC = () => {
       {runningCount > 0 && (
         <button
           type="button"
+          className="dex-stage-launch"
           aria-label={`Open Stage Manager (${runningCount} running)`}
           title="Stage Manager — see all running apps (F3)"
           onClick={() => window.dispatchEvent(new CustomEvent('dex-stage-toggle'))}
@@ -586,33 +587,14 @@ export const Home: React.FC = () => {
             zIndex: 5,
             display: 'flex',
             alignItems: 'center',
-            gap: 7,
-            padding: '5px 12px',
-            borderRadius: 9999,
-            background: 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))',
-            border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.92)',
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
-            textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-            transition: 'background 0.15s ease, border-color 0.15s ease',
+            gap: 6,
+            padding: '4px 8px',
+            fontSize: 11,
+            fontVariantNumeric: 'tabular-nums',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--dex-desktop-scrim, rgba(12,12,14,0.30))'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
         >
           <DexIcon name="grid" size={13} color="currentColor" />
-          Stage
-          <span style={{
-            minWidth: 16,
-            padding: '0 4px',
-            borderRadius: 9999,
-            background: 'rgba(255,255,255,0.14)',
-            fontSize: 10.5,
-            fontWeight: 600,
-            lineHeight: '16px',
-            textAlign: 'center',
-          }}>{runningCount}</span>
+          <span aria-hidden="true">{runningCount}</span>
         </button>
       )}
 

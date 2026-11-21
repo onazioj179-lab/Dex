@@ -14,7 +14,7 @@
 
 import { appBackLabel, tryAppBack, tryAppForward, MOUSE_BACK, MOUSE_FORWARD } from '../services/backNavigation';
 import { byAppId, baseAppId, AppWindowContext } from '../services/appWindows';
-import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, Suspense, lazy, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession, planReopen } from '../store/runningApps';
@@ -943,11 +943,24 @@ export const AppManager: React.FC = () => {
   const getMaximizedWindowBoundsRef = useRef<(() => { w: number; h: number }) | null>(null);
 
   // -- Minimized floating windows (hidden but still running) ---------------
-  const [minimizedApps, setMinimizedApps] = useState<Set<string>>(new Set());
+  const [individuallyMinimizedApps, setMinimizedApps] = useState<Set<string>>(new Set());
+  const spatialGroups = useSpatialStore(s => s.groups);
+  const hiddenByCollapsedGroup = useMemo(
+    () => new Set(spatialGroups.filter(group => group.collapsed).flatMap(group => group.appIds)),
+    [spatialGroups],
+  );
+  const minimizedApps = useMemo(
+    () => spatialEnabled && hiddenByCollapsedGroup.size > 0
+      ? new Set([...individuallyMinimizedApps, ...hiddenByCollapsedGroup])
+      : individuallyMinimizedApps,
+    [spatialEnabled, hiddenByCollapsedGroup, individuallyMinimizedApps],
+  );
   const minimizeFloatingApp = useCallback((appId: string) => {
     setMinimizedApps(prev => { const next = new Set(prev); next.add(appId); return next; });
   }, []);
   const restoreFloatingApp = useCallback((appId: string) => {
+    const spatial = useSpatialStore.getState();
+    if (spatial.enabled) spatial.expandGroupForWindow(appId);
     setMinimizedApps(prev => { const next = new Set(prev); next.delete(appId); return next; });
     // Bring to front on restore
     const z = nextDetachZ();
@@ -1013,9 +1026,11 @@ export const AppManager: React.FC = () => {
   // Compute the focused (highest-z) floating app (drives window-focus highlight).
   const focusedFloatingAppId = useMemo(() => {
     let maxZ = -1, id: string | null = null;
-    detachedApps.forEach((b, appId) => { if (b.z > maxZ) { maxZ = b.z; id = appId; } });
+    detachedApps.forEach((b, appId) => {
+      if (!minimizedApps.has(appId) && b.z > maxZ) { maxZ = b.z; id = appId; }
+    });
     return id;
-  }, [detachedApps]);
+  }, [detachedApps, minimizedApps]);
 
   // No left strip is reserved (Stage Manager removed in 5.6); floating windows
   // use the full workspace width.
@@ -3517,7 +3532,9 @@ export const AppManager: React.FC = () => {
       });
       // Open tabs join the canvas too, each at its own natural size, so the
       // workspace shows every open app (it used to show only floating ones).
-      const fromTabs = runningApps.map(a => a.id).filter(id => id !== 'home' && !detachedApps.has(id as AppId));
+      const tabs = runningApps.filter(app => app.id !== 'home' && !detachedApps.has(app.id as AppId));
+      const fromTabs = tabs.map(app => app.id);
+      const minimizedTabs = new Set(tabs.filter(app => app.isMinimized).map(app => app.id));
       spatialFromTabsRef.current = new Set(fromTabs);
       const tabFresh: Array<SpatialRect & { id: string }> = [];
       fromTabs.forEach(id => {
@@ -3540,21 +3557,24 @@ export const AppManager: React.FC = () => {
         Object.assign(placed, arrange('grid', tabFresh, origin));
       }
       sp.setPreSpatial(pre);
-      // Start at the fitted view so the first frame already uses the right
-      // level of detail (rendering every app live at 100% first cost seconds
-      // with many windows open).
-      const all = boundsOf(Object.values(placed));
+      // Start at the fitted view so the first frame shows the whole workspace.
+      const all = boundsOf(Object.entries(placed)
+        .filter(([id]) => !individuallyMinimizedApps.has(id) && !hiddenByCollapsedGroup.has(id) && !minimizedTabs.has(id))
+        .map(([, rect]) => rect));
       if (all) sp.setCamera(fitRect(all, sp.viewport.w || ws.w, sp.viewport.h || ws.h, 48, sp.limits), { animate: false });
       sp.setEnabled(true);
       if (fromTabs.length > 0) {
         fromTabs.forEach(id => mountedAppsRef.current.add(id as AppId));
+        if (minimizedTabs.size) setMinimizedApps(prev => new Set([...prev, ...minimizedTabs]));
         const front = currentApp;
         setDetachedApps(prev => {
           const next = new Map(prev);
           for (const [id, r] of Object.entries(placed)) {
-            const z = id === front ? nextDetachZ() + 50 : (next.get(id)?.z ?? nextDetachZ());
+            const z = next.get(id)?.z ?? nextDetachZ();
             next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z });
           }
+          const frontBounds = next.get(front);
+          if (frontBounds) next.set(front, { ...frontBounds, z: nextDetachZ() });
           return next;
         });
         setCurrentApp('home' as AppId);
@@ -3576,27 +3596,39 @@ export const AppManager: React.FC = () => {
       });
       sp.setPreSpatial(null);
       if (backToTabs.length > 0) {
-        backToTabs.forEach(id => { const b = detachedApps.get(id as AppId); if (b) spatialTabSizeRef.current.set(id, { w: b.w, h: b.h }); });
-        // The front-most canvas window that came from a tab becomes the current tab.
-        const front = backToTabs.reduce((a, b) => ((detachedApps.get(a as AppId)?.z ?? 0) >= (detachedApps.get(b as AppId)?.z ?? 0) ? a : b));
-        // Commit "windows -> tabs" BEFORE switching the canvas off. Otherwise
-        // the store change renders first on its own, turning every card back
-        // into a live full-layout window for one pass (seconds with many apps).
+        const returning = new Set(backToTabs);
+        let front: AppId = 'home';
+        let frontZ = -Infinity;
+        for (const id of backToTabs) {
+          const bounds = detachedApps.get(id as AppId)!;
+          spatialTabSizeRef.current.set(id, { w: bounds.w, h: bounds.h });
+          if (!individuallyMinimizedApps.has(id) && bounds.z > frontZ) {
+            front = id as AppId;
+            frontZ = bounds.z;
+          }
+        }
+        // Commit "windows -> tabs" before switching the canvas off so the
+        // non-spatial layout never briefly displays all the former tab windows.
         leavingSpatialRef.current = true;
         flushSync(() => {
-        setDetachedApps(prev => {
-          const next = new Map(prev);
-          backToTabs.forEach(id => next.delete(id));
-          for (const [id, r] of Object.entries(restore)) {
-            const b = next.get(id);
-            if (b) next.set(id, { ...b, ...r });
-          }
-          return next;
-        });
-        setMinimizedApps(prev => { if (!backToTabs.some(id => prev.has(id))) return prev; const n = new Set(prev); backToTabs.forEach(id => n.delete(id)); return n; });
-        // Focus the tab directly: the shell's setCurrentApp() would float the
-        // app again on the next frame (apps opened from the UI are windows).
-        setCurrentRunningApp(front as AppId);
+          setDetachedApps(prev => {
+            const next = new Map(prev);
+            backToTabs.forEach(id => next.delete(id));
+            for (const [id, r] of Object.entries(restore)) {
+              const b = next.get(id);
+              if (b) next.set(id, { ...b, ...r });
+            }
+            return next;
+          });
+          useRunningApps.setState(state => ({
+            runningApps: state.runningApps.map(app => {
+              const isMinimized = individuallyMinimizedApps.has(app.id);
+              return returning.has(app.id) && app.isMinimized !== isMinimized ? { ...app, isMinimized } : app;
+            }),
+          }));
+          setMinimizedApps(prev => new Set([...prev].filter(id => !returning.has(id))));
+          // Focus the tab directly because shell navigation opens a floating window.
+          setCurrentRunningApp(front);
         });
         sp.setEnabled(false);
         leavingSpatialRef.current = false;
@@ -3606,7 +3638,7 @@ export const AppManager: React.FC = () => {
       }
       spatialFromTabsRef.current = new Set();
     }
-  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, setCurrentApp, setCurrentRunningApp, spatialSizeFor]);
+  }, [applySpatialBounds, detachedApps, getMaximizedWindowBounds, getShellWorkspace, splitMode, runningApps, currentApp, hiddenByCollapsedGroup, individuallyMinimizedApps, setCurrentApp, setCurrentRunningApp, spatialSizeFor]);
 
   // On the canvas every app is a window: an app launched (or switched to) as a
   // tab while the canvas is open is placed on it instead of covering it.
@@ -3626,14 +3658,17 @@ export const AppManager: React.FC = () => {
         // One new window: the free spot in the current view.
         const id = todo[0];
         const rect = spatialPlaceFor(id, next) ?? { x: 0, y: 0, ...spatialSizeFor(id, ws) };
-        next.set(id, { ...rect, z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+        next.set(id, { ...rect, z: nextDetachZ() });
       } else if (todo.length > 1) {
         // A burst (e.g. a restored session): a tidy grid beside what is there.
         const taken = boundsOf(Array.from(next.values()));
         const origin = taken ? { x: taken.x + taken.w + 80, y: taken.y } : { x: 0, y: 0 };
         const placed = arrange('grid', todo.map(id => ({ id, x: 0, y: 0, ...spatialSizeFor(id, ws) })), origin);
         for (const [id, r] of Object.entries(placed)) {
-          next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z: id === focus ? nextDetachZ() + 50 : nextDetachZ() });
+          next.set(id, { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), z: nextDetachZ() });
+        }
+        if (focus && todo.includes(focus)) {
+          next.set(focus, { ...next.get(focus)!, z: nextDetachZ() });
         }
         pendingSpatialFitRef.current = true;
       }
@@ -3650,7 +3685,8 @@ export const AppManager: React.FC = () => {
       // The size actually rendered (app minimum sizes applied), so arrangements,
       // groups and the minimap match what is on screen.
       const r = isSpatialEnabled() ? getUsableFloatingBounds(id, b, ws) : b;
-      out[id] = { id, title: getLabel(id), x: b.x, y: b.y, w: r.w, h: r.h, z: b.z, minimized: minimizedApps.has(id) };
+      const groupHidden = spatialEnabled && hiddenByCollapsedGroup.has(id) && !individuallyMinimizedApps.has(id);
+      out[id] = { id, title: getLabel(id), x: b.x, y: b.y, w: r.w, h: r.h, z: b.z, minimized: minimizedApps.has(id), groupHidden };
     });
     const sp = useSpatialStore.getState();
     sp.setWindows(out);
@@ -3661,7 +3697,7 @@ export const AppManager: React.FC = () => {
     }
     if (pendingSpatialFitRef.current) { pendingSpatialFitRef.current = false; sp.fitAll(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detachedApps, minimizedApps]);
+  }, [detachedApps, minimizedApps, spatialEnabled, hiddenByCollapsedGroup, individuallyMinimizedApps]);
 
   // Let the spatial layer act on real windows.
   const sendToBack = useCallback((appId: string) => {
@@ -3691,61 +3727,33 @@ export const AppManager: React.FC = () => {
   useEffect(() => { if (splitMode !== 'off' && useSpatialStore.getState().enabled) setSpatial(false); }, [splitMode, setSpatial]);
 
   // Camera -> one transform on the world layer, plus off-screen culling.
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cullTimer: ReturnType<typeof setTimeout> | null = null;
     let motionTimer: ReturnType<typeof setTimeout> | null = null;
+    const culled = new Map<string, HTMLElement>();
+    const margin = 400;
+    const reveal = (id: string, el: HTMLElement) => {
+      el.removeAttribute('data-spatial-offscreen');
+      culled.delete(id);
+      spatialOffscreenRef.current.delete(id);
+    };
+    const canCull = (s: ReturnType<typeof useSpatialStore.getState>, id: string, el: HTMLElement) => {
+      const w = s.windows[id];
+      return !!w && !w.minimized && !el.contains(document.activeElement)
+        && !isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, margin);
+    };
     const cull = () => {
       cullTimer = null;
       const s = useSpatialStore.getState();
-      const root = worldRef.current;
-      const next = new Set<string>();      // culled: off-screen, not painted
-      const distant = new Set<string>();   // on-screen but shown as a title card
-      if (s.enabled) {
-        let front: SpatialWindow | null = null;
-        for (const w of Object.values(s.windows)) if (!w.minimized && (!front || w.z > front.z)) front = w;
-        // Level of detail per window, by its size ON SCREEN: a window is live
-        // when it is visible and big enough to use (>= ~360px wide), capped at
-        // LIVE_MAX at once (front window first, then the largest). Everything
-        // else is a title card. A single global zoom threshold flipped every
-        // window at once, which made zooming stutter with many windows.
-        const LIVE_MIN_PX = 360;
-        const LIVE_MAX = 12;
-        const onScreen: SpatialWindow[] = [];
-        for (const w of Object.values(s.windows)) {
-          if (w.minimized) continue;
-          if (!isOnScreen(w, s.camera, s.viewport.w, s.viewport.h, 400)) next.add(w.id);
-          else onScreen.push(w);
-        }
-        const candidates = onScreen
-          .filter((w) => w.id === front?.id || w.w * s.camera.z >= LIVE_MIN_PX)
-          .sort((a, b) => (a.id === front?.id ? -1 : b.id === front?.id ? 1 : b.w * b.h - a.w * a.h));
-        const live = new Set(candidates.slice(0, LIVE_MAX).map((w) => w.id));
-        for (const w of onScreen) if (!live.has(w.id)) distant.add(w.id);
-      }
-      root?.querySelectorAll<HTMLElement>('[data-floating-window]').forEach((el) => {
-        const id = el.dataset.floatingWindow || '';
-        if (next.has(id)) el.setAttribute('data-spatial-offscreen', 'true');
-        else el.removeAttribute('data-spatial-offscreen');
-        // Set here, not in render, so a zoom never re-renders the shell. On the
-        // canvas a window is a card until marked live (new windows start cheap).
-        if (s.enabled && !next.has(id) && !distant.has(id)) el.setAttribute('data-spatial-live', 'true');
-        else el.removeAttribute('data-spatial-live');
+      if (!s.enabled || !s.viewport.w || !s.viewport.h) return;
+      worldRef.current?.querySelectorAll<HTMLElement>('[data-floating-window]').forEach((el) => {
+        const id = el.dataset.floatingWindow!;
+        if (culled.has(id) || !canCull(s, id, el)) return;
+        el.setAttribute('data-spatial-offscreen', 'true');
+        culled.set(id, el);
+        spatialOffscreenRef.current.add(id);
+        appLifecycle.setPhase(id, 'background');
       });
-      // Off-screen and zoomed-out ("distant") windows both drop to the
-      // background lifecycle phase: apps that support it pause heavy work.
-      // Distant windows stay painted and live -- only their refresh slows.
-      for (const id of distant) next.add(id);
-      const prev = spatialOffscreenRef.current;
-      spatialOffscreenRef.current = next;
-      for (const id of next) if (!prev.has(id)) appLifecycle.setPhase(id, 'background');
-      // Only while the canvas is on: after leaving it the tab logic owns each
-      // app's phase, and re-foregrounding every former window here woke all
-      // the hidden tabs at once (seconds of work with many apps open).
-      if (s.enabled) {
-        for (const id of prev) {
-          if (!next.has(id) && s.windows[id] && !s.windows[id].minimized) appLifecycle.setPhase(id, 'foreground');
-        }
-      }
     };
     const apply = (s: ReturnType<typeof useSpatialStore.getState>) => {
       const el = worldRef.current;
@@ -3760,7 +3768,7 @@ export const AppManager: React.FC = () => {
         el.style.setProperty('transition', 'none', 'important');
         const prevT = el.style.getPropertyValue('transform');
         const nextT = `translate(${-x * z}px, ${-y * z}px) scale(${z})`;
-        el.style.setProperty('transform', nextT, 'important');
+        if (prevT !== nextT) el.style.setProperty('transform', nextT, 'important');
         el.style.transformOrigin = '0 0';
         // While the camera moves, keep the world on its own GPU layer so
         // frames are composited instead of re-painted; drop it shortly after
@@ -3773,22 +3781,35 @@ export const AppManager: React.FC = () => {
       } else {
         el.style.removeProperty('transform');
         el.style.removeProperty('transition');
+        el.style.removeProperty('will-change');
       }
-      // Debounced: decide level of detail once the camera settles, so a zoom or
-      // pan gesture never flips windows between card and live mid-motion.
+      // Wake approaching windows during the gesture. Only hiding waits for
+      // the camera to settle, so continuing to pan can't leave a blank body.
+      for (const [id, node] of culled) {
+        if (s.enabled && node.isConnected && canCull(s, id, node)) continue;
+        reveal(id, node);
+        if (s.enabled && s.windows[id] && !s.windows[id].minimized) {
+          appLifecycle.setPhase(id, 'foreground');
+        }
+      }
       if (cullTimer) clearTimeout(cullTimer);
-      cullTimer = setTimeout(cull, 120);
+      if (s.enabled && splitMode === 'off') cullTimer = setTimeout(cull, 120);
     };
     apply(useSpatialStore.getState());
     // Only camera, enable or window-set changes matter here. Every other
     // store write (zones refitting, groups, guides, selection) used to re-run
-    // this and push the level-of-detail pass back each time.
+    // this and push the cull pass back each time.
     const unsub = useSpatialStore.subscribe((st, prev) => {
       if (st.camera === prev.camera && st.enabled === prev.enabled && st.windows === prev.windows && st.viewport === prev.viewport) return;
       apply(st);
     });
-    return () => { unsub(); if (cullTimer) clearTimeout(cullTimer); if (motionTimer) clearTimeout(motionTimer); };
-  }, [splitMode, spatialEnabled]);
+    return () => {
+      unsub();
+      if (cullTimer) clearTimeout(cullTimer);
+      if (motionTimer) clearTimeout(motionTimer);
+      for (const [id, node] of culled) reveal(id, node);
+    };
+  }, [splitMode]);
 
   // Viewport size (camera fitting, culling, minimap).
   useEffect(() => {
@@ -4065,7 +4086,6 @@ export const AppManager: React.FC = () => {
           <div
             key={appId}
             data-floating-window={appId}
-            data-window-title={getLabel(appId)}
             data-testid={`app-instance-${appId}`}
             data-app-state="foreground"
             data-window-glass={useGlass ? 'on' : 'off'}
@@ -4104,17 +4124,18 @@ export const AppManager: React.FC = () => {
                 continues the drag in one motion (see the pointer handler below);
                 double-click toggles maximize / restore. */}
             <div
+              data-window-header=""
               style={{
-                height: 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                height: spatialEnabled ? 30 : 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
                 // Subtle top-lit gradient + hairline highlight gives the title bar real
                 // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
-                background: 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-surface) 100%)',
+                background: spatialEnabled ? 'var(--color-bg-surface)' : 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-surface) 100%)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
-                boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
+                boxShadow: spatialEnabled ? undefined : 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
                 justifyContent: 'center',
                 touchAction: 'none',
-                WebkitAppRegion: 'drag',
+                WebkitAppRegion: 'no-drag',
                 // Own stacking context above the app surface so an app's own
                 // full-screen overlays (modals at position:fixed; z-index:var(--z-max))
                 // can never paint over the close / minimize / maximize controls.
@@ -4373,7 +4394,7 @@ export const AppManager: React.FC = () => {
                       background: 'transparent', border: 'none', borderRadius: 4,
                       color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = spatialEnabled ? 'var(--color-accent-light)' : 'var(--color-border)'; e.currentTarget.style.color = spatialEnabled ? 'var(--color-accent)' : '#fff'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -4393,7 +4414,7 @@ export const AppManager: React.FC = () => {
                         background: 'transparent', border: 'none', borderRadius: 4,
                         color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = spatialEnabled ? 'var(--color-accent-light)' : 'var(--color-border)'; e.currentTarget.style.color = spatialEnabled ? 'var(--color-accent)' : '#fff'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                     >
                       {isMaximized ? (
@@ -4962,7 +4983,9 @@ export const AppManager: React.FC = () => {
               the Spatial canvas) keeps the app mounted with its state. */}
           {false}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-            <AppBody appId={appId} />
+            <WindowChromeProvider mode="standard" slot={null}>
+              <AppBody appId={appId} />
+            </WindowChromeProvider>
           </div>
         </div>
       );
@@ -4994,7 +5017,7 @@ export const AppManager: React.FC = () => {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, mountedAppsSafeSnapshot.join(',')]);
 
   // -- Suspend heavy background apps on extended idle ----------------------
   // On deep idle, heavy (GPU/audio) apps that are not foreground drop to
@@ -5741,10 +5764,14 @@ export const AppManager: React.FC = () => {
           name: a.name,
           icon: a.icon,
           color: a.color,
+          minimized: detachedApps.has(a.id) ? minimizedApps.has(a.id) : a.isMinimized,
           element: contentRef.current?.querySelector(`[data-app-id="${a.id}"]`) as HTMLElement | null,
         }))}
         activeAppId={currentApp}
-        onSelectApp={(id) => { setCurrentApp(id as AppId); setShowOverview(false); }}
+        onSelectApp={(id) => {
+          if (detachedApps.has(id)) openAppInWindow(id as AppId);
+          else setCurrentApp(id as AppId);
+        }}
         onCloseApp={(id) => { if (id !== 'home') handleCloseApp(id); }}
         onDismiss={() => setShowOverview(false)}
       />

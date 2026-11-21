@@ -206,6 +206,29 @@ describe('Gallery Page', () => {
     expect(labels.some((t) => /\bfaces?\b/i.test(t))).toBe(false);
     expect(container.textContent).not.toMatch(/Person \d/);
   });
+
+  it('imports photos from the native picker and restores them from the native library', async () => {
+    const { default: Gallery } = await import('../../src/renderer/pages/Gallery');
+    const path = 'C:\\Media\\trip.jpg';
+    const photo = { path, filename: 'trip.jpg', extension: '.jpg', modifiedAt: 123, size: 400 };
+    const catalog: typeof photo[] = [];
+    const invoke = vi.mocked(window.dex!.invoke);
+    invoke.mockImplementation(async (channel: string) => {
+      if (channel === 'dialog:showOpenDialog') return { canceled: false, filePaths: [path] };
+      if (channel === 'gallery:loadImage') { catalog.push(photo); return photo; }
+      if (channel === 'gallery:getImportedMedia') return catalog;
+      return null;
+    });
+
+    const view = render(<WithToast><Gallery /></WithToast>);
+    fireEvent.click(screen.getByRole('button', { name: 'Import', exact: true }));
+    expect(await screen.findByText('trip.jpg')).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith('gallery:loadImage', path);
+
+    view.unmount();
+    render(<WithToast><Gallery /></WithToast>);
+    expect(await screen.findByText('trip.jpg')).toBeInTheDocument();
+  });
 });
 
 // ===========================================================================

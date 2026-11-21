@@ -53,6 +53,30 @@ describe('overlay stack', () => {
     expect(document.activeElement).toBe(btn);
   });
 
+  it('keeps focus and stacking order when a covered overlay closes', () => {
+    const trigger = document.createElement('button');
+    const topControl = document.createElement('button');
+    document.body.append(trigger, topControl);
+    try {
+      const lower = pushOverlay({ id: 'lower', close: vi.fn(), restoreFocus: trigger });
+      const upper = pushOverlay({ id: 'upper', close: vi.fn() });
+      topControl.focus();
+      lower.release();
+      expect(document.activeElement).toBe(topControl);
+      expect(pushOverlay({ id: 'next', close: vi.fn() }).z).toBeGreaterThan(upper.z);
+    } finally {
+      trigger.remove();
+      topControl.remove();
+    }
+  });
+
+  it('ignores cleanup from a replaced registration', () => {
+    const earlier = pushOverlay({ id: 'panel', close: vi.fn() });
+    pushOverlay({ id: 'panel', close: vi.fn() });
+    earlier.release();
+    expect(isTopOverlay('panel')).toBe(true);
+  });
+
   it('clamps a popup into the viewport', () => {
     expect(clampToViewport(1000, 700, 300, 200, 1024, 768)).toEqual({ x: 716, y: 560 });
     expect(clampToViewport(-50, -5, 100, 100, 1024, 768)).toEqual({ x: 8, y: 8 });

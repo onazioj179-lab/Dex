@@ -136,8 +136,9 @@ export const useRunningApps = create<RunningAppsState>()(
          let newCurrentId = currentAppId;
         if (currentAppId === appId) {
           const { sessionHistory } = get();
-          const fallback = sessionHistory.find(id => id !== appId && newRunning.some(a => a.id === id));
-          newCurrentId = fallback ?? (newRunning.length > 0 ? newRunning[newRunning.length - 1].id : 'home');
+          const visible = newRunning.filter(app => !app.isMinimized);
+          const fallback = sessionHistory.find(id => visible.some(app => app.id === id));
+          newCurrentId = fallback ?? visible.at(-1)?.id ?? 'home';
         }
     
         set({
@@ -175,12 +176,12 @@ export const useRunningApps = create<RunningAppsState>()(
       },
   
       minimizeApp: (appId) => {
-        const { runningApps } = get();
+        const { runningApps, currentAppId } = get();
         set({
           runningApps: runningApps.map(a => 
             a.id === appId ? { ...a, isMinimized: true } : a
           ),
-          currentAppId: 'home',
+          currentAppId: currentAppId === appId ? 'home' : currentAppId,
         });
       },
   

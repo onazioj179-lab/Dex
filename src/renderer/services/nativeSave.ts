@@ -54,6 +54,14 @@ function fileActions(path: string) {
   ] : [];
 }
 
+function reportSaveError(name: string, error: unknown, source: string, retry?: () => void): void {
+  const message = error instanceof Error ? error.message : String(error);
+  void notify({
+    title: `Couldn't save ${name}`, body: message, source, icon: 'error', priority: 'high',
+    actions: retry ? [{ label: 'Retry', onClick: retry }] : undefined,
+  });
+}
+
 /**
  * Save `blob` as a file the user picks. Resolves with the path, or null when
  * the user cancels. Errors are shown (with Retry) and also rethrown.
@@ -61,19 +69,24 @@ function fileActions(path: string) {
 export async function saveBlobAs(fileName: string, blob: Blob, opts: { title?: string; source?: string } = {}): Promise<string | null> {
   const name = safeFileName(fileName);
   if (!hasNativeFiles()) { browserDownload(name, blob); return null; }
+  const source = opts.source || 'Files';
   const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
   const filters = ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined;
-  const path = await pickSavePath(name, filters, opts.title || 'Save');
+  let path: string | null;
+  try {
+    path = await pickSavePath(name, filters, opts.title || 'Save');
+  } catch (error) {
+    reportSaveError(name, error, source);
+    throw error;
+  }
   if (!path) return null;
   const write = async (): Promise<string> => {
     try {
       await writeBinaryFile(path, blob);
-      void notify({ title: `Saved ${baseName(path)}`, body: path, source: opts.source || 'Files', icon: 'success', actions: fileActions(path) });
+      void notify({ title: `Saved ${baseName(path)}`, body: path, source, icon: 'success', actions: fileActions(path) });
       return path;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      void notify({ title: `Couldn't save ${baseName(path)}`, body: msg, source: opts.source || 'Files', icon: 'error', priority: 'high',
-        actions: [{ label: 'Retry', onClick: () => { void write().catch(() => {}); } }] });
+      reportSaveError(baseName(path), e, source, () => { void write().catch(() => {}); });
       throw e;
     }
   };
@@ -127,7 +140,7 @@ function browserDownload(name: string, blob: Blob): void {
 }
 
 /** blob: URLs a captured click still needs: their revoke waits until the save has read them. */
-const pendingBlobs = new Set<string>();
+const pendingBlobs = new Map<string, number>();
 const deferredRevokes = new Set<string>();
 
 /** True when this anchor click is a file download DEX should handle natively. */
@@ -141,14 +154,28 @@ async function handleAnchor(a: HTMLAnchorElement): Promise<void> {
   const href = a.href;
   const name = safeFileName(a.getAttribute('download') || '', 'download');
   if (/^https?:/i.test(href)) { await downloadUrl(href); return; }
-  pendingBlobs.add(href);
+  const isBlob = href.startsWith('blob:');
+  if (isBlob) pendingBlobs.set(href, (pendingBlobs.get(href) ?? 0) + 1);
+  let blob: Blob;
   try {
-    const blob = await (await fetch(href)).blob();
-    await saveBlobAs(name, blob).catch(() => {});
+    const response = await fetch(href);
+    if (!response.ok) throw new Error('Could not read the export data.');
+    blob = await response.blob();
+  } catch (error) {
+    reportSaveError(name, error, 'Files');
+    return;
   } finally {
-    pendingBlobs.delete(href);
-    if (deferredRevokes.delete(href)) URL.revokeObjectURL(href);
+    if (isBlob) {
+      const readers = (pendingBlobs.get(href) ?? 1) - 1;
+      if (readers > 0) {
+        pendingBlobs.set(href, readers);
+      } else {
+        pendingBlobs.delete(href);
+        if (deferredRevokes.delete(href)) URL.revokeObjectURL(href);
+      }
+    }
   }
+  await saveBlobAs(name, blob).catch(() => {});
 }
 
 let installed = false;
@@ -162,8 +189,6 @@ export function installDownloadCapture(): void {
   // Programmatic a.click() (the common pattern; works on detached anchors too).
   HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
     if (hasNativeFiles() && isCapturableDownload(this)) {
-      // Claim the blob URL synchronously, before the caller's revoke runs.
-      if (this.href.startsWith('blob:')) pendingBlobs.add(this.href);
       void handleAnchor(this);
       return;
     }
@@ -187,7 +212,6 @@ export function installDownloadCapture(): void {
     const a = (e.target as Element | null)?.closest?.('a[download]') as HTMLAnchorElement | null;
     if (!a || e.defaultPrevented || !hasNativeFiles() || !isCapturableDownload(a)) return;
     e.preventDefault();
-    if (a.href.startsWith('blob:')) pendingBlobs.add(a.href);
     void handleAnchor(a);
   }, true);
 }

@@ -19,6 +19,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import DexIcon from '../components/DexIcon';
 import { isReduceMotion } from '../utils/MotionController';
 
 // ---------------------------------------------------------------------------
@@ -30,6 +31,7 @@ export interface OverviewApp {
   name: string;
   icon?: string;
   color?: string;
+  minimized?: boolean;
   /** The app's live container element (null when not kept alive / detached) */
   element?: HTMLElement | null;
 }
@@ -50,14 +52,14 @@ interface StageRect { x: number; y: number; w: number; h: number; live: boolean 
 // GRID LAYOUT
 // ---------------------------------------------------------------------------
 
-const MARGIN = { top: 88, bottom: 72, left: 56, right: 56 };
-const GAP = 28;
-const LABEL_H = 30;
+const MARGIN = { top: 74, bottom: 52, left: 36, right: 36 };
+const GAP = 18;
+const LABEL_H = 26;
 const EXIT_MS = 240;
 
 function computeSlots(n: number, W: number, H: number): { x: number; y: number; w: number; h: number }[] {
   if (n === 0) return [];
-  const cols = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
+  const cols = n <= 9 ? Math.ceil(Math.sqrt(n)) : Math.max(4, Math.ceil(Math.sqrt(n * W / H)));
   const rows = Math.ceil(n / cols);
   const availW = W - MARGIN.left - MARGIN.right;
   const availH = H - MARGIN.top - MARGIN.bottom;
@@ -102,7 +104,6 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
   onDismiss,
 }) => {
   const [search, setSearch] = useState('');
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [layout, setLayout] = useState<Map<string, StageRect>>(new Map());
   const searchRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,6 +114,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
 
   const stageApps = apps.filter(a => a.id !== 'home');
   const idsKey = stageApps.map(a => a.id).join(',');
+  const query = search.trim().toLowerCase();
 
   // Reset only when the stage closes. These resets used to sit in effects that
   // re-run on every window-list change and every parent render while hidden,
@@ -136,7 +138,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
     current.forEach((app, i) => {
       const slot = slots[i];
       const el = app.element;
-      if (!el) {
+      if (!el || app.minimized) {
         // Not kept alive (or detached): overlay renders an icon card instead
         next.set(app.id, { ...slot, live: false });
         return;
@@ -164,8 +166,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
       el.style.setProperty('opacity', '1', 'important');
       el.style.setProperty('pointer-events', 'none', 'important');
       el.style.setProperty('z-index', '2', 'important');
-      // Divide by scale so the radius reads as ~12px on screen after scaling
-      el.style.setProperty('border-radius', `${Math.round(12 / s)}px`);
+      el.style.setProperty('border-radius', `${Math.round(6 / s)}px`);
       el.style.setProperty('overflow', 'hidden');
       el.style.setProperty('box-shadow', '0 12px 32px rgba(0, 0, 0, 0.45)');
     });
@@ -198,6 +199,19 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
     if (exitTimerRef.current !== null) window.clearTimeout(exitTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!visible) return;
+    const opener = document.activeElement;
+    const container = containerRef.current;
+    searchRef.current?.focus({ preventScroll: true });
+    return () => {
+      const active = document.activeElement;
+      if (opener instanceof HTMLElement && opener.isConnected && (active === document.body || container?.contains(active))) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, [visible]);
+
   // -- Exit (dismiss or select): animate, then hand control back ------------
   const closeStage = useCallback((selectId?: string) => {
     if (closingRef.current) return;
@@ -206,7 +220,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
     const current = appsRef.current;
     current.forEach(app => {
       const el = app.element;
-      if (!el || app.id === 'home') return;
+      if (!el || !layout.get(app.id)?.live) return;
       if (app.id === selectId) {
         // Fly the chosen window back to full screen
         el.style.setProperty('transform', 'translate3d(0, 0, 0) scale(1)', 'important');
@@ -224,44 +238,44 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
     };
     if (reduce) finish();
     else exitTimerRef.current = window.setTimeout(finish, EXIT_MS);
-  }, [onSelectApp, onDismiss]);
+  }, [layout, onSelectApp, onDismiss]);
 
-  // -- Keyboard: Escape dismisses, Enter opens first match, typing filters --
+  // Escape dismisses. Enter in the search field opens the first match.
   useEffect(() => {
     if (!visible) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { closeStage(); return; }
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.isComposing && e.target === searchRef.current) {
         const filtered = appsRef.current.filter(a =>
-          a.id !== 'home' && a.name.toLowerCase().includes(search.toLowerCase())
+          a.id !== 'home' && a.name.toLowerCase().includes(query)
         );
         if (filtered.length > 0) closeStage(filtered[0].id);
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        searchRef.current?.focus();
-      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [visible, search, closeStage]);
+  }, [visible, query, closeStage]);
 
   // -- Search filter dims non-matching live windows --------------------------
   useEffect(() => {
     if (!visible || closingRef.current) return;
-    const q = search.toLowerCase();
     appsRef.current.forEach(app => {
       const el = app.element;
-      if (!el || app.id === 'home') return;
-      const match = !q || app.name.toLowerCase().includes(q);
+      if (!el || !layout.get(app.id)?.live) return;
+      const match = app.name.toLowerCase().includes(query);
       el.style.setProperty('opacity', match ? '1' : '0.2', 'important');
     });
-  }, [search, visible]);
+  }, [query, visible, layout]);
 
-  const handleCardClose = useCallback((e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const closeCard = (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
+    const card = event.currentTarget.parentElement;
+    const next = card?.nextElementSibling?.querySelector<HTMLButtonElement>('.dex-stage-switch:enabled')
+      ?? card?.previousElementSibling?.querySelector<HTMLButtonElement>('.dex-stage-switch:enabled')
+      ?? searchRef.current;
+    next?.focus({ preventScroll: true });
     onCloseApp(id);
-  }, [onCloseApp]);
+  };
 
   if (!visible) return null;
 
@@ -280,23 +294,19 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
         cursor: 'default',
       }}
     >
-      {/* Search pill — hidden until the user types (first keystroke focuses it) */}
-      <div style={{
+      <div className="dex-stage-search" style={{
         position: 'absolute',
-        top: 36,
+        top: 30,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 320,
-        padding: 'var(--space-2) var(--space-4)',
+        width: 'min(280px, calc(100% - 48px))',
+        padding: '5px 8px',
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: 10,
+        borderRadius: 6,
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--space-2)',
-        opacity: search.length > 0 ? 1 : 0,
-        pointerEvents: search.length > 0 ? 'auto' : 'none',
-        transition: isReduceMotion() ? 'none' : 'opacity 0.15s ease',
         zIndex: 3,
       }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -305,9 +315,10 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
           value={search}
           onChange={e => setSearch(e.target.value)}
           aria-label="Filter apps"
-          placeholder="Filter apps..."
+          placeholder="Find an app"
           style={{
             flex: 1,
+            minWidth: 0,
             background: 'transparent',
             border: 'none',
             outline: 'none',
@@ -316,12 +327,15 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
             fontFamily: 'var(--font-family)',
           }}
         />
+        <button type="button" className="dex-stage-close" aria-label="Close Stage Manager" onClick={() => closeStage()}>
+          <DexIcon name="close" size={13} />
+        </button>
       </div>
 
       {/* Empty state */}
       {stageApps.length === 0 && (
         <div style={{
-          position: 'absolute',
+          position: 'absolute', pointerEvents: 'none',
           inset: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -341,45 +355,20 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
       {stageApps.map(app => {
         const rect = layout.get(app.id);
         if (!rect) return null;
-        const isHovered = hoveredId === app.id;
-        const dimmed = search && !app.name.toLowerCase().includes(search.toLowerCase());
+        const dimmed = !app.name.toLowerCase().includes(query);
         return (
           <div
             key={app.id}
-            role="button"
-            tabIndex={0}
-            aria-label={`Switch to ${app.name}`}
-            onClick={() => { if (!dimmed) closeStage(app.id); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeStage(app.id); } }}
-            onMouseEnter={() => setHoveredId(app.id)}
-            onMouseLeave={() => setHoveredId(null)}
             style={{
               position: 'absolute',
               left: rect.x - 4,
               top: rect.y - 4,
               width: rect.w + 8,
               height: rect.h + 8 + LABEL_H,
-              cursor: dimmed ? 'default' : 'pointer',
-              outline: 'none',
+              opacity: dimmed ? 0.35 : 1,
               zIndex: 2,
             }}
           >
-            {/* Focus/hover ring around the live window */}
-            <div style={{
-              position: 'absolute',
-              left: 0, top: 0,
-              width: rect.w + 8,
-              height: rect.h + 8,
-              borderRadius: 14,
-              border: isHovered
-                ? '2px solid var(--color-accent)'
-                : app.id === activeAppId
-                  ? '2px solid var(--color-border)'
-                  : '2px solid transparent',
-              transition: isReduceMotion() ? 'none' : 'border-color 0.12s ease',
-              pointerEvents: 'none',
-            }} />
-
             {/* Fallback card when there's no live element to scale */}
             {!rect.live && (
               <div style={{
@@ -387,7 +376,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 left: 4, top: 4,
                 width: rect.w,
                 height: rect.h,
-                borderRadius: 10,
+                borderRadius: 6,
                 background: 'var(--color-bg-surface)',
                 border: '1px solid var(--color-border-subtle)',
                 display: 'flex',
@@ -399,62 +388,27 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
                 <div style={{
                   width: 44, height: 44,
                   borderRadius: 10,
-                  background: app.color || 'var(--color-bg-hover)',
+                  background: 'var(--color-accent-soft)',
+                  color: 'var(--color-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 22,
                 }}>
-                  {app.icon || app.name.charAt(0).toUpperCase()}
+                  <DexIcon name={app.icon || app.id} size={22} />
                 </div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Running</span>
               </div>
             )}
 
-            {/* Close button on hover */}
-            {isHovered && (
-              <button
-                onClick={(e) => handleCardClose(e, app.id)}
-                title={`Close ${app.name}`}
-                aria-label={`Close ${app.name}`}
-                style={{
-                  position: 'absolute',
-                  top: -2, right: -2,
-                  width: 22, height: 22,
-                  borderRadius: '50%',
-                  background: 'var(--color-error, rgba(192,69,58,0.9))',
-                  border: '1px solid rgba(0,0,0,0.3)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 3,
-                }}
-              >
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="white" strokeWidth="1.5">
-                  <line x1="1" y1="1" x2="7" y2="7"/><line x1="7" y1="1" x2="1" y2="7"/>
-                </svg>
-              </button>
-            )}
-
-            {/* App name */}
-            <div style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              width: '100%',
-              height: LABEL_H,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12.5,
-              fontWeight: isHovered ? 500 : 400,
-              color: isHovered ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-              fontFamily: 'var(--font-family)',
-            }}>
-              {app.name}
-            </div>
+            <button type="button" className="dex-stage-switch" aria-label={`${app.minimized ? 'Restore' : 'Switch to'} ${app.name}`}
+              aria-current={(app.id === activeAppId && !app.minimized) || undefined} disabled={dimmed} onClick={() => closeStage(app.id)}>
+              <span className="dex-stage-frame" style={{ bottom: LABEL_H }} aria-hidden="true" />
+              <span className="dex-stage-title">{app.name}</span>
+            </button>
+            <button type="button" className="dex-stage-close dex-stage-card-close" aria-label={`Close ${app.name}`}
+              disabled={dimmed} onClick={(event) => closeCard(event, app.id)}>
+              <DexIcon name="close" size={13} />
+            </button>
           </div>
         );
       })}

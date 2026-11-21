@@ -660,31 +660,96 @@
   --color-warning-muted: rgba(255, 159, 10, 0.14);
   color: var(--color-text-primary);
 }
-/* Spatial desktop. A window culled off-screen skips rendering its contents
-   (the app keeps running; DOM and state are untouched). At low zoom the deep
-   window shadows are dropped -- with dozens of windows they dominate paint. */
+/* Skip painting far-offscreen windows while keeping their app instances. */
 [data-spatial-world="on"] [data-spatial-offscreen="true"] { content-visibility: hidden; }
-/* Title cards: a canvas window is live only when it is on screen and big
-   enough to use (decided in AppManager's cull, capped at 12 live); otherwise
-   its body skips rendering (the app stays mounted and keeps its state) and it
-   shows its name. Sizes are large because the window itself is scaled down. */
-[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) [data-window-body] { content-visibility: hidden; }
-[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"])::after {
-  content: attr(data-window-title);
-  position: absolute; inset: 36px 0 0 0;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px; text-align: center;
-  font-size: 56px; font-weight: 600; letter-spacing: -0.02em;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-surface);
-  pointer-events: none;
-}
-/* Title-card windows drop their deep shadows (with dozens of windows they
-   dominate paint). Keyed on the window itself: a world-level attribute with
-   descendant selectors restyled every node on the canvas when it flipped. */
-[data-spatial-world="on"] [data-floating-window]:not([data-spatial-live="true"]) { box-shadow: none !important; }
 .dex-spatial-btn:hover:not(:disabled) { background: var(--color-bg-hover) !important; }
 .dex-spatial-btn[aria-pressed="true"] { background: var(--color-accent-light) !important; color: var(--color-accent) !important; }
+
+.dex-stage-launch,
+.dex-stage-close {
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-control);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.dex-stage-close {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.dex-stage-launch:hover,
+.dex-stage-close:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.dex-stage-search:focus-within { box-shadow: 0 0 0 1px var(--color-accent); }
+
+.dex-stage-launch:focus-visible,
+.dex-stage-close:focus-visible,
+.dex-stage-switch:focus-visible,
+[data-spatial-hud] button:focus-visible,
+[data-spatial-hud] input:focus-visible,
+.dexnotes-app :is(button, input, select):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.dex-stage-switch {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 30px 0 6px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.dex-stage-switch:disabled,
+.dex-stage-close:disabled { cursor: default; }
+
+.dex-stage-frame {
+  position: absolute;
+  inset: 2px 2px 26px;
+  border: 1px solid var(--color-border-control);
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.dex-stage-switch[aria-current="true"] .dex-stage-frame,
+.dex-stage-switch:enabled:hover .dex-stage-frame,
+.dex-stage-switch:focus-visible .dex-stage-frame {
+  border-color: var(--color-accent);
+}
+
+.dex-stage-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 24px;
+}
+
+.dex-stage-card-close { position: absolute; right: 2px; bottom: 0; }
+
+.dex-spatial-tabs { background: transparent !important; }
+.dex-spatial-tabs [role="tab"] { border-radius: 4px !important; }
+.dex-spatial-tabs [role="tab"]:not([aria-selected="true"]):hover,
+.dex-spatial-tabs [aria-selected="true"] {
+  background: var(--color-accent-light) !important;
+  color: var(--color-accent) !important;
+}
 .dex-spatial-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 /* The default (non-custom) light accent #0066CC is tuned for light surfaces;
