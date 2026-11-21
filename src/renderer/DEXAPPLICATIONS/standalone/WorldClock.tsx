@@ -6,6 +6,8 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useReducedMotion } from '../../utils/useReducedMotion';
+import { MeetingPlanner } from './MeetingPlanner';
+import { Button } from '../../ui/Button';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface ClockZone {
@@ -129,6 +131,7 @@ const WorldClock: React.FC = () => {
 
   const [showAnalog, setShowAnalog] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
   const [query, setQuery] = useState('');
   // Active row in the search list for keyboard (Arrow/Enter) navigation.
   const [activeResult, setActiveResult] = useState(0);
@@ -463,6 +466,7 @@ const WorldClock: React.FC = () => {
       <div className="dex-liquid-glass" style={s.toolbar}>
         <span style={s.title}>World Clock</span>
         <div style={s.toolbarRight}>
+          <Button size="sm" variant="subtle" aria-pressed={showPlanner} onClick={() => setShowPlanner(value => !value)}>Plan meeting</Button>
           <button className="dex-liquid-glass" style={{ ...s.toggleBtn, fontWeight: is24h ? 700 : 400 }} onClick={() => setIs24h(!is24h)} aria-label="Toggle 12/24 hour">
             {is24h ? '24h' : '12h'}
           </button>
@@ -479,6 +483,7 @@ const WorldClock: React.FC = () => {
         </div>
       </div>
 
+      {showPlanner && <MeetingPlanner cities={activeZones} is24h={is24h} />}
       {/* Add City Panel with search + autocomplete */}
       {showAdd && (
         <div className="dex-liquid-glass-strong" style={s.addPanel}>

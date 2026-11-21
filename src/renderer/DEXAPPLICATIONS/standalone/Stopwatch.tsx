@@ -6,6 +6,7 @@
  */
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { computeLapStats } from '../../../shared/format/lapStats';
+import { saveBlobAs } from '../../services/nativeSave';
 import { useTimerStore, stopwatchElapsed } from '../../store/timerStore';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 
@@ -83,6 +84,24 @@ const Stopwatch: React.FC = () => {
     }
   }, [laps, splits, exporting]);
 
+  const [savingCsv, setSavingCsv] = useState(false);
+  const saveCsv = async () => {
+    if (!laps.length || savingCsv) return;
+    setSavingCsv(true);
+    try {
+      const rows = ['Lap,Split (ms),Elapsed (ms)'];
+      for (let index = laps.length - 1; index >= 0; index--) {
+        rows.push([laps.length - index, splits[index], laps[index]].join(','));
+      }
+      await saveBlobAs('dex-stopwatch-laps.csv', new Blob([rows.join('\r\n') + '\r\n'], { type: 'text/csv' }),
+        { title: 'Save stopwatch laps', source: 'Stopwatch' });
+    } catch {
+      // The shared save bridge reports native write failures.
+    } finally {
+      setSavingCsv(false);
+    }
+  };
+
   return (
     <div style={s.container} className="dex-stopwatch">
       <style>{`
@@ -123,7 +142,10 @@ const Stopwatch: React.FC = () => {
             <span className="dex-label-caps" style={s.lapHeaderText}>Lap</span>
             <span className="dex-label-caps" style={s.lapHeaderText}>Split</span>
             <span className="dex-label-caps" style={s.lapHeaderText}>Time</span>
-            <button style={s.exportBtn} onClick={exportLaps} disabled={exporting} title="Copy laps to clipboard" aria-label="Copy laps to clipboard">Copy</button>
+            <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+              <button style={s.exportBtn} onClick={exportLaps} disabled={exporting} title="Copy laps to clipboard" aria-label="Copy laps to clipboard">Copy</button>
+              <button style={s.exportBtn} onClick={() => void saveCsv()} disabled={savingCsv} aria-label="Save laps as CSV">CSV</button>
+            </span>
           </div>
           <div style={s.lapList}>
             {laps.map((l, i) => {

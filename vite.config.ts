@@ -152,6 +152,7 @@ export default defineConfig({
           }
           if (id.includes('node_modules/dompurify')) return 'sanitize-vendor';
           if (id.includes('node_modules/d3-force')) return 'd3-vendor';
+          if (id.includes('node_modules/qrcode/')) return 'qr-vendor';
           // These two runtime deps had no vendor rule and were being inlined into
           // whichever (often eager) chunk imported them first. Split them out so
           // they cache once and stay off the eager critical path.
