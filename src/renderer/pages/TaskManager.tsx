@@ -77,7 +77,7 @@ const loadPinned = (): number[] => {
 };
 
 /** kind comes from the native classifier (proc_classify.rs): DEX's own tree, apps with a window, background. */
-interface SystemProcess { pid: number; name: string; cpu?: number; memory?: number; parent?: number | null; kind?: 'app' | 'background' | 'dex' }
+interface SystemProcess { pid: number; name: string; cpu?: number; memory?: number; parent?: number | null; startedAt?: number; kind?: 'app' | 'background' | 'dex' }
 type ProcKind = 'app' | 'dex' | 'background';
 const KIND_ORDER: ProcKind[] = ['app', 'dex', 'background'];
 const KIND_LABEL: Record<ProcKind, string> = { app: 'Apps', dex: 'DEX', background: 'Background processes' };
@@ -517,7 +517,7 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
   interface Group { key: string; procs: SystemProcess[]; cpu: number; memory: number }
   type Row =
     | { kind: 'category'; cat: ProcKind; count: number; cpu: number; memory: number }
-    | { kind: 'group'; group: Group }
+    | { kind: 'group'; group: Group; groupId: string }
     | { kind: 'proc'; proc: SystemProcess; nested: boolean; pinned: boolean };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -534,12 +534,12 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
         out.push({ kind: 'category', cat, count: list.length, cpu, memory });
         if (catCollapsed[cat]) continue;
       }
-      out.push(...buildRows(list));
+      out.push(...buildRows(list, cat));
     }
     return out;
   }, [visible, pinnedSet, groupBy, collapsed, sortKey, sortDir, catCollapsed]);
 
-  function buildRows(visible: SystemProcess[]): Row[] {
+  function buildRows(visible: SystemProcess[], category: ProcKind | null): Row[] {
     const out: Row[] = [];
     if (!groupBy) {
       for (const p of visible) if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: false, pinned: false });
@@ -560,14 +560,15 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
         : dir * (a.cpu - b.cpu));
     for (const g of groups) {
       if (g.procs.length === 1) { const p = g.procs[0]; if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: false, pinned: false }); continue; }
-      out.push({ kind: 'group', group: g });
-      if (!collapsed[g.key]) for (const p of g.procs) if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: true, pinned: false });
+      const groupId = (category ?? 'all') + ':' + g.key;
+      out.push({ kind: 'group', group: g, groupId });
+      if (!collapsed[groupId]) for (const p of g.procs) if (!pinnedSet.has(p.pid)) out.push({ kind: 'proc', proc: p, nested: true, pinned: false });
     }
     return out;
   }
 
   const virt = useVirtualList({ itemCount: rows.length, rowHeight: PROCESS_ROW_H, bufferRows: 8 });
-  const selected = selectedPid == null ? null : processes.find(p => p.pid === selectedPid) || null;
+  const selected = selectedPid == null ? null : visible.find(p => p.pid === selectedPid) || null;
 
   const sortBy = (key: SortKey) => {
     if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -583,7 +584,7 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const i = procRows.findIndex(r => r.proc.pid === selectedPid);
-      const n = e.key === 'ArrowDown' ? Math.min(procRows.length - 1, i + 1) : Math.max(0, i - 1);
+      const n = e.key === 'ArrowDown' ? Math.min(procRows.length - 1, i + 1) : i < 0 ? procRows.length - 1 : Math.max(0, i - 1);
       const next = procRows[n];
       if (next) {
         setSelectedPid(next.proc.pid);
@@ -666,13 +667,13 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
                 }
                 if (row.kind === 'group') {
                   const g = row.group;
-                  const isCollapsed = !!collapsed[g.key];
+                  const isCollapsed = !!collapsed[row.groupId];
                   return (
                     <button
                       type="button"
-                      key={`g-${g.key}`}
+                      key={row.groupId}
                       aria-expanded={!isCollapsed}
-                      onClick={() => setCollapsed(c => ({ ...c, [g.key]: !c[g.key] }))}
+                      onClick={() => setCollapsed(c => ({ ...c, [row.groupId]: !c[row.groupId] }))}
                       style={{ ...S.tr, ...S.groupRow }}
                     >
                       <span style={S.cellName}>
@@ -726,6 +727,8 @@ const ProcessesView: React.FC<ProcessesViewProps> = ({ processes, bridgeOk, busy
             <dt style={S.k}>Application</dt><dd style={S.v}>{groupKeyFor(selected.name)}</dd>
             <dt style={S.k}>CPU</dt><dd style={S.v}>{(selected.cpu || 0).toFixed(1)}%</dd>
             <dt style={S.k}>Memory</dt><dd style={S.v}>{fmtMB(selected.memory || 0)}</dd>
+            {selected.parent != null && <><dt style={S.k}>Parent PID</dt><dd style={S.v}>{selected.parent}</dd></>}
+            {!!selected.startedAt && <><dt style={S.k}>Started</dt><dd style={S.v}>{new Date(selected.startedAt * 1000).toLocaleString()}</dd></>}
             <dt style={S.k}>Seen for</dt><dd style={S.v}>{firstSeen.has(selected.pid) ? fmtAge(firstSeen.get(selected.pid)!) : '—'}</dd>
           </dl>
           <div style={S.inspActions}>

@@ -186,12 +186,13 @@ export const Power: React.FC = () => {
       const native = next === 'saver' ? 'eco' : next === 'performance' ? 'boost' : 'balanced';
       const res = await dex()?.power?.setProfile?.(native);
       const actual = await dex()?.power?.getProfile?.().catch(() => null);
-      setMode(actual ? modeFromNative(actual) : next);
+      if (actual) setMode(modeFromNative(actual));
       const changes: string[] = Array.isArray(res?.changes) ? res.changes : [];
       // Surface failures (e.g. "may require admin"); success needs no message.
       const problem = changes.find(c => /could not|requires|not available/i.test(c));
       if (!res) setModeNote('Power plans can only be changed in the DEX app.');
       else if (problem) setModeNote(problem);
+      else if (res.success === false || !actual) setModeNote('Could not verify the active power plan.');
     } catch {
       setModeNote('Could not change the power plan.');
     } finally {
@@ -201,6 +202,7 @@ export const Power: React.FC = () => {
 
   // --- Keep awake (Screen Wake Lock API) ---
   const wakeLock = useRef<any>(null);
+  const wakeRequest = useRef(0);
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [awakeUntil, setAwakeUntil] = useState(0);
   const wakeSupported = typeof (navigator as any).wakeLock?.request === 'function';
@@ -210,13 +212,21 @@ export const Power: React.FC = () => {
     wakeLock.current = null;
   }, []);
   const stopAwake = useCallback(() => {
+    wakeRequest.current++;
     if (wakeTimer.current) { clearTimeout(wakeTimer.current); wakeTimer.current = null; }
     releaseWake();
     setAwakeUntil(0);
   }, [releaseWake]);
   const requestWake = useCallback(async () => {
     try {
-      if (!document.hidden) wakeLock.current = await (navigator as any).wakeLock.request('screen');
+      if (document.hidden) return false;
+      const request = ++wakeRequest.current;
+      const lock = await (navigator as any).wakeLock.request('screen');
+      if (document.hidden || request !== wakeRequest.current) {
+        await lock.release();
+        return false;
+      }
+      wakeLock.current = lock;
       return true;
     } catch { return false; }
   }, []);
@@ -230,7 +240,7 @@ export const Power: React.FC = () => {
   // The OS drops wake locks when the page hides; take it back on return.
   useEffect(() => {
     const onVis = () => {
-      if (!document.hidden && awakeUntil > Date.now() && !wakeLock.current) void requestWake();
+      if (!document.hidden && awakeUntil > Date.now() && (!wakeLock.current || wakeLock.current.released)) void requestWake();
       pushLog(document.hidden ? 'Display off or DEX hidden' : 'Resumed');
     };
     document.addEventListener('visibilitychange', onVis);

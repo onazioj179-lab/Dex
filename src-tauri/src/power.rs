@@ -254,6 +254,9 @@ pub fn set_profile(app: &tauri::AppHandle, profile: &str) -> Value {
     let previous = g.current_profile.clone();
     let mut changes: Vec<String> = Vec::new();
     apply_profile(profile, &mut changes);
+    if cfg!(target_os = "windows") && active_scheme_profile() != Some(profile) {
+        return json!({ "success": false, "message": "Could not verify the active Windows power plan", "changes": changes });
+    }
     g.previous_profile = Some(previous);
     g.current_profile = profile.to_string();
     g.applied_at = now_ms();
