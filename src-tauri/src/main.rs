@@ -665,6 +665,7 @@ fn system_processes() -> Value {
                 "cpu": p.cpu,
                 "memory": p.memory_mb,
                 "parent": parents.get(&p.pid),
+                "startedAt": sys.process(sysinfo::Pid::from_u32(p.pid)).map(|process| process.start_time()),
                 "kind": kinds.get(&p.pid).copied().unwrap_or("background"),
             })
         })

@@ -245,15 +245,19 @@ pub fn set_profile(app: &tauri::AppHandle, profile: &str) -> Value {
     let profile = normalize_profile(profile);
     let st = lock_state(app);
     let mut g = st.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(actual) = active_scheme_profile() {
+    let active = active_scheme_profile();
+    if let Some(actual) = active {
         g.current_profile = actual.to_string();
     }
-    if g.current_profile == profile {
+    if g.current_profile == profile && (!cfg!(target_os = "windows") || active == Some(profile)) {
         return json!({ "success": true, "message": format!("Already in {} mode", profile), "changes": [] });
     }
     let previous = g.current_profile.clone();
     let mut changes: Vec<String> = Vec::new();
     apply_profile(profile, &mut changes);
+    if cfg!(target_os = "windows") && active_scheme_profile() != Some(profile) {
+        return json!({ "success": false, "message": "Could not verify the active Windows power plan", "changes": changes });
+    }
     g.previous_profile = Some(previous);
     g.current_profile = profile.to_string();
     g.applied_at = now_ms();

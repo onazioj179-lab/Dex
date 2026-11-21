@@ -18,9 +18,12 @@
 - **Search**: the App Menu and Classic Dock keep the search field anchored as results load. Search also finds code projects and offers "Ask UKI".
 - **Pixel Art**: undo and redo. **Project Dashboard**: status report into Notes.
 
+## Build serials
+- **002a** adds Files tabs and folder scans, project-linked Env Manager profiles, Task Manager process details, and Windows power-plan verification.
+
 ## Updates
-- Settings › Software Update checks the stable GitHub release, shows download progress, verifies the update, and restarts DEX when you install it.
-- Install 7.0.2 once to enable future in-app updates. Each stable release publishes one Windows setup executable.
+- Settings › Software Update shows the installed local preview build.
+- New preview builds are installed locally when approved.
 
 ## Everywhere
 - Confirmations and name prompts use DEX's own dialog instead of the system box.

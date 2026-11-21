@@ -30,11 +30,13 @@ import { requestTerminalAt } from '../components/terminalProfiles';
 import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
+import { FolderAnalysis } from './FolderAnalysis';
 import { FilesBatchRenameDialog } from './FilesBatchRenameDialog';
 import { usePinRegistry } from '../store/pinRegistry';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
-import { useDexSetting, readDexSetting } from '../hooks/useDexSetting';
+import { Button, IconButton } from '../ui/Button';
+import { useDexSetting, readDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { keyEventForApp, isTypingTarget } from '../shell/input/appKeyScope';
 import { toLocalDateInput } from '../utils/localDate';
 import { WindowToolbar } from '../shell/windowChrome';
@@ -373,14 +375,16 @@ export const Files: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [showBatchRename, setShowBatchRename] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState('documents');
+  const [locationTabs, setLocationTabs] = useState([{ id: 0, history: ['documents'], index: 0 }]);
+  const [activeLocationTab, setActiveLocationTab] = useState(0);
+  const nextLocationTab = useRef(1);
+  const { history, index: historyIndex } = locationTabs.find(tab => tab.id === activeLocationTab) ?? locationTabs[0];
+  const selectedLocation = history[historyIndex];
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'column'>('list');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>(['documents']);
-  const [historyIndex, setHistoryIndex] = useState(0);
   const listingRequest = useRef(0);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
@@ -776,8 +780,9 @@ export const Files: React.FC = () => {
   useEffect(() => {
     setSelectedFile(null);
     setSelectedFiles(new Set());
+    setColumnPath([selectedLocation]);
     loadFiles(selectedLocation);
-  }, [selectedLocation, loadFiles]);
+  }, [selectedLocation, activeLocationTab, loadFiles]);
 
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
@@ -813,31 +818,41 @@ export const Files: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedFile, files, historyIndex, currentPath]);
+  }, [selectedFile, files, historyIndex, currentPath, activeLocationTab]);
 
   const navigateTo = (path: string) => {
     setActiveCollection(null);
-    if (path === history[historyIndex]) return;
-    const newHistory = [...history.slice(0, historyIndex + 1), path];
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-    setSelectedLocation(path);
+    setLocationTabs(tabs => tabs.map(tab => {
+      if (tab.id !== activeLocationTab || path === tab.history[tab.index]) return tab;
+      const history = [...tab.history.slice(0, tab.index + 1), path];
+      return { ...tab, history, index: history.length - 1 };
+    }));
   };
 
-  const goBack = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setSelectedLocation(history[historyIndex - 1]);
-      setActiveCollection(null);
-    }
+  const moveHistory = (offset: number) => {
+    setActiveCollection(null);
+    setLocationTabs(tabs => tabs.map(tab => tab.id === activeLocationTab
+      ? { ...tab, index: Math.max(0, Math.min(tab.history.length - 1, tab.index + offset)) }
+      : tab));
   };
+  const goBack = () => moveHistory(-1);
+  const goForward = () => moveHistory(1);
 
-  const goForward = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setSelectedLocation(history[historyIndex + 1]);
-      setActiveCollection(null);
-    }
+  const switchLocationTab = (id: number) => {
+    setActiveCollection(null);
+    setActiveLocationTab(id);
+  };
+  const addLocationTab = () => {
+    const id = nextLocationTab.current++;
+    setLocationTabs(tabs => [...tabs, { id, history: [selectedLocation], index: 0 }]);
+    switchLocationTab(id);
+  };
+  const closeLocationTab = (id: number) => {
+    if (locationTabs.length < 2) return;
+    const index = locationTabs.findIndex(tab => tab.id === id);
+    const remaining = locationTabs.filter(tab => tab.id !== id);
+    setLocationTabs(remaining);
+    if (id === activeLocationTab) switchLocationTab(remaining[Math.min(index, remaining.length - 1)].id);
   };
 
   // System Back (Alt+Left, mouse side buttons, edge swipe) goes to the previous
@@ -1773,6 +1788,17 @@ export const Files: React.FC = () => {
 
       {/* Main Content */}
       <div style={styles.main}>
+        <div role="group" aria-label="Folder tabs" style={{ display: 'flex', gap: 4, alignItems: 'center', overflowX: 'auto', padding: '4px var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+          {locationTabs.map(tab => {
+            const path = tab.history[tab.index];
+            const name = QUICK_ACCESS.find(item => item.path === path)?.name ?? (path.split(/[\\/]/).filter(Boolean).pop() || path);
+            return <div key={tab.id} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <Button size="sm" variant={tab.id === activeLocationTab ? 'secondary' : 'ghost'} aria-pressed={tab.id === activeLocationTab} title={path} onClick={() => switchLocationTab(tab.id)}>{name}</Button>
+              {locationTabs.length > 1 && <IconButton size="sm" variant="ghost" ariaLabel={'Close folder tab ' + name} icon={<DexIcon name="close" size={12} />} onClick={() => closeLocationTab(tab.id)} />}
+            </div>;
+          })}
+          <IconButton size="sm" variant="ghost" ariaLabel="New folder tab" icon={<DexIcon name="plus" size={14} />} onClick={addLocationTab} />
+        </div>
         {/* Toolbar */}
         <WindowToolbar inline={(bar) => <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Files">{bar}</div>}>
           <div style={styles.navButtons}>
@@ -1827,6 +1853,9 @@ export const Files: React.FC = () => {
               onClear={() => setFilters(f => ({ ...f, query: '' }))}
               style={{ width: 240 }}
             />
+
+            <Button size="sm" variant="ghost" aria-pressed={showHiddenFiles}
+              onClick={() => writeDexSetting('showHiddenFiles', !showHiddenFiles)}>Show hidden files</Button>
 
             {/* Filter Toggle */}
             <button
@@ -1967,6 +1996,9 @@ export const Files: React.FC = () => {
         </WindowToolbar>
 
         {/* Filter Bar */}
+        {showFilters && !loading && !loadError && currentPath && !activeCollection && (
+          <FolderAnalysis key={currentPath} path={currentPath} />
+        )}
         {showFilters && (
           <div style={styles.filterBar}>
             <div style={styles.filterGroup}>
@@ -2058,7 +2090,12 @@ export const Files: React.FC = () => {
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
             <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
             <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
-            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={async () => {
+              try {
+                await navigator.clipboard.writeText([...selectedFiles].join('\n'));
+                toast.success('Paths copied');
+              } catch { toast.error('Could not copy paths'); }
+            }} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
             <button onClick={() => handleSelectAll()} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
             <button onClick={clearSelection} style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
@@ -2202,7 +2239,8 @@ export const Files: React.FC = () => {
               {columnPath.map((colPath, colIdx) => {
                 // Column 0 mirrors the live (filtered) main list; deeper columns
                 // render the cached listing for their own path.
-                const colEntries = colIdx === 0 ? filteredFiles : (columnData[colPath] ?? []);
+                const colEntries = colIdx === 0 ? filteredFiles : (columnData[colPath] ?? [])
+                  .filter(file => showHiddenFiles || (!file.hidden && !file.name.startsWith('.')));
                 const isColLoading = colIdx !== 0 && columnData[colPath] === undefined && columnLoading.has(colPath);
                 const isColEmpty = colIdx !== 0 && !isColLoading && columnData[colPath] !== undefined && colEntries.length === 0;
                 return (
