@@ -78,6 +78,30 @@ test.describe('Morphing Dock', () => {
     await expect(menu).toBeHidden();
   });
 
+  test('Classic dock search stays in the viewport and lets Tab leave the results', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 620 });
+    await page.addInitScript(() => {
+      localStorage.setItem('dex-dock-prefs-v1', JSON.stringify({ style: 'classic', acV2: true }));
+      localStorage.setItem('dex-floating-launcher-v2', JSON.stringify({ x: 0, y: 530, enabled: true }));
+    });
+    await page.goto('/');
+    const input = page.getByRole('combobox', { name: 'Spotlight Search' });
+    await expect(input).toBeVisible();
+    const field = await input.boundingBox();
+    const results = page.getByRole('listbox', { name: 'Search results' });
+    await input.fill('calculator');
+    await expect(results.getByRole('option').first()).toBeVisible();
+    const panel = await results.boundingBox();
+    expect(panel).not.toBeNull();
+    inside({ x: panel!.x, y: panel!.y, w: panel!.width, h: panel!.height }, { w: 800, h: 620 });
+    await input.fill('notes');
+    await expect(results.getByRole('option').filter({ hasText: 'Notes' }).first()).toBeVisible();
+    expect(await results.boundingBox()).toEqual(panel);
+    expect(await input.boundingBox()).toEqual(field);
+    await input.press('Tab');
+    await expect(results).toBeHidden();
+  });
+
   test('stays centred open and collapsed, collapse is faster, nothing leaves the screen', async ({ page }) => {
     await boot(page);
     const v = await vp(page);

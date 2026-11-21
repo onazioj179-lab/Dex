@@ -140,6 +140,8 @@ const ResultItem: React.FC<{
   return (
     <button
       id={id}
+      type="button"
+      tabIndex={-1}
       onClick={onClick}
       onContextMenu={appId ? (e) => { e.preventDefault(); e.stopPropagation(); openAppContextMenu({ appId, x: e.clientX, y: e.clientY, source: 'search' }); } : undefined}
       onMouseDown={e => e.preventDefault()}
@@ -569,7 +571,12 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         else setShowResults(false);
         break;
       case 'Tab':
-        if (variant !== 'overlay' || !flatResults.length) break;
+        if (variant === 'home') {
+          cancelSearch();
+          setShowResults(false);
+          break;
+        }
+        if (!flatResults.length) break;
         e.preventDefault();
         if (e.shiftKey) {
           setSelectedIndex(i => Math.max(i - 1, 0));
@@ -655,6 +662,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           <div
             ref={resultsRef}
             id={resultsId}
+            tabIndex={-1}
             role="listbox"
             aria-label="Search results"
             className="spotlight-results-scroll"
