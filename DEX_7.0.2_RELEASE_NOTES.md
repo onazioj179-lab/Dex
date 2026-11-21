@@ -1,6 +1,6 @@
 # DEX OS 7.0.2 — Release Notes
 
-**Creator:** Onazi oJ · **Status:** not released (see `DEX_7.0.2_VERIFICATION.md`)
+**Creator:** Onazi oJ
 
 ## UKI, Xack and Umari
 - **Xack** checks every UKI action in Rust: what it is, how risky it is, and whether it needs your approval. Approvals cover one exact command in one folder, once; the terminal refuses to run without one. You can allow a command for the session and revoke it in Security Center, where the full action history lives.
@@ -15,8 +15,12 @@
 - **DEX Code**: Tests tab runs your project's own test command (with approval) and summarises the results.
 - **Files**: rename many items at once with a conflict-checked preview.
 - **Browser**: search all saved history; remove single visits.
-- **Search**: code projects and "Ask UKI" in the App Menu search.
+- **Search**: the App Menu and Classic Dock keep the search field anchored as results load. Search also finds code projects and offers "Ask UKI".
 - **Pixel Art**: undo and redo. **Project Dashboard**: status report into Notes.
+
+## Updates
+- Settings › Software Update checks the stable GitHub release, shows download progress, verifies the update, and restarts DEX when you install it.
+- Install 7.0.2 once to enable future in-app updates. Each stable release publishes one Windows setup executable.
 
 ## Everywhere
 - Confirmations and name prompts use DEX's own dialog instead of the system box.
@@ -24,6 +28,5 @@
 - About shows the full build: `7.0.2+build.<n>`, serial, commit, channel and build time.
 
 ## Known limitations
-- Unsigned installers (no certificate).
-- Installer, upgrade and rollback not yet tested on this build.
+- Windows may show a SmartScreen prompt because the installer has no Authenticode certificate. In-app updates use a separate DEX signature.
 - Cloud AI features need your own provider key.

@@ -50,6 +50,7 @@ windows-core = "0.61"
 # UKI voice: Windows.Media.SpeechRecognition (speech_ctl.rs). Same 0.61 line as
 # webview2-com, so no second copy of the bindings.
 windows = { version = "0.61", features = ["Media_SpeechRecognition", "Foundation", "Foundation_Collections", "Globalization"] }
+tauri-plugin-updater = { version = "2.14.1", default-features = false, features = ["native-tls", "system-proxy"] }
 
 # Release builds: full optimisation, cross-crate LTO, one codegen unit for the
 # best code, and no debug info in the shipped exe. On MSVC symbols never live in

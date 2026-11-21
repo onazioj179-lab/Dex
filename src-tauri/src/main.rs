@@ -3259,6 +3259,8 @@ fn main() {
     startup_timeline::mark("WebView2 check");
     webview2::start_load_watchdog(std::time::Duration::from_secs(30));
     let builder = tauri::Builder::default();
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     // MUST be the first plugin. A second launch focuses the running window and
     // exits instead of starting a duplicate shell: a duplicate would double-run
     // the reminder/autobackup schedulers and file watchers on the same dex.db,
