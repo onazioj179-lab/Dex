@@ -416,7 +416,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         }}
         style={{
           padding: viewMode === 'compact' ? '5px 8px' : '7px 9px',
-          borderRadius: 5,
+          borderRadius: 6,
           cursor: 'pointer',
           transition: 'background 0.1s',
           marginBottom: 2,

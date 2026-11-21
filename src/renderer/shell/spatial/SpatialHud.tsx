@@ -33,7 +33,7 @@ const panel: React.CSSProperties = {
   // Shell glass material (follows Settings > Liquid Glass; solid when off).
   background: 'var(--color-bg-glass-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
   border: '1px solid var(--color-border)',
-  borderRadius: 7, boxShadow: '0 8px 24px rgba(0,0,0,0.28)', color: 'var(--color-text-primary)',
+  borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.28)', color: 'var(--color-text-primary)',
 };
 
 const Icon: React.FC<{ d: string; size?: number }> = ({ d, size = 14 }) => (
@@ -95,7 +95,7 @@ export const SpatialHud: React.FC = () => {
   }, [pct]);
 
   return (
-    <div data-spatial-hud="" style={{ position: 'absolute', right: 12, top: 12, maxWidth: 'calc(100% - 24px)', zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pointerEvents: 'none' }}>
+    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, top: 16, maxWidth: 'calc(100% - 32px)', zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pointerEvents: 'none' }}>
       {!panelOpen && <div aria-hidden="true" style={{
         ...panel, padding: '4px 10px', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
         opacity: showZoom ? 1 : 0, transition: 'opacity 160ms var(--ease-standard, ease)',
@@ -367,7 +367,7 @@ export const SpatialGroupFrames: React.FC = () => {
         return (
           <div key={g.id} data-spatial-group={g.id} aria-hidden="true" style={{
             position: 'fixed', left: b.x - FRAME_PAD, top: b.y - FRAME_PAD - FRAME_HEADER, width: b.w + FRAME_PAD * 2, height: b.h + FRAME_PAD * 2 + FRAME_HEADER,
-            border: `1px solid ${g.color}`, borderRadius: 7,
+            border: `1px solid ${g.color}`, borderRadius: 6,
             background: `color-mix(in srgb, ${g.color} 6%, transparent)`, zIndex: 100, pointerEvents: 'none',
           }}>
             <div
@@ -458,7 +458,7 @@ export const SpatialZones: React.FC = () => {
       {zones.map((z) => (
         <div key={z.id} data-spatial-zone={z.id} aria-hidden="true" style={{
           position: 'fixed', left: z.x, top: z.y, width: z.w, height: z.h, zIndex: 50, pointerEvents: 'none',
-          border: `1px dashed color-mix(in srgb, ${z.color} 70%, transparent)`, borderRadius: 8,
+          border: `1px dashed color-mix(in srgb, ${z.color} 70%, transparent)`, borderRadius: 10,
           background: `color-mix(in srgb, ${z.color} 4%, transparent)`,
         }}>
           <div title="Drag to move the zone and its windows" onPointerDown={(e) => startDrag(e, z.id, 'move')}

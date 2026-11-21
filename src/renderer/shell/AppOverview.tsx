@@ -387,7 +387,7 @@ export const AppOverview: React.FC<AppOverviewProps> = ({
               }}>
                 <div style={{
                   width: 44, height: 44,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   background: 'var(--color-accent-soft)',
                   color: 'var(--color-accent)',
                   display: 'flex',
