@@ -4,6 +4,7 @@
  * Layered raster drawing canvas with brushes, shapes, text, pan/zoom and history.
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useCreativeInput } from '../../services/creativeIntake';
 import { CAPSULE_HEIGHT, CAPSULE_SELECTED_BG } from '../../components/controls/capsuleTokens';
 import DexIcon from '../../components/DexIcon';
 import { CanvasObjectLayer } from './CanvasObjectLayer';
@@ -168,6 +169,7 @@ const Canvas: React.FC = () => {
   const [connectFrom, setConnectFrom] = useState<string | null | undefined>(undefined);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [color, setColor] = useState('#000000');
+  useCreativeInput('canvas', setColor);
   const [brushSize, setBrushSize] = useState(4);
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [fontSize, setFontSize] = useState(28);

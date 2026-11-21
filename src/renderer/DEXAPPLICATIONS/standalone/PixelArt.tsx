@@ -4,6 +4,7 @@
  * NES-style pixel grid editor with frames, onion-skin, symmetry, and PNG export
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useCreativeInput } from '../../services/creativeIntake';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassToolbar } from '../../styles/glassMenu';
 import { keyEventForApp, isTypingTarget } from '../../shell/input/appKeyScope';
@@ -730,6 +731,11 @@ const PixelArt: React.FC = () => {
       toast('error', 'Image import failed');
     }
   }, [size, currentFrame, paletteLock, lockedPalette]);
+
+  useCreativeInput('pixelart', value => {
+    if (typeof value === 'string') setColor(value);
+    else importImage(value);
+  });
 
   const onImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
