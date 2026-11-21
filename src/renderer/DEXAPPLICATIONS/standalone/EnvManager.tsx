@@ -16,6 +16,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { glassPanel, glassButton } from '../../styles/glassMenu';
 import { DexSearchInput } from '../../styles/components';
+import { Button } from '../../ui/Button';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { APP_DEFINITIONS } from '../../store/runningApps';
@@ -92,7 +93,7 @@ const persistProfiles = (profiles: EnvProfile[]) => {
 
 // Parse .env text into entries. Preserves trailing inline `# comment`.
 // Full-line comments and blanks are dropped (keys are the unit of the model).
-const parseEnv = (text: string): EnvEntry[] => {
+export const parseEnv = (text: string): EnvEntry[] => {
   const out: EnvEntry[] = [];
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -101,23 +102,18 @@ const parseEnv = (text: string): EnvEntry[] => {
     if (eq < 0) continue;
     let key = line.slice(0, eq).trim();
     if (key.startsWith('export ')) key = key.slice(7).trim();
-    if (!key) continue;
+    if (!NAME_RE.test(key)) continue;
     let rest = line.slice(eq + 1);
     let comment: string | undefined;
-    // A quoted value may legitimately contain '#'; only strip a comment that
-    // sits outside quotes.
+    // Double-quoted exports escape quotes, backslashes, and line breaks.
+    // Single-quoted values are literal.
     const trimmed = rest.trimStart();
     if (trimmed.startsWith('"') || trimmed.startsWith("'")) {
-      const quote = trimmed[0];
-      const end = trimmed.indexOf(quote, 1);
-      if (end >= 0) {
-        const after = trimmed.slice(end + 1);
-        const hash = after.indexOf('#');
-        if (hash >= 0) comment = after.slice(hash + 1).trim();
-        rest = trimmed.slice(1, end);
-      } else {
-        rest = trimmed.slice(1);
-      }
+      const quoted = /^(?:"((?:[^"\\]|\\.)*)"|'([^']*)')\s*(?:#\s*(.*))?$/.exec(trimmed);
+      if (!quoted) continue;
+      const escapes: Record<string, string> = { '"': '"', '\\': '\\', n: '\n', r: '\r', t: '\t' };
+      rest = quoted[1]?.replace(/\\(["\\nrt])/g, (_, escape: string) => escapes[escape]) ?? quoted[2];
+      comment = quoted[3];
     } else {
       const hash = rest.indexOf('#');
       if (hash >= 0) { comment = rest.slice(hash + 1).trim(); rest = rest.slice(0, hash); }
@@ -128,11 +124,13 @@ const parseEnv = (text: string): EnvEntry[] => {
   return out;
 };
 
-const needsQuote = (v: string): boolean => /\s|#|"|'/.test(v);
+const needsQuote = (value: string): boolean => /\s|#|"|'|\\/.test(value);
 
-const serializeEnv = (entries: EnvEntry[]): string =>
+export const serializeEnv = (entries: EnvEntry[]): string =>
   entries.map(e => {
-    const v = needsQuote(e.value) ? `"${e.value.replace(/"/g, '\\"')}"` : e.value;
+    const escaped = e.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    const v = needsQuote(e.value) ? '"' + escaped + '"' : e.value;
     return `${e.key}=${v}${e.comment ? ` # ${e.comment}` : ''}`;
   }).join('\n') + (entries.length ? '\n' : '');
 
@@ -171,6 +169,7 @@ export default function EnvManager(): React.ReactElement {
   });
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
+  const importFileRef = useRef<HTMLInputElement>(null);
   const [diffTarget, setDiffTarget] = useState('');
   const [requiredInput, setRequiredInput] = useState('');
 
@@ -230,7 +229,7 @@ export default function EnvManager(): React.ReactElement {
     else if (scope === 'global') entries = Object.entries(managed.global).map(([name, value]) => ({ name, value }));
     else entries = Object.entries(managed.apps[scope] || {}).map(([name, value]) => ({ name, value }));
     return entries
-      .filter(e => !q || e.name.toLowerCase().includes(q) || e.value.toLowerCase().includes(q))
+      .filter(e => !q || e.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [isProfile, activeProfile, isSystem, scope, system, managed, query]);
 
@@ -375,12 +374,14 @@ export default function EnvManager(): React.ReactElement {
     if (!activeProfile) return;
     const parsed = parseEnv(importText);
     if (!parsed.length) { toast('error', 'No KEY=VALUE lines found'); return; }
-    // Merge: parsed keys overwrite, others are kept.
-    const byKey = new Map(activeProfile.entries.map(e => [e.key, e] as const));
-    for (const e of parsed) byKey.set(e.key, e);
-    mutateActiveProfile(() => Array.from(byKey.values()));
+    const imported = new Map(parsed.map(entry => [entry.key, entry]));
+    mutateActiveProfile(entries => [...entries.filter(entry => !imported.has(entry.key)), ...imported.values()]);
     setShowImport(false); setImportText('');
-    toast('success', `Imported ${parsed.length} key${parsed.length === 1 ? '' : 's'}`);
+    const duplicateCount = parsed.length - imported.size;
+    const count = imported.size;
+    const summary = 'Imported ' + count + (count === 1 ? ' key' : ' keys');
+    if (duplicateCount) toast('info', summary + '. Used the last value for repeated keys.');
+    else toast('success', summary);
   }, [activeProfile, importText, mutateActiveProfile]);
 
   const exportEnv = useCallback(() => {
@@ -479,7 +480,7 @@ export default function EnvManager(): React.ReactElement {
             )}
           </select>
           <button style={{ ...glassButton, padding: '4px 8px', fontSize: 12 }} onClick={createProfile}>+ Profile</button>
-          <DexSearchInput aria-label="Search variables" size="sm" value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search" style={{ minWidth: 160 }} />
+          <DexSearchInput aria-label="Search variable keys" size="sm" value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search keys" style={{ minWidth: 160 }} />
         </div>
       </header>
 
@@ -501,6 +502,19 @@ export default function EnvManager(): React.ReactElement {
 
           {showImport && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <Button variant="secondary" size="sm" onClick={() => importFileRef.current?.click()}>Choose .env file</Button>
+                <input ref={importFileRef} aria-label="Choose .env file" type="file" hidden onChange={async event => {
+                  const control = event.currentTarget;
+                  const file = control.files?.[0];
+                  if (!file) return;
+                  try {
+                    const contents = await file.text();
+                    if (control.isConnected && control.files?.[0] === file) setImportText(contents);
+                  } catch { toast('error', 'Could not read the .env file'); }
+                  finally { if (control.files?.[0] === file) control.value = ''; }
+                }} />
+              </div>
               <textarea
                 aria-label="Paste .env text"
                 value={importText}

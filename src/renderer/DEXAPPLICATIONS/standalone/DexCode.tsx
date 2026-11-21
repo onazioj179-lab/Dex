@@ -8,6 +8,7 @@
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
+import { useCreativeInput } from '../../services/creativeIntake';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
@@ -844,12 +845,30 @@ const DexCode: React.FC = () => {
   // jumping to a line once the new content has rendered.
   const loadEditorFromPath = useCallback(async (filePath: string, line?: number) => {
     const content = await readProjectFile(filePath);
-    if (content == null) return;
+    if (content == null) return false;
     openInTab({ path: filePath, name: filePath.split(/[\\/]/).pop() || 'file.dex', code: content });
     addRecentFile(filePath);
     setRecentFiles(getRecentFiles());
     if (line && line > 0) setTimeout(() => jumpToLine(line), 60);
-  }, [jumpToLine]);
+    return true;
+  }, [jumpToLine, openInTab]);
+
+  useCreativeInput('dexcode', async input => {
+    if (input.kind === 'file') {
+      if (!(await loadEditorFromPath(input.path))) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'DEX Code could not read the selected file.' } }));
+      }
+      return;
+    }
+    const next = await loadProject(input.path);
+    if (next) {
+      setProject(next);
+      setWorkspaceHits([]);
+      setWorkspaceQuery('');
+    } else {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'DEX Code could not open the selected folder.' } }));
+    }
+  });
 
   // Quick Open results: fuzzy-rank the project's files against the query. Recent
   // files (without an open project) are folded in so Ctrl+P is useful even before

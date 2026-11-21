@@ -247,3 +247,19 @@ This pass covers 20 rows from the retired small-app backlog. Row numbers below r
 | #42, #78 | A task can start a Pomodoro, and completed focus phases retain the task link in the session log. The link applies to a task. General project-linked sessions remain open. |
 
 Open: packaged Windows file-picker verification, project-linked focus sessions, and completion dates for older tasks whose records have no timestamp.
+
+## 2026-11-21 Files and Env Manager batch
+
+This pass covers 20 rows from the retired small-app backlog.
+
+| Rows | Result |
+|---|---|
+| Files #1 | Breadcrumb and sidebar navigation share folder history. Back returns to the starting location, and a slow folder response cannot replace a more recent listing. Location tabs still need implementation. |
+| Files #2, #3, #7, #8, #9 | Reviewed the existing Quick Look, multi-item move/copy/delete, view and sort controls, inline naming, and properties panel. Batch rename's conflict and rollback tests still pass. |
+| Files #4 | Search, hidden-file settings and filters now apply in Recent Files as well as a folder. |
+| Files #5, #6 | Open With passes files to DEX Code and Gallery. The folder menu can open the selected directory as a DEX Code project. Pin state uses the same action in the toolbar and sidebar. |
+| Files #10 | Copy relative path checks the folder boundary and handles Windows drive case and mixed separators. |
+| Env #51, #52, #53, #55, #58 | Reviewed named profile switching, masking and copying, required-key validation, profile diffing, and value-free example export. Project-linked profile selection and per-profile validation schemas remain open. |
+| Env #54, #56, #57, #59, #60 | Import reads files or pasted assignments and reports repeated keys. Export preserves inline comments, quoted values, and backslashes. Search matches key names without using masked values. |
+
+Open for packaged checks: Quick Look and batch operations, Gallery and DEX Code handoffs, native file selection, location tabs, and validation schemas tied to individual projects.

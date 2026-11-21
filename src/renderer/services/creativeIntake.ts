@@ -1,7 +1,7 @@
 // DEX Platform - Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 import { useEffect, useRef } from 'react';
 
-type CreativeInput = { canvas: string; pixelart: string | File; qrcode: string; 'qrcode-color': string };
+type CreativeInput = { canvas: string; pixelart: string | File; qrcode: string; 'qrcode-color': string; gallery: string; dexcode: { kind: 'file' | 'folder'; path: string } };
 const pending: Partial<CreativeInput> = {};
 
 export function sendCreativeInput<K extends keyof CreativeInput>(appId: K, value: CreativeInput[K]) {
