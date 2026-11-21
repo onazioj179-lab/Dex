@@ -55,6 +55,29 @@ function inside(b: Box, v: { w: number; h: number }) {
 }
 
 test.describe('Morphing Dock', () => {
+  test('Search keeps the panel and input in place from app grid through empty results', async ({ page }) => {
+    await boot(page);
+    await page.locator('[data-dock-item="__trigger"]').click();
+    const menu = page.getByRole('dialog', { name: 'App menu' });
+    const input = menu.getByRole('combobox', { name: 'Search apps and actions' });
+    await expect(input).toBeFocused();
+    const start = await menu.boundingBox();
+    const field = await input.boundingBox();
+    await input.fill('calculator');
+    await expect(menu.getByRole('option').first()).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    expect(await input.boundingBox()).toEqual(field);
+    await input.fill('qqqqzzzzxxxx');
+    await expect(menu.getByText(/Nothing matches/)).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    await input.press('Escape');
+    await expect(input).toHaveValue('');
+    await expect(menu.getByLabel('Applications')).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    await input.press('Escape');
+    await expect(menu).toBeHidden();
+  });
+
   test('stays centred open and collapsed, collapse is faster, nothing leaves the screen', async ({ page }) => {
     await boot(page);
     const v = await vp(page);

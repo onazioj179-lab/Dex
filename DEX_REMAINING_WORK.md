@@ -1,5 +1,21 @@
 # DEX: Remaining Work
 
+## 2026-11-21 utility backlog batch
+
+This pass covers 20 rows from the Utility section of the retired small-app backlog. Existing features are identified separately from new or changed behavior.
+
+| Rows | Work |
+|---|---|
+| QR #24, #25, #30, #32 | Reviewed existing clipboard and URL intake, PNG/SVG and clipboard export, batch sheets, and email/event payloads. Existing batch and payload tests still cover encoding and sheet export. |
+| QR #26, #31 | Reviewed typed Wi-Fi, contact, and coordinate forms and history recall. New Wi-Fi codes stay out of persisted history. |
+| QR #27, #29, #33 | Added a configurable quiet zone, Color Picker swatch handoff, and rounded/dot styles shared by preview, PNG, SVG and batch sheets. |
+| Maps #54, #55, #57, #59 | Exercised autocomplete, recents, saved places, dropped pins and basemap selection. Search clears stale results, save and recent actions work through click and keyboard, and copy reports clipboard failures. |
+| Maps #58, #60, #61 | Added editable Calendar drafts and geo QR handoffs. Measure traces up to 32 points with undo for the last point. |
+| Activity #62, #64, #65 | Reviewed existing app, range and text filters. Fixed pause counts even when the feed is full and added filtered text-file export. |
+| Activity #63 | Partial. Activity opens the originating app. Opening the exact record still needs entity IDs from the feed. |
+
+Open from this area: a QR center logo (#28), road routing beyond straight-line measurement (#56), exact activity links (#63), and packaged Windows verification for Search and the revised utility flows.
+
 **Updated:** 2026-11-18 (finished rows cleared: 46 moved to the archive, #14 closed, #39 waiting on a listen-test) · **Creator:** Onazi oJ · This is the active backlog: only rows with work left. Finished rows that still need a packaged-app, hardware, key or owner check are listed at the end; fully completed rows are in `docs/reports/DEX_COMPLETED_WORK.md` (row numbers unchanged).
 
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |

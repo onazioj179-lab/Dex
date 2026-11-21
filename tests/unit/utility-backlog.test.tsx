@@ -15,6 +15,8 @@ import { saveBlobAs } from '../../src/renderer/services/nativeSave';
 import { useTimerStore } from '../../src/renderer/store/timerStore';
 import { createQrBatch, createQrMatrix, qrBatchToSVG } from '../../src/renderer/DEXAPPLICATIONS/standalone/qrEncoding';
 import { calendarQrPayload, mailtoPayload } from '../../src/shared/format/qrPayloads';
+import { sendCreativeInput } from '../../src/renderer/services/creativeIntake';
+import { qrMatrixToSVG, qrModuleStyleAt } from '../../src/shared/format/qrSvg';
 
 vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().mockResolvedValue(null) }));
 const stopwatch = useTimerStore.getState().stopwatch;
@@ -28,6 +30,22 @@ afterEach(() => {
 });
 
 describe('utility backlog', () => {
+  it('applies a Color Picker swatch to the requested QR color and uses the selected sheet style and quiet zone', () => {
+    render(<QRCodeGenerator />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Color Picker swatch target' }), { target: { value: 'background' } });
+    act(() => sendCreativeInput('qrcode-color', '#dbeeff'));
+    expect(screen.getByLabelText('Background color')).toHaveValue('#dbeeff');
+    fireEvent.click(screen.getByRole('button', { name: 'Batch mode' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Batch data, one code per line' }), { target: { value: 'DEX' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Quiet zone' }), { target: { value: '8' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Module style' }), { target: { value: 'dots' } });
+    const preview = decodeURIComponent(screen.getByRole('img', { name: 'QR code for line 1' }).getAttribute('src')!);
+    expect(preview).toContain('viewBox="0 0 37 37"');
+    expect(preview).toContain('<circle ');
+    expect(preview).toContain('fill="#dbeeff"');
+    expect(qrModuleStyleAt('dots', 2, 2, 21)).toBe('square');
+    expect(qrMatrixToSVG(createQrMatrix('DEX', 'M'), { moduleStyle: 'rounded' })).toContain('rx="0.2"');
+  });
   it('converts cooking measurements into every unit at the configured precision and persists a pinned pair', () => {
     const view = render(<UnitConverter />);
     fireEvent.click(screen.getByRole('tab', { name: 'Cooking' }));

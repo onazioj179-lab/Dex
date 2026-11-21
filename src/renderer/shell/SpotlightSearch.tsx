@@ -11,12 +11,13 @@
  * category headings, sliding selection indicator.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useId, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { spotlightEngine, type SpotlightResult, type SpotlightCategory, type HighlightSpan } from './SpotlightEngine';
 import { SPRING_PRESETS, SpringAnimator, isReduceMotion } from '../utils/MotionController';
 import { openAppContextMenu } from '../components/AppContextMenu';
 import DexIcon from '../components/DexIcon';
 import { platform } from '../utils';
+import { DexSearchInput } from '../styles/components';
 
 // ---------------------------------------------------------------------------
 // CATEGORY LABELS & ICONS
@@ -360,6 +361,9 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   const [results, setResults] = useState<SpotlightResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const resultsId = useId();
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [popup, setPopup] = useState<{ left: number; width: number; height: number; above: boolean }>();
   // Notify parent whenever the results panel toggles.
   React.useEffect(() => { onResultsOpenChange?.(showResults); }, [showResults, onResultsOpenChange]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -458,6 +462,11 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // Search handler with debounce — 150ms delay prevents regenerating 100+ items on every keystroke
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSeq = useRef(0);
+  const cancelSearch = useCallback(() => {
+    searchSeq.current++;
+    if (searchTimeout.current !== null) clearTimeout(searchTimeout.current);
+  }, []);
+  useEffect(() => cancelSearch, [cancelSearch]);
 
   const handleSearch = useCallback((value: string) => {
     setQuery(value);
@@ -499,14 +508,16 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       onClose?.();
     }
 
+    cancelSearch();
     setQuery('');
     queryRef.current = '';
     setResults([]);
     setShowResults(false);
-  }, [query, variant, onClose, onNavigate]);
+  }, [query, variant, onClose, onNavigate, cancelSearch]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     const pageSize = 5; // Number of items to jump on Page Up/Down
     
     switch (e.key) {
@@ -547,18 +558,18 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       }
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation();
+        cancelSearch();
         if (query) {
           setQuery('');
           queryRef.current = '';
           setResults(spotlightEngine.search(''));
           setShowResults(false);
-        } else if (variant === 'overlay') {
-          onClose?.();
-        }
+        } else if (variant === 'overlay') onClose?.();
+        else setShowResults(false);
         break;
       case 'Tab':
-        // In the embedded Home search, Tab leaves the field unless results are open.
-        if (variant !== 'overlay' && !(showResults && flatResults.length > 0)) break;
+        if (variant !== 'overlay' || !flatResults.length) break;
         e.preventDefault();
         if (e.shiftKey) {
           setSelectedIndex(i => Math.max(i - 1, 0));
@@ -567,7 +578,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         }
         break;
     }
-  }, [flatResults, selectedIndex, executeResult, query, variant, onClose, showResults]);
+  }, [flatResults, selectedIndex, executeResult, query, variant, onClose, cancelSearch]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -580,16 +591,24 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
     }
   }, [selectedIndex, flatResults.length]);
 
-  // Tell Home when the embedded search has results open so it can fade its
-  // widgets (clock etc.) out of the way — otherwise the widget layer, which
-  // renders after the scroll content, paints over the results dropdown.
-  const homeSearchActive = variant === 'home' && showResults && flatResults.length > 0;
-  useEffect(() => {
-    if (variant !== 'home') return undefined;
-    window.dispatchEvent(new CustomEvent('dex-home-search-active', { detail: { active: homeSearchActive } }));
-    // On unmount, always clear the flag so widgets are never stuck hidden.
-    return () => { window.dispatchEvent(new CustomEvent('dex-home-search-active', { detail: { active: false } })); };
-  }, [variant, homeSearchActive]);
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    if (!anchor || !showResults) return;
+    const position = () => {
+      const rect = anchor.getBoundingClientRect();
+      const width = Math.min(480, window.innerWidth - 16);
+      const left = Math.max(8, Math.min(rect.left + (rect.width - width) / 2, window.innerWidth - width - 8));
+      const aboveRoom = rect.top - 16;
+      const belowRoom = window.innerHeight - rect.bottom - 16;
+      const above = dropUp ? aboveRoom > 100 || aboveRoom >= belowRoom : belowRoom < 100 && aboveRoom > belowRoom;
+      setPopup({ left: left - rect.left, width, height: Math.max(0, Math.min(320, above ? aboveRoom : belowRoom)), above });
+    };
+    position();
+    window.addEventListener('resize', position);
+    const observer = new ResizeObserver(position);
+    observer.observe(anchor);
+    return () => { observer.disconnect(); window.removeEventListener('resize', position); };
+  }, [dropUp, showResults]);
 
   // -----------------------------------------------------------------------
   // HOME VARIANT: Embedded search bar with dropdown results
@@ -599,89 +618,52 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
     // as the Home hero (50px, drops down) AND as the bottom-docked launcher
     // search (~32px, drops UP so results don't run off the bottom of the screen).
     const ph = pillHeight ?? 50;
-    const dropStyle: React.CSSProperties = dropUp ? { bottom: ph + 8 } : { top: ph + 8 };
+    const dropStyle: React.CSSProperties = popup?.above ? { bottom: ph + 8 } : { top: ph + 8 };
     return (
-      <div data-dex-spotlight style={{ width: '100%', maxWidth: 560, position: 'relative' }}>
-        {/* Search Bar — canonical search pill (calm, no highlight); hero height retained */}
-        <div className="dex-home-search-pill" style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          height: ph, padding: '0 14px', boxSizing: 'border-box',
-          background: 'var(--color-bg-inset)',
-          border: `1px solid ${showResults ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-          borderRadius: 9999,
-          transition: 'border-color 0.18s ease',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} aria-hidden="true">
-            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={e => handleSearch(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={(e) => {
-              setShowResults(true);
-              if (!query) setResults(spotlightEngine.search(''));
-              e.currentTarget.selectionStart = e.currentTarget.selectionEnd = e.currentTarget.value.length;
-            }}
-            onBlur={() => setTimeout(() => setShowResults(false), 300)}
-            placeholder={placeholder ?? 'Search'}
-            aria-label="Spotlight Search"
-            role="combobox"
-            aria-expanded={showResults}
-            aria-haspopup="listbox"
-            aria-controls="spotlight-results-home"
-            aria-activedescendant={showResults && flatResults.length > 0 ? `spotlight-result-home-${selectedIndex}` : undefined}
-            autoComplete="off"
-            spellCheck={false}
-            className="dex-search-field"
-            style={{
-              flex: 1, height: '100%',
-              background: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--color-text-primary)',
-              fontSize: ph < 44 ? 14 : 16, fontWeight: 400,
-              fontFamily: 'var(--font-family)',
-              letterSpacing: '-0.01em',
-            }}
-          />
-          {query && (
-            <button
-              onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
-              aria-label="Clear search"
-              style={{
-                width: 28, height: 28, borderRadius: 14,
-                background: 'var(--color-bg-active)',
-                border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--color-text-secondary)',
-                transition: 'background 0.12s ease',
-                flexShrink: 0,
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          )}
-          {!hideVoice && <VoiceMicButton onTranscript={(text) => { handleSearch(text); inputRef.current?.focus(); }} />}
-        </div>
+      <div ref={anchorRef} data-dex-spotlight
+        onBlur={event => {
+          if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+          cancelSearch();
+          setShowResults(false);
+        }}
+        style={{ width: '100%', maxWidth: 560, position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <DexSearchInput ref={inputRef} size={ph < 44 ? 'md' : 'lg'} fullWidth reserveClearSpace
+          style={{ height: ph }}
+          value={query}
+          onChange={event => handleSearch(event.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            setResults(spotlightEngine.search(queryRef.current));
+            setShowResults(true);
+          }}
+          onClear={() => { handleSearch(''); inputRef.current?.focus(); }}
+          placeholder={placeholder ?? 'Search'}
+          aria-label="Spotlight Search"
+          role="combobox"
+          aria-expanded={showResults && Boolean(flatResults.length || query.trim())}
+          aria-controls={showResults && (flatResults.length || query.trim()) ? resultsId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={showResults && flatResults[Math.min(selectedIndex, flatResults.length - 1)]
+            ? `${resultsId}-${Math.min(selectedIndex, flatResults.length - 1)}` : undefined}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {!hideVoice && <VoiceMicButton onTranscript={text => { inputRef.current?.focus(); handleSearch(text); }} />}
 
         {/* Scrollable results dropdown */}
-        {showResults && flatResults.length > 0 && (
+        {showResults && popup && Boolean(flatResults.length || query.trim()) && (
           <div
             ref={resultsRef}
-            id="spotlight-results-home"
+            id={resultsId}
             role="listbox"
             aria-label="Search results"
             className="spotlight-results-scroll"
             onMouseDown={e => e.preventDefault()}
             style={{
               // Floating surface wider than the dock field, centred on it.
-              position: 'absolute', left: 'calc(50% - min(240px, 46vw))', width: 'min(480px, 92vw)', ...dropStyle,
-              maxHeight: 440, overflowY: 'auto', overflowX: 'hidden',
-              scrollBehavior: 'smooth',
+              position: 'absolute', left: popup.left, width: popup.width, ...dropStyle,
+              height: popup.height, overflowY: 'auto', overflowX: 'hidden',
+              scrollbarGutter: 'stable',
               // Liquid glass (master overhaul) -- the strong variant: translucent
               // enough to bloom the wallpaper/content behind it, opaque enough that
               // result text stays readable. Falls back to solid on weak GPUs /
@@ -693,9 +675,10 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               borderRadius: 18,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: 6,
-              animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
+              boxSizing: 'border-box',
             }}
           >
+            {!flatResults.length && <div role="status" style={{ padding: 12, color: 'var(--color-text-secondary)' }}>No results found</div>}
             {groupedResults.map(group => (
               <div key={group.category}>
                 <div style={{
@@ -709,7 +692,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
                   return (
                     <ResultItem
                       key={result.id}
-                      id={`spotlight-result-home-${globalIndex}`}
+                      id={`${resultsId}-${globalIndex}`}
                       result={result}
                       isSelected={globalIndex === selectedIndex}
                       onClick={() => executeResult(result)}
