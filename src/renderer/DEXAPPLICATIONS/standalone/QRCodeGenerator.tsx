@@ -7,6 +7,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, memo } from '
 import { qrMatrixToSVG } from '../../../shared/format/qrSvg';
 import { colorInputValue } from '../../utils/canvasTheme';
 import { createQrBatch, createQrMatrix, qrBatchToSVG, type QrErrorLevel } from './qrEncoding';
+import { useCreativeInput } from '../../services/creativeIntake';
 import { calendarQrPayload, mailtoPayload } from '../../../shared/format/qrPayloads';
 import { saveBlobAs } from '../../services/nativeSave';
 import { Button } from '../../ui/Button';
@@ -324,6 +325,8 @@ const QRCodeGenerator: React.FC = () => {
     const bytes = new TextEncoder().encode(qrData).length;
     return { modules, version, bytes };
   }, [qrMatrix, qrData]);
+
+  useCreativeInput('qrcode', value => { setMode('text'); setText(value); });
 
   return (
     <div style={s.container} data-dex-qr-root>

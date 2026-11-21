@@ -20,6 +20,8 @@ import { glassSidebar } from '../styles/glassMenu';
 import { type ExifData, fileUrlToPath, loadExifFromPath } from '../utils/exifParser';
 import DexIcon from '../components/DexIcon';
 import { useCreativeSuite } from '../services/CreativeSuiteBridge';
+import { sendCreativeInput } from '../services/creativeIntake';
+import { duplicateImageKey, galleryBreadcrumbs, galleryFolder, loadGalleryTags, moveAlbumItems, smallImageQrData, TAGS_KEY, tagMedia } from './galleryOrganize';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
@@ -430,7 +432,46 @@ export const Gallery: React.FC = () => {
   const [showExifPanel, setShowExifPanel] = useState(false);
   const [exifCache, setExifCache] = useState<Record<string, ExifData | null>>({});
   const [showTagSystem, setShowTagSystem] = useState(false);
-  const [mediaTags, setMediaTags] = useState<Record<string, string[]>>({});
+  const [mediaTags, setMediaTags] = useState(loadGalleryTags);
+  const [folderFilter, setFolderFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [duplicateFilter, setDuplicateFilter] = useState(false);
+  const [folderTree, setFolderTree] = useState(false);
+  useEffect(() => {
+    persistOrWarn(TAGS_KEY, JSON.stringify(mediaTags), 'your Gallery tags');
+  }, [mediaTags]);
+  const addMediaTag = (ids: string[], name: string) => {
+    if (!name.trim() || !ids.length) return;
+    setMediaTags(previous => tagMedia(previous, ids, name));
+    setTagInput('');
+  };
+  const knownFolders = useMemo(() => [...new Set(media.map(item => galleryFolder(item.id)).filter(Boolean))].sort(), [media]);
+  const knownTags = useMemo(() => [...new Set(media.flatMap(item => (mediaTags[item.id] ?? []).map(tag => tag.toLowerCase())))].sort(), [media, mediaTags]);
+  const duplicateKeys = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of media) {
+      const key = duplicateImageKey(item);
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return new Set([...counts].filter(([, count]) => count > 1).map(([key]) => key));
+  }, [media]);
+  const [sendingImage, setSendingImage] = useState(false);
+  const sendingImageRef = useRef(false);
+  const sendImage = useCallback(async (item: MediaItem, target: 'pixelart' | 'qrcode') => {
+    if (item.type !== 'image' || !item.src || sendingImageRef.current) return;
+    sendingImageRef.current = true;
+    setSendingImage(true);
+    try {
+      const response = await fetch(item.src);
+      if (!response.ok) throw new Error('Image could not be read.');
+      const blob = await response.blob();
+      if (blob.size > 25_000_000) throw new Error('Choose an image under 25 MB.');
+      if (target === 'pixelart') sendCreativeInput('pixelart', new File([blob], item.name, { type: blob.type }));
+      else sendCreativeInput('qrcode', await smallImageQrData(blob));
+      setSelectedMedia(current => current?.id === item.id ? null : current);
+    } catch { toast.error('Could not send image', 'Choose a readable image under 25 MB. QR codes use a small preview.'); }
+    finally { sendingImageRef.current = false; setSendingImage(false); }
+  }, [toast]);
   const [tagInput, setTagInput] = useState('');
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   const adjustCacheKey = selectedMedia ? `dex-gallery-adj-${selectedMedia.id}` : null;
@@ -490,17 +531,6 @@ export const Gallery: React.FC = () => {
     try { persistOrWarn('dex-gallery-renames', JSON.stringify(renameMap), 'your Gallery renames'); } catch { /* unserialisable */ }
   }, [renameMap]);
 
-  // Derive a folder breadcrumb from the media path (id/src are absolute file paths).
-  const folderCrumbs = useCallback((item: MediaItem | null): string[] => {
-    if (!item) return [];
-    try {
-      const raw = (item.id || item.src || '').replace(/^file:\/\//, '');
-      const parts = raw.replace(/\\/g, '/').split('/').filter(Boolean);
-      parts.pop(); // drop the filename
-      return parts.slice(-3); // keep the last few folders so it stays compact
-    } catch { return []; }
-  }, []);
-
   const commitRename = useCallback((item: MediaItem) => {
     try {
       const next = renameDraft.trim();
@@ -555,13 +585,17 @@ export const Gallery: React.FC = () => {
         }
       })();
       if (!albumMatch) return false;
+      const folder = galleryFolder(item.id);
+      if (folderFilter && folder !== folderFilter && !folder.startsWith(folderFilter + '/')) return false;
+      if (tagFilter && !mediaTags[item.id]?.some(tag => tag.toLowerCase() === tagFilter)) return false;
+      if (duplicateFilter && !duplicateKeys.has(duplicateImageKey(item) ?? '')) return false;
       if (q) {
         const name = (renameMap[item.id] ?? item.name ?? '').toLowerCase();
         if (!name.includes(q)) return false;
       }
       return true;
     });
-  }, [media, favorites, selectedAlbum, searchQuery, renameMap, activeUserAlbum]);
+  }, [media, favorites, selectedAlbum, searchQuery, renameMap, activeUserAlbum, folderFilter, tagFilter, mediaTags, duplicateFilter, duplicateKeys]);
 
   // Sort by the active key/direction. Name uses the effective (renamed) name.
   const sortedMedia = useMemo(() => {
@@ -1152,6 +1186,20 @@ export const Gallery: React.FC = () => {
     toast.success(`${r.added ? `Added ${r.added}` : 'Already there'} · "${r.album.name}"`, 'Albums list photos; the files stay where they are.');
   }, [userAlbums, toast]);
 
+  const batchTag = async () => {
+    const ids = [...selectedItems];
+    const label = await dexPrompt({ title: 'Tag ' + ids.length + ' selected items', label: 'Tag name', confirmLabel: 'Apply tag' });
+    if (label) addMediaTag(ids, label);
+  };
+  const batchMove = async () => {
+    if (!activeUserAlbum) return;
+    const ids = [...selectedItems];
+    const name = await dexPrompt({ title: 'Move between albums', label: 'Destination album name', confirmLabel: 'Move to album' });
+    if (!name?.trim() || name.trim().toLowerCase() === activeUserAlbum.name.toLowerCase()) return;
+    setUserAlbums(previous => moveAlbumItems(previous, activeUserAlbum, name, ids));
+    clearSelection();
+  };
+
   const deleteUserAlbum = useCallback(async (album: UserAlbum) => {
     if (!(await dexConfirm({ title: `Delete album "${album.name}"?`, message: 'Only the album goes; the photos and videos stay in your library.', confirmLabel: 'Delete album', tone: 'destructive' }))) return;
     setUserAlbums(prev => prev.filter(a => a.id !== album.id));
@@ -1259,6 +1307,8 @@ export const Gallery: React.FC = () => {
       { id: 'fav', label: isFav ? 'Unfavorite' : 'Favorite', icon: Icons.heart, onSelect: () => toggleFavorite(item.id), dividerAfter: true },
       { id: 'copy', label: 'Copy to Clipboard', shortcut: 'Ctrl+C', icon: Icons.copy, onSelect: () => { setSelectedMedia(item); setTimeout(() => copyImageToClipboard(), 50); } },
       ...(item.type === 'image' ? [
+        { id: 'pixel-art', label: 'Open in Pixel Art', icon: Icons.grid, onSelect: () => { void sendImage(item, 'pixelart'); } },
+        { id: 'image-qr', label: 'Encode preview as QR', icon: Icons.share, onSelect: () => { void sendImage(item, 'qrcode'); } },
         { id: 'prism', label: 'Edit in Prism', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'image' as const, data: item.src, sourceApp: 'gallery' }, 'prism') },
       ] : []),
       ...(item.type === 'video' ? [
@@ -1270,7 +1320,7 @@ export const Gallery: React.FC = () => {
       { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { void openWithShell('reveal', item.src, item.name); }, dividerAfter: true },
       { id: 'delete', label: 'Move to Recycle Bin', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
-  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename, addItemsToAlbum, activeUserAlbum]);
+  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename, addItemsToAlbum, activeUserAlbum, sendImage]);
 
   // Lightbox keyboard nav + zoom. '+'/'=' zoom in, '-' zoom out, '0' fits.
   useEffect(() => {
@@ -1455,8 +1505,10 @@ export const Gallery: React.FC = () => {
       <div style={styles.main}>
         {/* Toolbar */}
         <div style={styles.toolbar}>
-          <h2 style={styles.title}>{ALBUMS.find(a => a.id === selectedAlbum)?.name ?? 'All Media'}</h2>
+          <h2 style={styles.title}>{activeUserAlbum?.name ?? ALBUMS.find(a => a.id === selectedAlbum)?.name ?? 'All Media'}</h2>
           <div style={styles.toolbarRight}>
+            <button type="button" style={{ ...styles.viewBtn, width: 'auto' }} aria-expanded={folderTree}
+              onClick={() => setFolderTree(value => !value)}>Filters</button>
             {/* Search within the current album */}
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <span style={{ position: 'absolute', left: 8, display: 'flex', color: 'var(--color-text-muted)', pointerEvents: 'none' }}>
@@ -1512,6 +1564,8 @@ export const Gallery: React.FC = () => {
                 <>
                   <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600 }}>{selectedItems.size} selected</span>
                   <button onClick={selectAll} aria-label="Select all" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-accent)' }}>All</button>
+                  <button type="button" style={{ ...styles.viewBtn, width: 'auto' }} onClick={() => void batchTag()}>Tag selected</button>
+                  {activeUserAlbum && <button type="button" style={{ ...styles.viewBtn, width: 'auto' }} onClick={() => void batchMove()}>Move to album</button>}
                   <button onClick={batchFavorite} aria-label="Favorite selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Favorite</button>
                   <button onClick={batchExport} aria-label="Export selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-success)' }}>Export</button>
                   <button onClick={batchDelete} aria-label="Delete selected" style={{ ...styles.viewBtn, width: 'auto', padding: '0 var(--space-2)', fontSize: 11, fontWeight: 600, color: 'var(--color-error)' }}>Delete</button>
@@ -1522,6 +1576,24 @@ export const Gallery: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {(folderTree || folderFilter || tagFilter || duplicateFilter) && (
+          <div role="group" aria-label="Gallery filters" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '6px 12px' }}>
+            <label>Folder <select aria-label="Gallery folder" value={folderFilter} onChange={event => { setFolderFilter(event.target.value); clearSelection(); }}>
+              <option value="">All folders</option>
+              {folderFilter && !knownFolders.includes(folderFilter) && <option value={folderFilter}>{folderFilter}</option>}
+              {knownFolders.map(folder => <option key={folder} value={folder}>{folder}</option>)}
+            </select></label>
+            <label>Tag <select aria-label="Gallery tag" value={tagFilter} onChange={event => { setTagFilter(event.target.value); clearSelection(); }}>
+              <option value="">All tags</option>
+              {knownTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+            </select></label>
+            <label title="Matches image file size and similar filenames"><input type="checkbox" checked={duplicateFilter}
+              onChange={event => { setDuplicateFilter(event.target.checked); clearSelection(); }} /> Possible duplicates</label>
+            <button type="button" style={{ ...styles.viewBtn, width: 'auto' }}
+              onClick={() => { setFolderFilter(''); setTagFilter(''); setDuplicateFilter(false); clearSelection(); }}>Clear filters</button>
+          </div>
+        )}
 
         {/* Gallery content */}
         <div style={styles.content}>
@@ -1832,8 +1904,8 @@ export const Gallery: React.FC = () => {
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
-              <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Add tag..." onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ flex: 1, padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }} />
-              <button aria-label="Add tag" onClick={() => { if (tagInput.trim() && selectedMedia) { setMediaTags(t => ({ ...t, [selectedMedia.id]: [...(t[selectedMedia.id] || []), tagInput.trim()] })); setTagInput(''); } }} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
+              <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Add tag..." onKeyDown={e => { if (e.key === 'Enter' && selectedMedia) addMediaTag([selectedMedia.id], tagInput); }} maxLength={40} aria-label="Media tag"  style={{ flex: 1, padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }} />
+              <button aria-label="Add tag" onClick={() => { if (selectedMedia) addMediaTag([selectedMedia.id], tagInput); }} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
             </div>
             {selectedMedia && (mediaTags[selectedMedia.id] || []).length > 0 ? (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -2020,20 +2092,36 @@ export const Gallery: React.FC = () => {
         <div style={styles.lightbox}>
           <div style={styles.lightboxHeader}>
             <button style={styles.lightboxClose} aria-label="Close lightbox" onClick={() => setSelectedMedia(null)}>{Icons.close}</button>
+            {selectedMedia.type === 'image' && <>
+              <button type="button" style={styles.lightboxBtn} disabled={sendingImage} onClick={() => void sendImage(selectedMedia, 'pixelart')} aria-label="Open in Pixel Art"><DexIcon name="grid" size={16} /></button>
+              <button type="button" style={styles.lightboxBtn} disabled={sendingImage} onClick={() => void sendImage(selectedMedia, 'qrcode')} aria-label="Encode preview as QR"><DexIcon name="qrcode" size={16} /></button>
+            </>}
             <span style={styles.lightboxTitle}>
               {/* Folder breadcrumb derived from the media path */}
-              {folderCrumbs(selectedMedia).length > 0 && (
+              {galleryBreadcrumbs(selectedMedia.id).length > 0 && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 'var(--space-2)', color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 400 }}>
-                  {folderCrumbs(selectedMedia).map((crumb, i, arr) => (
+                  {galleryBreadcrumbs(selectedMedia.id).map((crumb, i, arr) => (
                     <React.Fragment key={i}>
-                      <span>{crumb}</span>
+                      <button type="button" style={{ ...styles.viewBtn, width: 'auto' }} title={crumb.path} onClick={() => {
+                        setSelectedAlbum('all'); setFolderFilter(crumb.path); setTagFilter(''); setDuplicateFilter(false);
+                        setSearchQuery(''); clearSelection(); setSelectedMedia(null);
+                      }}>{crumb.label}</button>
                       {i < arr.length - 1 && <span style={{ opacity: 0.5 }}>/</span>}
                     </React.Fragment>
                   ))}
                   <span style={{ opacity: 0.5 }}>/</span>
                 </span>
               )}
-              {displayName(selectedMedia)}
+              {renamingId === selectedMedia.id ? <input aria-label="Rename media" autoFocus value={renameDraft}
+                onChange={event => setRenameDraft(event.target.value)} onBlur={() => commitRename(selectedMedia)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                  if (event.key === 'Escape') { event.stopPropagation(); setRenamingId(null); }
+                }} /> : <>
+                  {displayName(selectedMedia)}
+                  <button type="button" style={styles.lightboxBtn} onClick={() => startRename(selectedMedia)} aria-label="Rename media">{Icons.edit}</button>
+                </>}
+              {duplicateKeys.has(duplicateImageKey(selectedMedia) ?? '') && <span title="Matches image file size and similar filenames"> · Possible duplicate</span>}
               {selectedMedia.type === 'video' && <span style={{ marginLeft: 'var(--space-2)', padding: '2px var(--space-2)', borderRadius: 4, background: 'color-mix(in srgb, var(--color-tag-purple, #bf5af2) 20%, transparent)', color: 'var(--color-tag-purple, #bf5af2)', fontSize: 11 }}>Video</span>}
             </span>
             <div style={styles.lightboxActions}>

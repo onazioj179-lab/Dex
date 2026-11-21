@@ -7,38 +7,15 @@ import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { sendToNotes } from '../../services/sendTo';
 import { useSavedColors, saveColor, removeColor } from '../../services/sharedColors';
 
-interface HSL { h: number; s: number; l: number }
+import { ColorWorkbench } from './ColorWorkbench';
+import { setStudioMode } from './creativeStudio/studioMode';
+import { sendCreativeInput } from '../../services/creativeIntake';
+import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, relativeLuminance, type HSL } from '../../../shared/creative/colorUtils';
+import { nearestColorName, parseHexList } from '../../../shared/creative/paletteTools';
 
-const hslToHex = (h: number, s: number, l: number): string => {
-  s /= 100; l /= 100;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-};
+export { contrastRatio } from '../../../shared/creative/colorUtils';
 
-const hexToHsl = (hex: string): HSL => {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else h = ((r - g) / d + 4) * 60;
-  }
-  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
-};
-
-import { hexToRgb as sharedHexToRgb } from '../../../shared/creative/colorUtils';
-const hexToRgb = (hex: string) => sharedHexToRgb(hex) ?? { r: 0, g: 0, b: 0 };
+const hslToHex = (h: number, s: number, l: number) => rgbToHex(hslToRgb({ h, s, l }));
 
 // Real hex values so clicking a swatch can be parsed by hexToHsl. The brand
 // colors are resolved from the base design-system tokens (error/warning/success/
@@ -57,7 +34,13 @@ const loadHistory = (): string[] => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+      return Array.isArray(parsed) ? parseHexList(parsed.flatMap(value => {
+        if (typeof value !== 'string') return [];
+        const rgb = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(value);
+        if (rgb) return [rgbToHex({ r: +rgb[1], g: +rgb[2], b: +rgb[3] })];
+        const hsl = /^hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)$/.exec(value);
+        return [hsl ? hslToHex(+hsl[1], +hsl[2], +hsl[3]) : value];
+      }).join(' ')).slice(0, 12) : [];
     }
   } catch { /* ignore */ }
   return [];
@@ -69,28 +52,50 @@ const saveHistory = (history: string[]) => {
   } catch { /* ignore */ }
 };
 
-// WCAG 2.x relative luminance + contrast ratio (pure, unit-tested). Used for the
-// accessibility readout so designers can check legibility against black/white.
-function relLuminance(hex: string): number {
-  const { r, g, b } = hexToRgb(hex);
-  const lin = (c: number) => { const cs = c / 255; return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4); };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-export function contrastRatio(hexA: string, hexB: string): number {
-  const l1 = relLuminance(hexA), l2 = relLuminance(hexB);
-  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-}
-
 const ColorPicker: React.FC = () => {
   const [hsl, setHsl] = useState<HSL>({ h: 210, s: 100, l: 60 });
   const [hexInput, setHexInput] = useState('');
   const [history, setHistory] = useState<string[]>(loadHistory);
-  const historyLoadedRef = useRef(true); // Already loaded from initializer
+  const [selectedHex, setSelectedHex] = useState<string | null>(null);
+  const [hueLocked, setHueLocked] = useState(false);
+  const [sampleError, setSampleError] = useState('');
+  const [sampling, setSampling] = useState(false);
+  const EyeDropper = (window as Window & { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const hex = hslToHex(hsl.h, hsl.s, hsl.l);
-  const rgb = hexToRgb(hex);
+  const hex = selectedHex ?? hslToHex(hsl.h, hsl.s, hsl.l);
+  const rgb = hexToRgb(hex)!;
+  const max = Math.max(rgb.r, rgb.g, rgb.b);
+  const min = Math.min(rgb.r, rgb.g, rgb.b);
+  const hsb = [hsl.h, Math.round(max === 0 ? 0 : (max - min) * 100 / max), Math.round(max / 2.55)];
+  const remember = (value: string) => setHistory(previous => [value, ...previous.filter(item => item !== value)].slice(0, 12));
+
+  const pick = (value: string) => {
+    const parsed = hexToRgb(value);
+    if (!parsed) return;
+    const coords = rgbToHsl(parsed);
+    const next = hueLocked ? hslToHex(hsl.h, coords.s, coords.l) : rgbToHex(parsed);
+    setHsl({ ...coords, h: hueLocked ? hsl.h : coords.h });
+    setSelectedHex(next);
+    setHexInput(next);
+    remember(next);
+  };
+  const adjust = (key: keyof HSL, value: number) => {
+    const next = { ...hsl, [key]: value };
+    setSelectedHex(null);
+    setHsl(next);
+  };
+  const sample = async () => {
+    if (!EyeDropper || sampling) return;
+    setSampleError('');
+    setSampling(true);
+    try {
+      pick((await new EyeDropper().open()).sRGBHex);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) setSampleError('Screen sampling is unavailable.');
+    } finally { setSampling(false); }
+  };
 
   useEffect(() => {
     setHexInput(hex);
@@ -98,9 +103,7 @@ const ColorPicker: React.FC = () => {
 
   // Save history to localStorage when it changes
   useEffect(() => {
-    if (historyLoadedRef.current) {
-      saveHistory(history);
-    }
+    saveHistory(history);
   }, [history]);
 
   useEffect(() => {
@@ -108,29 +111,27 @@ const ColorPicker: React.FC = () => {
   }, []);
 
   const copy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).catch(() => { /* clipboard blocked */ });
+    if (!navigator.clipboard?.writeText) { setSampleError('Clipboard is unavailable.'); return; }
+    void navigator.clipboard.writeText(text).then(() => {
+      setSampleError('');
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
+    }, () => setSampleError('Could not copy to the clipboard.'));
     // DEX color ecosystem: copied colors also flow into the Omni Clipboard (typed
     // automatically as a color clip), so they're reusable + sendable across DEX.
     try { (window as any).__dexClipboardStore?.getState?.().add(text, { sourceAppId: 'colorpicker', sourceAppName: 'Colors' }); } catch { /* optional */ }
-    setCopied(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setCopied(false), 1500);
-    setHistory(prev => {
-      const next = [text, ...prev.filter(c => c !== text)].slice(0, 12);
-      return next;
-    });
-  }, []);
+    remember(hex);
+  }, [hex]);
 
-  const handleHexInput = useCallback((val: string) => {
-    setHexInput(val);
-    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-      setHsl(hexToHsl(val));
-    }
-  }, []);
+  const handleHexInput = (value: string) => {
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) pick(value);
+    else setHexInput(value);
+  };
 
   // Black or white, whichever contrasts more (crossover at luminance ~0.18;
   // the old 0.35 put white on mid blues at 2.9:1).
-  const previewOnDark = relLuminance(hex) > 0.179;
+  const previewOnDark = relativeLuminance(rgb) > 0.179;
   // Shared library (AssetLibrary 'palette'): saved here, shown in PRISM, kept in dex.db.
   const saved = useSavedColors();
   const isSaved = saved.includes(hex.toLowerCase());
@@ -178,28 +179,36 @@ const ColorPicker: React.FC = () => {
       <div style={s.sliders}>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>H</span>
-          <input type="range" min={0} max={360} value={hsl.h} className="cp-slider"
-            onChange={e => setHsl(p => ({ ...p, h: +e.target.value }))}
+          <input type="range" min={0} max={360} value={hsl.h} className="cp-slider" onPointerUp={() => remember(hex)} onKeyUp={() => remember(hex)}
+            disabled={hueLocked} onChange={e => adjust('h', +e.target.value)}
             aria-label="Hue" aria-valuetext={`${hsl.h} degrees`}
             style={{ ...s.slider, background: `linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)` }} />
           <span style={s.sliderVal}>{hsl.h}°</span>
         </div>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>S</span>
-          <input type="range" min={0} max={100} value={hsl.s} className="cp-slider"
-            onChange={e => setHsl(p => ({ ...p, s: +e.target.value }))}
+          <input type="range" min={0} max={100} value={hsl.s} className="cp-slider" onPointerUp={() => remember(hex)} onKeyUp={() => remember(hex)}
+            onChange={e => adjust('s', +e.target.value)}
             aria-label="Saturation" aria-valuetext={`${hsl.s} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, ${hslToHex(hsl.h, 0, hsl.l)}, ${hslToHex(hsl.h, 100, hsl.l)})` }} />
           <span style={s.sliderVal}>{hsl.s}%</span>
         </div>
         <div style={s.sliderRow}>
           <span style={s.sliderLabel}>L</span>
-          <input type="range" min={0} max={100} value={hsl.l} className="cp-slider"
-            onChange={e => setHsl(p => ({ ...p, l: +e.target.value }))}
+          <input type="range" min={0} max={100} value={hsl.l} className="cp-slider" onPointerUp={() => remember(hex)} onKeyUp={() => remember(hex)}
+            onChange={e => adjust('l', +e.target.value)}
             aria-label="Lightness" aria-valuetext={`${hsl.l} percent`}
             style={{ ...s.slider, background: `linear-gradient(to right, #000, ${hslToHex(hsl.h, hsl.s, 50)}, #fff)` }} />
           <span style={s.sliderVal}>{hsl.l}%</span>
         </div>
+      </div>
+
+      <div style={{ ...s.hexRow, flexWrap: 'wrap', alignItems: 'center' }}>
+        <label><input type="checkbox" checked={hueLocked} onChange={event => setHueLocked(event.target.checked)} /> Lock hue</label>
+        <button type="button" style={s.valueChip} disabled={!EyeDropper || sampling} onClick={() => void sample()}
+          title={EyeDropper ? 'Sample a pixel on screen' : 'Screen sampling is unavailable in this runtime'}>Eyedropper</button>
+        <span title="Nearest reference swatch">{nearestColorName(hex)}</span>
+        {sampleError && <span role="status">{sampleError}</span>}
       </div>
 
       {/* Values */}
@@ -216,6 +225,21 @@ const ColorPicker: React.FC = () => {
           <span style={s.valueLabel}>HSL</span>
           <span style={s.valueText}>{hsl.h}, {hsl.s}%, {hsl.l}%</span>
         </button>
+        <button type="button" onClick={() => copy(hsb[0] + '°, ' + hsb[1] + '%, ' + hsb[2] + '%')} className="dex-liquid-glass cp-chip"
+          style={s.valueChip} title="Copy HSB" aria-label="Copy HSB">
+          <span style={s.valueLabel}>HSB</span><span style={s.valueText}>{hsb[0]}°, {hsb[1]}%, {hsb[2]}%</span>
+        </button>
+        <button type="button" onClick={() => copy('--swatch: ' + hex + ';')} className="dex-liquid-glass cp-chip"
+          style={s.valueChip} title="Copy CSS variable" aria-label="Copy CSS variable">
+          <span style={s.valueLabel}>CSS VAR</span><span style={s.valueText}>--swatch</span>
+        </button>
+        {(['canvas', 'pixelart'] as const).map(app => <button key={app} type="button" onClick={() => {
+          if (app === 'canvas') setStudioMode('board');
+          sendCreativeInput(app, hex);
+        }}
+          className="dex-liquid-glass cp-chip" style={s.valueChip}>
+          Send to {app === 'canvas' ? 'Canvas' : 'Pixel Art'}
+        </button>)}
         <button
           onClick={() => sendToNotes(
             `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
@@ -261,7 +285,7 @@ const ColorPicker: React.FC = () => {
           <div className="dex-label-caps" style={s.sectionLabel}>Saved</div>
           <div style={s.palette}>
             {saved.map((c) => (
-              <button key={c} onClick={() => setHsl(hexToHsl(c))}
+              <button key={c} onClick={() => pick(c)}
                 onContextMenu={(e) => { e.preventDefault(); removeColor(c); }}
                 style={{ ...s.swatch, background: c, boxShadow: c === hex.toLowerCase() ? '0 0 0 2px var(--color-accent)' : 'none' }}
                 title={`${c.toUpperCase()} (right-click to remove)`} aria-label={`Use saved color ${c}`} />
@@ -275,7 +299,7 @@ const ColorPicker: React.FC = () => {
         <div className="dex-label-caps" style={s.sectionLabel}>Presets</div>
         <div style={s.palette}>
           {PRESETS.map((c, i) => (
-            <button key={`${c}-${i}`} onClick={() => setHsl(hexToHsl(c))}
+            <button key={`${c}-${i}`} onClick={() => pick(c)}
               style={{ ...s.swatch, background: c, boxShadow: c === hex ? '0 0 0 2px var(--color-accent)' : 'none' }}
               title={c} aria-label={`Use preset color ${c}`} />
           ))}
@@ -288,23 +312,7 @@ const ColorPicker: React.FC = () => {
           <div className="dex-label-caps" style={s.sectionLabel}>Recent</div>
           <div style={s.palette}>
             {history.map(c => (
-              <button key={c} onClick={() => {
-                if (c.startsWith('#')) {
-                  setHsl(hexToHsl(c));
-                } else {
-                  // Parse rgb(...) or hsl(...) back to HSL
-                  const rgbMatch = c.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-                  if (rgbMatch) {
-                    const tmpHex = '#' + [rgbMatch[1], rgbMatch[2], rgbMatch[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
-                    setHsl(hexToHsl(tmpHex));
-                  }
-                  const hslMatch = c.match(/hsl\((\d+),\s*(\d+)%?,\s*(\d+)%?\)/);
-                  if (hslMatch) {
-                    setHsl({ h: parseInt(hslMatch[1]), s: parseInt(hslMatch[2]), l: parseInt(hslMatch[3]) });
-                  }
-                }
-                copy(c);
-              }}
+              <button key={c} onClick={() => pick(c)}
                 style={{ ...s.swatch, background: c }}
                 title={c} aria-label={`Reuse recent color ${c}`} />
             ))}
@@ -312,23 +320,7 @@ const ColorPicker: React.FC = () => {
         </div>
       )}
 
-      {/* WCAG contrast — legibility of this color against white / black */}
-      <div style={s.section}>
-        <div className="dex-label-caps" style={s.sectionLabel}>Contrast</div>
-        {([['#FFFFFF', 'on white'], ['#000000', 'on black']] as const).map(([bg, label]) => {
-          const ratio = contrastRatio(hex, bg);
-          const aa = ratio >= 4.5, aaa = ratio >= 7;
-          return (
-            <div key={bg} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px var(--space-1)', fontSize: 12 }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>{ratio.toFixed(2)}:1 <span style={{ color: 'var(--color-text-tertiary)' }}>{label}</span></span>
-              <span style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em' }}>
-                <span style={{ color: aa ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>AA</span>
-                <span style={{ color: aaa ? 'var(--color-success)' : 'var(--color-text-tertiary)' }}>AAA</span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <div style={s.section}><ColorWorkbench hex={hex} hsl={hsl} pick={pick} copy={copy} /></div>
     </div>
   );
 };

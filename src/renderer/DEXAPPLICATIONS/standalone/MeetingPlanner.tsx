@@ -61,7 +61,7 @@ export function MeetingPlanner({ cities, is24h }: { cities: City[]; is24h: boole
   }));
 
   return (
-    <section aria-label="Meeting planner" style={{ display: 'grid', gap: 10, padding: 12, background: 'var(--color-bg-secondary)', borderRadius: 8 }}>
+    <section aria-label="Meeting planner" style={{ display: 'grid', gap: 10, padding: 12, background: 'var(--color-bg-secondary)', borderRadius: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
         <input type="date" aria-label="Meeting date" value={day}
           style={{ color: 'var(--color-text-primary)', background: 'var(--color-bg-inset)', border: '1px solid var(--color-border)', padding: '5px 8px' }}
