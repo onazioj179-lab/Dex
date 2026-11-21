@@ -60,13 +60,21 @@ const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ---------------------------------------------------------------------------
 
 interface EnvEntry { key: string; value: string; comment?: string }
-interface EnvProfile { id: string; name: string; entries: EnvEntry[] }
+interface EnvProfile { id: string; name: string; entries: EnvEntry[]; requiredKeys?: string[]; projectRoot?: string }
 
 const PROFILES_KEY = 'dex.envManager.profiles.v1';
 const ACTIVE_KEY = 'dex.envManager.activeProfile.v1';
 const REQUIRED_KEY = 'dex.envManager.requiredKeys.v1';
+const EMPTY_REQUIRED_KEYS: string[] = [];
 
 const makeId = (): string => `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+const readLegacyRequiredKeys = (): string[] => {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(REQUIRED_KEY) || '[]');
+    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === 'string' && NAME_RE.test(key)) : [];
+  } catch { return []; }
+};
 
 const loadProfiles = (): EnvProfile[] => {
   try {
@@ -74,11 +82,16 @@ const loadProfiles = (): EnvProfile[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
+    const legacyRequiredKeys = readLegacyRequiredKeys();
     return parsed
       .filter((p: any) => p && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.entries))
       .map((p: any) => ({
         id: p.id,
         name: p.name,
+        projectRoot: typeof p.projectRoot === 'string' && p.projectRoot.trim() ? p.projectRoot : undefined,
+        requiredKeys: Array.isArray(p.requiredKeys)
+          ? p.requiredKeys.filter((key: unknown) => typeof key === 'string' && NAME_RE.test(key))
+          : legacyRequiredKeys,
         entries: (p.entries as any[])
           .filter(e => e && typeof e.key === 'string')
           .map(e => ({ key: e.key, value: typeof e.value === 'string' ? e.value : '', comment: typeof e.comment === 'string' ? e.comment : undefined })),
@@ -162,11 +175,9 @@ export default function EnvManager(): React.ReactElement {
 
   // Local profiles state.
   const [profiles, setProfiles] = useState<EnvProfile[]>(() => loadProfiles());
+  const profilesRef = useRef(profiles);
+  const [choosingProject, setChoosingProject] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
-  const [requiredKeys, setRequiredKeys] = useState<string[]>(() => {
-    try { const r = localStorage.getItem(REQUIRED_KEY); const a = r ? JSON.parse(r) : []; return Array.isArray(a) ? a.filter((x: any) => typeof x === 'string') : []; }
-    catch { return []; }
-  });
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -176,6 +187,7 @@ export default function EnvManager(): React.ReactElement {
   const isProfile = scope.startsWith('profile:');
   const activeProfileId = isProfile ? scope.slice('profile:'.length) : '';
   const activeProfile = useMemo(() => profiles.find(p => p.id === activeProfileId) || null, [profiles, activeProfileId]);
+  const requiredKeys = activeProfile?.requiredKeys ?? EMPTY_REQUIRED_KEYS;
 
   const flash = useCallback((m: string) => {
     setNote(m);
@@ -205,12 +217,15 @@ export default function EnvManager(): React.ReactElement {
     } catch { /* ignore */ }
   }, []);
   useEffect(() => { try { localStorage.setItem(ACTIVE_KEY, scope); } catch { /* ignore */ } }, [scope]);
-  useEffect(() => { try { localStorage.setItem(REQUIRED_KEY, JSON.stringify(requiredKeys)); } catch { /* ignore */ } }, [requiredKeys]);
 
   // Reset transient per-scope UI when the scope changes.
   useEffect(() => { setRevealed(new Set()); setShowImport(false); setImportText(''); }, [scope]);
 
-  const updateProfiles = useCallback((next: EnvProfile[]) => { setProfiles(next); persistProfiles(next); }, []);
+  const updateProfiles = useCallback((next: EnvProfile[]) => {
+    profilesRef.current = next;
+    setProfiles(next);
+    persistProfiles(next);
+  }, []);
 
   const appScopes = useMemo(
     () => Object.entries(APP_DEFINITIONS).map(([id, def]) => ({ id, name: def.name })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -325,7 +340,7 @@ export default function EnvManager(): React.ReactElement {
   const createProfile = useCallback(async () => {
     const name = ((await dexPrompt({ title: 'New profile', label: 'Name', defaultValue: `Profile ${profiles.length + 1}`, confirmLabel: 'Create' })) || '').trim();
     if (!name) return;
-    const prof: EnvProfile = { id: makeId(), name, entries: [] };
+    const prof: EnvProfile = { id: makeId(), name, entries: [], requiredKeys: [] };
     updateProfiles([...profiles, prof]);
     setScope(`profile:${prof.id}`);
     toast('success', `Created profile "${name}"`);
@@ -340,11 +355,11 @@ export default function EnvManager(): React.ReactElement {
 
   const duplicateProfile = useCallback(() => {
     if (!activeProfile) return;
-    const copy: EnvProfile = { id: makeId(), name: `${activeProfile.name} copy`, entries: activeProfile.entries.map(e => ({ ...e })) };
+    const copy: EnvProfile = { id: makeId(), name: `${activeProfile.name} copy`, entries: activeProfile.entries.map(e => ({ ...e })), requiredKeys: [...requiredKeys], projectRoot: activeProfile.projectRoot };
     updateProfiles([...profiles, copy]);
     setScope(`profile:${copy.id}`);
     toast('success', `Duplicated to "${copy.name}"`);
-  }, [activeProfile, profiles, updateProfiles]);
+  }, [activeProfile, profiles, requiredKeys, updateProfiles]);
 
   const deleteProfile = useCallback(async () => {
     if (!activeProfile) return;
@@ -411,12 +426,33 @@ export default function EnvManager(): React.ReactElement {
     return { duplicates, empties, missingRequired, ok };
   }, [activeProfile, requiredKeys]);
 
-  const addRequired = useCallback(() => {
+  const changeRequiredKeys = (keys: string[]) => {
+    updateProfiles(profiles.map(profile => profile.id === activeProfileId ? { ...profile, requiredKeys: keys } : profile));
+  };
+
+  const addRequired = () => {
     const n = requiredInput.trim();
     if (!NAME_RE.test(n)) { toast('error', 'Invalid key name'); return; }
-    setRequiredKeys(prev => prev.includes(n) ? prev : [...prev, n]);
+    if (!requiredKeys.includes(n)) changeRequiredKeys([...requiredKeys, n]);
     setRequiredInput('');
-  }, [requiredInput]);
+  };
+
+  const chooseProject = async () => {
+    if (!activeProfileId || !window.dex?.invoke || choosingProject) return;
+    const profileId = activeProfileId;
+    setChoosingProject(true);
+    try {
+      const pick = await window.dex.invoke('dialog:showOpenDialog', { properties: ['openDirectory'], title: 'Choose a project folder' });
+      if (pick?.canceled) return;
+      const path = pick?.filePaths?.[0];
+      if (typeof path !== 'string' || !path.trim()) throw new Error('No folder was selected.');
+      updateProfiles(profilesRef.current.map(profile => profile.id === profileId ? { ...profile, projectRoot: path } : profile));
+    } catch {
+      toast('error', 'Could not select a project folder');
+    } finally {
+      setChoosingProject(false);
+    }
+  };
 
   // ---- diff ---------------------------------------------------------------
   const diff = useMemo(() => {
@@ -500,6 +536,17 @@ export default function EnvManager(): React.ReactElement {
             <button style={{ ...glassButton, padding: '2px 8px', fontSize: 11, color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={deleteProfile}>Delete profile</button>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 12 }}>
+            <Button size="sm" variant="ghost" disabled={!window.dex?.invoke} loading={choosingProject} onClick={() => void chooseProject()}>
+              {activeProfile.projectRoot ? 'Change project folder' : 'Link project folder'}
+            </Button>
+            {activeProfile.projectRoot && <>
+              <span style={{ overflowWrap: 'anywhere' }}>{activeProfile.projectRoot}</span>
+              <Button size="sm" variant="ghost" disabled={choosingProject} onClick={() => updateProfiles(profiles.map(profile =>
+                profile.id === activeProfileId ? { ...profile, projectRoot: undefined } : profile))}>Unlink</Button>
+            </>}
+          </div>
+
           {showImport && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -548,7 +595,7 @@ export default function EnvManager(): React.ReactElement {
                 {requiredKeys.map(k => (
                   <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', fontFamily: 'var(--font-mono)' }}>
                     {k}
-                    <button style={{ ...glassButton, padding: '0 4px', fontSize: 10 }} onClick={() => setRequiredKeys(prev => prev.filter(x => x !== k))} aria-label={`Remove required ${k}`}>×</button>
+                    <button style={{ ...glassButton, padding: '0 4px', fontSize: 10 }} onClick={() => changeRequiredKeys(requiredKeys.filter(key => key !== k))} aria-label={`Remove required ${k}`}>×</button>
                   </span>
                 ))}
                 <input aria-label="Add required key" value={requiredInput} onChange={(e) => setRequiredInput(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === 'Enter') addRequired(); }} placeholder="REQUIRED_KEY" style={{ ...inputStyle, width: 150, fontSize: 11, padding: '3px 6px' }} />

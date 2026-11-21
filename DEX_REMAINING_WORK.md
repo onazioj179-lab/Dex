@@ -263,3 +263,20 @@ This pass covers 20 rows from the retired small-app backlog.
 | Env #54, #56, #57, #59, #60 | Import reads files or pasted assignments and reports repeated keys. Export preserves inline comments, quoted values, and backslashes. Search matches key names without using masked values. |
 
 Open for packaged checks: Quick Look and batch operations, Gallery and DEX Code handoffs, native file selection, location tabs, and validation schemas tied to individual projects.
+
+## 2026-11-21 Files, Task Manager and Power batch
+
+This pass covers the 20 retired-backlog rows from Files #11 through Power #30, plus the Files tabs and Env Manager follow-ups.
+
+| Rows | Result |
+|---|---|
+| Files #11, #13, #15 | Added a shared hidden-files toggle that also applies to deeper columns. Files now runs the native duplicate and storage-by-type scans from the current folder. The scan includes subfolders and has a 20,000-file limit. |
+| Files #12, #14 | Reviewed the native archive APIs, Files' internal drag-to-move, and the existing Code and Gallery file handoffs. In-place archive actions and cross-app drag-to-import remain open. |
+| Task Manager #16, #19, #20, #25 | Reviewed the live sorted process list, aggregate performance history, name/PID search, and the Snapshot to Notes action. Keyboard selection stays within visible filter results. |
+| Task Manager #17, #18, #22, #23 | Reviewed End Process, DEX app/window counts, aggregate network and disk telemetry, and persisted PID pins. Restart, per-app attribution and per-process I/O remain open. Pins still follow PID. |
+| Task Manager #21, #24 | Group expansion is independent across categories. The process inspector shows the parent PID and native start time when available. Executable path and thread count remain open. |
+| Power #26, #27, #28 | Reviewed battery level and time estimates, native plan controls, and CPU-based energy ranking. The selected plan requires confirmation from Windows. Fixed late screen-wake-lock requests and resuming after the browser releases a lock. |
+| Power #29, #30 | Scheduled sleep/restart, battery health, and cycle counts remain open. |
+| Files #1 and Env #51, #53 | Added location tabs with independent histories. Env profiles can link to a project folder and edit their own required keys. Existing profiles inherit the former shared requirements. |
+
+The next approved local preview is needed for packaged Windows checks.
