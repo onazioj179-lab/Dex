@@ -83,6 +83,8 @@ describe('Gallery organization and handoff', () => {
     const to = { id: 'two', name: 'Archive', itemIds: [], createdAt: 0 };
     const result = moveAlbumItems([from, to], from, 'Archive', ['second', 'missing']);
     expect(result.map(album => album.itemIds)).toEqual([['first'], ['second']]);
+    const fullName = { ...from, name: 'a'.repeat(60) };
+    expect(moveAlbumItems([fullName], fullName, fullName.name + 'b', ['second'])).toEqual([fullName]);
   });
 
   it('keeps folder breadcrumb paths and groups likely filename copies by size', () => {

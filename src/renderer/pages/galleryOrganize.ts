@@ -28,14 +28,14 @@ export function tagMedia(tags: GalleryTags, ids: string[], label: string): Galle
 }
 
 export function moveAlbumItems(albums: UserAlbum[], from: UserAlbum, name: string, ids: string[]): UserAlbum[] {
-  if (!name.trim() || name.trim().toLowerCase() === from.name.toLowerCase()) return albums;
+  if (!name.trim()) return albums;
   const origin = albums.find(album => album.id === from.id);
   if (!origin) return albums;
   const allowed = new Set(origin.itemIds);
   const moving = ids.filter(id => allowed.has(id));
   if (!moving.length) return albums;
   const added = addToAlbum(albums, name, moving);
-  return removeFromAlbum(added.albums, from.id, moving);
+  return added.album.id === from.id ? albums : removeFromAlbum(added.albums, from.id, moving);
 }
 
 export function galleryFolder(id: string): string {
