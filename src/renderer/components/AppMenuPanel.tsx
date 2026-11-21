@@ -12,8 +12,9 @@
 // - Right-click any app for the shared app menu; drag an app onto the Dock
 //   to pin it; drag pinned apps (or Alt+←/→) to reorder them.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from './DexIcon';
+import { DexSearchInput } from '../styles/components';
 import { searchApps, type AppSearchHit } from '../services/appRegistry';
 import { spotlightEngine, type SpotlightResult } from '../shell/SpotlightEngine';
 import { appPinning, useMenuPinnedIds } from '../services/appPinning';
@@ -45,6 +46,8 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   const [dragOver, setDragOver] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const resultsId = useId();
   const pinnedIds = useMenuPinnedIds();
   const byId = useMemo(() => new Map(apps.map(a => [a.id, a])), [apps]);
   const ids = useMemo(() => apps.map(a => a.id), [apps]);
@@ -73,9 +76,18 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, indexTick]);
   const total = hits.length + more.length;
+  const hasMatches = hits.length > 0 || more.some(result => !result.id.startsWith('uki-ask-'));
+  const selected = Math.max(0, Math.min(active, total - 1));
 
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(t); }, []);
-  useEffect(() => { setActive(0); }, [query]);
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [q]);
+  useEffect(() => {
+    if (!q || !total) return;
+    document.getElementById(`${resultsId}-${selected}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [q, resultsId, selected, total]);
+  const changeQuery = (value: string) => { setActive(0); setQuery(value); };
 
   const pinned = pinnedIds.map(id => byId.get(id)).filter((a): a is MenuApp => !!a);
   const recent = history.filter(id => id !== 'home' && !pinnedIds.includes(id)).map(id => byId.get(id)).filter((a): a is MenuApp => !!a).slice(0, 6);
@@ -92,12 +104,15 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   };
 
   const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation();
-      if (query) setQuery(''); else onClose();
-    } else if (q && e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, total - 1)); }
-    else if (q && e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
-    else if (q && e.key === 'Enter') { e.preventDefault(); runAt(active); }
+      if (query) changeQuery(''); else onClose();
+    } else if (q && e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.max(0, Math.min(selected + 1, total - 1))); }
+    else if (q && e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(selected - 1, 0)); }
+    else if (q && e.key === 'PageDown') { e.preventDefault(); setActive(Math.max(0, Math.min(selected + 5, total - 1))); }
+    else if (q && e.key === 'PageUp') { e.preventDefault(); setActive(Math.max(selected - 5, 0)); }
+    else if (q && e.key === 'Enter') { e.preventDefault(); if (total) runAt(selected); }
     else if (!q && e.key === 'ArrowDown') { e.preventDefault(); gridRef.current?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus(); }
   };
 
@@ -193,61 +208,46 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
 
   return (
     <>
-      <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
-        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: 'var(--color-text-tertiary)', pointerEvents: 'none' }}>
-          <DexIcon name="search" size={14} color="currentColor" />
-        </span>
-        <input
+      <div style={{ flex: '0 0 auto', paddingBottom: 'var(--space-3)' }}>
+        <DexSearchInput
           ref={inputRef}
-          type="text"
-          className="dex-search-field"
+          size="lg"
+          fullWidth
+          reserveClearSpace
           role="combobox"
           aria-expanded={!!q}
-          aria-controls="dex-app-menu-results"
-          aria-activedescendant={q && active < total ? `dex-app-hit-${active}` : undefined}
+          aria-controls={q ? resultsId : undefined}
+          aria-activedescendant={q && total ? `${resultsId}-${selected}` : undefined}
           aria-autocomplete="list"
           aria-label="Search apps and actions"
-          placeholder="Search apps and actions"
+          placeholder="Search apps, files, notes, and settings"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => changeQuery(e.target.value)}
           onKeyDown={onSearchKey}
-          // A pill, like the dock search: no border, no focus ring glow --
-          // the caret and a slightly brighter fill say it's focused.
-          style={{
-            width: '100%', boxSizing: 'border-box', height: 34, padding: '0 32px 0 32px', borderRadius: 9999,
-            border: 'none', background: 'rgba(255,255,255,0.08)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-            color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
-            transition: 'background 0.15s ease',
-          }}
-          onFocus={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
-          onBlur={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+          onClear={() => { changeQuery(''); inputRef.current?.focus(); }}
+          autoComplete="off"
+          spellCheck={false}
         />
-        {query && (
-          <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 22, height: 22, border: 'none', borderRadius: 9999, background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DexIcon name="close" size={12} color="currentColor" />
-          </button>
-        )}
       </div>
-
+      <div ref={scrollRef} className="spotlight-results-scroll"
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable' }}>
       {q ? (
-        <div id="dex-app-menu-results" role="listbox" aria-label="Results">
-          {total === 0 && (
-            <div style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0' }}>Nothing matches &ldquo;{q}&rdquo;</div>
+        <div id={resultsId} role="listbox" aria-label="Results">
+          {!hasMatches && (
+            <div role="status" style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0', overflowWrap: 'anywhere' }}>Nothing matches &ldquo;{q}&rdquo;</div>
           )}
           {hits.map((h, i) => (
             <div
               key={`${h.kind}:${h.appId}:${h.actionId ?? ''}`}
-              id={`dex-app-hit-${i}`}
+              id={`${resultsId}-${i}`}
               role="option"
-              aria-selected={i === active}
-              onMouseEnter={() => setActive(i)}
+              aria-selected={i === selected}
+              onMouseMove={() => setActive(i)}
               onClick={() => runHit(h)}
               onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 10, cursor: 'pointer',
-                background: i === active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                background: i === selected ? 'var(--color-bg-active)' : 'transparent',
               }}
             >
               <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
@@ -270,12 +270,12 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
             return (
               <div
                 key={m.id}
-                id={`dex-app-hit-${i}`}
+                id={`${resultsId}-${i}`}
                 role="option"
-                aria-selected={i === active}
-                onMouseEnter={() => setActive(i)}
+                aria-selected={i === selected}
+                onMouseMove={() => setActive(i)}
                 onClick={() => runAt(i)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', background: i === active ? 'rgba(255,255,255,0.08)' : 'transparent' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', background: i === selected ? 'var(--color-bg-active)' : 'transparent' }}
               >
                 <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)' }}>
                   <DexIcon name={m.icon || 'search'} size={14} color="currentColor" />
@@ -306,6 +306,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           ))}
         </div>
       )}
+      </div>
     </>
   );
 };

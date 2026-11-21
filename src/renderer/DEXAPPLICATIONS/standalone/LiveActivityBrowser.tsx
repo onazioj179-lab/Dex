@@ -19,7 +19,9 @@ import { DexSearchInput } from '../../styles/components';
 import { VirtualList } from '../../components/VirtualList';
 import { APP_DEFINITIONS, useRunningApps } from '../../store/runningApps';
 import { sendToNotes } from '../../services/sendTo';
+import { saveBlobAs } from '../../services/nativeSave';
 import { frameScheduler } from '../../services/FrameScheduler';
+import { Button } from '../../ui/Button';
 
 // --- bridge ---------------------------------------------------------------
 // Same invoke seam the feature stores use; degrades to empty under web/no-bridge.
@@ -136,26 +138,32 @@ const LiveActivityBrowser: React.FC = () => {
   // resuming reveals everything that arrived without losing any events.
   const [bufferCount, setBufferCount] = useState(0);
   const pausedRef = useRef(false);
-  const bufferRef = useRef<ActivityEntry[]>([]);
+  const bufferRef = useRef<ActivityEntry[] | null>(null);
+  const displayedRef = useRef<ActivityEntry[]>([]);
+  const requestSequence = useRef(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const launchApp = useRunningApps(s => s.launchApp);
   const bringToFront = useRunningApps(s => s.bringToFront);
 
   const load = useCallback(async () => {
+    const request = ++requestSequence.current;
     try {
       const [feed, st] = await Promise.all([
         invoke<ActivityEntry[]>('activity-feed:get', { limit: FEED_LIMIT }),
         invoke<FeedStats>('activity-feed:stats'),
       ]);
+      if (request !== requestSequence.current) return;
       if (st && typeof st === 'object') setStats(st);
       if (Array.isArray(feed)) {
         if (pausedRef.current) {
           // Freeze the visible list; stash the latest snapshot and surface a count
           // of how many new entries are waiting so the user can resume to see them.
           bufferRef.current = feed;
-          setBufferCount(Math.max(0, feed.length - entries.length));
+          const visible = new Set(displayedRef.current.map(entry => entry.id));
+          setBufferCount(feed.filter(entry => !visible.has(entry.id)).length);
         } else {
+          displayedRef.current = feed;
           setEntries(feed);
         }
       }
@@ -164,20 +172,21 @@ const LiveActivityBrowser: React.FC = () => {
       console.warn('[LiveActivity] load failed', err);
       setLoaded(true);
     }
-  }, [entries.length]);
+  }, []);
 
   // Pause/resume the live feed. On resume we flush whatever was buffered.
   const togglePause = useCallback(() => {
-    setPaused(prev => {
-      const next = !prev;
-      pausedRef.current = next;
-      if (!next) {
-        if (bufferRef.current.length) setEntries(bufferRef.current);
-        bufferRef.current = [];
-        setBufferCount(0);
+    const next = !pausedRef.current;
+    pausedRef.current = next;
+    setPaused(next);
+    if (!next) {
+      if (bufferRef.current) {
+        displayedRef.current = bufferRef.current;
+        setEntries(bufferRef.current);
       }
-      return next;
-    });
+      bufferRef.current = null;
+      setBufferCount(0);
+    }
   }, []);
 
   useEffect(() => {
@@ -188,6 +197,7 @@ const LiveActivityBrowser: React.FC = () => {
     const onVis = () => { if (document.visibilityState === 'visible') void load(); };
     document.addEventListener('visibilitychange', onVis);
     return () => {
+      requestSequence.current++;
       if (timer.current) clearInterval(timer.current);
       document.removeEventListener('visibilitychange', onVis);
     };
@@ -258,8 +268,7 @@ const LiveActivityBrowser: React.FC = () => {
     } catch { /* navigation best-effort */ }
   }, [launchApp, bringToFront]);
 
-  // Export the currently filtered slice as a plain-text log into Notes.
-  const exportToNotes = useCallback(async () => {
+  const exportSlice = useCallback(async (destination: 'file' | 'notes') => {
     if (busy) return;
     setBusy(true);
     try {
@@ -272,12 +281,14 @@ const LiveActivityBrowser: React.FC = () => {
       const header = `DEX Activity Log (${filtered.length} item${filtered.length === 1 ? '' : 's'})` +
         (parts.length ? ` — ${parts.join(', ')}` : '');
       const lines = filtered.map(e => {
-        const when = relTime(parseTs(e.created_at));
+        const when = e.created_at;
         const appName = (APP_DEFINITIONS as Record<string, { name: string }>)[e.app]?.name || e.app || 'System';
         const extra = e.details ? ` — ${e.details}` : '';
         return `[${when}] ${appName} · ${e.event_type}: ${e.title}${extra}`;
       });
-      await sendToNotes([header, '', ...lines].join('\n'), header);
+      const text = [header, '', ...lines].join('\n');
+      if (destination === 'notes') await sendToNotes(text, header);
+      else await saveBlobAs('DEX-activity.txt', new Blob([text], { type: 'text/plain' }), { source: 'Activity' });
     } catch (err) {
       console.warn('[LiveActivity] export failed', err);
       toast('error', 'Could not export activity');
@@ -295,8 +306,9 @@ const LiveActivityBrowser: React.FC = () => {
     setBusy(true);
     try {
       await invoke('activity-feed:clear');
+      displayedRef.current = [];
       setEntries([]);
-      bufferRef.current = [];
+      bufferRef.current = null;
       setBufferCount(0);
       void load();
     } catch (err) {
@@ -388,8 +400,8 @@ const LiveActivityBrowser: React.FC = () => {
         </button>
         <button
           type="button"
-          onClick={() => { void exportToNotes(); }}
-          disabled={busy}
+          onClick={() => { void exportSlice('notes'); }}
+          disabled={busy || !filtered.length}
           aria-label="Send filtered activity to Notes"
           title="Send the current view to Notes"
           style={{
@@ -399,6 +411,8 @@ const LiveActivityBrowser: React.FC = () => {
             opacity: busy ? 0.5 : 1,
           }}
         >Send to Notes</button>
+        <Button size="sm" type="button" disabled={busy || !filtered.length} aria-label="Save filtered activity"
+          onClick={() => void exportSlice('file')}>Save log</Button>
         <button
           type="button"
           onClick={() => { void clearAll(); }}

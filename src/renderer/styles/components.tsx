@@ -1595,6 +1595,7 @@ export interface DexSearchInputProps extends Omit<React.InputHTMLAttributes<HTML
   onSubmit?: (value: string) => void;
   loading?: boolean;
   fullWidth?: boolean;
+  reserveClearSpace?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -1604,6 +1605,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
   onSubmit,
   loading = false,
   fullWidth = false,
+  reserveClearSpace = false,
   value,
   onChange,
   onKeyDown,
@@ -1620,9 +1622,10 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
   // and chain to any onKeyDown the caller passed, so existing call sites are
   // unaffected.
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
     if (event.key === 'Enter' && onSubmit) onSubmit(String(value ?? ''));
     else if (event.key === 'Escape' && onClear) onClear();
-    onKeyDown?.(event);
   };
 
   // Canonical control rhythm -- identical to Button/TextInput heights so a search
@@ -1720,9 +1723,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
             <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
-      ) : (
-        null
-      )}
+      ) : reserveClearSpace ? <span aria-hidden="true" style={{ width: 18, flexShrink: 0 }} /> : null}
     </div>
   );
 });

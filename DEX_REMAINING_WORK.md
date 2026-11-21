@@ -1,5 +1,21 @@
 # DEX: Remaining Work
 
+## 2026-11-21 utility backlog batch
+
+This pass covers 20 rows from the Utility section of the retired small-app backlog. Existing features are identified separately from new or changed behavior.
+
+| Rows | Work |
+|---|---|
+| QR #24, #25, #30, #32 | Reviewed existing clipboard and URL intake, PNG/SVG and clipboard export, batch sheets, and email/event payloads. Existing batch and payload tests still cover encoding and sheet export. |
+| QR #26, #31 | Reviewed typed Wi-Fi, contact, and coordinate forms and history recall. New Wi-Fi codes stay out of persisted history. |
+| QR #27, #29, #33 | Added a configurable quiet zone, Color Picker swatch handoff, and rounded/dot styles shared by preview, PNG, SVG and batch sheets. |
+| Maps #54, #55, #57, #59 | Exercised autocomplete, recents, saved places, dropped pins and basemap selection. Search clears stale results, save and recent actions work through click and keyboard, and copy reports clipboard failures. |
+| Maps #58, #60, #61 | Added editable Calendar drafts and geo QR handoffs. Measure traces up to 32 points with undo for the last point. |
+| Activity #62, #64, #65 | Reviewed existing app, range and text filters. Fixed pause counts even when the feed is full and added filtered text-file export. |
+| Activity #63 | Partial. Activity opens the originating app. Opening the exact record still needs entity IDs from the feed. |
+
+Open from this area: a QR center logo (#28), road routing beyond straight-line measurement (#56), exact activity links (#63), and packaged Windows verification for Search and the revised utility flows.
+
 **Updated:** 2026-11-18 (finished rows cleared: 46 moved to the archive, #14 closed, #39 waiting on a listen-test) · **Creator:** Onazi oJ · This is the active backlog: only rows with work left. Finished rows that still need a packaged-app, hardware, key or owner check are listed at the end; fully completed rows are in `docs/reports/DEX_COMPLETED_WORK.md` (row numbers unchanged).
 
 | # | Requirement | Status | Why incomplete | Components | Next action | Needs | Priority |
@@ -217,3 +233,17 @@ CI on `main` and on every PR since 2026-11-14 00:13 UTC is red without running: 
 | # | App | Item | Priority | Status | What changed | Next check |
 |---|---|---|---|---|---|---|
 | 246 | CI | GitHub Actions jobs not starting | HIGH | BLOCKED (owner: billing) | Nothing to change in the repo | Owner fixes Billing & plans, then re-run the latest `main` run |
+
+## 2026-11-21 Tasks and Pomodoro batch
+
+This pass covers 20 rows from the retired small-app backlog. Row numbers below refer to that backlog.
+
+| Rows | Result |
+|---|---|
+| #26, #28, #31, #36, #40, #43, #44 | Reviewed the existing natural-language quick-add, subtasks and completion rollup, quick-add tokens, estimated/actual time, keyboard triage, sorting, and filter chips. |
+| #27, #29, #38, #39, #41 | Added custom recurrence in days and month-end clamping. Reopening a completed occurrence leaves its successor in place, and completing it again keeps a single successor. Date-only tasks become overdue after their due day. Completed Today tracks actual completion timestamps. Both completion paths respect blockers, and new dependency cycles are prevented. Snoozed items stay out of the Today count and Home preview. |
+| #30, #35, #37 | Added drag-to-list destinations in Manual sort, bulk list moves, undo for bulk delete, and persistent saved tag filters. |
+| #32, #33, #34 | Notes can copy a line to Tasks. Kanban can copy a card with its description and date. UKI's Tasks context identifies today's open items. Tasks can reference existing files through the native picker. |
+| #42, #78 | A task can start a Pomodoro, and completed focus phases retain the task link in the session log. The link applies to a task. General project-linked sessions remain open. |
+
+Open: packaged Windows file-picker verification, project-linked focus sessions, and completion dates for older tasks whose records have no timestamp.

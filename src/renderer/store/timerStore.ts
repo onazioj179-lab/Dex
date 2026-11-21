@@ -137,6 +137,8 @@ export const DEFAULT_POMO_CONFIG: PomodoroConfig = {
   autoStartNext: false,
 };
 
+interface FocusTask { id: string; title: string }
+
 export interface PomodoroRuntime {
   phase: PomoPhase;
   startedAt: number | null;
@@ -144,6 +146,7 @@ export interface PomodoroRuntime {
   running: boolean;
   /** Completed WORK sessions in the current cycle (drives long-break cadence). */
   completedSessions: number;
+  task?: FocusTask;
 }
 
 export interface PomodoroLogEntry {
@@ -152,6 +155,7 @@ export interface PomodoroLogEntry {
   at: number;
   /** Duration in minutes. */
   minutes: number;
+  task?: FocusTask;
 }
 
 export interface PomodoroLog {
@@ -247,6 +251,7 @@ interface TimerStoreState {
   pomodoroConfig: PomodoroConfig;
   pomodoroLog: PomodoroLog;
   startPomodoro: () => void;
+  startTaskFocus: (task: FocusTask) => boolean;
   pausePomodoro: () => void;
   resetPomodoro: () => void;
   setPomodoroPhase: (phase: PomoPhase) => void;
@@ -432,6 +437,17 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
       set({ pomodoro: next });
     },
 
+    startTaskFocus: task => {
+      const rt = get().pomodoro;
+      if (rt.running || rt.accumulatedMs > 0) return false;
+      const next: PomodoroRuntime = {
+        ...rt, task, phase: 'work', running: true, startedAt: Date.now(), accumulatedMs: 0,
+      };
+      persistPomodoro(next);
+      set({ pomodoro: next });
+      return true;
+    },
+
     pausePomodoro: () => {
       const rt = get().pomodoro;
       if (!rt.running) return;
@@ -443,7 +459,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
 
     resetPomodoro: () => {
       const rt = get().pomodoro;
-      const next: PomodoroRuntime = { ...rt, startedAt: null, accumulatedMs: 0, running: false };
+      const next: PomodoroRuntime = { ...rt, task: undefined, startedAt: null, accumulatedMs: 0, running: false };
       persistPomodoro(next);
       set({ pomodoro: next });
     },
@@ -465,7 +481,10 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
       // Log + daily totals (work phases count toward focus minutes).
       let log = rolloverLog(pomodoroLog);
       if (!opts?.skip) {
-        const entry: PomodoroLogEntry = { phase: completedPhase, at: opts?.completedAt ?? Date.now(), minutes };
+        const entry: PomodoroLogEntry = {
+          phase: completedPhase, at: opts?.completedAt ?? Date.now(), minutes,
+          ...(completedPhase === 'work' && rt.task ? { task: rt.task } : {}),
+        };
         const entryDay = calendarDayKey(new Date(entry.at));
         if (entryDay === log.date) {
           log = {
@@ -495,6 +514,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => {
       const autoStart = cfg.autoStartNext;
       const next: PomodoroRuntime = {
         phase: nextPhase,
+        ...(rt.task ? { task: rt.task } : {}),
         completedSessions,
         accumulatedMs: 0,
         running: autoStart,

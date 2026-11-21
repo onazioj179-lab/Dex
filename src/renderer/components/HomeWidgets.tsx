@@ -1423,6 +1423,7 @@ interface DashTask {
   completed: boolean;
   priority: 'low' | 'medium' | 'high';
   dueDate: string | null;
+  snoozedUntil?: string | null;
 }
 
 async function loadDashTasks(): Promise<DashTask[]> {
@@ -1469,8 +1470,9 @@ const CurrentTasksWidget: React.FC = () => {
 
   const open = useMemo(() => {
     const pOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const now = Date.now();
     return tasks
-      .filter(t => !t.completed)
+      .filter(t => !t.completed && !(t.snoozedUntil && Date.parse(t.snoozedUntil) > now))
       .sort((a, b) => {
         const da = parseLocalDate(a.dueDate)?.getTime() ?? Infinity;
         const db = parseLocalDate(b.dueDate)?.getTime() ?? Infinity;

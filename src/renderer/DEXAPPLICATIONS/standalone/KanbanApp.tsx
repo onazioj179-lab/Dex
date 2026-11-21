@@ -16,6 +16,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActio
 import { persistOrWarn } from '../../utils/persistOrWarn';
 import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
 import { parseLocalDate } from '../../utils/localDate';
+import { sendToTasks } from '../../services/taskIntake';
 
 // -- Types --------------------------------------------------------------
 
@@ -252,6 +253,10 @@ const CardDetail: React.FC<{
         <div style={modalStyles.footer}>
           <button className="kanban-btn" style={modalStyles.deleteBtn} onClick={onDelete} aria-label="Delete card">Delete Card</button>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button type="button" className="kanban-btn" style={modalStyles.cancelBtn}
+              disabled={!title.trim()} onClick={() => {
+                if (sendToTasks({ title, notes: description, dueDate })) onClose();
+              }}>Copy to Tasks</button>
             <button className="kanban-btn" style={modalStyles.cancelBtn} onClick={onClose} aria-label="Cancel">Cancel</button>
             <button className="kanban-btn" style={modalStyles.saveBtn} onClick={handleSave} aria-label="Save card">Save</button>
           </div>
