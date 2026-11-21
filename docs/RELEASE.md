@@ -85,6 +85,19 @@ installers on a Windows runner, publishes the GitHub release "DEX OS X.Y.Z",
 and mirrors it to the update channel (`onazioj179-lab/dex-updates`, tag
 `dex-vX.Y.Z`) when the `DEX_UPDATES_TOKEN` secret is set.
 
+The stable release publishes one x64 setup, its updater signature, a SHA-256
+checksum, and `latest.json`. Settings › Updates checks the latest DEX release
+on GitHub. Tauri verifies the installer signature and the signed version before
+DEX offers to restart. The first updater-enabled build needs a one-time install
+from GitHub. Subsequent in-app updates require a higher released version.
+Development commits and build serials do not publish a new installer.
+
+The workflow reads the repository secret `TAURI_SIGNING_PRIVATE_KEY` and, if
+configured, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep the private key outside
+the repository and retain its backup. The matching public key is embedded in
+`src-tauri/tauri.conf.json`. Updater signing and optional Windows Authenticode
+signing use separate keys.
+
 ```bash
 git tag -a vX.Y.Z -m "DEX OS X.Y.Z"
 ```
@@ -93,18 +106,11 @@ git tag -a vX.Y.Z -m "DEX OS X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-To publish a locally built, signed release instead, create it first; the
-workflow then uploads onto the existing release rather than creating one:
-
-```bash
-gh release create vX.Y.Z --repo onazioj179-lab/Dex --title "DEX OS X.Y.Z" --notes-file DEX_X.Y.Z_RELEASE_NOTES.md src-tauri/target/release/bundle/nsis/DEX_X.Y.Z_x64-setup.exe src-tauri/target/release/bundle/SHA256SUMS
-```
-
 ## 6. Old releases
 
-- The workflow keeps the newest three releases in `onazioj179-lab/Dex`
-  (`scripts/prune-releases.js --keep 3`). Keep at least one earlier working
-  release for rollback until the new one has been installed successfully.
+- Verify the current setup opens and reports the expected version before
+  removing superseded releases. Release cleanup is a separate operation from
+  publishing.
 - `dex-updates` is shared with other products. Never run the count-based prune
   there; delete a specific old DEX release only:
   `gh release delete dex-vX.Y.Z --repo onazioj179-lab/dex-updates --yes --cleanup-tag`.

@@ -45,11 +45,12 @@ portable-pty = "0.9"  # real pseudoterminal for the Terminal app (ConPTY on Wind
 # WebView2 preflight (src/webview2.rs). Same versions wry already pulls in, so
 # these add no new crates to the build — they just make the loader API callable.
 [target.'cfg(windows)'.dependencies]
-webview2-com = "0.38"
-windows-core = "0.61"
-# UKI voice: Windows.Media.SpeechRecognition (speech_ctl.rs). Same 0.61 line as
-# webview2-com, so no second copy of the bindings.
+webview2-com = "0.39"
+windows-core = "0.62"
+# UKI voice: Windows.Media.SpeechRecognition (speech_ctl.rs). Windows Speech uses the 0.61 bindings separately from
+# the WebView2 interop above.
 windows = { version = "0.61", features = ["Media_SpeechRecognition", "Foundation", "Foundation_Collections", "Globalization"] }
+tauri-plugin-updater = { version = "2.14.1", default-features = false, features = ["native-tls", "system-proxy"] }
 
 # Release builds: full optimisation, cross-crate LTO, one codegen unit for the
 # best code, and no debug info in the shipped exe. On MSVC symbols never live in

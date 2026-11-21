@@ -35,6 +35,20 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
+      - name: Resolve tag
+        id: tag
+        env:
+          DEX_REQUESTED_TAG: ${{ github.event.inputs.tag }}
+        shell: bash
+        run: |
+          TAG="${DEX_REQUESTED_TAG:-${GITHUB_REF#refs/tags/}}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected a stable vX.Y.Z release tag."
+            exit 1
+          fi
+          node -e 'if ("v" + require("./package.json").version !== process.argv[1]) process.exit(1)' "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -78,13 +92,26 @@ jobs:
           $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pw
           Remove-Item $pfx -Force
           if (-not $cert.HasPrivateKey) { Write-Error 'The certificate has no private key.'; exit 1 }
-          $cfg = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint } } } | ConvertTo-Json -Compress -Depth 5
-          "TAURI_CONFIG=$cfg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "DEX_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "DEX_EXPECT_SIGNED=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Signing with $($cert.Subject), expires $($cert.NotAfter)"
 
       - name: Build Tauri setup (NSIS)
-        run: npm run build:tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: pwsh
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Missing the DEX updater signing key.' }
+          $bundle = @{ createUpdaterArtifacts = $true }
+          if ($env:DEX_CERT_THUMBPRINT) {
+            $bundle.windows = @{ certificateThumbprint = $env:DEX_CERT_THUMBPRINT }
+          }
+          $config = Join-Path $env:RUNNER_TEMP 'dex-release-config.json'
+          @{ bundle = $bundle } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $config -Encoding utf8
+          npx tauri build --config $config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run verify:bundle
 
       - name: Check installer signature
         shell: pwsh
@@ -103,7 +130,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          cp src-tauri/target/release/bundle/nsis/*-setup.exe release-assets/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe release-assets/
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe.sig release-assets/
           # SHA-256 checksums for this version's installers.
           node scripts/release-checksums.cjs && cp src-tauri/target/release/bundle/SHA256SUMS release-assets/
           echo "Release assets:"
@@ -113,16 +141,6 @@ jobs:
           if [ -z "$(ls -A release-assets)" ]; then
             echo "::error::No installers were produced by the Tauri build."
             exit 1
-          fi
-
-      - name: Resolve tag
-        id: tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract changelog for this version
@@ -155,6 +173,12 @@ jobs:
           echo "Generated release notes:"
           cat release-notes.md
 
+      - name: Generate signed update manifest
+        env:
+          DEX_RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        shell: bash
+        run: node scripts/write-update-manifest.mjs "$DEX_RELEASE_TAG" "$GITHUB_REPOSITORY" release-assets
+
       - name: Publish to GitHub Releases (Dex)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -168,14 +192,8 @@ jobs:
             gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
             gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --title "DEX OS ${TAG#v}"
           else
-            gh release create "$TAG" --repo "$REPO" --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
+            gh release create "$TAG" --repo "$REPO" --verify-tag --latest --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
           fi
-
-      - name: Prune old Dex releases (keep newest 3)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: node scripts/prune-releases.js --repo "${{ github.repository }}" --keep 3
 
       - name: Mirror to dex-updates auto-update channel
         if: ${{ env.DEX_UPDATES_TOKEN != '' }}
