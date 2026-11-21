@@ -29,6 +29,8 @@
 // =============================================================================
 
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -45,6 +47,9 @@ static SERVER_STOP: AtomicBool = AtomicBool::new(false);
 // Serializes read-modify-write of the KV state across the dispatch path and the
 // HTTP worker thread so concurrent updates don't clobber each other.
 static STATE_LOCK: Mutex<()> = Mutex::new(());
+// The browser receives the raw credential exactly once, in the successful pair
+// response. Only its SHA-256 digest remains in-process; it is never persisted.
+static ACCESS_TOKEN_HASH: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
 // ---------------------------------------------------------------------------
 // Time / ids
@@ -62,6 +67,35 @@ fn action_id() -> String {
     let rnd = crate::util::pseudo_uuid_v4();
     let short: String = rnd.chars().filter(|c| c.is_ascii_alphanumeric()).take(6).collect();
     format!("action_{}_{}", now_ms(), short)
+}
+
+fn issue_access_token() -> Result<String, getrandom::Error> {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes)?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn hash_access_token(token: &str) -> [u8; 32] {
+    Sha256::digest(token.as_bytes()).into()
+}
+
+fn constant_time_eq(left: &[u8; 32], right: &[u8; 32]) -> bool {
+    left.iter()
+        .zip(right.iter())
+        .fold(0u8, |difference, (a, b)| difference | (a ^ b))
+        == 0
+}
+
+fn set_access_token(token: &str) {
+    if let Ok(mut current) = ACCESS_TOKEN_HASH.lock() {
+        *current = Some(hash_access_token(token));
+    }
+}
+
+fn clear_access_token() {
+    if let Ok(mut current) = ACCESS_TOKEN_HASH.lock() {
+        *current = None;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +227,7 @@ fn start_server(app: &tauri::AppHandle) -> Value {
 // connection. Void channel -> returns true (matches the handler's `return true`).
 fn stop_server(app: &tauri::AppHandle) -> Value {
     SERVER_STOP.store(true, Ordering::SeqCst);
+    clear_access_token();
     let _g = STATE_LOCK.lock();
     let mut state = load_state(app);
     state.insert("status".into(), Value::String("disconnected".into()));
@@ -204,6 +239,7 @@ fn stop_server(app: &tauri::AppHandle) -> Value {
 // BrowserBridge.startPairing(): 6-char uppercase hex code, 5-minute expiry,
 // status -> pairing, emit browser:pairingStarted. Returns the PairingRequest.
 fn start_pairing(app: &tauri::AppHandle) -> Value {
+    clear_access_token();
     let raw = crate::util::pseudo_uuid_v4();
     let code: String = raw
         .chars()
@@ -229,6 +265,7 @@ fn start_pairing(app: &tauri::AppHandle) -> Value {
 
 // BrowserBridge.cancelPairing(): clear pairing, back to disconnected. Void -> true.
 fn cancel_pairing(app: &tauri::AppHandle) -> Value {
+    clear_access_token();
     let _g = STATE_LOCK.lock();
     let mut state = load_state(app);
     state.insert("pairing".into(), Value::Null);
@@ -240,6 +277,7 @@ fn cancel_pairing(app: &tauri::AppHandle) -> Value {
 // BrowserBridge.disconnect(): clear connection + pending actions, status ->
 // disconnected, emit browser:disconnected. Void -> true.
 fn disconnect(app: &tauri::AppHandle) -> Value {
+    clear_access_token();
     {
         let _g = STATE_LOCK.lock();
         let mut state = load_state(app);
@@ -307,6 +345,7 @@ struct ParsedReq {
     method: String,
     path: String,
     query: String,
+    headers: HashMap<String, String>,
     body: String,
 }
 
@@ -347,11 +386,15 @@ fn read_request(stream: &mut std::net::TcpStream) -> Option<ParsedReq> {
     };
 
     let mut content_length: usize = 0;
+    let mut headers = HashMap::new();
     for line in lines {
         if let Some((k, v)) = line.split_once(':') {
-            if k.trim().eq_ignore_ascii_case("content-length") {
+            let key = k.trim().to_ascii_lowercase();
+            let value = v.trim().to_string();
+            if key == "content-length" {
                 content_length = v.trim().parse().unwrap_or(0);
             }
+            headers.insert(key, value);
         }
     }
     if content_length > 65536 {
@@ -376,8 +419,38 @@ fn read_request(stream: &mut std::net::TcpStream) -> Option<ParsedReq> {
         method,
         path,
         query,
+        headers,
         body: String::from_utf8_lossy(&body).to_string(),
     })
+}
+
+fn request_access_token(req: &ParsedReq) -> Option<&str> {
+    req.headers
+        .get("authorization")
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .or_else(|| req.headers.get("x-dex-bridge-token").map(String::as_str))
+        .filter(|token| token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
+fn is_authorized(req: &ParsedReq) -> bool {
+    let Some(token) = request_access_token(req) else {
+        return false;
+    };
+    let supplied = hash_access_token(token);
+    ACCESS_TOKEN_HASH
+        .lock()
+        .ok()
+        .and_then(|stored| *stored)
+        .is_some_and(|stored| constant_time_eq(&stored, &supplied))
+}
+
+fn require_authorized(req: &ParsedReq, stream: &mut std::net::TcpStream) -> bool {
+    if is_authorized(req) {
+        true
+    } else {
+        write_response(stream, 401, "{\"error\":\"Invalid or missing bridge credential\"}");
+        false
+    }
 }
 
 fn write_response(stream: &mut std::net::TcpStream, code: u16, body: &str) {
@@ -385,16 +458,16 @@ fn write_response(stream: &mut std::net::TcpStream, code: u16, body: &str) {
         200 => "OK",
         400 => "Bad Request",
         401 => "Unauthorized",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        500 => "Internal Server Error",
         _ => "OK",
     };
     let resp = format!(
         "HTTP/1.1 {} {}\r\n\
          Content-Type: application/json\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: Content-Type, X-Pairing-Code\r\n\
+         Cache-Control: no-store\r\n\
          Content-Length: {}\r\n\
          Connection: close\r\n\
          \r\n{}",
@@ -416,15 +489,10 @@ fn handle_conn(app: &tauri::AppHandle, mut stream: std::net::TcpStream) {
         }
     };
 
-    if req.method == "OPTIONS" {
-        write_response(&mut stream, 200, "");
-        return;
-    }
-
     match req.path.as_str() {
         "/status" => handle_http_status(app, &mut stream),
         "/pair" => handle_http_pair(app, &req, &mut stream),
-        "/action" => handle_http_action(app, &mut stream),
+        "/action" => handle_http_action(app, &req, &mut stream),
         "/result" => handle_http_result(app, &req, &mut stream),
         "/heartbeat" => handle_http_heartbeat(app, &req, &mut stream),
         _ => write_response(&mut stream, 404, "{\"error\":\"Not found\"}"),
@@ -476,6 +544,14 @@ fn handle_http_pair(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::n
         return;
     }
 
+    let access_token = match issue_access_token() {
+        Ok(token) => token,
+        Err(_) => {
+            write_response(stream, 500, "{\"error\":\"Unable to establish secure bridge session\"}");
+            return;
+        }
+    };
+
     let conn_id = format!("conn_{}", now_ms());
     let connection = json!({
         "id": conn_id,
@@ -489,18 +565,31 @@ fn handle_http_pair(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::n
     state.insert("pairing".into(), Value::Null);
     state.insert("status".into(), Value::String("connected".into()));
     save_state(app, state);
+    set_access_token(&access_token);
     drop(_g);
 
     crate::native_ops::emit_event(app, "browser:connected", &connection);
     write_response(
         stream,
         200,
-        &json!({ "success": true, "connectionId": conn_id }).to_string(),
+        &json!({
+            "success": true,
+            "connectionId": conn_id,
+            "accessToken": access_token,
+            "tokenType": "Bearer",
+        }).to_string(),
     );
 }
 
 // /action (GET): hand the browser its pending actions, marking them "sent".
-fn handle_http_action(app: &tauri::AppHandle, stream: &mut std::net::TcpStream) {
+fn handle_http_action(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::net::TcpStream) {
+    if req.method != "GET" {
+        write_response(stream, 405, "{\"error\":\"Method not allowed\"}");
+        return;
+    }
+    if !require_authorized(req, stream) {
+        return;
+    }
     let _g = STATE_LOCK.lock();
     let mut state = load_state(app);
     if get_status_str(&state) != "connected" {
@@ -528,6 +617,9 @@ fn handle_http_action(app: &tauri::AppHandle, stream: &mut std::net::TcpStream) 
 fn handle_http_result(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::net::TcpStream) {
     if req.method != "POST" {
         write_response(stream, 405, "{\"error\":\"Method not allowed\"}");
+        return;
+    }
+    if !require_authorized(req, stream) {
         return;
     }
     let _g = STATE_LOCK.lock();
@@ -576,6 +668,13 @@ fn handle_http_result(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std:
 
 // /heartbeat: refresh lastActivity and optional tabCount.
 fn handle_http_heartbeat(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut std::net::TcpStream) {
+    if req.method != "GET" && req.method != "POST" {
+        write_response(stream, 405, "{\"error\":\"Method not allowed\"}");
+        return;
+    }
+    if !require_authorized(req, stream) {
+        return;
+    }
     let _g = STATE_LOCK.lock();
     let mut state = load_state(app);
     if get_status_str(&state) == "connected" {
@@ -595,6 +694,29 @@ fn handle_http_heartbeat(app: &tauri::AppHandle, req: &ParsedReq, stream: &mut s
     }
     drop(_g);
     write_response(stream, 200, "{\"ok\":true}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{constant_time_eq, hash_access_token, issue_access_token};
+
+    #[test]
+    fn bridge_tokens_are_high_entropy_hex_credentials() {
+        let first = issue_access_token().expect("OS random source");
+        let second = issue_access_token().expect("OS random source");
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn bridge_token_digests_compare_without_early_exit() {
+        let expected = hash_access_token(&"a".repeat(64));
+        let matching = hash_access_token(&"a".repeat(64));
+        let different = hash_access_token(&"b".repeat(64));
+        assert!(constant_time_eq(&expected, &matching));
+        assert!(!constant_time_eq(&expected, &different));
+    }
 }
 
 // ---------------------------------------------------------------------------

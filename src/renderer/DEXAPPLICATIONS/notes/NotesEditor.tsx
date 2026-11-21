@@ -29,6 +29,7 @@ import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemp
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
+import { loadAppPreferences, useAppPreference } from '../../store/appPreferences';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -46,7 +47,7 @@ function countSentences(text: string): number {
 
 interface NotesEditorProps {
   content: string;
-  onChange: (content: string, plainText: string, wordCount: number) => void;
+  onChange: (content: string, plainText: string, wordCount: number, editedAt: number) => void;
   onSave: () => void;
   readOnly?: boolean;
   editorMode: 'edit' | 'preview' | 'split';
@@ -388,9 +389,12 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   onDropFiles,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const renderedEditor = useRef<HTMLDivElement | null>(null);
   const undoMgr = useRef(new UndoManager(200));
-  const lastContent = useRef(content);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastContent = useRef<string>();
+  const pendingEdit = useRef<{ timer: ReturnType<typeof setTimeout>; at: number } | null>(null);
+  const editCallbacks = useRef({ onChange, onSave });
+  editCallbacks.current = { onChange, onSave };
   const isComposing = useRef(false);
   // Set by the Ctrl/Cmd+Shift+V shortcut so the next paste lands as plain text,
   // stripping all formatting (the normal paste keeps rich HTML when available).
@@ -407,6 +411,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // Reading level (Flesch-Kincaid grade + ease band) -- shown once a note is long
   // enough for the score to be meaningful. Computed in the debounced pass below.
   const [readability, setReadability] = useState('');
+  const lineSpacing = Number(useAppPreference('notes', 'lineSpacing'));
+  useEffect(() => { void loadAppPreferences(); }, []);
   // -- Outline (document headings -> navigable table of contents) -------------
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [headings, setHeadings] = useState<{ level: number; text: string }[]>([]);
@@ -482,21 +488,26 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     return () => unregisterUkiAppContext('notes');
   }, []);
 
-  // Initial render: set editor HTML
   useEffect(() => {
-    if (editorRef.current && content !== lastContent.current) {
+    const editor = editorRef.current;
+    if (!editor) {
+      renderedEditor.current = null;
+      return;
+    }
+    if (!pendingEdit.current && (editor !== renderedEditor.current || content !== lastContent.current)) {
+      renderedEditor.current = editor;
       lastContent.current = content;
       const doc = deserializeDoc(content);
       const html = docToHTML(doc);
-      editorRef.current.innerHTML = DOMPurify.sanitize(html);
-      const text = editorRef.current.textContent || '';
+      editor.innerHTML = DOMPurify.sanitize(html);
+      const text = editor.textContent || '';
       setIsEmpty(!text.trim());
       setCharCount(text.length);
       setWdCount(countWords(text));
       setSentenceCount(countSentences(text));
       refreshHeadings();
     }
-  }, [content, refreshHeadings]);
+  }, [content, editorMode, refreshHeadings]);
 
   // Auto-focus editor so user can start typing immediately
   useEffect(() => {
@@ -519,14 +530,36 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     }
   }, [readOnly, editorMode]);
 
-  // Cleanup pending save timer on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
+  const publishEdit = useCallback((editor = editorRef.current, updateStats = true) => {
+    const pending = pendingEdit.current;
+    if (!editor || !pending) return false;
+    clearTimeout(pending.timer);
+    pendingEdit.current = null;
+    const doc = htmlToDoc(editor.innerHTML);
+    const serialized = serializeDoc(doc);
+    const plainText = docToPlainText(doc);
+    if (updateStats) {
+      const stats = analyzeText(plainText);
+      setReadability(stats.words >= 30 ? `Grade ${stats.gradeLevel} · ${stats.readability}` : '');
+    }
+    lastContent.current = serialized;
+    editCallbacks.current.onChange(serialized, plainText, countWords(plainText), pending.at);
+    return true;
   }, []);
 
-  // -- Emit Changes ------------------------------------------------------
+  const hasEditableSurface = editorMode !== 'preview';
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current;
+    return () => {
+      if (publishEdit(editor, false)) editCallbacks.current.onSave();
+    };
+  }, [hasEditableSurface, publishEdit]);
+
+  useEffect(() => {
+    const onPageHide = () => { if (publishEdit()) editCallbacks.current.onSave(); };
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [publishEdit]);
 
   const emitChange = useCallback(() => {
     if (!editorRef.current || isComposing.current) return;
@@ -541,22 +574,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     setSentenceCount(countSentences(liveText));
     refreshHeadings();
 
-    // Debounce the heavy work: parse HTML -> doc, serialize, extract plain text,
-    // then notify the parent (which itself persists). onChange timing is
-    // unchanged (it already only fired after this 300ms debounce).
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      if (!editorRef.current) return;
-      const doc = htmlToDoc(editorRef.current.innerHTML);
-      const serialized = serializeDoc(doc);
-      const plainText = docToPlainText(doc);
-      const words = countWords(plainText);
-      const stats = analyzeText(plainText);
-      setReadability(stats.words >= 30 ? `Grade ${stats.gradeLevel} · ${stats.readability}` : '');
-      lastContent.current = serialized;
-      onChange(serialized, plainText, words);
-    }, 300);
-  }, [onChange]);
+    if (pendingEdit.current) clearTimeout(pendingEdit.current.timer);
+    pendingEdit.current = { at: Date.now(), timer: setTimeout(publishEdit, 300) };
+  }, [publishEdit, refreshHeadings]);
 
   // -- Undo/Redo Push ----------------------------------------------------
 
@@ -931,6 +951,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     // Save
     if (ctrl && e.key === 's') {
       e.preventDefault();
+      publishEdit();
       onSave();
       return;
     }
@@ -1030,7 +1051,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         }
       }
     }
-  }, [readOnly, exec, emitChange, onSave, wikiOpen, wikiMatches, wikiActive, insertWikiLink, closeWiki]);
+  }, [readOnly, exec, emitChange, onSave, publishEdit, wikiOpen, wikiMatches, wikiActive, insertWikiLink, closeWiki]);
 
   // -- Input Handler -----------------------------------------------------
 
@@ -1255,12 +1276,13 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                   ...(focusMode ? styles.focusModeEditable : {}),
                   fontFamily,
                   fontSize,
+                  lineHeight: lineSpacing,
                 }}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onClick={handleClick}
-                onBlur={closeWiki}
+                onBlur={() => { publishEdit(); closeWiki(); }}
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 spellCheck

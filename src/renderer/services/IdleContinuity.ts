@@ -44,6 +44,7 @@ class IdleContinuityService {
   private lastActivityAt = Date.now();
   private lastPointerActivityAt = 0;
   private foregroundAppId = 'home';
+  private refreshCheckInFlight = false;
   private appActivity = new Map<string, AppActivity>([
     ['home', { lastActiveAt: Date.now(), lastRefreshAt: Date.now() }],
   ]);
@@ -101,6 +102,10 @@ class IdleContinuityService {
   setForegroundApp(appId: string): void {
     this.foregroundAppId = appId || 'home';
     this.recordActivity(this.foregroundAppId);
+    try {
+      const bridge = (window as any).dex || (window as any).electron;
+      bridge?.invoke?.('adaptive:setFocusedApp', this.foregroundAppId)?.catch?.(() => {});
+    } catch { /* native adaptive engine unavailable */ }
   }
 
   markAppActive(appId: string, at = Date.now()): void {
@@ -138,19 +143,53 @@ class IdleContinuityService {
     // throttle below, which is keyed on each app's own foreground/background
     // status (not on the user being idle) and is invisible/battery-friendly.
     this.setState('active');
-    this.fireDueBackgroundRefreshes(now);
+    void this.fireDueBackgroundRefreshes(now);
   }
 
-  private fireDueBackgroundRefreshes(now: number): void {
+  private async fireDueBackgroundRefreshes(now: number): Promise<void> {
+    if (this.refreshCheckInFlight) return;
+    const due: Array<[string, AppActivity, number]> = [];
     for (const [appId, activity] of this.appActivity) {
       if (appId === this.foregroundAppId) continue;
       const interval = this.getRefreshInterval(appId);
       if (interval > 0 && now - activity.lastRefreshAt >= interval) {
+        due.push([appId, activity, interval]);
+      }
+    }
+    if (due.length === 0) return;
+
+    this.refreshCheckInFlight = true;
+    try {
+      const root = document.documentElement;
+      const memoryPressure = root.getAttribute('data-memory-pressure');
+      const thermal = root.getAttribute('data-thermal-state');
+      if (memoryPressure === 'high' || thermal === 'hot' || thermal === 'critical') return;
+
+      const bridge = (window as any).dex || (window as any).electron;
+      if (bridge?.invoke) {
+        const response = await bridge.invoke('adaptive:shouldYieldCpu').catch(() => false);
+        const shouldYield = response === true || response?.value === true || response?.shouldYield === true;
+        if (shouldYield) return;
+      }
+
+      try {
+        const battery = await (navigator as any).getBattery?.();
+        if (battery && !battery.charging && battery.level <= 0.2) return;
+      } catch { /* battery API unavailable */ }
+
+      for (const [appId, activity, interval] of due) {
         activity.lastRefreshAt = now;
         window.dispatchEvent(new CustomEvent('dex-app-background-refresh', {
-          detail: { appId, intervalMs: interval, continuityClass: this.getAppClass(appId) },
+          detail: {
+            appId,
+            intervalMs: interval,
+            continuityClass: this.getAppClass(appId),
+            resourceApproved: true,
+          },
         }));
       }
+    } finally {
+      this.refreshCheckInFlight = false;
     }
   }
 

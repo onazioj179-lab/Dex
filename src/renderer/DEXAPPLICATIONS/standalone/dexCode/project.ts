@@ -4,13 +4,7 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Project awareness for DexCode: open a folder, list its source files, read
-// them, and search across them. Uses the same IPC bridge as fileIO (proven in
-// Forge's folder import): `dialog:showOpenDialog` + `fs:readdir` + `fs:read-file`.
-//
-// `fs:readdir` returns a flat list of entry NAMES (no stat/type), so this lists
-// the folder's top level and keeps only entries that look like source files. It
-// does not fake a recursive tree it cannot reliably build.
+// Project browsing and desktop-scoped editing for DexCode.
 
 import { extractSymbols, type CodeSymbol } from './symbols';
 
@@ -26,6 +20,16 @@ export interface ProjectFile {
 export interface DexProject {
   root: string;
   files: ProjectFile[];
+  writable?: boolean;
+  limited?: boolean;
+  unreadable?: number;
+}
+
+export interface ProjectDocument {
+  root: string;
+  path: string;
+  content: string;
+  revision: string;
 }
 
 export interface WorkspaceHit {
@@ -38,6 +42,35 @@ export interface WorkspaceHit {
 function bridge(): { invoke: (channel: string, ...args: unknown[]) => Promise<any> } | null {
   const dex = (typeof window !== 'undefined' ? (window as any).dex : null) || null;
   return dex && typeof dex.invoke === 'function' ? dex : null;
+}
+
+function comparisonPath(value: string): string {
+  const plain = value.replace(/^\\\\\?\\UNC\\/i, '\\\\').replace(/^\\\\\?\\/, '');
+  return /^[A-Za-z]:|^\\\\/.test(plain) ? plain.replaceAll('\\', '/').toLowerCase() : plain;
+}
+
+export function sameProjectPath(left: string, right: string): boolean {
+  return comparisonPath(left) === comparisonPath(right);
+}
+
+export function projectContains(project: DexProject, file: string): boolean {
+  const root = comparisonPath(project.root);
+  return comparisonPath(file).startsWith(root.endsWith('/') ? root : root + '/');
+}
+
+function publishProject(result: unknown): DexProject | null {
+  if (!result || typeof result !== 'object') return null;
+  const project = result as Partial<DexProject> & { success?: boolean; canceled?: boolean; error?: string };
+  if (project.success === false) throw new Error(project.error || 'The project could not be opened.');
+  if (!project.root || project.canceled || !Array.isArray(project.files)) return null;
+  try { localStorage.setItem(PROJECT_KEY, project.root); } catch { /* Storage may be unavailable. */ }
+  return {
+    root: project.root,
+    files: project.files,
+    writable: project.writable,
+    limited: project.limited,
+    unreadable: project.unreadable,
+  };
 }
 
 /** Join a folder root and an entry name using the root's own path separator. */
@@ -60,10 +93,12 @@ export function clearStoredProject(): void {
   try { localStorage.removeItem(PROJECT_KEY); } catch { /* ignore */ }
 }
 
-/** Read a folder's top-level source files into a project model. */
+/** Read a folder's source files without granting write access. */
 export async function loadProject(root: string): Promise<DexProject | null> {
   const dex = bridge();
   if (!dex) return null;
+  const native = await dex.invoke('codeProject:list', { root });
+  if (native != null) return publishProject(native);
   try {
     const names: string[] = (await dex.invoke('fs:readdir', root)) || [];
     const files = names
@@ -78,10 +113,20 @@ export async function loadProject(root: string): Promise<DexProject | null> {
   }
 }
 
+export async function restoreProject(): Promise<DexProject | null> {
+  const result = await bridge()?.invoke('codeProject:restore');
+  // Old saved paths can still be browsed. Only the native record grants editing.
+  const root = getStoredProjectRoot();
+  const restored = result?.success === false && root ? null : publishProject(result);
+  return restored ?? (root ? await loadProject(root) : null);
+}
+
 /** Prompt for a folder and load it as the active project. */
 export async function pickProjectFolder(): Promise<DexProject | null> {
   const dex = bridge();
   if (!dex) return null;
+  const native = await dex.invoke('codeProject:choose');
+  if (native != null) return publishProject(native);
   try {
     const result = await dex.invoke('dialog:showOpenDialog', {
       properties: ['openDirectory'],
@@ -95,10 +140,39 @@ export async function pickProjectFolder(): Promise<DexProject | null> {
   }
 }
 
+export async function closeProjectFolder(project: DexProject): Promise<void> {
+  const result = await bridge()?.invoke('codeProject:close', { root: project.root });
+  if (result?.success === false || project.writable && !result?.success) {
+    throw new Error(result?.error || 'The project could not be closed.');
+  }
+  clearStoredProject();
+}
+
+export async function openProjectDocument(project: DexProject, path: string): Promise<ProjectDocument> {
+  const result = await bridge()?.invoke('codeProject:openFile', { root: project.root, path });
+  const document = result?.document;
+  if (!result?.success || typeof document?.path !== 'string' ||
+    typeof document?.content !== 'string' || typeof document?.revision !== 'string') {
+    throw new Error(result?.error || 'The project file could not be opened.');
+  }
+  return { root: project.root, ...document };
+}
+
+export async function saveProjectDocument(document: Omit<ProjectDocument, 'content'>, content: string): Promise<string> {
+  const result = await bridge()?.invoke('codeProject:saveFile', { ...document, content });
+  if (!result?.success || typeof result.revision !== 'string') {
+    throw new Error(result?.error || 'The project file could not be saved.');
+  }
+  return result.revision;
+}
+
 export async function readProjectFile(path: string): Promise<string | null> {
   const dex = bridge();
   if (!dex) return null;
-  try { return await dex.invoke('fs:read-file', path); } catch { return null; }
+  try {
+    const content = await dex.invoke('fs:read-file', path);
+    return typeof content === 'string' ? content : null;
+  } catch { return null; }
 }
 
 /**
@@ -113,10 +187,12 @@ export interface ProjectSymbol extends CodeSymbol {
  * Index every project file's top-level symbols (functions/classes/vars) by name,
  * so "go to definition" can jump across files. Bounded by maxFiles.
  */
-export async function buildSymbolIndex(project: DexProject, maxFiles = 200): Promise<Map<string, ProjectSymbol[]>> {
+export async function buildSymbolIndex(project: DexProject, maxFiles = 200, signal?: AbortSignal): Promise<Map<string, ProjectSymbol[]>> {
   const index = new Map<string, ProjectSymbol[]>();
   for (const file of project.files.slice(0, maxFiles)) {
+    if (signal?.aborted) break;
     const content = await readProjectFile(file.path);
+    if (signal?.aborted) break;
     if (!content) continue;
     for (const sym of extractSymbols(content)) {
       const arr = index.get(sym.name);
@@ -127,13 +203,14 @@ export async function buildSymbolIndex(project: DexProject, maxFiles = 200): Pro
   return index;
 }
 
-export async function searchProject(project: DexProject, query: string, maxHits = 200): Promise<WorkspaceHit[]> {
+export async function searchProject(project: DexProject, query: string, maxHits = 200, signal?: AbortSignal): Promise<WorkspaceHit[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const hits: WorkspaceHit[] = [];
   for (const f of project.files) {
-    if (hits.length >= maxHits) break;
+    if (signal?.aborted || hits.length >= maxHits) break;
     const content = await readProjectFile(f.path);
+    if (signal?.aborted) break;
     if (!content) continue;
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
@@ -144,4 +221,29 @@ export async function searchProject(project: DexProject, query: string, maxHits 
     }
   }
   return hits;
+}
+
+let searchTicket = Date.now() * 1024;
+
+export async function searchWorkspaceFiles(project: DexProject, query: string, signal: AbortSignal): Promise<{
+  hits: WorkspaceHit[]; limited?: boolean; skipped?: number;
+}> {
+  if (typeof project.writable !== 'boolean') {
+    return { hits: await searchProject(project, query, 200, signal) };
+  }
+  const dex = bridge();
+  if (!dex || signal.aborted) return { hits: [] };
+  const ticket = ++searchTicket;
+  const cancel = () => { void dex.invoke('codeProject:cancelSearch', { ticket }).catch(() => {}); };
+  signal.addEventListener('abort', cancel, { once: true });
+  try {
+    const result = await dex.invoke('codeProject:search', { root: project.root, query, ticket });
+    if (signal.aborted) return { hits: [] };
+    if (!result?.success || !Array.isArray(result.hits)) {
+      throw new Error(result?.error || 'Project search failed.');
+    }
+    return { hits: result.hits, limited: result.limited, skipped: result.skipped };
+  } finally {
+    signal.removeEventListener('abort', cancel);
+  }
 }

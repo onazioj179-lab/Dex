@@ -1,7 +1,7 @@
 # ===========================================================================
 # DEX OS -- Buildroot Board Defconfig
 # ===========================================================================
-# Minimal Linux x86_64 system that boots directly into DEX (Electron kiosk).
+# Minimal Linux x86_64 system that boots directly into DEX (Tauri kiosk).
 # Target: bare-metal x86_64 with EFI boot, Mesa GPU, ALSA audio, NetworkManager.
 # Build: make BR2_EXTERNAL=../dex-os/buildroot dex_defconfig && make
 # ===========================================================================
@@ -53,11 +53,13 @@ BR2_TARGET_GRUB2_BUILTIN_MODULES_PC="boot linux ext2 fat part_gpt part_msdos nor
 # ---------------------------------------------------------------------------
 # Filesystem images
 # ---------------------------------------------------------------------------
+BR2_TARGET_ROOTFS_CPIO=y
+BR2_TARGET_ROOTFS_CPIO_GZIP=y
 BR2_TARGET_ROOTFS_EXT2=y
 BR2_TARGET_ROOTFS_EXT2_4=y
 BR2_TARGET_ROOTFS_EXT2_SIZE="2G"
-BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_DEX_PATH)/scripts/post-build.sh"
-BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_DEX_PATH)/scripts/post-image.sh"
+BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_DEX_PATH)/../scripts/post-build.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_DEX_PATH)/../scripts/post-image.sh"
 BR2_TARGET_ROOTFS_ISO9660=y
 BR2_TARGET_ROOTFS_ISO9660_HYBRID=y
 
@@ -131,6 +133,7 @@ BR2_PACKAGE_PANGO=y
 BR2_PACKAGE_CAIRO=y
 BR2_PACKAGE_GDK_PIXBUF=y
 BR2_PACKAGE_GTK3=y
+BR2_PACKAGE_WEBKITGTK=y
 BR2_PACKAGE_LIBNOTIFY=y
 
 # ---------------------------------------------------------------------------

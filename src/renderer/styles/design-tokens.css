@@ -20,11 +20,14 @@
   --dex-font-mono: "SF Mono", "Cascadia Code", "Berkeley Mono", ui-monospace, "Roboto Mono", monospace;
   /* Tabular numerals for any numeric / data display. */
   --dex-numeric: "tnum" 1, "lnum" 1;
+}
 
-  /* ---- Color: neutral grays + ONE accent ------------------------------- */
-  --dex-accent: #4a9eff;
-  --dex-accent-hover: #6cb2ff;
-  --dex-accent-soft: rgba(74, 158, 255, 0.08);
+:root,
+[data-app-theme="dark"] {
+  /* ---- Color: monochrome signal, no chromatic accent ------------------- */
+  --dex-accent: #f2f2f2;
+  --dex-accent-hover: #ffffff;
+  --dex-accent-soft: rgba(255, 255, 255, 0.08);
 
   --dex-bg: #0c0c0e;
   --dex-bg-surface: #161618;
@@ -42,7 +45,9 @@
   /* one restrained elevation, not a heavy drop shadow
      (GOAL-6D shadow intensity -40% pass applied) */
   --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.17), 0 4px 14px rgba(0, 0, 0, 0.13);
+}
 
+:root {
   /* ---- Spacing scale (4px grid) — no magic numbers --------------------- */
   --dex-space-1: 4px;
   --dex-space-2: 8px;
@@ -65,13 +70,20 @@
   --dex-icon-lg: 24px;
   --dex-icon-stroke: 1.75px; /* Lucide 1.5–2px, pixel-aligned */
 
-  /* ---- Motion: 150–220ms, standard ease, NO bounce, NO slow fades ----- */
+  /* ---- Motion -------------------------------------------------------- */
   --dex-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --dex-motion-fast: 150ms;
-  --dex-motion: 180ms;
-  --dex-motion-slow: 220ms;
+  --dex-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --dex-ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --dex-ease-move: cubic-bezier(0.65, 0, 0.35, 1);
+  --dex-motion-fast: 120ms;
+  --dex-motion: 190ms;
+  --dex-motion-slow: 240ms;
+  --dex-motion-dismiss: 110ms;
   --dex-transition: var(--dex-motion) var(--dex-ease);
+}
 
+:root,
+[data-app-theme="dark"] {
   /* ---- Focus: keyboard-accessible ring --------------------------------
      Monochrome focus identity (owner direction): focus + selection read in
      WHITE on dark (near-black on light, see [data-theme="light"] below) so the
@@ -80,7 +92,9 @@
   --dex-focus-color: #ffffff;
   --dex-focus-glow: rgba(255, 255, 255, 0.22);
   --dex-focus-ring: 0 0 0 2px var(--dex-bg), 0 0 0 4px var(--dex-focus-color);
+}
 
+:root {
   /* ---- Modal widths: responsive by construction (never overflow) ------- */
   --dex-modal-sm: min(400px, calc(100vw - 32px));
   --dex-modal-md: min(520px, calc(100vw - 48px));
@@ -100,6 +114,7 @@
   --dex-control-h-sm: 28px;
   --dex-control-h-md: 32px;
   --dex-control-h-lg: 40px;
+  --dex-control-h-xs: 24px;
 }
 
 /* Light theme parity for the dex token layer. Values mirror the canonical
@@ -129,14 +144,180 @@
   --dex-focus-glow: rgba(0, 0, 0, 0.16);
 }
 
-/* Reduced motion: honour the OS setting. */
+:root[data-perf-tier="low"]:not([data-reduced-motion="on"]) {
+  --dex-motion: 150ms;
+  --dex-motion-slow: 180ms;
+  --dex-motion-dismiss: 100ms;
+}
+:root[data-reduced-motion="on"],
+[data-app-motion="reduced"] {
+  --dex-motion-fast: 0ms;
+  --dex-motion: 0ms;
+  --dex-motion-slow: 0ms;
+  --dex-motion-dismiss: 0ms;
+}
+html[data-reduced-motion="on"] *,
+html[data-reduced-motion="on"] *::before,
+html[data-reduced-motion="on"] *::after,
+[data-app-motion="reduced"],
+[data-app-motion="reduced"] *,
+[data-app-motion="reduced"]::before,
+[data-app-motion="reduced"]::after,
+[data-app-motion="reduced"] *::before,
+[data-app-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0ms !important;
+  scroll-behavior: auto !important;
+}
+[data-app-theme] {
+  color: var(--color-text-primary);
+  --color-bg-glass: var(--color-bg-surface);
+  --color-bg-glass-strong: var(--color-bg-inset);
+  --pg-surface: var(--color-bg-surface);
+  --pg-surface-strong: var(--color-bg-inset);
+  --pg-sidebar: var(--color-bg-surface);
+  --pg-toolbar: var(--color-bg-surface);
+  --pg-text-primary: var(--color-text-primary);
+  --pg-text-secondary: var(--color-text-secondary);
+  --pg-text-tertiary: var(--color-text-tertiary);
+  --glass-border: var(--color-border-subtle);
+  --glass-blur: none;
+}
+[data-app-theme]:is(.dex-liquid-glass, .dex-liquid-glass-strong, .dex-frosted-ice, .dex-frosted-ice-strong),
+[data-app-theme] :is(.dex-liquid-glass, .dex-liquid-glass-strong, .dex-frosted-ice, .dex-frosted-ice-strong) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+[data-floating-window] {
+  transition: box-shadow var(--dex-motion) var(--dex-ease);
+}
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dex-motion-fast: 1ms;
-    --dex-motion: 1ms;
-    --dex-motion-slow: 1ms;
+    --dex-motion-fast: 0ms;
+    --dex-motion: 0ms;
+    --dex-motion-slow: 0ms;
+    --dex-motion-dismiss: 0ms;
   }
 }
+
+.dex-motion-surface {
+  opacity: 0;
+  transition: opacity var(--dex-motion-dismiss) var(--dex-ease-exit);
+}
+.dex-motion-surface[data-open="true"] {
+  opacity: 1;
+  transition: opacity var(--dex-motion) var(--dex-ease-enter);
+}
+.dex-motion-surface[data-open="false"] {
+  pointer-events: none !important;
+}
+.dex-motion-surface[data-anchored="true"] {
+  scale: 0.985;
+  transition: opacity var(--dex-motion-dismiss) var(--dex-ease-exit), scale var(--dex-motion-dismiss) var(--dex-ease-exit);
+}
+.dex-motion-surface[data-anchored="true"][data-open="true"] {
+  scale: 1;
+  transition: opacity var(--dex-motion) var(--dex-ease-enter), scale var(--dex-motion) var(--dex-ease-enter);
+}
+@starting-style {
+  .dex-motion-surface[data-open="true"] { opacity: 0; }
+  .dex-motion-surface[data-anchored="true"][data-open="true"] { scale: 0.985; }
+}
+[data-perf-tier="low"] .dex-motion-surface[data-anchored="true"] { scale: 1; }
+
+.dex-workspace-viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout style;
+}
+.dex-workspace-layer {
+  position: absolute;
+  inset: 0;
+  contain: layout style;
+  transform-origin: left top;
+}
+.dex-workspace-inline {
+  transform: var(--dex-camera-inverse, none);
+  transform-origin: left top;
+}
+.dex-spatial-pan {
+  position: absolute;
+  inset: 0;
+  z-index: 4991;
+  cursor: grab;
+  touch-action: none;
+}
+.dex-spatial-pan:active { cursor: grabbing; }
+.dex-spatial-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 60px;
+  z-index: 4992;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: var(--dex-hairline);
+  border-radius: var(--radius-md);
+  background: var(--dex-bg-surface);
+  box-shadow: var(--dex-elevation);
+}
+.dex-spatial-controls button {
+  display: grid;
+  place-items: center;
+  min-height: 29px;
+  min-width: 29px;
+  padding: 0 5px;
+  color: var(--dex-text);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dex-motion-fast) var(--dex-ease);
+}
+.dex-spatial-controls button:hover:not(:disabled) { background: var(--dex-bg-hover); }
+.dex-spatial-controls button[aria-pressed="true"] {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--dex-bg-surface));
+}
+.dex-spatial-controls button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.dex-spatial-controls button:disabled { opacity: .4; cursor: default; }
+.dex-spatial-controls .dex-spatial-zoom { min-width: 46px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.dex-spatial-divider { width: 1px; height: 16px; margin: 0 4px; background: var(--color-border); }
+@media (pointer: coarse) {
+  .dex-spatial-controls button { min-height: 38px; min-width: 38px; }
+}
+
+[data-floating-window] > [data-resize-handle] {
+  position: absolute;
+  z-index: 51;
+  touch-action: none;
+}
+[data-resize-handle="left"], [data-resize-handle="right"] {
+  top: 36px;
+  bottom: 12px;
+  width: 6px;
+}
+[data-resize-handle="top"], [data-resize-handle="bottom"] {
+  left: 12px;
+  right: 12px;
+  height: 5px;
+}
+[data-resize-handle="nw"], [data-resize-handle="ne"], [data-resize-handle="sw"], [data-resize-handle="se"] {
+  width: 12px;
+  height: 12px;
+}
+[data-resize-handle="left"], [data-resize-handle="nw"], [data-resize-handle="sw"] { left: 0; }
+[data-resize-handle="right"], [data-resize-handle="ne"], [data-resize-handle="se"] { right: 0; }
+[data-resize-handle="top"], [data-resize-handle="nw"], [data-resize-handle="ne"] { top: 0; }
+[data-resize-handle="bottom"], [data-resize-handle="sw"], [data-resize-handle="se"] { bottom: 0; }
 
 /* High-DPI sharpness: at >=1.5x scaling a 1px border paints 2-3 device
    pixels and reads soft. Drop to 0.5px (one device pixel) and lift opacity
@@ -289,6 +470,67 @@ html, body, #root {
  * ======================================================================== */
 
 .dex-btn { -webkit-tap-highlight-color: transparent; }
+.dex-btn[data-size="xs"] { min-width: var(--dex-control-h-xs); height: var(--dex-control-h-xs); border-radius: var(--radius-md); }
+.dex-btn[data-size="sm"] { min-height: var(--dex-control-h-sm); }
+.dex-btn[data-size="md"] { min-height: var(--dex-control-h-md); }
+.dex-btn[data-size="lg"] { min-height: var(--dex-control-h-lg); }
+
+/* One dense control contract for app toolbars and floating window chrome. */
+.dex-control-cluster,
+.dex-window-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.dex-window-controls .dex-btn {
+  color: var(--color-text-secondary);
+}
+.dex-window-controls .dex-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+.dex-window-controls .dex-window-control-close:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-active);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+.dex-app-toolbar {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+.dex-app-toolbar svg,
+.dex-window-controls svg {
+  flex: none;
+  shape-rendering: geometricPrecision;
+}
+.dex-app-toolbar button:not(.dex-btn) {
+  min-height: var(--dex-control-h-xs);
+  border-radius: var(--radius-md) !important;
+  font-family: var(--dex-font-ui);
+}
+.dex-app-toolbar button:not(.dex-btn) > svg:only-child {
+  width: min(16px, 100%);
+  height: min(16px, 100%);
+}
+
+/* Per-app consolidation: all hosted applications share a minimum interaction
+   rhythm and the same sharp rounded edge. Larger purpose-built controls remain
+   larger; undersized local toolbar controls are raised to the safe floor. */
+html[data-dex-identity="monolith"] [data-app-container] button {
+  min-height: var(--dex-control-h-xs);
+  border-radius: var(--radius-lg) !important;
+  font-family: var(--dex-font-ui);
+}
+html[data-dex-identity="monolith"] [data-app-container] button:has(> svg:only-child) {
+  min-width: var(--dex-control-h-xs);
+}
+html[data-dex-identity="monolith"] [data-app-container] :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: var(--dex-control-h-sm);
+  border-radius: var(--radius-lg) !important;
+}
 
 .dex-btn[data-variant="primary"] {
   background: var(--color-accent, #4a9eff);
@@ -429,3 +671,105 @@ html, body, #root {
 /* Native heavy elements + headings: lighter + tighter tracking = sharp. */
 strong, b { font-weight: 600; }
 h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -0.012em; }
+
+/* ==========================================================================
+ * DEX MONOLITH — authoritative monochrome system identity.
+ * Broad influences are translated into original, functional traits: armored
+ * chamfers, tactical contrast, mechanical seams, and compact instrumentation.
+ * No licensed imagery, decorative glow, gradients, or chromatic app branding.
+ * ======================================================================== */
+
+html[data-dex-identity="monolith"] {
+  color-scheme: dark;
+  --color-bg-base: #08090a;
+  --color-bg-surface: #121416;
+  --color-bg-surface-solid: #121416;
+  --color-bg-inset: #0b0d0e;
+  --color-bg-hover: #1a1d20;
+  --color-bg-active: #24282c;
+  --color-bg-overlay: #0d0f11;
+  --color-bg-elevated: #171a1d;
+  --color-bg-secondary: #0e1012;
+  --color-bg-tertiary: #1a1d20;
+  --color-bg-glass: rgba(18, 20, 22, 0.9);
+  --color-bg-glass-strong: rgba(11, 13, 14, 0.96);
+  --color-accent: #f2f2f2;
+  --color-accent-hover: #ffffff;
+  --color-accent-dark: #c8c8c8;
+  --color-accent-text: #08090a;
+  --color-text-on-accent: #08090a;
+  --color-accent-light: rgba(255, 255, 255, 0.14);
+  --color-accent-soft: rgba(255, 255, 255, 0.08);
+  --color-accent-muted: rgba(255, 255, 255, 0.1);
+  --color-success: #d8d8d8;
+  --color-success-muted: rgba(216, 216, 216, 0.12);
+  --color-warning: #a8a8a8;
+  --color-warning-muted: rgba(168, 168, 168, 0.12);
+  --color-error: #f2f2f2;
+  --color-error-muted: rgba(242, 242, 242, 0.12);
+  --color-danger: #f2f2f2;
+  --status-ok: #d8d8d8;
+  --status-warn: #a8a8a8;
+  --status-error: #f2f2f2;
+  --color-border: rgba(255, 255, 255, 0.15);
+  --color-border-default: rgba(255, 255, 255, 0.15);
+  --color-border-subtle: rgba(255, 255, 255, 0.075);
+  --color-border-strong: rgba(255, 255, 255, 0.24);
+  --glass-bg: rgba(12, 14, 16, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --glass-blur: blur(14px) saturate(100%);
+  --dex-desktop-scrim: #121416;
+  --dex-desktop-scrim-hover: #1a1d20;
+  --dex-accent: #f2f2f2;
+  --dex-accent-hover: #ffffff;
+  --dex-accent-soft: rgba(255, 255, 255, 0.08);
+  --pg-surface: rgba(18, 20, 22, 0.96);
+  --pg-surface-strong: rgba(12, 14, 16, 0.98);
+  --pg-sidebar: rgba(11, 13, 14, 0.98);
+  --pg-toolbar: rgba(20, 22, 24, 0.96);
+  --pg-border: rgba(255, 255, 255, 0.08);
+  --pg-border-strong: rgba(255, 255, 255, 0.15);
+  --graph-node-blue: #f2f2f2;
+  --graph-node-teal: #c8c8c8;
+  --graph-node-purple: #9c9c9c;
+  --graph-node-soft: #747474;
+  --graph-node-alert: #ffffff;
+  --shadow-glow: none;
+  --shadow-glow-sm: none;
+  --shadow-glow-accent: none;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+}
+
+html[data-dex-identity="monolith"] :where(button, [role="button"], input, select, textarea) {
+  border-radius: min(var(--radius-lg, 6px), 6px);
+}
+
+html[data-dex-identity="monolith"] :where([class*="gradient"], [style*="linear-gradient"], [style*="radial-gradient"]):not([data-preserve-content-color]) {
+  background-image: none !important;
+}
+
+html[data-dex-identity="monolith"] :where(img[src*="/appicons/"], img[src*="appicons/"]) {
+  filter: grayscale(1) contrast(1.12);
+}
+
+html[data-dex-identity="monolith"] [data-dex-nook] {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.48), inset 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-dex-identity="monolith"] ::selection {
+  color: #08090a;
+  background: #f2f2f2;
+}
+
+/* Some legacy accessibility rules use hardcoded blue with !important. The
+   product-wide keyboard focus contract is monochrome and must win over them. */
+html[data-dex-identity="monolith"] :where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus,
+html[data-dex-identity="monolith"] :where(button, [role="button"], a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #f2f2f2 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16) !important;
+}

@@ -20,13 +20,21 @@
 //   - Strips most ANSI escape sequences for safe display; preserves color
 //     and bright via 16-color palette.
 // ===========================================================================
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { isTauri } from '../services/platform/tauriCompat';
 import { APP_DEFINITIONS } from '../store/runningApps';
+import { useAppPreference } from '../store/appPreferences';
 import { buildDexCommands, matchTerminalCommand, resolveShortcut, suggestDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { describeCapabilities, type CapabilityStatus } from '../uki/permissions';
 import { parseAnsi, type Span } from '../../shared/term/ansiParser';
 import { sendToNotes } from '../services/sendTo';
+
+const TerminalViewport = lazy(() => import('./TerminalViewport'));
+const MAX_REPLAY = 256 * 1024;
+const MAX_TRANSCRIPT_LINES = 8000;
+const MAX_TRANSCRIPT_LINE = 32 * 1024;
 
 // ---------------------------------------------------------------------------
 // IPC bridge accessor
@@ -49,6 +57,8 @@ const bridge = (): ElectronBridge | null => {
 export interface TerminalProps {
   /** Auto-spawn a session on mount. Default true. */
   autoSpawn?: boolean;
+  /** Whether this panel can take focus and send visible geometry. */
+  visible?: boolean;
   /** Working directory hint for the spawned shell. */
   cwd?: string;
   /** Optional shell override (e.g. 'pwsh.exe', '/bin/bash'). */
@@ -131,8 +141,17 @@ function longestCommonPrefix(items: readonly string[]): string {
   return prefix;
 }
 
-export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand }) => {
+export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, visible = true, cwd, shell, onClose, height, onRunningCommand }) => {
+  const fontSize = Number(useAppPreference('dexcode', 'terminalFontSize'));
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [nativeSession, setNativeSession] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [interactive, setInteractive] = useState(false);
+  const [viewportOpened, setViewportOpened] = useState(false);
+  const [viewportSession, setViewportSession] = useState('');
+  const stream = useRef({ replay: '', listeners: new Set<(data: string) => void>() });
+  const inputQueue = useRef({ current: null as string | null, tail: Promise.resolve() });
+  const sizeQueue = useRef({ current: null as string | null, pending: null as { cols: number; rows: number } | null, running: false });
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState('');
   // History is shared across sessions and persisted to localStorage. We seed
@@ -177,6 +196,19 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   const onRunningCommandRef = useRef(onRunningCommand);
   onRunningCommandRef.current = onRunningCommand;
 
+  const subscribeViewport = useCallback((write: (data: string) => void) => {
+    const output = stream.current;
+    if (output.replay) write(output.replay);
+    output.listeners.add(write);
+    return () => { output.listeners.delete(write); };
+  }, []);
+
+  const publishViewport = useCallback((data: string) => {
+    const output = stream.current;
+    output.replay = (output.replay + data).slice(-MAX_REPLAY);
+    output.listeners.forEach(write => write(data));
+  }, []);
+
   const flushTailBuffer = useCallback(() => {
     const tail = bufferRef.current;
     if (!tail) return;
@@ -196,11 +228,18 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     bufferRef.current += chunk;
     const parts = bufferRef.current.split(/\r?\n/);
     bufferRef.current = parts.pop() ?? '';
+    if (bufferRef.current.length > MAX_TRANSCRIPT_LINE) {
+      parts.push(bufferRef.current.slice(0, MAX_TRANSCRIPT_LINE));
+      bufferRef.current = bufferRef.current.slice(MAX_TRANSCRIPT_LINE);
+    }
     if (parts.length === 0) return;
     for (const raw of parts) {
       const { spans, color, bold } = parseAnsi(raw, colorStateRef.current.color, colorStateRef.current.bold);
       colorStateRef.current = { color, bold };
       pendingLinesRef.current.push({ id: ++lineIdRef.current, spans: spans.length ? spans : [{ text: '' }] });
+    }
+    if (pendingLinesRef.current.length > MAX_TRANSCRIPT_LINES) {
+      pendingLinesRef.current = pendingLinesRef.current.slice(-MAX_TRANSCRIPT_LINES);
     }
     if (flushRafRef.current !== null) return;
     flushRafRef.current = requestAnimationFrame(() => {
@@ -210,7 +249,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (pending.length === 0) return;
       setLines(prev => {
         const next = prev.concat(pending);
-        return next.length > 8000 ? next.slice(next.length - 8000) : next;
+        return next.length > MAX_TRANSCRIPT_LINES ? next.slice(-MAX_TRANSCRIPT_LINES) : next;
       });
     });
   }, []);
@@ -221,15 +260,21 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   useEffect(() => {
     const b = bridge();
     if (!b) {
-      setError('Terminal IPC unavailable (running outside Electron).');
+      setError('The native terminal connection is unavailable.');
       return;
     }
     let mounted = true;
     let dataOff: (() => void) | null = null;
     let exitOff: (() => void) | null = null;
     let activeId: string | null = null;
+    let spawning = false;
+    const native = isTauri();
+    let listening = false;
     let spawnedAt = 0;
     let backoffTimer: ReturnType<typeof setTimeout> | null = null;
+    setSessionId(null);
+    setNativeSession(false);
+    setSessionEnded(false);
 
     const handleSpawnFailure = (msg: string) => {
       if (!mounted) return;
@@ -249,60 +294,130 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     };
 
     const startSession = () => {
-      if (!mounted) return;
+      if (!mounted || spawning || activeId) return;
+      if (backoffTimer) {
+        clearTimeout(backoffTimer);
+        backoffTimer = null;
+      }
+      spawning = true;
       setUnavailable(false);
       setError(null);
+      setSessionEnded(false);
+      stream.current.replay = '';
       spawnedAt = Date.now();
-      b.invoke('pty:spawn', { cwd, shell }).then(res => {
-        const r = res as { sessionId?: string; error?: string };
-        if (!mounted) return;
-        if (r.error) { handleSpawnFailure(r.error); return; }
-        if (r.sessionId) { activeId = r.sessionId; setSessionId(r.sessionId); }
-      }).catch(err => {
+      const start = async () => {
+        const r = await b.invoke('pty:spawn', { cwd, shell, ...(native ? { deferEvents: true } : {}) }) as
+          { sessionId?: string; error?: string; interactive?: boolean } | null;
+        if (!mounted) {
+          if (r?.sessionId) void b.invoke('pty:kill', { sessionId: r.sessionId }).catch(() => {});
+          return;
+        }
+        if (!r?.sessionId || r.error) {
+          handleSpawnFailure(r?.error || 'The terminal did not return a session.');
+          return;
+        }
+        activeId = r.sessionId;
+        inputQueue.current = { current: r.sessionId, tail: Promise.resolve() };
+        sizeQueue.current = { current: r.sessionId, pending: null, running: false };
+        setSessionId(r.sessionId);
+        setNativeSession(r.interactive === true);
+        setViewportSession(r.sessionId);
+        if (native) {
+          const response = await b.invoke('pty:attach', { sessionId: r.sessionId }) as { success?: boolean; error?: string } | null;
+          if (!response?.success && mounted && activeId === r.sessionId) {
+            activeId = null;
+            inputQueue.current.current = null;
+            setSessionId(null);
+            void b.invoke('pty:kill', { sessionId: r.sessionId }).catch(() => {});
+            handleSpawnFailure(response?.error ?? 'Could not connect terminal output.');
+          }
+        }
+      };
+      void start().catch(err => {
+        if (activeId) {
+          void b.invoke('pty:kill', { sessionId: activeId }).catch(() => {});
+          activeId = null;
+          inputQueue.current.current = null;
+          if (mounted) setSessionId(null);
+        }
         if (mounted) handleSpawnFailure(String(err));
+      }).finally(() => {
+        spawning = false;
       });
     };
-    startSessionRef.current = startSession;
 
     const onData = (...args: unknown[]) => {
       const payload = args[args.length - 1] as { sessionId?: string; data?: string };
       if (payload?.sessionId === activeId && typeof payload.data === 'string') {
         appendOutput(payload.data);
+        publishViewport(payload.data);
       }
     };
     const onExit = (...args: unknown[]) => {
       const payload = args[args.length - 1] as { sessionId?: string; code?: number };
       if (payload?.sessionId !== activeId) return;
-      const code = payload.code ?? 0;
+      const code = payload.code ?? null;
       const ranMs = Date.now() - spawnedAt;
       flushTailBuffer();
-      appendOutput(`\r\n[session exited code=${code}]\r\n`);
+      const message = code === null ? '\r\n[session ended]\r\n' : `\r\n[session exited code=${code}]\r\n`;
+      appendOutput(message);
+      publishViewport(message);
       activeId = null;
+      inputQueue.current.current = null;
+      sizeQueue.current.current = null;
       if (!mounted) return;
       // Attach an exit-code badge to the most recent command line, if any.
       const badgeLine = lastCmdLineIdRef.current;
-      if (badgeLine !== null) {
+      if (!native && code !== null && badgeLine !== null) {
         setExitBadges(prev => ({ ...prev, [badgeLine]: code }));
       }
       runningCmdRef.current = null;
       try { onRunningCommandRef.current?.(null); } catch { /* host detached */ }
       setSessionId(null);
+      setSessionEnded(true);
       // -1 is our "shell unavailable" sentinel; a non-zero fast exit is also a
       // failed start. Either way retry (bounded). A clean/long-lived exit does
       // not loop — it just resets the retry budget for a manual restart.
-      if (code === -1 || (code !== 0 && ranMs < FAST_EXIT_MS)) {
+      if (code === -1 || (code !== null && code !== 0 && ranMs < FAST_EXIT_MS)) {
         handleSpawnFailure(`shell exited early (code ${code})`);
       } else {
         retriesRef.current = 0;
       }
     };
 
-    if (b.on) {
-      dataOff = b.on('pty:data', onData);
-      exitOff = b.on('pty:exit', onExit);
+    if (native) {
+      const connect = async () => {
+        if (!mounted || listening) return;
+        listening = true;
+        try {
+          const owner = getCurrentWebviewWindow();
+          if (!dataOff) {
+            const remove = await owner.listen('pty:data', event => onData(event.payload));
+            if (!mounted) { remove(); return; }
+            dataOff = remove;
+          }
+          if (!exitOff) {
+            const remove = await owner.listen('pty:exit', event => onExit(event.payload));
+            if (!mounted) { remove(); return; }
+            exitOff = remove;
+          }
+          startSession();
+        } catch {
+          if (mounted) setError('Could not subscribe to native terminal events.');
+        } finally {
+          listening = false;
+        }
+      };
+      startSessionRef.current = () => { void connect(); };
+      if (autoSpawn) void connect();
+    } else {
+      startSessionRef.current = startSession;
+      if (b.on) {
+        dataOff = b.on('pty:data', onData);
+        exitOff = b.on('pty:exit', onExit);
+      }
+      if (autoSpawn) startSession();
     }
-
-    if (autoSpawn) startSession();
 
     return () => {
       if (flushRafRef.current !== null) {
@@ -312,6 +427,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (backoffTimer) clearTimeout(backoffTimer);
       flushTailBuffer();
       mounted = false;
+      inputQueue.current.current = null;
+      sizeQueue.current.current = null;
       startSessionRef.current = null;
       if (dataOff) dataOff();
       if (exitOff) exitOff();
@@ -319,7 +436,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         b.invoke('pty:kill', { sessionId: activeId }).catch(() => { /* shutting down */ });
       }
     };
-  }, [autoSpawn, cwd, shell, appendOutput, flushTailBuffer]);
+  }, [autoSpawn, cwd, shell, appendOutput, flushTailBuffer, publishViewport]);
 
   // Manual restart from the unavailable state — resets the retry budget.
   const handleRetry = useCallback(() => {
@@ -376,9 +493,78 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
   // -------------------------------------------------------------------------
   // Send input
   // -------------------------------------------------------------------------
-  const send = useCallback((text: string) => {
+  const writeTerminal = useCallback((data: string) => {
     const b = bridge();
-    if (!b || !sessionId) return;
+    const queue = inputQueue.current;
+    if (!b || !sessionId || queue.current !== sessionId) return;
+    const report = (reason: string) => {
+      const message = `\r\n[Terminal input failed: ${reason}]\r\n`;
+      appendOutput(message);
+      publishViewport(message);
+    };
+    if (data.length > MAX_REPLAY) {
+      report('paste is too large');
+      return;
+    }
+    queue.tail = queue.tail.then(async () => {
+      for (let offset = 0; offset < data.length;) {
+        if (queue.current !== sessionId) return;
+        let end = Math.min(data.length, offset + 16000);
+        const last = data.charCodeAt(end - 1);
+        if (end < data.length && last >= 0xd800 && last <= 0xdbff) end--;
+        const response = await b.invoke('pty:write', { sessionId, data: data.slice(offset, end) }) as
+          { success?: boolean; error?: string } | null;
+        if (!response || response.success === false) {
+          if (queue.current === sessionId) report(response?.error ?? 'session unavailable');
+          return;
+        }
+        offset = end;
+      }
+    }).catch(() => { if (queue.current === sessionId) report('no response from the shell'); });
+  }, [appendOutput, publishViewport, sessionId]);
+
+  const resizeTerminal = useCallback((cols: number, rows: number) => {
+    const queue = sizeQueue.current;
+    const b = bridge();
+    if (!sessionId || !b || queue.current !== sessionId) return;
+    queue.pending = { cols, rows };
+    if (queue.running) return;
+    queue.running = true;
+    const send = async () => {
+      try {
+        while (queue.current === sessionId && queue.pending) {
+          const size = queue.pending;
+          queue.pending = null;
+          await b.invoke('pty:resize', { sessionId, ...size });
+        }
+      } finally {
+        queue.running = false;
+      }
+    };
+    void send().catch(() => {});
+  }, [sessionId]);
+
+  useEffect(() => {
+    const surface = scrollRef.current;
+    if (!surface || !nativeSession || !sessionId || !visible || interactive) return;
+    let lastSize = '';
+    const measure = () => {
+      if (!surface.clientWidth || !surface.clientHeight) return;
+      const cols = Math.max(1, Math.floor((surface.clientWidth - 20) / (fontSize * 0.6)));
+      const rows = Math.max(1, Math.floor((surface.clientHeight - 16) / (fontSize * 1.45)));
+      const key = `${cols}:${rows}`;
+      if (key === lastSize) return;
+      lastSize = key;
+      resizeTerminal(cols, rows);
+    };
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(surface);
+    measure();
+    return () => observer?.disconnect();
+  }, [nativeSession, sessionId, visible, interactive, fontSize, resizeTerminal]);
+
+  const send = useCallback((text: string) => {
+    if (!sessionId) return;
     // The echo of `${text}\r\n` becomes exactly one committed line; its id is the
     // next value lineIdRef will yield. Capture it so an exit-code badge can be
     // attached to this command later.
@@ -387,11 +573,11 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       runningCmdRef.current = text.trim();
       try { onRunningCommandRef.current?.(text.trim()); } catch { /* host detached */ }
     }
-    // Echo locally so the line appears immediately
-    appendOutput(`${text}\r\n`);
+    // The native TTY already echoes input. Legacy pipe sessions need local echo.
+    if (!nativeSession) appendOutput(`${text}\r\n`);
     const isWindows = typeof navigator !== 'undefined' && /win/i.test(navigator.platform);
-    b.invoke('pty:write', { sessionId, data: text + (isWindows ? '\r\n' : '\n') }).catch(() => { /* */ });
-  }, [sessionId, appendOutput]);
+    writeTerminal(text + (nativeSession ? '\r' : isWindows ? '\r\n' : '\n'));
+  }, [sessionId, appendOutput, nativeSession, writeTerminal]);
 
   // -------------------------------------------------------------------------
   // DEX commands -- the in-terminal `dex <cmd>` runner. Reads the ONE canonical
@@ -717,11 +903,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
       // Otherwise: send SIGINT via control-char and discard the pending line.
       e.preventDefault();
-      const b = bridge();
-      if (b && sessionId) b.invoke('pty:write', { sessionId, data: '\x03' }).catch(() => {});
+      writeTerminal('\x03');
       setInput('');
     }
-  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput, showSuggest, dexSuggestions, suggestIdx, dexSuggestQuery, acceptSuggestion, scrollSearch, scrollMatchIds]);
+  }, [input, history, historyIdx, onClose, send, sessionId, handleDexInput, revSearch, revMatch, dexCompletionNames, appendOutput, showSuggest, dexSuggestions, suggestIdx, dexSuggestQuery, acceptSuggestion, scrollSearch, scrollMatchIds, writeTerminal]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -735,13 +920,13 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         background: '#0c0c0c',
         color: '#d0d0d0',
         fontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace',
-        fontSize: 12,
+        fontSize,
         lineHeight: 1.45,
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
         borderRadius: 4,
         overflow: 'hidden',
       }}
-      onClick={() => inputRef.current?.focus()}
+      onClick={() => { if (!interactive) inputRef.current?.focus(); }}
     >
       <div
         style={{
@@ -753,9 +938,9 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 600,
         }}
       >
-        <span>Terminal {sessionId ? `· ${sessionId}` : unavailable ? '· unavailable' : error ? '· error' : '· starting…'}</span>
+        <span>Terminal {sessionId ? `· ${sessionId}` : unavailable ? '· unavailable' : error ? '· error' : sessionEnded ? '· ended' : '· starting…'}</span>
         <div style={{ display: 'flex', gap: 4 }}>
-          {(unavailable || (!sessionId && error)) && (
+          {(unavailable || (!sessionId && (error || sessionEnded))) && (
             <button
               type="button"
               onClick={handleRetry}
@@ -766,9 +951,17 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
                 fontSize: 10, cursor: 'pointer', padding: '2px 6px', fontWeight: 600,
               }}
             >
-              Retry
+              {sessionEnded && !error ? 'Restart' : 'Retry'}
             </button>
           )}
+          {nativeSession && (
+            <button type="button" aria-pressed={interactive}
+              onClick={() => { setViewportOpened(true); setInteractive(value => !value); }}
+              style={{ background: 'transparent', color: '#d0d0d0', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+              Interactive
+            </button>
+          )}
+          <div style={{ display: interactive && nativeSession ? 'none' : 'contents' }}>
           <button
             type="button"
             onClick={() => { setScrollSearch((p) => (p ? null : { q: '', idx: 0 })); setTimeout(() => searchInputRef.current?.focus(), 0); }}
@@ -817,8 +1010,14 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           >
             Clear
           </button>
+          </div>
         </div>
       </div>
+      {viewportOpened && nativeSession && <Suspense fallback={interactive ? <div role="status">Opening interactive terminal…</div> : null}>
+        <TerminalViewport key={viewportSession} active={interactive && visible} fontSize={fontSize}
+          subscribe={subscribeViewport} onInput={writeTerminal} onResize={resizeTerminal} />
+      </Suspense>}
+      <div style={{ display: interactive && nativeSession ? 'none' : 'contents' }}>
       <div
         ref={scrollRef}
         style={{
@@ -1134,6 +1333,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
             fontSize: 'inherit',
           }}
         />
+      </div>
       </div>
     </div>
   );

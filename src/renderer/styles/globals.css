@@ -6026,9 +6026,7 @@ button:disabled {
 
 /* ---- Tier-aware transform suppression ---- */
 /* Low tier: no transforms anywhere (kill scale/translate hover anims) */
-[data-perf-tier="low"] *:hover,
-[data-perf-tier="low"] *:active,
-[data-perf-tier="low"] *:focus {
+[data-perf-tier="low"] :is(:hover, :active, :focus):not([data-spatial-scale], .dex-workspace-inline, [data-floating-window][data-dragging]) {
   transform: none !important;
 }
 /* Mid tier: keep transforms but make them snappy/cheap */

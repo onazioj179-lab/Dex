@@ -28,6 +28,7 @@ export interface WindowSnapshot {
   z: number;
   minimized?: boolean;
   maximized?: boolean;
+  restoreBounds?: { x: number; y: number; w: number; h: number };
   focused?: boolean;
 }
 

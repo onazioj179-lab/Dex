@@ -571,7 +571,9 @@ fn update_note(conn: &Connection, id: &str, data: &Value) -> Value {
         values.push(SqlValue::Integer(now));
         values.push(SqlValue::Text(id.to_string()));
         let sql = format!("UPDATE notes SET {} WHERE id = ?", updates.join(", "));
-        let _ = conn.execute(&sql, rusqlite::params_from_iter(values));
+        if !matches!(conn.execute(&sql, rusqlite::params_from_iter(values)), Ok(1)) {
+            return json!({ "success": false, "error": "The note could not be saved" });
+        }
     }
 
     if let Some(tags) = data.get("tags") {

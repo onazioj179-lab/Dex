@@ -751,6 +751,7 @@ interface NoteToolbarProps {
   onColorLabel?: (color: string | null) => void;
   focusMode: boolean;
   saving: boolean;
+  saveFailed?: boolean;
   /** Timestamp of the last successful save, for the autosave indicator. */
   lastSavedAt?: number | null;
 }
@@ -779,6 +780,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
   focusMode,
   saving,
   lastSavedAt,
+  saveFailed,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showColorMenu, setShowColorMenu] = useState(false);
@@ -799,7 +801,9 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
       minHeight: 36,
     }}>
       {/* Left: autosave status */}
-      <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
+      {saveFailed && !saving
+        ? <span role="status" style={{ color: 'var(--color-error)', fontSize: 12 }}>Save failed. Press Ctrl+S to retry.</span>
+        : <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />}
 
       {/* Center: editor mode tabs */}
       <div style={{ display: 'flex', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 4, padding: 2 }}>

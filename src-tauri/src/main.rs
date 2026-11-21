@@ -11,11 +11,26 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod kv_repository;
+mod app_preferences;
+mod audio_control;
+mod browser_pages;
+#[cfg(windows)]
+mod browser_downloads;
+mod editor_files;
+mod editor_file_core;
+mod code_project;
+mod code_project_core;
+mod uki_permissions;
 mod activity_feed;
 mod git;
 mod env_manager;
 mod ssh;
 mod fs_ops;
+mod file_batch;
+mod file_transfer;
+mod umari_index;
+mod uki_context;
 mod watch;
 mod analytics;
 mod power;
@@ -82,6 +97,8 @@ mod failure_ctl;
 mod features_ctl;
 mod folderrules_ctl;
 mod gallery_ctl;
+mod gallery_media;
+mod process_actions;
 mod gpu_ctl;
 mod guardrails_ctl;
 mod hardware_ctl;
@@ -189,6 +206,9 @@ mod read_later;
 mod recycle_bin;
 mod rewind;
 mod terminal;
+mod terminal_pty;
+mod code_tasks;
+mod code_tasks_core;
 mod workflows;
 mod security;
 mod relationship_graph;
@@ -310,55 +330,36 @@ fn files_list(app: &tauri::AppHandle, dir: &str) -> Value {
 }
 
 /// Destination of a move/copy: target_dir joined with the source basename.
-fn dest_in_dir(src: &str, target_dir: &str) -> PathBuf {
-    let name = std::path::Path::new(src)
-        .file_name()
-        .map(|n| n.to_os_string())
-        .unwrap_or_default();
-    PathBuf::from(target_dir).join(name)
+fn io_result(result: std::io::Result<()>, path: &str) -> Value {
+    match result {
+        Ok(()) => json!({ "success": true, "path": path }),
+        Err(error) => json!({ "success": false, "error": file_batch::error_message(&error) }),
+    }
 }
 
-fn io_result(res: std::io::Result<()>, path: &str) -> Value {
-    match res {
-        Ok(()) => json!({ "success": true, "path": path }),
-        Err(e) => json!({ "success": false, "error": e.to_string() }),
+fn file_transfer_result(result: std::io::Result<PathBuf>) -> Value {
+    match result {
+        Ok(path) => json!({ "success": true, "path": path.to_string_lossy() }),
+        Err(error) => json!({ "success": false, "error": file_batch::error_message(&error) }),
     }
 }
 
 fn files_rename(old: &str, new_name: &str) -> Value {
-    // Only the basename of new_name (prevent path traversal via the filename).
-    let safe = std::path::Path::new(new_name)
-        .file_name()
-        .map(|n| n.to_os_string())
-        .unwrap_or_default();
-    let dest = std::path::Path::new(old)
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join(safe);
-    io_result(std::fs::rename(old, &dest), &dest.to_string_lossy())
+    file_transfer_result(file_transfer::rename(std::path::Path::new(old), std::ffi::OsStr::new(new_name)))
 }
 
-fn files_move(src: &str, target_dir: &str) -> Value {
-    let dest = dest_in_dir(src, target_dir);
-    match std::fs::rename(src, &dest) {
-        Ok(()) => json!({ "success": true, "path": dest.to_string_lossy() }),
-        // rename fails across volumes — fall back to copy + remove.
-        Err(_) => match std::fs::copy(src, &dest) {
-            Ok(_) => io_result(std::fs::remove_file(src), &dest.to_string_lossy()),
-            Err(e) => json!({ "success": false, "error": e.to_string() }),
-        },
+fn files_transfer(src: &str, target_dir: &str, moving: bool) -> Value {
+    if src.is_empty() || target_dir.is_empty() {
+        return json!({ "success": false, "error": "Select a source and destination folder." });
     }
-}
-
-fn files_copy(src: &str, target_dir: &str) -> Value {
-    let dest = dest_in_dir(src, target_dir);
-    if std::path::Path::new(src).is_dir() {
-        return json!({ "success": false, "error": "directory copy not supported yet" });
-    }
-    match std::fs::copy(src, &dest) {
-        Ok(_) => json!({ "success": true, "path": dest.to_string_lossy() }),
-        Err(e) => json!({ "success": false, "error": e.to_string() }),
-    }
+    file_transfer_result(file_transfer::transfer(
+        std::path::Path::new(src),
+        std::path::Path::new(target_dir),
+        moving,
+        file_transfer::Conflict::Skip,
+        &std::sync::atomic::AtomicBool::new(false),
+        file_batch::trash,
+    ))
 }
 
 fn files_delete(path: &str) -> Value {
@@ -404,7 +405,7 @@ fn files_organize_by_type(dir: &str) -> Value {
 
     let read = match std::fs::read_dir(dir) {
         Ok(r) => r,
-        Err(_) => return json!([]),
+        Err(error) => return json!({ "success": false, "error": error.to_string() }),
     };
 
     let mut operations: Vec<Value> = Vec::new();
@@ -426,12 +427,6 @@ fn files_organize_by_type(dir: &str) -> Value {
             .unwrap_or("other");
 
         let target_dir = PathBuf::from(dir).join(folder);
-        // Create the destination folder on demand; skip this file if it fails
-        // (matches the Electron `continue` on mkdir error).
-        if !target_dir.exists() && std::fs::create_dir_all(&target_dir).is_err() {
-            continue;
-        }
-
         let src = path.to_string_lossy().to_string();
         let original_name = path
             .file_name()
@@ -452,20 +447,21 @@ fn files_organize_by_type(dir: &str) -> Value {
             "undoData": { "originalPath": src, "originalName": original_name },
         });
 
-        if target_path.exists() {
-            op["error"] = json!("Target file already exists");
-        } else {
-            match std::fs::rename(&path, &target_path) {
-                Ok(()) => op["success"] = json!(true),
-                // Cross-volume rename fails — fall back to copy + remove.
-                Err(_) => match std::fs::copy(&path, &target_path) {
-                    Ok(_) => match std::fs::remove_file(&path) {
-                        Ok(()) => op["success"] = json!(true),
-                        Err(e) => op["error"] = json!(e.to_string()),
-                    },
-                    Err(e) => op["error"] = json!(e.to_string()),
-                },
+        let result = std::fs::create_dir_all(&target_dir).and_then(|()| {
+            if file_transfer::is_link(&std::fs::symlink_metadata(&target_dir)?) {
+                return Err(std::io::Error::other("The category folder points through a symbolic link or reparse point"));
             }
+            file_transfer::transfer(
+                &path, &target_dir, true, file_transfer::Conflict::Skip,
+                &std::sync::atomic::AtomicBool::new(false), file_batch::trash,
+            )
+        });
+        match result {
+            Ok(actual) => {
+                op["success"] = json!(true);
+                op["targetPath"] = json!(actual.to_string_lossy());
+            }
+            Err(error) => op["error"] = json!(file_batch::error_message(&error)),
         }
         operations.push(op);
     }
@@ -476,23 +472,44 @@ fn files_organize_by_type(dir: &str) -> Value {
 /// `system:getStatus` / `power:getStats` — full live snapshot: CPU%, cores,
 /// memory, disk, and network throughput.
 ///
-/// CPU usage and network rate are deltas, so this takes two samples around a
-/// short sleep (`MINIMUM_CPU_UPDATE_INTERVAL`) -- a single refresh always reports
-/// 0% CPU. The structured `cpu`/`memory`/`disk`/`network`/`uptime` fields are
+/// CPU usage and network rate are deltas. The first call establishes a baseline
+/// and later calls reuse it. The structured `cpu`/`memory`/`disk`/`network`/`uptime` fields are
 /// what the Task Manager reads; the flat `memory*MB`/`uptimeSec` fields are kept
 /// for the older power/diagnostics consumers that still read them.
 fn system_status() -> Value {
-    use std::time::Instant;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
 
-    let mut sys = sysinfo::System::new_all();
-    // Baseline network counters; received()/transmitted() then report the bytes
-    // moved since this point, which we divide by the elapsed time for a rate.
-    let mut networks = sysinfo::Networks::new_with_refreshed_list();
-    let t0 = Instant::now();
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
-    networks.refresh();
-    let elapsed = t0.elapsed().as_secs_f64().max(0.001);
+    struct Sampler {
+        system: sysinfo::System,
+        networks: sysinfo::Networks,
+        disk: Option<(Instant, Value)>,
+        sampled_at: Instant,
+        status: Option<Value>,
+    }
+    static SAMPLER: OnceLock<Mutex<Sampler>> = OnceLock::new();
+    let Ok(mut sampler) = SAMPLER.get_or_init(|| {
+        let mut system = sysinfo::System::new();
+        system.refresh_cpu_usage();
+        let networks = sysinfo::Networks::new_with_refreshed_list();
+        Mutex::new(Sampler { system, networks, disk: None, sampled_at: Instant::now(), status: None })
+    }).lock() else {
+        return json!({ "success": false, "error": "System sampling is unavailable." });
+    };
+    let interval = sysinfo::MINIMUM_CPU_UPDATE_INTERVAL.max(Duration::from_millis(500));
+    if sampler.sampled_at.elapsed() < interval {
+        if let Some(status) = &sampler.status {
+            return status.clone();
+        }
+        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL.saturating_sub(sampler.sampled_at.elapsed()));
+    }
+    sampler.system.refresh_cpu_usage();
+    sampler.system.refresh_memory();
+    sampler.networks.refresh();
+    let now = Instant::now();
+    let elapsed = now.duration_since(sampler.sampled_at).as_secs_f64().max(0.001);
+    sampler.sampled_at = now;
+    let sys = &sampler.system;
 
     let cpu_usage = sys.global_cpu_info().cpu_usage();
     let cores = sys.cpus().len() as u64;
@@ -502,26 +519,33 @@ fn system_status() -> Value {
     let mem_percent = if mem_total > 0 { (mem_used as f64 / mem_total as f64) * 100.0 } else { 0.0 };
 
     let (mut rx, mut tx, mut iface_count) = (0u64, 0u64, 0u64);
-    for (_iface, data) in &networks {
-        rx += data.received();
-        tx += data.transmitted();
+    for (_iface, data) in &sampler.networks {
+        rx = rx.saturating_add(data.received());
+        tx = tx.saturating_add(data.transmitted());
         iface_count += 1;
     }
     let rx_bps = (rx as f64 / elapsed) as u64;
     let tx_bps = (tx as f64 / elapsed) as u64;
 
-    let disks = sysinfo::Disks::new_with_refreshed_list();
-    let (mut disk_total, mut disk_avail) = (0u64, 0u64);
-    for d in &disks {
-        disk_total += d.total_space();
-        disk_avail += d.available_space();
+    if sampler.disk.as_ref().is_none_or(|(at, _)| at.elapsed() >= Duration::from_secs(15)) {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let (mut total, mut available) = (0u64, 0u64);
+        for disk in &disks {
+            total = total.saturating_add(disk.total_space());
+            available = available.saturating_add(disk.available_space());
+        }
+        let used = total.saturating_sub(available);
+        let disk = if total > 0 {
+            json!({ "used": used, "total": total, "percent": used as f64 / total as f64 * 100.0 })
+        } else {
+            Value::Null
+        };
+        sampler.disk = Some((now, disk));
     }
-    let disk_used = disk_total.saturating_sub(disk_avail);
-    let disk_percent = if disk_total > 0 { (disk_used as f64 / disk_total as f64) * 100.0 } else { 0.0 };
 
     let uptime = sysinfo::System::uptime();
 
-    json!({
+    let status = json!({
         "success": true,
         "shell": "tauri",
         // Legacy flat fields (power:getStats / diagnostics back-compat).
@@ -529,12 +553,14 @@ fn system_status() -> Value {
         "memoryTotalMB": mem_total / (1024 * 1024),
         "uptimeSec": uptime,
         // Structured fields read by the Task Manager.
-        "cpu": { "usage": cpu_usage, "cores": cores },
-        "memory": { "used": mem_used, "total": mem_total, "percent": mem_percent },
-        "disk": { "used": disk_used, "total": disk_total, "percent": disk_percent },
+        "cpu": (cores > 0 && cpu_usage.is_finite()).then(|| json!({ "usage": cpu_usage, "cores": cores })),
+        "memory": (mem_total > 0).then(|| json!({ "used": mem_used, "total": mem_total, "percent": mem_percent })),
+        "disk": sampler.disk.as_ref().map(|(_, value)| value),
         "network": { "connected": iface_count > 0, "rxBps": rx_bps, "txBps": tx_bps },
         "uptime": uptime,
-    })
+    });
+    sampler.status = Some(status.clone());
+    status
 }
 
 /// A process row for ranking. Kept separate from the JSON shape so the ranking
@@ -545,11 +571,12 @@ struct ProcInfo {
     name: String,
     cpu: f32,
     memory_mb: u64,
+    started_at: u64,
 }
 
-/// Number of processes returned to the UI. A task list wants the resource hogs,
-/// not an unsorted dump of every PID on the machine.
-const PROCESS_LIMIT: usize = 60;
+/// Bound the size of a single IPC response. The count still describes every
+/// process seen by the operating system sampler.
+const PROCESS_LIMIT: usize = 4096;
 
 /// Rank by resource pressure — CPU% descending, memory as the tiebreaker — and
 /// keep the top `limit`. Pure and deterministic.
@@ -559,19 +586,33 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
             .partial_cmp(&a.cpu)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(b.memory_mb.cmp(&a.memory_mb))
+            .then(a.pid.cmp(&b.pid))
     });
     procs.truncate(limit);
     procs
 }
 
-/// `system:getProcesses` — top running processes by resource use (pid, name,
-/// cpu%, memMB). Ranked + capped so the UI gets the hogs, not raw noise.
+/// `system:getProcesses` — sampled running processes with the observed total.
 fn system_processes() -> Value {
-    let mut sys = sysinfo::System::new_all();
-    // Per-process CPU% is a delta between two samples; without the sleep every
-    // process reads 0% and the ranking collapses to memory only.
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_all();
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Instant;
+
+    type Sampler = (sysinfo::System, Option<(Instant, Value)>);
+    static SAMPLER: OnceLock<Mutex<Sampler>> = OnceLock::new();
+    let Ok(mut sampler) = SAMPLER.get_or_init(|| Mutex::new((sysinfo::System::new(), None))).lock() else {
+        return json!({ "success": false, "error": "Process sampling is unavailable." });
+    };
+    let refresh = sysinfo::ProcessRefreshKind::new().with_cpu().with_memory();
+    if let Some((at, snapshot)) = &sampler.1 {
+        if at.elapsed() < sysinfo::MINIMUM_CPU_UPDATE_INTERVAL {
+            return snapshot.clone();
+        }
+    } else {
+        sampler.0.refresh_processes_specifics(refresh);
+        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    }
+    let sys = &mut sampler.0;
+    sys.refresh_processes_specifics(refresh);
     let all: Vec<ProcInfo> = sys
         .processes()
         .iter()
@@ -580,8 +621,10 @@ fn system_processes() -> Value {
             name: p.name().to_string(),
             cpu: p.cpu_usage(),
             memory_mb: p.memory() / (1024 * 1024),
+            started_at: p.start_time(),
         })
         .collect();
+    let total = all.len();
     let procs: Vec<Value> = rank_processes(all, PROCESS_LIMIT)
         .iter()
         .map(|p| {
@@ -590,10 +633,14 @@ fn system_processes() -> Value {
                 "name": p.name,
                 "cpu": p.cpu,
                 "memory": p.memory_mb,
+                "startedAt": p.started_at,
+                "instance": process_actions::instance(p.pid, p.started_at),
             })
         })
         .collect();
-    json!({ "success": true, "processes": procs })
+    let snapshot = json!({ "success": true, "total": total, "processes": procs });
+    sampler.1 = Some((Instant::now(), snapshot.clone()));
+    snapshot
 }
 
 #[cfg(test)]
@@ -601,7 +648,7 @@ mod process_ranking_tests {
     use super::{rank_processes, ProcInfo};
 
     fn p(pid: u32, cpu: f32, memory_mb: u64) -> ProcInfo {
-        ProcInfo { pid, name: format!("proc{pid}"), cpu, memory_mb }
+        ProcInfo { pid, name: format!("proc{pid}"), cpu, memory_mb, started_at: 0 }
     }
 
     #[test]
@@ -672,31 +719,17 @@ fn clipboard_read() -> Value {
 }
 
 // --- Batch 2: persistent key-value store (JSON in app config dir) ----------
-fn kv_path(app: &tauri::AppHandle) -> PathBuf {
-    let dir = app
-        .path()
-        .app_config_dir()
-        .unwrap_or_else(|_| PathBuf::from("."));
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join("dex-kv.json")
-}
-fn kv_load(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
-    std::fs::read_to_string(kv_path(app))
-        .ok()
-        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .and_then(|v| v.as_object().cloned())
-        .unwrap_or_default()
+pub(crate) fn kv_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path().app_config_dir().map(|dir| dir.join("dex-kv.json")).map_err(|e| e.to_string())
 }
 pub(crate) fn kv_get(app: &tauri::AppHandle, key: &str) -> Value {
-    kv_load(app).get(key).cloned().unwrap_or(Value::Null)
+    kv_path(app).ok().and_then(|path| kv_repository::get(&path, key).ok()).unwrap_or(Value::Null)
 }
 pub(crate) fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
-    let mut map = kv_load(app);
-    map.insert(key.to_string(), value);
-    let data = serde_json::to_string(&Value::Object(map)).unwrap_or_default();
-    match std::fs::write(kv_path(app), data) {
+    let result = kv_path(app).and_then(|path| kv_repository::set(&path, key, value).map_err(|e| e.to_string()));
+    match result {
         Ok(()) => json!({ "success": true }),
-        Err(e) => json!({ "success": false, "error": e.to_string() }),
+        Err(error) => json!({ "success": false, "error": error }),
     }
 }
 
@@ -816,16 +849,16 @@ fn walk_collect(root: &std::path::Path, max: usize) -> Vec<(PathBuf, std::fs::Me
             Err(_) => continue,
         };
         for entry in rd.flatten() {
+            if scanned >= cap_scan { break; }
             scanned += 1;
-            let meta = match entry.metadata() {
+            let name = entry.file_name();
+            if !dex_search::allowed_relative(std::path::Path::new(&name)) { continue; }
+            let meta = match std::fs::symlink_metadata(entry.path()) {
                 Ok(m) => m,
                 Err(_) => continue,
             };
+            if !dex_search::regular_entry(&meta) { continue; }
             if meta.is_dir() {
-                let name = entry.file_name().to_string_lossy().to_lowercase();
-                if name.starts_with('.') || name == "node_modules" || name == "$recycle.bin" {
-                    continue;
-                }
                 stack.push(entry.path());
             } else {
                 out.push((entry.path(), meta));
@@ -861,12 +894,22 @@ fn file_entry_json(path: &std::path::Path, meta: &std::fs::Metadata) -> Value {
 }
 
 fn files_search(app: &tauri::AppHandle, query: &str, location: Option<String>) -> Value {
-    if query.trim().is_empty() {
+    if query.trim().is_empty() || query.len() > 512 {
         return json!({ "success": true, "files": [] });
     }
-    let root = resolve_path(app, &location.unwrap_or_else(|| "home".into()));
-    let q = query.to_lowercase();
-    let files = walk_collect(&root, 8000);
+    let folders = if let Some(location) = location {
+        vec![resolve_path(app, &location)]
+    } else {
+        let p = app.path();
+        [p.document_dir(), p.desktop_dir(), p.download_dir()].into_iter().flatten().collect()
+    };
+    let q = query.trim().to_lowercase();
+    let mut files = Vec::new();
+    for folder in folders {
+        let remaining = 8000usize.saturating_sub(files.len());
+        if remaining == 0 { break; }
+        files.extend(walk_collect(&folder, remaining));
+    }
     let matches: Vec<Value> = files
         .iter()
         .filter(|(p, _)| {
@@ -896,27 +939,6 @@ fn files_recent(app: &tauri::AppHandle, limit: usize) -> Value {
         .map(|(p, m)| file_entry_json(p, m))
         .collect();
     json!({ "success": true, "files": out })
-}
-
-fn get_scopes(app: &tauri::AppHandle) -> Value {
-    let stored = kv_get(app, "fileScopes");
-    if let Some(arr) = stored.as_array() {
-        if !arr.is_empty() {
-            return json!(arr);
-        }
-    }
-    let p = app.path();
-    let mut scopes: Vec<Value> = Vec::new();
-    for (name, dir) in [
-        ("Documents", p.document_dir()),
-        ("Desktop", p.desktop_dir()),
-        ("Downloads", p.download_dir()),
-    ] {
-        if let Ok(d) = dir {
-            scopes.push(json!({ "path": d.to_string_lossy(), "name": name, "fileCount": 0, "indexed": false }));
-        }
-    }
-    json!(scopes)
 }
 
 // --- Wave B: trash (safe delete) + os/disk info ----------------------------
@@ -967,203 +989,6 @@ fn audio_waveform(path: &str, buckets: usize) -> Value {
         Ok(peaks) => json!({ "success": true, "peaks": peaks }),
         Err(e) => json!({ "success": false, "error": e }),
     }
-}
-
-// --- Native search index (Tantivy, GOAL-6A) --------------------------------
-/// Query the index; `None` when the index is empty so the caller falls back to
-/// the bounded filesystem walk.
-fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Value> {
-    // Clone the (Arc-backed) index handle out of the guard and release the lock
-    // immediately, so a concurrent rebuild can't block this search.
-    let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = { state.lock().ok()?.as_ref()?.clone() };
-    if idx.count() == 0 {
-        return None;
-    }
-    Some(json!({ "success": true, "files": idx.search(query, limit) }))
-}
-
-/// Clear + rebuild the index from the user's document folders.
-fn index_rebuild(app: &tauri::AppHandle) -> Value {
-    // Take a clone of the index handle, then DROP the lock before the multi-second
-    // clear + walk so searches stay responsive during a rebuild. The clone shares
-    // the same underlying Tantivy index (internally synchronized).
-    let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = {
-        let guard = match state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "success": false, "error": "index busy" }),
-        };
-        match guard.as_ref() {
-            Some(i) => i.clone(),
-            None => return json!({ "success": false, "error": "index unavailable" }),
-        }
-    }; // lock released here
-
-    if let Err(e) = idx.clear() {
-        return json!({ "success": false, "error": e });
-    }
-    let p = app.path();
-    let mut total = 0usize;
-    for dir in [p.document_dir(), p.desktop_dir(), p.download_dir()]
-        .into_iter()
-        .flatten()
-    {
-        if let Ok(n) = idx.index_path(&dir, 20000) {
-            total += n;
-        }
-    }
-    json!({ "success": true, "indexed": total })
-}
-
-fn index_stats(app: &tauri::AppHandle) -> Value {
-    let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let count = state
-        .lock()
-        .ok()
-        .and_then(|g| g.as_ref().map(|i| i.count()))
-        .unwrap_or(0);
-    json!({ "indexed": count, "shell": "tauri" })
-}
-
-/// Incrementally re-sync the index against the user's folders WITHOUT a full
-/// rebuild: snapshot each folder (size+mtime), diff it against the previous
-/// snapshot held in managed state, then `upsert_file` the added/modified files
-/// and `remove_path` the deleted ones. Cheap to call often (e.g. on focus).
-///
-/// Guard: a first run (empty baseline) or an unusually large diff falls back to a
-/// full clear+rebuild, because `upsert_file` commits per file and thousands of
-/// commits would be pathological — incremental is for the small steady-state diff.
-fn index_sync(app: &tauri::AppHandle) -> Value {
-    // Clone the (Arc-backed) index handle and release the search lock immediately.
-    let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = {
-        let guard = match search_state.lock() {
-            Ok(g) => g,
-            Err(_) => return json!({ "success": false, "error": "index busy" }),
-        };
-        match guard.as_ref() {
-            Some(i) => i.clone(),
-            None => return json!({ "success": false, "error": "index unavailable" }),
-        }
-    };
-
-    let p = app.path();
-    let dirs: Vec<std::path::PathBuf> = [p.document_dir(), p.desktop_dir(), p.download_dir()]
-        .into_iter()
-        .flatten()
-        .collect();
-
-    // Hold the snapshot lock for the whole sync so two syncs can't interleave; it
-    // is a different mutex from the search index, so queries stay responsive.
-    let snap_state = app.state::<std::sync::Mutex<dex_scanner::Snapshot>>();
-    let mut prev = match snap_state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "snapshot busy" }),
-    };
-
-    let mut new_snapshot: dex_scanner::Snapshot = dex_scanner::Snapshot::new();
-    for dir in &dirs {
-        new_snapshot.extend(dex_scanner::scan_snapshot(dir, 20000));
-    }
-    let diff = dex_scanner::diff_snapshots(&prev, &new_snapshot);
-
-    const SYNC_UPSERT_LIMIT: usize = 500;
-    let change_count = diff.added.len() + diff.modified.len();
-    if prev.is_empty() || change_count > SYNC_UPSERT_LIMIT {
-        // Initial build or too-large diff: a full rebuild is cheaper than thousands
-        // of single-file commits. Reset the baseline to the freshly-scanned state.
-        let _ = idx.clear();
-        let mut total = 0usize;
-        for dir in &dirs {
-            if let Ok(n) = idx.index_path(dir, 20000) {
-                total += n;
-            }
-        }
-        *prev = new_snapshot;
-        return json!({ "success": true, "mode": "rebuilt", "indexed": total });
-    }
-
-    let mut upserted = 0usize;
-    for path in diff.added.iter().chain(diff.modified.iter()) {
-        if idx.upsert_file(std::path::Path::new(path)).unwrap_or(false) {
-            upserted += 1;
-        }
-    }
-    let mut removed = 0usize;
-    for path in &diff.removed {
-        if idx.remove_path(std::path::Path::new(path)).is_ok() {
-            removed += 1;
-        }
-    }
-    *prev = new_snapshot;
-
-    json!({
-        "success": true,
-        "mode": "incremental",
-        "added": diff.added.len(),
-        "modified": diff.modified.len(),
-        "removed": removed,
-        "upserted": upserted,
-    })
-}
-
-/// Start a live, push-based filesystem watcher over the indexed folders so the
-/// search index refreshes itself as files change — the push complement to the
-/// poll-based `search:sync`. Change bursts are coalesced (~1.5s quiet window) and
-/// then run through `index_sync`, whose snapshot-diff collapses even noisy or
-/// metadata-only events down to the minimal set of upserts/removals. The watcher
-/// is owned by its debounce thread for the app's lifetime; if setup fails it
-/// degrades silently (on-demand `search:sync` / `search:rebuild` still work).
-fn start_index_watcher(app: tauri::AppHandle) {
-    use notify::Watcher;
-    let dirs: Vec<std::path::PathBuf> = {
-        let p = app.path();
-        [p.document_dir(), p.desktop_dir(), p.download_dir()]
-            .into_iter()
-            .flatten()
-            .collect()
-    };
-    if dirs.is_empty() {
-        return;
-    }
-    let (tx, rx) = std::sync::mpsc::channel::<()>();
-    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        if let Ok(event) = res {
-            if matches!(
-                event.kind,
-                notify::EventKind::Create(_)
-                    | notify::EventKind::Modify(_)
-                    | notify::EventKind::Remove(_)
-            ) {
-                let _ = tx.send(());
-            }
-        }
-    }) {
-        Ok(w) => w,
-        Err(_) => return,
-    };
-    for dir in &dirs {
-        let _ = watcher.watch(dir.as_path(), notify::RecursiveMode::Recursive);
-    }
-    std::thread::spawn(move || {
-        let _keep_alive = watcher; // own the watcher so it stays active
-        loop {
-            // Block until the first change in a quiet period.
-            if rx.recv().is_err() {
-                break;
-            }
-            // Coalesce the burst: drain until ~1.5s of quiet, then sync once.
-            loop {
-                match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
-                    Ok(()) => continue,
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
-                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
-                }
-            }
-            let _ = index_sync(&app);
-        }
-    });
 }
 
 /// Native Vault dispatch (GOAL-6B) — encrypted password manager + TOTP. State is
@@ -1603,6 +1428,28 @@ async fn dex_ipc(app: tauri::AppHandle, window: tauri::Window, channel: String, 
 }
 
 fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, args: Value) -> Value {
+    if window.label().starts_with(browser_pages::PAGE_PREFIX) {
+        return Value::Null;
+    }
+    if channel.starts_with("app-preferences:") {
+        return app_preferences::dispatch(&app, window.label(), &channel, &args);
+    }
+    if matches!(channel.as_str(), "browser:openPageWindow" | "browser:pageWindows" | "browser:pageAction") {
+        return browser_pages::dispatch(&app, window.label(), &channel, &args);
+    }
+    if matches!(channel.as_str(), "browser:downloads" | "browser:downloadAction") {
+        #[cfg(windows)]
+        return browser_downloads::dispatch(&app, window.label(), &channel, &args);
+        #[cfg(not(windows))]
+        return if channel == "browser:downloads" {
+            json!({"success": true, "supported": false, "downloads": []})
+        } else {
+            json!({"success": false, "error": "Native Browser downloads are unavailable on this platform."})
+        };
+    }
+    if channel.starts_with("audio-control:") {
+        return audio_control::dispatch(&channel, &args);
+    }
     // Positional arg helpers (the renderer sends method args as a JSON array).
     let arg_str = |i: usize| args.get(i).and_then(|v| v.as_str()).map(|s| s.to_string());
     let arg_u64 = |i: usize| args.get(i).and_then(|v| v.as_u64());
@@ -1670,6 +1517,9 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("failure:") { return failure_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("features:") { return features_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("folderrules:") { return folderrules_ctl::dispatch(&app, &channel, &args); }
+    if matches!(channel.as_str(), "gallery:mediaLibrary" | "gallery:importMedia" | "gallery:exportEdited" | "gallery:exportOriginals") {
+        return gallery_media::dispatch(&app, &channel, &args);
+    }
     if channel.starts_with("gallery:") { return gallery_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("gpu:") { return gpu_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("guardrails:") { return guardrails_ctl::dispatch(&app, &channel, &args); }
@@ -1703,7 +1553,9 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("plugins:") { return plugins_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("prerender:") { return prerender_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("privacy:") { return privacy_ctl::dispatch(&app, &channel, &args); }
-    if channel.starts_with("pty:") { return terminal::dispatch(&app, &channel, &args); }
+    if channel.starts_with("pty:") { return terminal::dispatch(&app, window.label(), &channel, &args); }
+    if channel.starts_with("codeTasks:") { return code_tasks::dispatch(&app, window.label(), &channel, &args); }
+    if channel.starts_with("codeProject:") { return code_project::dispatch(&app, window.label(), &channel, &args); }
     if channel.starts_with("quickactions:") { return quickactions_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("recovery:") { return recovery_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("reliability:") { return reliability_ctl::dispatch(&app, &channel, &args); }
@@ -1724,6 +1576,18 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("task-queue:") { return task_queue::dispatch(&app, &channel, &args); }
     if channel.starts_with("thermal:") { return thermal_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("transfer:") { return transfer_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("uki:permissions:") { return uki_permissions::dispatch(&app, &channel, &args); }
+    if channel == "uki:context:filter" { return uki_context::filter(&app, &args[0]); }
+    if channel == "uki:searchIndexedFiles" {
+        if !uki_permissions::granted(&app, "file-read") {
+            return json!({ "success": false, "error": "UKI needs the Read files permission." });
+        }
+        let Some(hits) = umari_index::search(&app, args[0].as_str().unwrap_or_default(), None, 12) else {
+            return json!({ "success": false, "error": "Build an approved Umari index in Settings before searching." });
+        };
+        let files: Vec<_> = hits.into_iter().map(|hit| hit.name).collect();
+        return json!({ "success": true, "files": files });
+    }
     if channel.starts_with("uki:") { return uki_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("undo:") { return undo_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("uninstall:") { return uninstall_ctl::dispatch(&app, &channel, &args); }
@@ -1780,8 +1644,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 
         // --- Files ----------------------------------------------------------
         "files:list" => files_list(&app, &arg_str(0).unwrap_or_else(|| "home".into())),
-        "files:getScopes" | "fileSearch:getScopes" => get_scopes(&app),
-        "files:isInScope" => json!(true),
+        "files:getScopes" | "fileSearch:getScopes" => umari_index::scopes(&app),
+        "files:isInScope" => json!(arg_str(0).is_some_and(|path| umari_index::in_scope(&app, std::path::Path::new(&path)))),
         // Real bounded search/recent (Wave 2). files.recent/files.search pass an
         // options object; search.query passes a positional query string.
         "files:recent" | "fileIntel:getRecentFiles" => {
@@ -1801,21 +1665,29 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                 .or_else(|| a0.get("query").and_then(|v| v.as_str()).map(|s| s.to_string()))
                 .unwrap_or_default();
             let location = a0.get("location").and_then(|v| v.as_str()).map(|s| s.to_string());
-            // Prefer the native Tantivy index; fall back to the bounded walk
-            // until the index has been built (search:rebuild).
-            index_search(&app, &query, 200).unwrap_or_else(|| files_search(&app, &query, location))
+            let within = location.as_ref().map(|path| resolve_path(&app, path));
+            match umari_index::search(&app, &query, within.as_deref(), 200) {
+                Some(matches) if !matches.is_empty() => json!({ "success": true, "files": matches }),
+                _ => files_search(&app, &query, location),
+            }
         }
         "files:rename" => files_rename(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
-        "files:move" => files_move(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
-        "files:copy" => files_copy(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
+        "files:move" => files_transfer(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default(), true),
+        "files:copy" => files_transfer(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default(), false),
+        "files:batch" => file_batch::run(&args[0], |progress| {
+            use tauri::Emitter;
+            let _ = window.emit("dex-files-batch-progress", progress);
+        }),
+        "files:cancelBatch" => file_batch::cancel(&arg_str(0).unwrap_or_default()),
+        "files:renameBatch" => file_batch::run_rename(&args[0]),
         "files:delete" => files_delete(&arg_str(0).unwrap_or_default()),
         "files:mkdir" => files_mkdir(&arg_str(0).unwrap_or_default()),
         "files:organizeByType" => files_organize_by_type(&arg_str(0).unwrap_or_default()),
 
         // --- System / power -------------------------------------------------
-        "system:getStatus" => system_status(),
-        "power:getStats" => system_status(),
+        "system:getStatus" | "power:getStats" | "diagnostics:getSystemInfo" | "diagnostics:getPerformance" => system_status(),
         "system:getProcesses" => system_processes(),
+        "system:endObservedProcess" => process_actions::end(&args),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
 
         // --- Shell ----------------------------------------------------------
@@ -1827,6 +1699,10 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 
         // --- Native dialogs (Tauri dialog plugin) --------------------------
         // Electron dialog.showOpenDialog parity: { canceled, filePaths }.
+        "dialog:open-file" => editor_files::open_dialog(&app, &args),
+        "dialog:save-file" => editor_files::save_dialog(&app, &args),
+        "fs:read-file" => editor_files::read_text(&arg_str(0).unwrap_or_default()),
+        "fs:write-file" => editor_files::write_text(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
         "dialog:showOpenDialog" | "files:openDialog" => native_ops::show_open_dialog(&app, &args),
 
         // --- Filesystem command layer (need app paths/dialog + the db) -----
@@ -1909,6 +1785,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // --- Batch 2: Persistent key-value storage -------------------------
         "capability:storage:get" | "storage:get" => kv_get(&app, &arg_str(0).unwrap_or_default()),
         "capability:storage:set" | "storage:set" => {
+            if matches!(arg_str(0).as_deref(), Some(uki_permissions::KEY) | Some("uki:operator:audit")) { return json!({"success": false, "error": "Native permission authority is read-only"}); }
             kv_set(&app, &arg_str(0).unwrap_or_default(), args.get(1).cloned().unwrap_or(Value::Null))
         }
 
@@ -1970,13 +1847,11 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "health:check" | "health:getStatus" | "watchdog:health" => {
             json!({ "healthy": true, "shell": "tauri" })
         }
-        "diagnostics:getSystemInfo" => system_status(),
 
         // --- Batch 5: App data locations -----------------------------------
         "app:getPath" | "data:getLocations" => app_paths(&app),
 
         // --- Batch 9: diagnostics / crash stats ----------------------------
-        "diagnostics:getPerformance" => system_status(),
         "diagnostics:getLogs" | "crashReporter:getRecent" | "health:getLogs" => json!([]),
         "crashReporter:getStats" => json!({ "total": 0, "recent": [] }),
 
@@ -1992,9 +1867,10 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "system:getDiskUsage" | "power:getDiskUsage" => disk_usage(),
 
         // --- Native search index (GOAL-6A, Tantivy) ------------------------
-        "search:rebuild" | "fileSearch:reindex" => index_rebuild(&app),
-        "search:sync" | "fileSearch:sync" => index_sync(&app),
-        "search:getStats" => index_stats(&app),
+        ch @ ("search:rebuild" | "fileSearch:reindex" | "search:sync" | "fileSearch:sync" | "search:getStats") => {
+            umari_index::dispatch(&app, ch, &args)
+        }
+        ch if ch.starts_with("umari:index:") => umari_index::dispatch(&app, ch, &args),
 
         // --- Native audio analysis (GOAL-6C) -------------------------------
         "audio:getMetadata" | "audio:getInfo" => audio_metadata(&arg_str(0).unwrap_or_default()),
@@ -2149,11 +2025,6 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         // Routed here, not via db_dispatch, because it needs the AppHandle.
         ch if ch.starts_with("multiwindow:") => multi_window::dispatch_native(&app, ch, &args),
 
-        // --- Terminal / PTY (core/PtyService parity) -----------------------
-        // Piped-stdio shell sessions; output streams back as pty:data/pty:exit
-        // events. Needs the AppHandle (for emit + managed session state).
-        ch if ch.starts_with("pty:") => terminal::dispatch(&app, ch, &args),
-
         // --- HTTP file transfer (LAN QR/link share) ------------------------
         // Self-contained HTTP server for download/upload over the LAN (the DTP
         // device-to-device protocol is separate). transfer:selectFiles is the
@@ -2183,10 +2054,14 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 /// `routeConfiguredModels` so the result matches the Electron path.
 #[tauri::command]
 fn smart_router_route(
+    window: tauri::Window,
     goal: String,
     user_text: String,
     candidates: Vec<RouteCandidate>,
 ) -> Vec<String> {
+    if window.label().starts_with(browser_pages::PAGE_PREFIX) {
+        return Vec::new();
+    }
     route_for_prompt(RoutingGoal::parse(&goal), &user_text, &candidates)
 }
 
@@ -2256,9 +2131,24 @@ pub(crate) fn ensure_all_schemas(c: &rusqlite::Connection) {
 
 fn main() {
     tauri::Builder::default()
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                let app = window.app_handle().clone();
+                let owner = window.label().to_owned();
+                tauri::async_runtime::spawn_blocking(move || {
+                    code_tasks::close_window(&app, &owner);
+                    code_project::close_window(&app, &owner);
+                    terminal::close_window(&app, &owner);
+                });
+            }
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            audio_control::start(app.handle());
+            if std::env::var("DEX_KIOSK").as_deref() == Ok("1") {
+                if let Some(window) = app.get_webview_window("main") { window.set_fullscreen(true)?; }
+            }
             // Vault state lives for the app lifetime; the key is only set while
             // unlocked. File is stored in the app config dir.
             let vault_path = app
@@ -2267,19 +2157,8 @@ fn main() {
                 .unwrap_or_default()
                 .join("vault.dex");
             app.manage(std::sync::Mutex::new(dex_vault::VaultManager::new(vault_path)));
-            // Native search index (built on demand via search:rebuild).
-            let index_dir = app
-                .path()
-                .app_data_dir()
-                .unwrap_or_default()
-                .join("search-index");
-            app.manage(std::sync::Mutex::new(
-                dex_search::SearchIndex::open_or_create(&index_dir).ok(),
-            ));
-            // Previous file snapshot for incremental `search:sync` (size+mtime per
-            // path). Starts empty: the first sync does a full build, then each later
-            // sync only diffs + upserts what changed.
-            app.manage(std::sync::Mutex::new(dex_scanner::Snapshot::new()));
+            let index_dir = app.path().app_data_dir().ok().map(|path| path.join("umari-index-v2"));
+            app.manage(umari_index::UmariIndex::new(index_dir));
             // Notification center — persists under the app data dir, mirroring
             // Electron's userData/notifications.
             let notif_dir = app
@@ -2312,14 +2191,13 @@ fn main() {
             app.manage(db::DbGate::new(()));
             // Terminal/PTY session table (in-app shell; piped-stdio sessions).
             app.manage(terminal::TerminalState::default());
+            app.manage(code_tasks::CodeTasks::default());
+            app.manage(code_project::CodeProjects::default());
             // Live file-watcher table; start watchers for persisted folders now
             // that the db + watched_folders schema are ready (mirrors startWatching).
             app.manage(cmd_file_watcher::FileWatchState::default());
             cmd_file_watcher::start_all(app.handle().clone());
-            // Live, push-based watcher that keeps the native search index fresh as
-            // files change (debounced -> index_sync). Best-effort; the poll-based
-            // search:sync / search:rebuild remain the fallback.
-            start_index_watcher(app.handle().clone());
+            umari_index::start_watch(app.handle());
             // Security permissions store (session-scoped; SecurityController parity).
             app.manage(std::sync::Mutex::new(security::SecurityState::default()));
             app.manage(watch::GenericWatchState::default());

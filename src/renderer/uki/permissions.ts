@@ -16,6 +16,11 @@
 
 import * as cache from './cache';
 import { SCHEMA_VERSION, type UkiPermissionRecord } from './schemas';
+import { isTauri, invoke } from '@tauri-apps/api/core';
+
+async function nativePermission<T>(operation: string, ...args: unknown[]): Promise<T> {
+  return invoke<T>('dex_ipc', { channel: `uki:permissions:${operation}`, args });
+}
 
 export type Capability = UkiPermissionRecord['capability'];
 
@@ -27,6 +32,11 @@ const HARD_DENY: ReadonlySet<Capability> = new Set<Capability>([
 ]);
 
 export async function listGrants(): Promise<UkiPermissionRecord[]> {
+  if (isTauri()) {
+    const records = await nativePermission<unknown>('list');
+    if (!Array.isArray(records)) throw new Error('Native permission authority unavailable');
+    return records as UkiPermissionRecord[];
+  }
   const raw = (await cache.getAsync<UkiPermissionRecord[]>(STORE_KEY)) ?? [];
   const now = Date.now();
   // Lazy-prune expired session grants on read.
@@ -48,6 +58,11 @@ export async function grant(
   if (HARD_DENY.has(capability)) {
     throw new Error(`Capability ${capability} is hard-denied in this build.`);
   }
+  if (isTauri()) {
+    const result = await nativePermission<{ ok: boolean; record?: UkiPermissionRecord; error?: string }>('grant', capability, scope);
+    if (!result?.ok || !result.record) throw new Error(result?.error || 'Native permission denied');
+    return result.record;
+  }
   const grants = await listGrants();
   const filtered = grants.filter((g) => g.capability !== capability);
   const record: UkiPermissionRecord = {
@@ -62,6 +77,11 @@ export async function grant(
 }
 
 export async function revoke(capability: Capability): Promise<void> {
+  if (isTauri()) {
+    const result = await nativePermission<{ ok: boolean; error?: string }>('revoke', capability);
+    if (!result?.ok) throw new Error(result?.error || 'Native permission revoke failed');
+    return;
+  }
   const grants = await listGrants();
   await cache.setAsync(STORE_KEY, grants.filter((g) => g.capability !== capability));
 }

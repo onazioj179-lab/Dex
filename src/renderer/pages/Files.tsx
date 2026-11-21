@@ -18,10 +18,11 @@ import { useAppTracking, useFileTracking } from '../services/usePatternLearning'
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { useToastHelpers } from '../components/Toast';
+import { invokeFileOperation, invokePlatformIpc } from '../services/platform/ipc';
+import { batchPending, fileLabel, useFileBatch, type BatchConflict } from '../services/platform/useFileBatch';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
-import { useLiveActivityStore } from '../store/liveActivityStore';
 import { useColorLabelsStore } from '../store/featureSuiteStore';
 import { useConfirm } from '../components/ConfirmDialog';
 import { usePinRegistry } from '../store/pinRegistry';
@@ -333,6 +334,8 @@ export const Files: React.FC = () => {
   const { launchApp } = useRunningApps();
   const addRecent = useRecentFiles(s => s.addRecent);
   const toast = useToastHelpers();
+  const { run: runBatch, progress: batchProgress, report: batchReport, error: batchError, cancel: cancelBatch, cancelling: cancellingBatch, dismiss: dismissBatch } = useFileBatch();
+  const [batchConflict, setBatchConflict] = useState<BatchConflict>('skip');
 
   // Progressive loading for large directories
   const ITEMS_PER_PAGE = 100;
@@ -340,6 +343,10 @@ export const Files: React.FC = () => {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const [currentPath, setCurrentPath] = useState<string>('');
+  const currentPathRef = useRef(currentPath);
+  currentPathRef.current = currentPath;
+  const listingRevision = useRef(0);
+  const listingPending = useRef(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [allFiles, setAllFiles] = useState<FileItem[]>([]); // For smart collections
   const [selectedLocation, setSelectedLocation] = useState('documents');
@@ -438,9 +445,10 @@ export const Files: React.FC = () => {
   // Properties panel (file/folder metadata from already-loaded FileItem data).
   const [propertiesFile, setPropertiesFile] = useState<FileItem | null>(null);
 
-  // Multi-item clipboard for batch copy/cut, paired with the existing single
-  // `clipboard`. Batch paste fans out over the existing files:copy/files:move.
-  const [batchClipboard, setBatchClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null);
+  const [clipboard, setClipboard] = useState<{ paths: string[]; mode: 'copy' | 'cut' } | null>(null);
+  const clipboardLabel = clipboard && (clipboard.paths.length === 1
+    ? fileLabel(clipboard.paths[0])
+    : `${clipboard.paths.length} items`);
 
   // Anchor index (into the live filteredFiles order) for Shift+click range
   // selection. A ref so updating it never forces a re-render; range math reads
@@ -586,6 +594,13 @@ export const Files: React.FC = () => {
 
   // Load files from the system
   const loadFiles = useCallback(async (location: string) => {
+    const revision = ++listingRevision.current;
+    listingPending.current = true;
+    if (currentPathRef.current && currentPathRef.current !== location) {
+      selectionAnchorRef.current = null;
+      setSelectedFiles(new Set());
+      setSelectedFile(null);
+    }
     setLoading(true);
     setLoadError(null);
     // Invalidate the per-column listing cache so deeper Miller columns re-fetch
@@ -598,7 +613,8 @@ export const Files: React.FC = () => {
     try {
       if (window.electron?.invoke) {
         const result = await window.electron.invoke('files:list', location);
-        if (result.success) {
+        if (revision !== listingRevision.current) return;
+        if (result?.success && Array.isArray(result.files)) {
           const filesWithCategory = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
             ...f,
             modified: new Date(f.modified),
@@ -624,6 +640,8 @@ export const Files: React.FC = () => {
             .sort((a: FileItem, b: FileItem) => b.modified.getTime() - a.modified.getTime())
             .slice(0, 20);
           setRecentFiles(recent);
+        } else {
+          setLoadError(result?.error || 'Could not open this folder.');
         }
       } else {
         // No files available - show empty state
@@ -631,11 +649,16 @@ export const Files: React.FC = () => {
         setCurrentPath(`/${location}`);
       }
     } catch (error) {
+      if (revision !== listingRevision.current) return;
       console.error('Failed to load files:', error);
       setLoadError('Unable to load files. Check folder permissions or try again.');
       toast.error('Failed to load files');
+    } finally {
+      if (revision === listingRevision.current) {
+        listingPending.current = false;
+        setLoading(false);
+      }
     }
-    setLoading(false);
   }, [getFileCategory, recordRecentFolder]);
 
   // Load a single column's directory listing (column view). Reuses the same
@@ -643,9 +666,11 @@ export const Files: React.FC = () => {
   // Miller column populates instead of rendering blank.
   const loadColumn = useCallback(async (location: string) => {
     if (!window.electron?.invoke) return;
+    const revision = listingRevision.current;
     setColumnLoading(prev => { const next = new Set(prev); next.add(location); return next; });
     try {
       const result = await window.electron.invoke('files:list', location);
+      if (revision !== listingRevision.current) return;
       if (result?.success) {
         const filesWithCategory: FileItem[] = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
           ...f,
@@ -657,10 +682,13 @@ export const Files: React.FC = () => {
         setColumnData(prev => ({ ...prev, [location]: [] }));
       }
     } catch (error) {
+      if (revision !== listingRevision.current) return;
       console.error('Failed to load column:', error);
       setColumnData(prev => ({ ...prev, [location]: [] }));
     } finally {
-      setColumnLoading(prev => { const next = new Set(prev); next.delete(location); return next; });
+      if (revision === listingRevision.current) {
+        setColumnLoading(prev => { const next = new Set(prev); next.delete(location); return next; });
+      }
     }
   }, [getFileCategory]);
 
@@ -680,16 +708,13 @@ export const Files: React.FC = () => {
     e.preventDefault();
     setDragOverPath(null);
     if (!dragFile || !targetDir.isDirectory) return;
-    try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('files:move', dragFile.path, targetDir.path);
-        loadFiles(currentPath);
-      }
-    } catch (err) {
-      console.error('Move failed:', err);
-      toast.error('Failed to move file');
+    const sources = selectedFiles.has(dragFile.path) ? [...selectedFiles] : [dragFile.path];
+    const items = await runBatch({ action: 'move', sources, destination: targetDir.path, conflict: batchConflict });
+    if (items && !listingPending.current && currentPathRef.current === currentPath) {
+      setSelectedFiles(new Set(batchPending(items).map(item => item.source)));
+      void loadFiles(currentPath);
     }
-  }, [dragFile, currentPath, loadFiles]);
+  }, [dragFile, selectedFiles, currentPath, loadFiles, runBatch, batchConflict]);
 
   useEffect(() => {
     loadFiles(selectedLocation);
@@ -698,6 +723,7 @@ export const Files: React.FC = () => {
   // Quick Look – spacebar preview (macOS style)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (useRunningApps.getState().currentAppId !== 'files') return;
       const target = e.target as HTMLElement | null;
       // Don't hijack typing in inputs (rename, search, etc.)
       const inEditable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -778,7 +804,6 @@ export const Files: React.FC = () => {
 
   // ===== FILE OPERATIONS =====
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; file: FileItem } | null>(null);
-  const [clipboard, setClipboard] = useState<{ file: FileItem; mode: 'copy' | 'cut' } | null>(null);
 
   const handleFileContextMenu = (e: React.MouseEvent, file: FileItem) => {
     e.preventDefault();
@@ -788,33 +813,26 @@ export const Files: React.FC = () => {
   };
 
   const handleCopyFile = (file: FileItem) => {
-    setClipboard({ file, mode: 'copy' });
+    setClipboard({ paths: [file.path], mode: 'copy' });
     setContextMenu(null);
   };
 
   const handleCutFile = (file: FileItem) => {
-    setClipboard({ file, mode: 'cut' });
+    setClipboard({ paths: [file.path], mode: 'cut' });
     setContextMenu(null);
   };
 
-  const handlePasteFile = async () => {
-    if (!clipboard) return;
-    try {
-      if (window.electron?.invoke) {
-        const dest = currentPath;
-        if (clipboard.mode === 'copy') {
-          await window.electron.invoke('files:copy', clipboard.file.path, dest);
-        } else {
-          await window.electron.invoke('files:move', clipboard.file.path, dest);
-          setClipboard(null);
-        }
-        loadFiles(currentPath);
-      }
-    } catch (err) {
-      console.error('Paste failed:', err);
-      toast.error('Paste operation failed');
+  const handlePasteFile = useCallback(async () => {
+    if (!clipboard || !currentPath) return;
+    const action = clipboard.mode === 'copy' ? 'copy' : 'move';
+    const items = await runBatch({ action, sources: clipboard.paths, destination: currentPath, conflict: batchConflict });
+    if (!items) return;
+    if (action === 'move') {
+      const paths = batchPending(items).map(item => item.source);
+      setClipboard(previous => previous === clipboard ? (paths.length ? { paths, mode: 'cut' } : null) : previous);
     }
-  };
+    if (!listingPending.current && currentPathRef.current === currentPath) void loadFiles(currentPath);
+  }, [clipboard, currentPath, batchConflict, runBatch, loadFiles]);
 
   const handleCreateFolder = () => {
     setFolderNameDraft('');
@@ -824,23 +842,22 @@ export const Files: React.FC = () => {
     const name = folderNameDraft?.trim();
     setFolderNameDraft(null);
     if (!name) return;
+    if (name === '.' || name === '..' || /[\\/]/.test(name)) {
+      toast.error('Enter a folder name without a path');
+      return;
+    }
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('files:mkdir', `${currentPath}/${name}`);
-        loadFiles(currentPath);
-      }
+      await invokeFileOperation('files:mkdir', `${currentPath}/${name}`);
+      loadFiles(currentPath);
     } catch (err) {
-      toast.error('Failed to create folder');
+      toast.error('Failed to create folder', err instanceof Error ? err.message : undefined);
     }
   };
 
   // Keyboard shortcuts for file operations
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard) {
-        e.preventDefault();
-        handlePasteFile();
-      }
+      if (useRunningApps.getState().currentAppId !== 'files') return;
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
         e.preventDefault();
         handleCreateFolder();
@@ -848,29 +865,23 @@ export const Files: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clipboard, handlePasteFile, handleCreateFolder]);
+  }, [handleCreateFolder]);
 
   const handleDeleteFile = async (file: FileItem) => {
     setContextMenu(null);
     const confirmed = await confirm({
       title: 'Move to Trash?',
-      message: `"${file.name}" will be moved to the recycle bin.`,
+      message: `"${file.name}" will be moved to the system Trash.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
     if (!confirmed) return;
     try {
-      // Send to recycle bin first
-      if ((window as any).dex?.invoke) {
-        await (window as any).dex.invoke('recycle-bin:delete', 'files', file.isDirectory ? 'folder' : 'file', file.name, JSON.stringify({ path: file.path, size: file.size }), currentPath);
-      }
-      if (window.electron?.invoke) {
-        await window.electron.invoke('files:delete', file.path);
-        loadFiles(currentPath);
-      }
+      await invokeFileOperation('files:trash', file.path);
+      loadFiles(currentPath);
     } catch (err) {
       console.error('Delete failed:', err);
-      toast.error('Failed to delete file');
+      toast.error('Failed to move item to Trash', err instanceof Error ? err.message : undefined);
     }
   };
 
@@ -917,36 +928,18 @@ export const Files: React.FC = () => {
     const count = selectedFiles.size;
     const confirmed = await confirm({
       title: 'Move selected to Trash?',
-      message: `${count} item${count === 1 ? '' : 's'} will be moved to the recycle bin.`,
+      message: `${count} item${count === 1 ? '' : 's'} will be moved to the system Trash.`,
       confirmLabel: 'Move to Trash',
       tone: 'destructive',
     });
     if (!confirmed) return;
-    const paths = [...selectedFiles];
-    let done = 0;
-    let failed = 0;
-    for (const path of paths) {
-      const item = files.find(f => f.path === path);
-      try {
-        // Record in the recycle bin first (best-effort), mirroring single delete.
-        if ((window as any).dex?.invoke && item) {
-          await (window as any).dex.invoke('recycle-bin:delete', 'files', item.isDirectory ? 'folder' : 'file', item.name, JSON.stringify({ path: item.path, size: item.size }), currentPath);
-        }
-        if (window.electron?.invoke) {
-          await window.electron.invoke('files:delete', path);
-          done++;
-        } else {
-          failed++;
-        }
-      } catch {
-        failed++;
-      }
+    const items = await runBatch({ action: 'trash', sources: [...selectedFiles] });
+    if (items && !listingPending.current && currentPathRef.current === currentPath) {
+      selectionAnchorRef.current = null;
+      setSelectedFiles(new Set(batchPending(items).map(item => item.source)));
+      void loadFiles(currentPath);
     }
-    clearSelection();
-    loadFiles(currentPath);
-    if (done > 0) toast.success(`Deleted ${done} item${done === 1 ? '' : 's'}`);
-    if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
-  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm]);
+  }, [selectedFiles, currentPath, loadFiles, runBatch, confirm]);
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
@@ -960,13 +953,11 @@ export const Files: React.FC = () => {
     setRenamingPath(null);
     if (!next || next === file.name) return;
     try {
-      if (window.electron?.invoke) {
-        await window.electron.invoke('files:rename', file.path, next);
-        loadFiles(currentPath);
-      }
+      await invokeFileOperation('files:rename', file.path, next);
+      loadFiles(currentPath);
     } catch (err) {
       console.error('Rename failed:', err);
-      toast.error('Failed to rename file');
+      toast.error('Failed to rename file', err instanceof Error ? err.message : undefined);
     }
   }, [renameDraft, currentPath, loadFiles, toast]);
 
@@ -1075,40 +1066,18 @@ export const Files: React.FC = () => {
     return out;
   }, [pinnedFolders, localPins]);
 
-  // ----- Batch copy / cut / paste over the existing files:copy / files:move -----
+  // ----- Stage selected items for the same clipboard as the context menu -----
   const handleBatchCopy = useCallback(() => {
     if (selectedFiles.size === 0) return;
-    setBatchClipboard({ paths: [...selectedFiles], mode: 'copy' });
+    setClipboard({ paths: [...selectedFiles], mode: 'copy' });
     toast.info(`Copied ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
   }, [selectedFiles, toast]);
 
   const handleBatchCut = useCallback(() => {
     if (selectedFiles.size === 0) return;
-    setBatchClipboard({ paths: [...selectedFiles], mode: 'cut' });
+    setClipboard({ paths: [...selectedFiles], mode: 'cut' });
     toast.info(`Cut ${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'}`);
   }, [selectedFiles, toast]);
-
-  const handleBatchPaste = useCallback(async () => {
-    if (!batchClipboard || !currentPath) return;
-    const { paths, mode } = batchClipboard;
-    let ok = 0;
-    for (const src of paths) {
-      try {
-        if (window.electron?.invoke) {
-          if (mode === 'copy') await window.electron.invoke('files:copy', src, currentPath);
-          else await window.electron.invoke('files:move', src, currentPath);
-          ok++;
-        }
-      } catch (err) {
-        console.error('Batch paste failed for', src, err);
-      }
-    }
-    if (mode === 'cut') setBatchClipboard(null);
-    setSelectedFiles(new Set());
-    loadFiles(currentPath);
-    if (ok > 0) toast.success(`${mode === 'copy' ? 'Copied' : 'Moved'} ${ok} item${ok === 1 ? '' : 's'}`);
-    else toast.error('Paste operation failed');
-  }, [batchClipboard, currentPath, loadFiles, toast]);
 
   // Prompt for a destination folder via the native open dialog (directory mode).
   // Mirrors the picker pattern used elsewhere (Home / PDFViewer): try
@@ -1130,56 +1099,51 @@ export const Files: React.FC = () => {
     }
   }, [currentPath, toast]);
 
-  // Copy or MOVE every selected item into a destination folder chosen via the
-  // native picker. Streams server-side through the existing files:copy /
-  // files:move handlers (so large files transfer without renderer work) and
-  // reports live progress through transferState. On move, the source folder is
-  // refreshed; on copy, the listing is left as-is unless dest === currentPath.
   const handleTransferSelected = useCallback(async (mode: 'copy' | 'move') => {
     if (selectedFiles.size === 0) return;
     const paths = [...selectedFiles];
     const dest = await pickDestinationFolder();
     if (!dest) return;
-    const destName = dest.split(/[\\/]/).filter(Boolean).pop() || dest;
-    // Drive the system-wide live-activity glass card with real count-based progress.
-    const la = useLiveActivityStore.getState();
-    const verb = mode === 'copy' ? 'Copying' : 'Moving';
-    const activityId = la.start({
-      title: `${verb} to ${destName}`,
-      subtitle: `0 of ${paths.length} items`,
-      icon: 'files',
-      badge: 'FILES',
-      progress: 0,
-    });
-    let done = 0;
-    let failed = 0;
-    for (const src of paths) {
-      try {
-        if (window.electron?.invoke) {
-          await window.electron.invoke(mode === 'copy' ? 'files:copy' : 'files:move', src, dest);
-          done++;
-        } else {
-          failed++;
-        }
-      } catch (err) {
-        console.error(`Failed to ${mode}`, src, '->', dest, err);
-        failed++;
-      }
-      useLiveActivityStore.getState().update(activityId, {
-        subtitle: `${done + failed} of ${paths.length} items`,
-        progress: (done + failed) / paths.length,
+    const items = await runBatch({ action: mode, sources: paths, destination: dest, conflict: batchConflict });
+    if (!items || listingPending.current || currentPathRef.current !== currentPath) return;
+    selectionAnchorRef.current = null;
+    setSelectedFiles(new Set(batchPending(items).map(item => item.source)));
+    if (mode === 'move' || dest === currentPath) void loadFiles(currentPath);
+  }, [selectedFiles, pickDestinationFolder, currentPath, loadFiles, runBatch, batchConflict]);
+
+  const pendingBatchItems = useMemo(() => batchReport ? batchPending(batchReport.items) : [], [batchReport]);
+  const partialBatchItems = useMemo(() => batchReport?.items.filter(item => item.status === 'partial') ?? [], [batchReport]);
+  const batchAttention = useMemo(() => [...pendingBatchItems, ...partialBatchItems], [pendingBatchItems, partialBatchItems]);
+  const retryBatch = async (keepBoth: boolean) => {
+    if (!batchReport) return;
+    const pending = keepBoth ? pendingBatchItems.filter(item => item.status === 'conflict') : pendingBatchItems;
+    const sources = pending.map(item => item.source);
+    const result = await runBatch(
+      { ...batchReport.request, sources, conflict: keepBoth ? 'keepBoth' : batchConflict },
+      { report: batchReport, rows: pending },
+    );
+    if (!result) return;
+    const completed = new Set(result.filter(item => item.status === 'complete' || item.status === 'covered').map(item => item.source));
+    if (batchReport.request.action !== 'copy') {
+      setClipboard(previous => {
+        if (previous?.mode !== 'cut') return previous;
+        const paths = previous.paths.filter(path => !completed.has(path));
+        return paths.length ? { ...previous, paths } : null;
       });
     }
-    useLiveActivityStore.getState().complete(activityId, {
-      status: failed > 0 ? 'error' : 'success',
-      title: `${mode === 'copy' ? 'Copied' : 'Moved'} to ${destName}`,
-      subtitle: failed > 0 ? `${done} done · ${failed} failed` : `${done} item${done === 1 ? '' : 's'}`,
-    });
-    clearSelection();
-    // A move always mutates the current folder; a copy only does when the
-    // destination is the folder being viewed. Refresh in either of those cases.
-    if (mode === 'move' || dest === currentPath) loadFiles(currentPath);
-  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles]);
+    setSelectedFiles(previous => new Set([...previous].filter(path => !completed.has(path))));
+    const current = currentPathRef.current;
+    if (current && !listingPending.current) void loadFiles(current);
+  };
+
+  const copySelectedPaths = async () => {
+    try {
+      await navigator.clipboard.writeText([...selectedFiles].join('\n'));
+      toast.success(`Copied ${selectedFiles.size} path${selectedFiles.size === 1 ? '' : 's'}`);
+    } catch {
+      toast.error('Could not copy selected paths');
+    }
+  };
 
   // Keyboard shortcuts for the multi-selection. Declared after the batch
   // handlers so every reference is in scope. Delete removes the selection;
@@ -1188,6 +1152,7 @@ export const Files: React.FC = () => {
   // hijacked, and gated on there being a selection (or a staged batch).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (useRunningApps.getState().currentAppId !== 'files' || batchProgress || e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       const inEditable = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
       if (inEditable) return;
@@ -1201,14 +1166,14 @@ export const Files: React.FC = () => {
       } else if (mod && (e.key === 'x' || e.key === 'X') && selectedFiles.size > 0) {
         e.preventDefault();
         handleBatchCut();
-      } else if (mod && (e.key === 'v' || e.key === 'V') && batchClipboard) {
+      } else if (mod && (e.key === 'v' || e.key === 'V') && clipboard) {
         e.preventDefault();
-        handleBatchPaste();
+        void handlePasteFile();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedFiles, batchClipboard, handleBatchDelete, handleBatchCopy, handleBatchCut, handleBatchPaste]);
+  }, [selectedFiles, clipboard, batchProgress, handleBatchDelete, handleBatchCopy, handleBatchCut, handlePasteFile]);
 
   // Keep the '--' placeholder for empty/zero rows; otherwise use the shared canonical.
   const formatSize = (bytes: number): string => (bytes > 0 ? formatBytes(bytes) : '--');
@@ -1737,12 +1702,17 @@ export const Files: React.FC = () => {
                 if (!currentPath) return;
                 const ok = await confirm({ title: 'Organize folder?', message: 'Organize files in this folder into Audio, Video, Images, Documents, Archives, and Other subfolders?', confirmLabel: 'Organize' });
                 if (!ok) return;
-                try {
-                  if (window.electron?.invoke) {
-                    await window.electron.invoke('files:organizeByType', currentPath);
-                    loadFiles(currentPath);
-                  }
-                } catch (e) { console.warn('[Files] organizeByType failed:', e); }
+                const entries = await invokePlatformIpc<Array<{ success: boolean; error?: string }> | { error: string }>('files:organizeByType', currentPath);
+                if (!Array.isArray(entries)) {
+                  toast.error('Could not organize this folder', entries?.error);
+                  return;
+                }
+                const failed = entries.filter(entry => !entry.success);
+                const moved = entries.length - failed.length;
+                if (moved) toast.success(`Organized ${moved} item${moved === 1 ? '' : 's'}`);
+                if (failed.length) toast.error(`Could not organize ${failed.length} item${failed.length === 1 ? '' : 's'}`, failed[0].error);
+                if (!entries.length) toast.info('No files to organize');
+                if (!listingPending.current && currentPathRef.current === currentPath) void loadFiles(currentPath);
               }}
               title="Organize files by type (Audio, Video, Images...)"
               aria-label="Organize files by type"
@@ -1756,7 +1726,8 @@ export const Files: React.FC = () => {
                 className="dex-toolbtn"
                 style={{ ...styles.navBtn, color: 'var(--color-accent)' }}
                 onClick={handlePasteFile}
-                title={`Paste "${clipboard.file.name}" (Ctrl+V)`}
+                title={`Paste ${clipboardLabel} (Ctrl+V)`}
+                disabled={Boolean(batchProgress)}
                 aria-label="Paste file"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
@@ -1904,18 +1875,10 @@ export const Files: React.FC = () => {
               <button
                 onClick={() => handlePasteFile()}
                 style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}
-                aria-label={`Paste ${clipboard.file.name}`}
+                aria-label={`Paste ${clipboardLabel}`}
+                disabled={Boolean(batchProgress)}
               >
-                Paste "{clipboard.file.name}"
-              </button>
-            )}
-            {batchClipboard && (
-              <button
-                onClick={() => handleBatchPaste()}
-                style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}
-                aria-label={`Paste ${batchClipboard.paths.length} items here`}
-              >
-                Paste {batchClipboard.paths.length} item{batchClipboard.paths.length === 1 ? '' : 's'} ({batchClipboard.mode === 'cut' ? 'move' : 'copy'})
+                Paste {clipboardLabel}
               </button>
             )}
             <div style={{ flex: 1 }} />
@@ -1923,28 +1886,73 @@ export const Files: React.FC = () => {
           </div>
         )}
 
-        {/* Batch Action Bar — appears whenever one or more items are selected.
-            Copy/Move open a destination picker and stream through files:copy /
-            files:move; Delete batch-removes; Deselect clears. The in-place
-            Copy here / Cut staging and Copy Paths remain as secondary tools. */}
+        {(selectedFiles.size > 0 || clipboard) && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px var(--space-4)', fontSize: 12 }}>
+            Name conflicts
+            <select value={batchConflict} disabled={Boolean(batchProgress)} onChange={e => setBatchConflict(e.target.value as BatchConflict)}>
+              <option value="skip">Skip existing items</option>
+              <option value="keepBoth">Keep both</option>
+            </select>
+          </label>
+        )}
+
         {selectedFiles.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '10px var(--space-4)', background: 'var(--color-bg-surface-solid)', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600 }}>{selectedFiles.size} selected</span>
-            <button onClick={() => handleTransferSelected('copy')} title="Copy selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copy to...</button>
-            <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
-            <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            <button disabled={Boolean(batchProgress)} onClick={() => handleTransferSelected('copy')} title="Copy selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copy to...</button>
+            <button disabled={Boolean(batchProgress)} onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
+            <button disabled={Boolean(batchProgress)} onClick={handleBatchDelete} title="Move selected to Trash (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to Trash</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
             <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
             <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
-            <button onClick={() => { selectedFiles.forEach(p => { void navigator.clipboard.writeText(p); }); toast.success('Paths copied'); }} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
+            <button onClick={() => void copySelectedPaths()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy Paths</button>
             <div style={{ flex: 1 }} />
             <button onClick={() => handleSelectAll()} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Select All</button>
             <button onClick={clearSelection} style={{ padding: '3px 10px', borderRadius: 4, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Deselect</button>
           </div>
         )}
 
-        {/* Transfer progress now shows in the system-wide live-activity glass card
-            (components/LiveActivityHost), driven by handleTransferSelected. */}
+        {batchProgress && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px var(--space-4)' }}>
+            <progress aria-label="File operation progress" value={batchProgress.finished} max={batchProgress.total} />
+            <span role="status">{batchProgress.finished} of {batchProgress.total} items</span>
+            <button disabled={!batchProgress.started || cancellingBatch} onClick={() => void cancelBatch()}>
+              {cancellingBatch ? 'Cancelling…' : 'Cancel'}
+            </button>
+          </div>
+        )}
+        {batchError && <div role="status" style={{ padding: '8px var(--space-4)' }}>{batchError} <button onClick={dismissBatch}>Dismiss</button></div>}
+        {batchReport && (
+          <div style={{ display: 'grid', gap: 6, padding: '8px var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <span role="status">
+                {batchReport.items.filter(item => item.status === 'complete').length} completed
+                {batchReport.items.some(item => item.status === 'covered') && ` · ${batchReport.items.filter(item => item.status === 'covered').length} already included`}
+                {pendingBatchItems.length > 0 && ` · ${pendingBatchItems.length} remaining`}
+                {partialBatchItems.length > 0 && ` · ${partialBatchItems.length} copied with original kept`}
+              </span>
+              {pendingBatchItems.some(item => item.status === 'conflict') && <button disabled={Boolean(batchProgress)} onClick={() => void retryBatch(true)}>Keep both and retry conflicts</button>}
+              {pendingBatchItems.length > 0 && batchReport.request.action !== 'trash' && <button disabled={Boolean(batchProgress)} onClick={() => void retryBatch(false)}>Retry remaining</button>}
+              <button onClick={dismissBatch}>Dismiss</button>
+            </div>
+            {batchAttention.length > 0 && (
+              <details>
+                <summary>Items requiring attention</summary>
+                <ul style={{ maxHeight: 140, overflow: 'auto', marginBlock: 4 }}>
+                  {batchAttention.slice(0, 30).map((item, index) => (
+                    <li key={`${index}:${item.source}`} title={item.source}>{fileLabel(item.source)} · {item.reason ?? 'Cancelled'}</li>
+                  ))}
+                </ul>
+                {batchAttention.length > 30 && <button onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(batchAttention.map(item => `${item.source}\t${item.reason ?? item.status}`).join('\n'));
+                    toast.success('Copied file operation report');
+                  } catch { toast.error('Could not copy the report'); }
+                }}>Copy full report</button>}
+              </details>
+            )}
+          </div>
+        )}
 
         {/* File List */}
         <div
@@ -2351,7 +2359,7 @@ export const Files: React.FC = () => {
             </button>
             {clipboard && (
               <button onClick={() => { handlePasteFile(); setContextMenu(null); }} aria-label="Paste file" style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-accent)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
-                Paste "{clipboard.file.name}"
+                Paste {clipboardLabel}
               </button>
             )}
             <div style={{ height: '1px', background: 'var(--color-border, var(--color-border-subtle))', margin: '4px 0' }} />

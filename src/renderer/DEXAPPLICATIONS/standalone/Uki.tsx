@@ -18,7 +18,7 @@ import {
   hasVisionProvider,
 } from '../../uki/providers/connect';
 import { captureScreenImage, isScreenCaptureAvailable } from '../../uki/screenCapture';
-import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
+import { liveContext } from '../../uki/context';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
@@ -47,33 +47,15 @@ const SYSTEM_PROMPT =
   'Be concise, helpful, and proactive. When the user asks you to do something across ' +
   'their apps (notes, tasks, files, media), explain the steps clearly. Use markdown for code.';
 
-const OS_NAMES: Record<string, string> = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
-
-/** Compact one-liner describing the user's machine, for the [Live context] block. */
-function formatDevice(d: DeviceInfo): string {
-  const os = [OS_NAMES[d.platform ?? ''] ?? d.platform, d.osVersion].filter(Boolean).join(' ');
-  const arch = d.arch ? ` (${d.arch})` : '';
-  const cpu = d.cpuModel
-    ? `, ${d.cpuModel}${d.cpuCores ? ` ${d.cpuCores}-core` : ''}`
-    : (d.cpuCores ? `, ${d.cpuCores}-core CPU` : '');
-  const ram = d.totalMemoryBytes ? `, ${Math.round(d.totalMemoryBytes / (1024 ** 3))} GB RAM` : '';
-  return `${os}${arch}${cpu}${ram}`.trim();
-}
-
-/** Compact live-context block appended to the system prompt so uki knows what the
- *  user is looking at (foreground/open/recent apps, local time, connectivity) and
- *  what machine it is running on (DEX 5.7 device awareness).
- *  Built per-send from the dependency-light snapshot in uki/context.ts. */
-function buildSystemPrompt(grounding?: string | null): string {
+/** Build a bounded prompt from app identifiers and authorized foreground data. */
+async function buildSystemPrompt(grounding?: string | null): Promise<string> {
   const c = liveContext();
   const parts = [
     `Local time: ${c.localTime}.`,
-    c.device ? `Device: ${formatDevice(c.device)}.` : '',
-    c.activeWorkspace ? `Active workspace: "${c.activeWorkspace.name}" (a ${c.activeWorkspace.kind} space).` : '',
+    c.activeWorkspace ? `Workspace type: ${c.activeWorkspace.kind}.` : '',
     c.foregroundAppId ? `The user is currently in the "${c.foregroundAppId}" app.` : '',
     c.openAppIds.length ? `Open apps: ${c.openAppIds.join(', ')}.` : '',
     c.sessionHistory.length ? `Recently used: ${c.sessionHistory.slice(-5).join(', ')}.` : '',
-    c.recentFiles.length ? `Recent files: ${c.recentFiles.join(', ')}.` : '',
     `Network: ${c.online ? 'online' : 'offline'}.`,
   ].filter(Boolean);
   let prompt = `${SYSTEM_PROMPT}\n\n[Live context] ${parts.join(' ')}`;
@@ -85,7 +67,7 @@ function buildSystemPrompt(grounding?: string | null): string {
   if (skillBlock) prompt += `\n\n[Relevant skill packs]\n${skillBlock}`;
   // Deep per-app context (e.g. the open note's title + selection) when any app
   // has registered a resolver — see uki/appContextRegistry.ts.
-  const appCtx = formatUkiContexts();
+  const appCtx = await formatUkiContexts();
   if (appCtx) prompt += `\n\n[What the user is looking at]\n${appCtx}`;
   // Fresh facts pulled from public APIs for this turn (weather/currency/lookup),
   // so the model answers with current data instead of stale training knowledge.
@@ -289,9 +271,6 @@ export default function Uki(): React.ReactElement {
 
   useEffect(() => {
     void refreshConversations();
-    // Warm the device/hardware cache once so uki can answer questions about the
-    // user's computer (CPU/RAM/OS) from its [Live context] block (DEX 5.7).
-    void ensureDeviceInfo();
   }, [refreshConversations]);
 
   useEffect(() => {
@@ -391,7 +370,7 @@ export default function Uki(): React.ReactElement {
     setBusy(true);
     let out = '';
     try {
-      out = await runChatCommand(pa.plan, buildSystemPrompt());
+      out = await runChatCommand(pa.plan, await buildSystemPrompt());
     } catch {
       out = 'Action failed.';
     }
@@ -466,7 +445,7 @@ export default function Uki(): React.ReactElement {
       }
       setBusy(true);
       let out = '';
-      try { out = await runChatCommand(command.plan, buildSystemPrompt()); } catch { out = 'Action failed.'; }
+      try { out = await runChatCommand(command.plan, await buildSystemPrompt()); } catch { out = 'Action failed.'; }
       setBusy(false);
       const reply: Message = { id: newId(), role: 'copilot', content: out, timestamp: Date.now() };
       setMessages((m) => [...m, reply]);
@@ -538,7 +517,7 @@ export default function Uki(): React.ReactElement {
     try {
       const result = await streamConfiguredLLM(
         text,
-        buildSystemPrompt(grounding),
+        await buildSystemPrompt(grounding),
         (_token, running) => {
           full = running;
           setStreamingText(running);

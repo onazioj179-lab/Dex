@@ -7,7 +7,7 @@
 // Shell preferences store
 // ---------------------------------------------------------------------------
 // One Zustand store for all "shell-level" user preferences that we wired up
-// in May 2026 — movable taskbar, compact taskbar, Liquid-Glass tint, Night
+// in May 2026 — movable taskbar, compact taskbar, Frosted Ice, Night
 // Shift, low-end mode, and the "respect-my-update-choice" guard.
 //
 // Persisted to localStorage under DEX_SHELL_PREFS_KEY and mirrored to the
@@ -33,9 +33,9 @@ export interface ShellPreferences {
   dockAlign: DockAlign;
   /** Size preset for dock + icons. */
   dockPreset: DockSizePreset;
-  /** Liquid-Glass background opacity (0.4–1.0). 1.0 = fully opaque. */
+  /** Frosted Ice background opacity (0.4–1.0). 1.0 = fully opaque. */
   glassOpacity: number;
-  /** Liquid-Glass tint hex (e.g. "#0a0a0a"). Mixed into surfaces. */
+  /** Frosted Ice neutral base (legacy tint field retained for persistence). */
   glassTint: string;
   /** Global transparency mode for shell glass surfaces. */
   glassMode: GlassMode;
@@ -61,11 +61,10 @@ export const DEFAULT_SHELL_PREFERENCES: ShellPreferences = {
   dockEdge: 'bottom',
   dockAlign: 'center',
   dockPreset: 'regular',
-  // Full Apple-style liquid glass out of the box (owner direction). The master
-  // toggle in Settings flips this to 'off' for fully-opaque true-black surfaces.
-  glassOpacity: 0.6,
+  // Frosted Ice is readable first: high-opacity diffusion, restrained blur.
+  glassOpacity: 0.9,
   glassTint: '#0a0a0a',
-  glassMode: 'liquid',
+  glassMode: 'normal',
   nightShift: false,
   nightShiftIntensity: 0.4,
   lowEndMode: false,
@@ -124,7 +123,8 @@ export function mergePrefs(input: unknown): ShellPreferences {
   base.glassTint = typeof o.glassTint === 'string' && /^#[0-9a-f]{6}$/i.test(o.glassTint)
     ? o.glassTint
     : base.glassTint;
-  base.glassMode = o.glassMode === 'off' || o.glassMode === 'reduced' || o.glassMode === 'liquid'
+  // Legacy `liquid` values migrate to the canonical Frosted Ice mode.
+  base.glassMode = o.glassMode === 'off' || o.glassMode === 'reduced'
     ? o.glassMode
     : 'normal';
   base.nightShift = o.nightShift === true;
@@ -194,15 +194,14 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
   root.style.setProperty('--dex-glass-tint-g', String(g));
   root.style.setProperty('--dex-glass-tint-b', String(b));
 
-  // Liquid glass (master overhaul): the shell's frosted material is computed
-  // from the user's glass prefs and written here as inline CSS vars, so this is
+  // Frosted Ice is computed from the user's material prefs and written here as
+  // inline CSS vars, so this is
   // the single runtime control point for every `--color-bg-glass(-strong)`
   // consumer (menus, dropdowns, sidebars, toolbars, panels, the floating
   // chrome). Paired with the adaptive backdrop blur in styles/glassMenu.ts.
   //   off      -> fully solid, theme-aware (no see-through, no blur)
   //   reduced  -> near-opaque, no blur (accessibility / weak GPU)
-  //   normal   -> translucent fill + 24px frosted blur
-  //   liquid   -> lighter fill floor + 32px blur with extra saturation
+  //   normal   -> high-opacity fill + restrained 14px diffusion
   const tint = `${r}, ${g}, ${b}`;
   if (effectiveMode === 'off') {
     // Glass FULLY OFF (owner direction): every glass surface -- menus, panels,
@@ -223,19 +222,15 @@ export function applyGlassVars(prefs: Pick<ShellPreferences, 'glassOpacity' | 'g
     root.style.setProperty('--glass-bg', `rgba(${tint}, ${op})`);
     root.style.setProperty('--glass-blur', 'none');
   } else {
-    const liquid = effectiveMode === 'liquid';
-    // 'liquid' floats a touch more transparent so the wallpaper lensing reads.
-    const op = liquid ? Math.min(requestedOpacity, 0.78) : requestedOpacity;
-    const blur = liquid ? 32 : 24;
-    const sat = liquid ? 200 : 180;
-    const filter = `blur(${blur}px) saturate(${sat}%)`;
+    const op = Math.max(requestedOpacity, 0.86);
+    const filter = 'blur(14px) saturate(100%)';
     root.style.setProperty('--dex-glass-bg', `rgba(${tint}, ${op})`);
     root.style.setProperty('--color-bg-glass', `rgba(${tint}, ${op})`);
     root.style.setProperty('--color-bg-glass-strong', `rgba(${tint}, ${Math.min(op + 0.12, 1)})`);
     root.style.setProperty('--dex-glass-blur', filter);
-    // Floating chrome floats a touch more transparent than panels for the
-    // classic translucent top-bar / dock look.
-    root.style.setProperty('--glass-bg', `rgba(${tint}, ${Math.max(op - 0.08, 0.5)})`);
+    // Floating chrome remains slightly lighter than content panels while
+    // preserving strong text contrast.
+    root.style.setProperty('--glass-bg', `rgba(${tint}, ${Math.max(op - 0.04, 0.82)})`);
     root.style.setProperty('--glass-blur', filter);
   }
 }
@@ -344,7 +339,7 @@ export const useShellPreferences = create<ShellPreferencesStore>((set, get) => {
       applyGlassVars({ ...get(), glassTint: safe });
     },
     setGlassMode: (mode) => {
-      const safe: GlassMode = mode === 'off' || mode === 'reduced' || mode === 'liquid' ? mode : 'normal';
+      const safe: GlassMode = mode === 'off' || mode === 'reduced' ? mode : 'normal';
       update({ glassMode: safe });
       applyGlassVars({ ...get(), glassMode: safe });
     },

@@ -10,9 +10,13 @@
  * Grid + list views, favorites, albums, lightbox with video playback.
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { invokePlatformIpc } from '../services/platform/ipc';
+import { isTauri } from '../services/platform/tauriCompat';
+import { downloadGalleryFile, galleryFileAction, loadAllMedia, type MediaItem } from './galleryMedia';
+import { CROP_RATIOS, DEFAULT_GALLERY_EDITS, encodeGalleryImage, galleryEditFrame, galleryFilter, loadGalleryEdits, type GalleryEdits } from './galleryEdits';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { glassSidebar } from '../styles/glassMenu';
@@ -23,28 +27,12 @@ import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
 import ContextMenu, { useContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { openPiP } from '../components/PictureInPicture';
+import { loadAppPreferences, useAppPreference } from '../store/appPreferences';
+import { clampImagePan, zoomImageAt, type GalleryImageView } from './galleryImageView';
 
 // ===========================================================================
 // TYPES
 // ===========================================================================
-
-interface MediaItem {
-  id: string;
-  type: 'image' | 'video';
-  src: string;
-  url: string;
-  thumbnail: string;
-  name: string;
-  date: Date;
-  size: number;
-  duration?: number;
-  favorite: boolean;
-  format?: string;
-  width?: number;
-  height?: number;
-  fps?: number;
-  codec?: string;
-}
 
 interface Album {
   id: string;
@@ -191,78 +179,6 @@ const ALBUMS: Album[] = [
 // DATA LOADING - Load both pictures AND videos from system
 // ===========================================================================
 
-const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
-const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|bmp|webp|svg|tiff|heic|heif)$/i;
-
-const loadAllMedia = async (): Promise<MediaItem[]> => {
-  const allMedia: MediaItem[] = [];
-
-  try {
-    if (window.electron?.invoke) {
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
-
-      // Load pictures and videos in parallel
-      const [pictureFiles, videoFiles] = await Promise.all([
-        Promise.race([window.electron.invoke('media:getMediaFiles', 'pictures'), timeout]),
-        Promise.race([window.electron.invoke('media:getMediaFiles', 'videos'), timeout]),
-      ]);
-
-      const processFiles = (files: Array<{ path?: string; name?: string; extension?: string; modified?: number; size?: number; duration?: number }>, fallbackType: 'image' | 'video') => {
-        if (!files || !Array.isArray(files)) return;
-        for (const f of files) {
-          const ext = (f.extension || f.name?.split('.').pop() || '').toLowerCase();
-          const isVideo = VIDEO_EXTENSIONS.test(`.${ext}`);
-          const isImage = IMAGE_EXTENSIONS.test(`.${ext}`);
-          const type: 'image' | 'video' = isVideo ? 'video' : isImage ? 'image' : fallbackType;
-
-          const filePath = f.path ? `file://${f.path.replace(/\\/g, '/')}` : '';
-          allMedia.push({
-            id: f.path || `media-${allMedia.length}`,
-            type,
-            src: filePath,
-            url: filePath,
-            thumbnail: filePath,
-            name: f.name || `media-${allMedia.length}`,
-            date: new Date(f.modified || Date.now()),
-            size: f.size || 0,
-            duration: f.duration || undefined,
-            favorite: false,
-            format: ext.toUpperCase() || undefined,
-            width: (f as any).width || undefined,
-            height: (f as any).height || undefined,
-            fps: (f as any).fps || undefined,
-            codec: (f as any).codec || undefined,
-          });
-        }
-      };
-
-      processFiles((pictureFiles ?? []) as Parameters<typeof processFiles>[0], 'image');
-      processFiles((videoFiles ?? []) as Parameters<typeof processFiles>[0], 'video');
-    }
-  } catch (err) {
-    console.warn('Failed to load media from system:', err);
-  }
-
-  // Fallback to localStorage
-  if (allMedia.length === 0) {
-    try {
-      const saved = localStorage.getItem('dex-gallery-media');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.map((m: any) => ({ ...m, date: new Date(m.date) }));
-      }
-    } catch { /* */ }
-  }
-
-  // Deduplicate by path
-  const seen = new Set<string>();
-  return allMedia.filter(m => {
-    if (seen.has(m.id)) return false;
-    seen.add(m.id);
-    return true;
-  });
-};
-
 // Favorites persistence
 const loadFavorites = async (): Promise<string[]> => {
   try {
@@ -286,7 +202,7 @@ const loadFavorites = async (): Promise<string[]> => {
 
 const saveFavorites = async (favorites: string[]) => {
   const data = JSON.stringify(favorites);
-  localStorage.setItem('dex-gallery-favorites', data);
+  try { localStorage.setItem('dex-gallery-favorites', data); } catch { /* use the platform store */ }
   try { await window.electron?.invoke?.('capability:storage:set', 'dex-gallery-favorites', data); } catch { /* */ }
 };
 
@@ -310,49 +226,68 @@ const getPlaceholderColor = (id: string): string => PLACEHOLDER_COLORS[Math.abs(
 // VIRTUALIZED GRID (Phase 4)
 // ===========================================================================
 
-interface VirtualizedMediaGridProps<T extends { id: string }> {
-  parentRef: React.RefObject<HTMLDivElement>;
-  items: T[];
-  columnsCount: number;
-  renderItem: (item: T) => React.ReactNode;
+const VIRTUALIZE_AT = 30;
+const GRID_TILE_MIN = 140;
+const GRID_GAP = 16;
+
+interface MediaRowsProps {
+  scrollRef: React.RefObject<HTMLDivElement>;
+  items: MediaItem[];
+  layout: 'grid' | 'list';
+  renderItem: (item: MediaItem) => React.ReactNode;
 }
 
-function VirtualizedMediaGrid<T extends { id: string }>({ parentRef, items, columnsCount, renderItem }: VirtualizedMediaGridProps<T>) {
-  const cols = Math.max(1, columnsCount);
-  const rowCount = Math.ceil(items.length / cols);
-  const rowVirtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 180,
+function MediaRows({ scrollRef, items, layout, renderItem }: MediaRowsProps) {
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const [geometry, setGeometry] = useState({ width: GRID_TILE_MIN, offset: 0 });
+  const virtual = items.length >= VIRTUALIZE_AT;
+  const grid = layout === 'grid';
+  const columns = grid ? Math.max(1, Math.floor((geometry.width + GRID_GAP) / (GRID_TILE_MIN + GRID_GAP))) : 1;
+  const tileWidth = (geometry.width - (columns - 1) * GRID_GAP) / columns;
+  const rowHeight = grid ? tileWidth + 48 : 66;
+  const rows = useVirtualizer({
+    enabled: virtual,
+    count: Math.ceil(items.length / columns),
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowHeight,
+    scrollMargin: geometry.offset,
     overscan: 4,
   });
+
+  useLayoutEffect(() => {
+    const container = rowsRef.current;
+    const scroll = scrollRef.current;
+    if (!virtual || !container || !scroll) return;
+    const measure = () => {
+      const width = container.clientWidth || GRID_TILE_MIN;
+      const offset = container.offsetTop;
+      setGeometry(previous => previous.width === width && previous.offset === offset ? previous : { width, offset });
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(container);
+    observer?.observe(scroll);
+    return () => observer?.disconnect();
+  }, [scrollRef, virtual, layout]);
+  useLayoutEffect(() => { if (virtual) rows.measure(); }, [rows, columns, rowHeight, geometry.offset, virtual]);
+
+  if (!virtual) return <div style={grid ? styles.grid : styles.list}>{items.map(renderItem)}</div>;
   return (
-    <div ref={parentRef} style={{ height: '100%', overflow: 'auto', contain: 'layout' as any }}>
-      <div style={{ height: rowVirtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const rowStart = virtualRow.index * cols;
-          const rowItems = items.slice(rowStart, rowStart + cols);
-          return (
-            <div
-              key={virtualRow.key}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: virtualRow.size,
-                transform: `translateY(${virtualRow.start}px)`,
-                display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 'var(--space-4)',
-                paddingBottom: 'var(--space-4)',
-              }}
-            >
-              {rowItems.map(renderItem)}
-            </div>
-          );
-        })}
-      </div>
+    <div ref={rowsRef} style={{ height: rows.getTotalSize(), position: 'relative' }}>
+      {rows.getVirtualItems().map(row => {
+        const start = row.index * columns;
+        return (
+          <div key={row.key} style={{
+            position: 'absolute', inset: '0 0 auto', height: row.size,
+            transform: 'translateY(' + (row.start - geometry.offset) + 'px)',
+            display: grid ? 'grid' : 'block',
+            gridTemplateColumns: 'repeat(' + columns + ', minmax(0, 1fr))',
+            gap: GRID_GAP,
+          }}>
+            {items.slice(start, start + columns).map(renderItem)}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -369,23 +304,27 @@ export const Gallery: React.FC = () => {
 
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const favoritesLoadedRef = useRef(false); // Track if favorites were loaded from storage
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const [selectedAlbum, setSelectedAlbum] = useState('all');
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [loading, setLoading] = useState(true);
+  const defaultLayout = useAppPreference('gallery', 'layout') === 'list' ? 'list' : 'grid';
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(defaultLayout);
+  useEffect(() => { void loadAppPreferences(); }, []);
+  useEffect(() => setViewMode(defaultLayout), [defaultLayout]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
-
-  // Image zoom/pan state (iOS-style)
-  const [imgZoom, setImgZoom] = useState(1);
-  const [imgPan, setImgPan] = useState({ x: 0, y: 0 });
+  const currentView = useRef<GalleryImageView>({ zoom: 1, pan: { x: 0, y: 0 } });
+  const [imageView, setImageView] = useState(currentView.current);
+  const { zoom: imgZoom, pan: imgPan } = imageView;
+  const [imageError, setImageError] = useState(false);
   const [imgDragging, setImgDragging] = useState(false);
-  const [imgDragStart, setImgDragStart] = useState({ x: 0, y: 0 });
-  // rAF batching for image pan (see handleImagePointerMove).
-  const panRafRef = useRef(0);
-  const panTargetRef = useRef<{ x: number; y: number } | null>(null);
-  const [imgRotation, setImgRotation] = useState(0);
+  const imageDrag = useRef<{ pointerId: number; x: number; y: number; scale: number; view: GalleryImageView } | null>(null);
+  const imageFrame = useRef(0);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [imageFit, setImageFit] = useState(1);
+  const [fileAction, setFileAction] = useState<'import' | 'export' | null>(null);
+  const fileActionInProgress = useRef(false);
   const [showMediaInfo, setShowMediaInfo] = useState(false);
 
   // === PRO FEATURES STATE ===
@@ -405,20 +344,24 @@ export const Gallery: React.FC = () => {
   const [showTagSystem, setShowTagSystem] = useState(false);
   const [mediaTags, setMediaTags] = useState<Record<string, string[]>>({});
   const [tagInput, setTagInput] = useState('');
-  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
-  const adjustCacheKey = selectedMedia ? `dex-gallery-adj-${selectedMedia.id}` : null;
-  const cachedAdj = useMemo(() => {
-    if (!adjustCacheKey) return null;
-    try { return JSON.parse(localStorage.getItem(adjustCacheKey) || 'null'); } catch { return null; }
-  }, [adjustCacheKey]);
-  const [adjustExposure, setAdjustExposure] = useState(0);
-  const [adjustContrast, setAdjustContrast] = useState(0);
-  const [adjustSaturation, setAdjustSaturation] = useState(0);
-  const [adjustTemp, setAdjustTemp] = useState(0);
-  const [showCropRotate, setShowCropRotate] = useState(false);
-  const [cropRatio, setCropRatio] = useState<'free' | '16:9' | '4:3' | '1:1' | '3:2'>('free');
-  const [straightenAngle, setStraightenAngle] = useState(0);
-  const [showPresets, setShowPresets] = useState(false);
+  const [editPanel, setEditPanel] = useState<'adjust' | 'crop' | 'presets' | null>(null);
+  const adjustCacheKey = selectedMedia?.type === 'image' ? 'dex-gallery-adj-' + selectedMedia.id : null;
+  const savedEdits = useMemo(() => adjustCacheKey ? loadGalleryEdits(adjustCacheKey) : DEFAULT_GALLERY_EDITS, [adjustCacheKey]);
+  const [editDraft, setEditDraft] = useState<{ key: string; edits: GalleryEdits } | null>(null);
+  const edits = editDraft?.key === adjustCacheKey ? editDraft.edits : savedEdits;
+  const updateEdits = (patch: Partial<GalleryEdits>) => {
+    if (!adjustCacheKey) return;
+    const next = { ...edits, ...patch };
+    setEditDraft({ key: adjustCacheKey, edits: next });
+    try {
+      localStorage.setItem(adjustCacheKey, JSON.stringify(next));
+    } catch {
+      toast.error('Changes are visible but could not be saved for later.');
+    }
+  };
+  const editFrame = useMemo(() => galleryEditFrame(imageSize.width, imageSize.height, edits),
+    [imageSize, edits.rotation, edits.straighten, edits.crop, edits.flipX, edits.flipY]);
+  const adjustmentFilter = galleryFilter(edits);
   const [showCompareMode, setShowCompareMode] = useState(false);
   const [compareItem, setCompareItem] = useState<MediaItem | null>(null);
   const [showSlideshow, setShowSlideshow] = useState(false);
@@ -443,6 +386,48 @@ export const Gallery: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const nativeGallery = isTauri();
+  const { data: loadedMedia, loading, error: galleryError, reload } = useAsyncResource(loadAllMedia, { timeoutMs: 15000 });
+
+  useEffect(() => { if (loadedMedia) setMedia(loadedMedia); }, [loadedMedia]);
+  useEffect(() => {
+    let active = true;
+    void loadFavorites().then(items => {
+      if (!active) return;
+      setFavorites(items);
+      setFavoritesLoaded(true);
+    });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (favoritesLoaded) void saveFavorites(favorites);
+  }, [favorites, favoritesLoaded]);
+
+  const runFileAction = useCallback(async (kind: 'import' | 'export', action: () => Promise<void>) => {
+    if (fileActionInProgress.current) return;
+    fileActionInProgress.current = true;
+    setFileAction(kind);
+    try {
+      await action();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The Gallery file operation failed.');
+    } finally {
+      fileActionInProgress.current = false;
+      setFileAction(null);
+    }
+  }, [toast]);
+
+  const importMedia = () => void runFileAction('import', async () => {
+    const result = await galleryFileAction('gallery:importMedia');
+    if (result.canceled) return;
+    if (result.count) {
+      setSelectedAlbum('all');
+      setSearchQuery('');
+      clearSelection();
+      reload();
+    }
+    if (result.skipped) toast.error(`${result.skipped} file(s) could not be added.`);
+  });
 
   // Resolve an item's effective display name (custom rename wins over the raw name).
   const displayName = useCallback((item: MediaItem) => renameMap[item.id] ?? item.name, [renameMap]);
@@ -508,7 +493,7 @@ export const Gallery: React.FC = () => {
         switch (selectedAlbum) {
           case 'photos': return item.type === 'image';
           case 'videos': return item.type === 'video';
-          case 'favorites': return favorites.includes(item.id);
+          case 'favorites': return favoriteIds.has(item.id);
           case 'recent': return (now - item.date.getTime()) < sevenDays;
           case 'screenshots': return item.name?.toLowerCase().includes('screenshot');
           default: return true;
@@ -521,7 +506,7 @@ export const Gallery: React.FC = () => {
       }
       return true;
     });
-  }, [media, favorites, selectedAlbum, searchQuery, renameMap]);
+  }, [media, favoriteIds, selectedAlbum, searchQuery, renameMap]);
 
   // Sort by the active key/direction. Name uses the effective (renamed) name.
   const sortedMedia = useMemo(() => {
@@ -625,24 +610,42 @@ export const Gallery: React.FC = () => {
     }
   }, [selectedItems]);
 
+  const exportOriginals = useCallback((items: MediaItem[]) => void runFileAction('export', async () => {
+    if (nativeGallery) {
+      const paths = items.flatMap(item => item.path ? [item.path] : []);
+      if (!paths.length) throw new Error('No local media files selected.');
+      const result = await galleryFileAction('gallery:exportOriginals', paths);
+      if (result.canceled) return;
+      const failed = (result.failed?.length ?? 0) + items.length - paths.length;
+      if (failed) {
+        const reason = result.failed?.[0]?.error ?? 'Some items are unavailable as local files.';
+        toast.error(`Exported ${result.count ?? 0} of ${items.length}. ${reason}`);
+      } else {
+        toast.success(`Exported ${result.count} file(s).`);
+      }
+      return;
+    }
+    for (const item of items) if (item.src) downloadGalleryFile(item.src, item.name);
+  }), [nativeGallery, runFileAction, toast]);
+
   const batchExport = useCallback(() => {
-    if (selectedItems.size === 0) return;
-    const toExport = media.filter(m => selectedItems.has(m.id) && m.src);
-    if (toExport.length === 0) { toast.error('No exportable files selected'); return; }
-    if (toExport.length > 20 && !confirm(`Export ${toExport.length} files? This may take a moment.`)) return;
-    let failed = 0;
-    toExport.forEach((m, i) => {
-      setTimeout(() => {
-        try {
-          const a = document.createElement('a');
-          a.href = m.src;
-          a.download = m.name;
-          a.click();
-        } catch { failed++; }
-        if (i === toExport.length - 1 && failed > 0) toast.error(`${failed} file(s) failed to download`);
-      }, i * 200);
-    });
-  }, [selectedItems, media]);
+    exportOriginals(media.filter(item => selectedItems.has(item.id)));
+  }, [exportOriginals, media, selectedItems]);
+
+  const saveEditedImage = () => void runFileAction('export', async () => {
+    if (!selectedMedia?.src || selectedMedia.type !== 'image' || imageError) throw new Error('Open a readable image first.');
+    const name = 'edited_' + selectedMedia.name.replace(/\.[^.]+$/, '') + '.png';
+    const blob = await encodeGalleryImage(selectedMedia.src, edits);
+    if (nativeGallery) {
+      if (blob.size > 64 * 1024 * 1024) throw new Error('Edited PNG files are limited to 64 MB.');
+      const result = await galleryFileAction('gallery:exportEdited', name, await blob.arrayBuffer());
+      if (!result.canceled) toast.success('Saved edited image.');
+    } else {
+      const url = URL.createObjectURL(blob);
+      downloadGalleryFile(url, name);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  });
 
   // Slideshow auto-advance
   useEffect(() => {
@@ -655,29 +658,6 @@ export const Gallery: React.FC = () => {
     return () => clearInterval(timer);
   }, [slideshowRunning, slideshowInterval, filteredMedia]);
 
-  // Restore cached adjustments when selecting a media item
-  useEffect(() => {
-    if (cachedAdj) {
-      setAdjustExposure(cachedAdj.e ?? 0);
-      setAdjustContrast(cachedAdj.c ?? 0);
-      setAdjustSaturation(cachedAdj.s ?? 0);
-      setAdjustTemp(cachedAdj.t ?? 0);
-    } else {
-      setAdjustExposure(0); setAdjustContrast(0); setAdjustSaturation(0); setAdjustTemp(0);
-    }
-  }, [adjustCacheKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Persist adjustments to localStorage when changed
-  useEffect(() => {
-    if (!adjustCacheKey) return;
-    const hasAdj = adjustExposure !== 0 || adjustContrast !== 0 || adjustSaturation !== 0 || adjustTemp !== 0;
-    if (hasAdj) {
-      localStorage.setItem(adjustCacheKey, JSON.stringify({ e: adjustExposure, c: adjustContrast, s: adjustSaturation, t: adjustTemp }));
-    } else {
-      localStorage.removeItem(adjustCacheKey);
-    }
-  }, [adjustCacheKey, adjustExposure, adjustContrast, adjustSaturation, adjustTemp]);
-
   const startSlideshow = useCallback(() => {
     setSlideshowIndex(0);
     setSlideshowRunning(true);
@@ -688,90 +668,102 @@ export const Gallery: React.FC = () => {
     setSlideshowRunning(false);
   }, []);
 
-  // Reset zoom/pan when media changes
-  useEffect(() => {
-    setImgZoom(1);
-    setImgPan({ x: 0, y: 0 });
-    setImgRotation(0);
+  useLayoutEffect(() => {
+    imageDrag.current = null;
+    setImgDragging(false);
+    currentView.current = { zoom: 1, pan: { x: 0, y: 0 } };
+    setImageView(currentView.current);
+    setImageSize({ width: 0, height: 0 });
+    setImageError(false);
     setShowMediaInfo(false);
-  }, [selectedMedia?.id]);
+    if (!selectedMedia || selectedMedia.type === 'video') setEditPanel(null);
+    return () => { cancelAnimationFrame(imageFrame.current); imageFrame.current = 0; };
+  }, [selectedMedia?.id, selectedMedia?.src]);
 
-  // Throttle wheel zoom to 60ms to prevent jank
-  const handleImageWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const now = performance.now();
-    if ((handleImageWheel as any)._lastCall && now - (handleImageWheel as any)._lastCall < 60) return;
-    (handleImageWheel as any)._lastCall = now;
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setImgZoom(prev => Math.min(Math.max(prev + delta, 0.5), 8));
-  }, []);
+  const updateImageView = useCallback((view: GalleryImageView) => {
+    const surface = imageContainerRef.current;
+    if (!surface || !imageSize.width || !imageSize.height) return;
+    const viewport = { width: surface.clientWidth, height: surface.clientHeight };
+    currentView.current = clampImagePan(view, viewport, editFrame, 0);
+    if (!imageFrame.current) imageFrame.current = requestAnimationFrame(() => {
+      imageFrame.current = 0;
+      setImageView(currentView.current);
+    });
+  }, [editFrame, imageSize]);
 
-  const handleImagePointerDown = useCallback((e: React.PointerEvent) => {
-    if (imgZoom <= 1) return;
+  useEffect(() => {
+    const surface = imageContainerRef.current;
+    if (!surface) return;
+    const wheel = (event: WheelEvent) => {
+      if (event.altKey || event.deltaY === 0) return;
+      event.preventDefault();
+      if (imageDrag.current) return;
+      const rect = surface.getBoundingClientRect();
+      const scale = rect.width / surface.clientWidth || 1;
+      const anchor = { x: (event.clientX - rect.left - rect.width / 2) / scale,
+        y: (event.clientY - rect.top - rect.height / 2) / scale };
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1);
+      const view = currentView.current;
+      updateImageView(zoomImageAt(view, view.zoom * Math.exp(-delta * 0.0025), anchor));
+    };
+    const fit = () => {
+      setImageFit(Math.min(surface.clientWidth / editFrame.width, surface.clientHeight / editFrame.height));
+      updateImageView(currentView.current);
+    };
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    observer?.observe(surface);
+    surface.addEventListener('wheel', wheel, { passive: false });
+    return () => {
+      observer?.disconnect();
+      surface.removeEventListener('wheel', wheel);
+    };
+  }, [selectedMedia?.id, selectedMedia?.src, updateImageView, editFrame]);
+
+  const handleImagePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !e.isPrimary || currentView.current.zoom <= 1 || (e.target as Element).closest('button')) return;
+    const surface = e.currentTarget;
+    const scale = surface.getBoundingClientRect().width / surface.clientWidth || 1;
+    surface.setPointerCapture(e.pointerId);
+    imageDrag.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, scale, view: currentView.current };
     setImgDragging(true);
-    setImgDragStart({ x: e.clientX - imgPan.x, y: e.clientY - imgPan.y });
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [imgZoom, imgPan]);
+  }, []);
 
   const handleImagePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!imgDragging) return;
-    // Coalesce pan updates to one setState per frame: pointermove fires far
-    // faster than the display refreshes, so per-event setImgPan just thrashes
-    // the lightbox render. Keep the latest target and flush it on the frame.
-    panTargetRef.current = { x: e.clientX - imgDragStart.x, y: e.clientY - imgDragStart.y };
-    if (panRafRef.current) return;
-    panRafRef.current = requestAnimationFrame(() => {
-      panRafRef.current = 0;
-      if (panTargetRef.current) setImgPan(panTargetRef.current);
-    });
-  }, [imgDragging, imgDragStart]);
+    const start = imageDrag.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    updateImageView({ zoom: start.view.zoom, pan: {
+      x: start.view.pan.x + (e.clientX - start.x) / start.scale,
+      y: start.view.pan.y + (e.clientY - start.y) / start.scale,
+    } });
+  }, [updateImageView]);
 
-  const handleImagePointerUp = useCallback(() => {
-    if (panRafRef.current) { cancelAnimationFrame(panRafRef.current); panRafRef.current = 0; }
-    if (panTargetRef.current) { setImgPan(panTargetRef.current); panTargetRef.current = null; }
+  const handleImagePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (imageDrag.current?.pointerId !== e.pointerId) return;
+    if (e.type === 'pointerup') handleImagePointerMove(e);
+    imageDrag.current = null;
     setImgDragging(false);
-  }, []);
+  }, [handleImagePointerMove]);
 
-  const handleImageDoubleClick = useCallback(() => {
-    if (imgZoom > 1) {
-      setImgZoom(1);
-      setImgPan({ x: 0, y: 0 });
-    } else {
-      setImgZoom(3);
-    }
-  }, [imgZoom]);
+  const changeImageZoom = useCallback((zoom: number) => {
+    if (!imageDrag.current) updateImageView(zoomImageAt(currentView.current, zoom, { x: 0, y: 0 }));
+  }, [updateImageView]);
+  const handleImageDoubleClick = useCallback((event: React.MouseEvent) => {
+    if (!(event.target as Element).closest('button')) changeImageZoom(currentView.current.zoom > 1 ? 1 : 3);
+  }, [changeImageZoom]);
+  const zoomIn = useCallback(() => changeImageZoom(currentView.current.zoom + 0.5), [changeImageZoom]);
+  const zoomOut = useCallback(() => changeImageZoom(currentView.current.zoom - 0.5), [changeImageZoom]);
+  const zoomReset = useCallback(() => changeImageZoom(1), [changeImageZoom]);
+  const rotateImage = () => updateEdits({ rotation: (edits.rotation + 90) % 360 });
 
-  const zoomIn = useCallback(() => setImgZoom(prev => Math.min(prev + 0.5, 8)), []);
-  const zoomOut = useCallback(() => {
-    setImgZoom(prev => {
-      const next = Math.max(prev - 0.5, 1);
-      if (next <= 1) setImgPan({ x: 0, y: 0 });
-      return next;
-    });
-  }, []);
-  const zoomReset = useCallback(() => { setImgZoom(1); setImgPan({ x: 0, y: 0 }); }, []);
-  const rotateImage = useCallback(() => setImgRotation(prev => (prev + 90) % 360), []);
-
-  // Convert adjustment sliders to CSS filter string
-  const getAdjustmentFilter = useCallback(() => {
-    const parts: string[] = [];
-    if (adjustExposure !== 0) parts.push(`brightness(${1 + adjustExposure / 100})`);
-    if (adjustContrast !== 0) parts.push(`contrast(${1 + adjustContrast / 100})`);
-    if (adjustSaturation !== 0) parts.push(`saturate(${1 + adjustSaturation / 100})`);
-    if (adjustTemp !== 0) parts.push(adjustTemp > 0 ? `sepia(${adjustTemp / 200})` : `hue-rotate(${adjustTemp / 4}deg)`);
-    return parts.length > 0 ? parts.join(' ') : 'none';
-  }, [adjustExposure, adjustContrast, adjustSaturation, adjustTemp]);
-
-  const copyImageToClipboard = useCallback(async () => {
-    if (!selectedMedia?.src) return;
+  const copyImageToClipboard = useCallback(async (item: MediaItem) => {
     try {
-      const res = await fetch(selectedMedia.src);
-      const blob = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      const blob = await encodeGalleryImage(item.src, DEFAULT_GALLERY_EDITS);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     } catch {
-      try { await navigator.clipboard.writeText(selectedMedia.src); } catch { toast.error('Failed to copy to clipboard'); }
+      toast.error('Could not copy the image to the clipboard.');
     }
-  }, [selectedMedia]);
+  }, [toast]);
 
   const getMediaFormat = useCallback((item: MediaItem): string => {
     if (item.format) return item.format;
@@ -780,7 +772,8 @@ export const Gallery: React.FC = () => {
   }, []);
 
   // Video player state (Tahoe-style custom controls)
-  const [videoPlaying, setVideoPlaying] = useState(true);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoVolume, setVideoVolume] = useState(80);
@@ -788,10 +781,14 @@ export const Gallery: React.FC = () => {
   const [showVideoControls, setShowVideoControls] = useState(true);
   const videoControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cleanup video controls timer on unmount
-  useEffect(() => {
+  useLayoutEffect(() => {
+    setVideoError(false);
+    setVideoPlaying(false);
+    setVideoCurrentTime(0);
+    setVideoDuration(0);
+    setShowVideoControls(true);
     return () => { if (videoControlsTimer.current) clearTimeout(videoControlsTimer.current); };
-  }, []);
+  }, [selectedMedia?.id, selectedMedia?.src]);
 
   const handleVideoTimeUpdate = useCallback(() => {
     if (videoRef.current) {
@@ -801,30 +798,35 @@ export const Gallery: React.FC = () => {
 
   const handleVideoLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
-      setVideoDuration(videoRef.current.duration);
+      setVideoDuration(Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
       videoRef.current.volume = videoVolume / 100;
+      videoRef.current.muted = videoMuted;
     }
-  }, [videoVolume]);
+  }, [videoVolume, videoMuted]);
 
   const toggleVideoPlay = useCallback(() => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
-      videoRef.current.play();
-      setVideoPlaying(true);
+      void videoRef.current.play().catch(error => {
+        if (error.name !== 'AbortError') toast.error('Could not start video playback.');
+      });
     } else {
       videoRef.current.pause();
       setVideoPlaying(false);
     }
-  }, []);
+  }, [toast]);
 
   const seekVideo = useCallback((pct: number) => {
     if (!videoRef.current || !videoDuration) return;
-    videoRef.current.currentTime = (pct / 100) * videoDuration;
+    videoRef.current.currentTime = (Math.max(0, Math.min(100, pct)) / 100) * videoDuration;
   }, [videoDuration]);
 
   const changeVideoVolume = useCallback((vol: number) => {
     setVideoVolume(vol);
-    if (videoRef.current) videoRef.current.volume = vol / 100;
+    if (videoRef.current) {
+      videoRef.current.volume = vol / 100;
+      if (vol > 0) videoRef.current.muted = false;
+    }
     if (vol > 0) setVideoMuted(false);
   }, []);
 
@@ -838,11 +840,11 @@ export const Gallery: React.FC = () => {
   const toggleVideoFullscreen = useCallback(() => {
     if (!videoRef.current) return;
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      void document.exitFullscreen().catch(() => toast.error('Could not exit fullscreen.'));
     } else {
-      videoRef.current.requestFullscreen?.();
+      void videoRef.current.requestFullscreen?.().catch(() => toast.error('Could not enter fullscreen.'));
     }
-  }, []);
+  }, [toast]);
 
   const handleVideoMouseMove = useCallback(() => {
     setShowVideoControls(prev => { if (prev) return prev; return true; });
@@ -852,67 +854,12 @@ export const Gallery: React.FC = () => {
     }, 3000);
   }, []);
 
-  // Keyboard shortcuts for Gallery video playback and image navigation
-  useEffect(() => {
-    if (!selectedMedia) return;
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-      if (selectedMedia.type === 'video') {
-        if (e.key === ' ') { e.preventDefault(); toggleVideoPlay(); }
-        else if (e.key === 'ArrowRight' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); if (videoRef.current) videoRef.current.currentTime = Math.min(videoDuration, videoRef.current.currentTime + 5); }
-        else if (e.key === 'ArrowLeft' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); if (videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5); }
-        else if (e.key === 'f') toggleVideoFullscreen();
-        else if (e.key === 'm') toggleVideoMute();
-      }
-      if (e.key === 'ArrowRight' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); navigateMedia('next'); }
-      else if (e.key === 'ArrowLeft' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); navigateMedia('prev'); }
-      else if (e.key === 'Escape') setSelectedMedia(null);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [selectedMedia, toggleVideoPlay, toggleVideoFullscreen, toggleVideoMute, videoDuration]);
-
-  const fmtTime = (s: number): string => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  // Load all media (pictures + videos) on mount
-  // Initial gallery load via the shared useAsyncResource (owns the mounted-guard,
-  // timeout, AbortController, and set-after-unmount safety that this used to
-  // hand-roll). The loader pulls media + favorites together; the apply effects
-  // fan the result into the existing state.
-  const { data: loadedGallery, loading: galleryLoading, error: galleryError } = useAsyncResource(
-    async (signal) => {
-      const [media, favorites] = await Promise.all([loadAllMedia(), loadFavorites()]);
-      return signal.aborted ? null : { media, favorites };
-    },
-    { timeoutMs: 8000 },
-  );
-  useEffect(() => { setLoading(galleryLoading); }, [galleryLoading]);
-  useEffect(() => {
-    if (!loadedGallery) return;
-    setMedia(loadedGallery.media);
-    setFavorites(loadedGallery.favorites);
-    favoritesLoadedRef.current = true; // Mark initial load complete
-  }, [loadedGallery]);
-  useEffect(() => { if (galleryError) toast.error('Failed to load gallery'); }, [galleryError]);
-
-  // Save favorites to storage (only after initial load)
-  useEffect(() => { 
-    if (favoritesLoadedRef.current) {
-      saveFavorites(favorites); 
-    }
-  }, [favorites]);
-
   // Load EXIF data when selecting a media item with EXIF panel open
   useEffect(() => {
     if (!showExifPanel || !selectedMedia || selectedMedia.type !== 'image') return;
     if (exifCache[selectedMedia.id] !== undefined) return; // already loaded or attempted
     let cancelled = false;
-    loadExifFromPath(selectedMedia.src).then(data => {
+    loadExifFromPath(selectedMedia.path ?? selectedMedia.src).then(data => {
       if (!cancelled) setExifCache(prev => ({ ...prev, [selectedMedia.id]: data }));
     });
     return () => { cancelled = true; };
@@ -934,62 +881,21 @@ export const Gallery: React.FC = () => {
     const now = Date.now();
     const sevenDays = 7 * 24 * 3600 * 1000;
     const counts = { all: 0, photos: 0, videos: 0, favorites: 0, recent: 0, screenshots: 0 };
-    const favSet = new Set(favorites);
     for (const m of media) {
       counts.all++;
       if (m.type === 'image') counts.photos++;
       if (m.type === 'video') counts.videos++;
-      if (favSet.has(m.id)) counts.favorites++;
+      if (favoriteIds.has(m.id)) counts.favorites++;
       if (now - m.date.getTime() < sevenDays) counts.recent++;
       if (m.name?.toLowerCase().includes('screenshot')) counts.screenshots++;
     }
     return counts;
-  }, [media, favorites]);
+  }, [media, favoriteIds]);
 
-  // Progressive loading: render items in batches for smooth scrolling
-  const ITEMS_PER_PAGE = 60;
-  // Switch the grid to the windowed renderer once a library passes this size.
-  // Lower than ITEMS_PER_PAGE so medium libraries (30-60) also window their rows
-  // instead of mounting every thumbnail at once; tiny libraries stay plain to
-  // avoid the virtualizer's measure pass causing a one-frame layout shift.
-  const GRID_VIRTUALIZE_THRESHOLD = 30;
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  // Reset visible count when album/search/sort changes
-  useEffect(() => { setVisibleCount(ITEMS_PER_PAGE); }, [selectedAlbum, searchQuery, sortKey, sortDir]);
-  const visibleMedia = useMemo(() => sortedMedia.slice(0, visibleCount), [sortedMedia, visibleCount]);
-  const hasMoreItems = visibleCount < sortedMedia.length;
-
-  // IntersectionObserver for automatic infinite scroll
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el || !hasMoreItems) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setVisibleCount(c => c + ITEMS_PER_PAGE);
-    }, { rootMargin: '200px' });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMoreItems]);
-
-  // Phase 4: Virtualized grid (used when visibleMedia.length >= GRID_VIRTUALIZE_THRESHOLD)
-  const gridScrollRef = useRef<HTMLDivElement | null>(null);
-  const [columnsCount, setColumnsCount] = useState(6);
-  useEffect(() => {
-    const el = gridScrollRef.current;
-    if (!el) return;
-    const compute = () => {
-      const w = el.clientWidth;
-      // Match styles.grid: minmax(140px, 1fr) with 16px gap
-      const ITEM_MIN = 140;
-      const GAP = 16;
-      const cols = Math.max(1, Math.floor((w + GAP) / (ITEM_MIN + GAP)));
-      setColumnsCount(cols);
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const mediaScrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (mediaScrollRef.current) mediaScrollRef.current.scrollTop = 0;
+  }, [selectedAlbum, searchQuery, sortKey, sortDir, viewMode]);
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
@@ -1027,35 +933,61 @@ export const Gallery: React.FC = () => {
       { id: 'rename', label: 'Rename', icon: Icons.edit, shortcut: 'F2', onSelect: () => startRename(item) },
       { id: 'select', label: selectedItems.has(item.id) ? 'Deselect' : 'Select', icon: Icons.grid, onSelect: () => { setSelectionMode(true); toggleItemSelection(item.id); lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); }, dividerAfter: true },
       { id: 'fav', label: isFav ? 'Unfavorite' : 'Favorite', icon: Icons.heart, onSelect: () => toggleFavorite(item.id), dividerAfter: true },
-      { id: 'copy', label: 'Copy to Clipboard', shortcut: 'Ctrl+C', icon: Icons.copy, onSelect: () => { setSelectedMedia(item); setTimeout(() => copyImageToClipboard(), 50); } },
+      { id: 'export', label: 'Export original', icon: Icons.download, onSelect: () => exportOriginals([item]) },
       ...(item.type === 'image' ? [
+        { id: 'copy', label: 'Copy image', icon: Icons.copy, onSelect: () => void copyImageToClipboard(item) },
         { id: 'prism', label: 'Edit in Prism', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'image' as const, data: item.src, sourceApp: 'gallery' }, 'prism') },
       ] : []),
       ...(item.type === 'video' ? [
         { id: 'vinx', label: 'Edit in Vinx', icon: Icons.edit, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'videoeditor') },
         { id: 'forge', label: 'Send to Forge', icon: Icons.settings, onSelect: () => sendToApp({ name: item.name, kind: 'video' as const, data: item.src, sourceApp: 'gallery' }, 'forge') },
       ] : []),
-      { id: 'files', label: 'Show in Files', icon: Icons.folder, onSelect: () => { if ((window as any).electron?.invoke) (window as any).electron.invoke('shell:showItemInFolder', item.src); }, dividerAfter: true },
+      ...(item.path ? [{
+        id: 'files', label: 'Show in file manager', icon: Icons.folder, dividerAfter: true,
+        onSelect: async () => {
+          const result = await invokePlatformIpc<{ success: boolean }>('shell:showItemInFolder', item.path);
+          if (!result?.success) toast.error('Could not locate the file.');
+        },
+      }] : []),
       { id: 'delete', label: 'Delete', icon: Icons.trash, danger: true, shortcut: 'Del', onSelect: () => deleteMedia(item) },
     ];
-  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, batchDelete, batchFavorite, clearSelection, startRename]);
+  }, [favorites, selectedItems, sortedMedia, toggleFavorite, toggleItemSelection, copyImageToClipboard, sendToApp, deleteMedia, batchExport, exportOriginals, batchDelete, batchFavorite, clearSelection, startRename, toast]);
 
-  // Lightbox keyboard nav + zoom. '+'/'=' zoom in, '-' zoom out, '0' fits.
   useEffect(() => {
     if (!selectedMedia) return;
-    const handler = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      if (e.key === 'Escape') setSelectedMedia(null);
-      else if (e.key === 'ArrowLeft') navigateMedia('prev');
-      else if (e.key === 'ArrowRight') navigateMedia('next');
-      else if (selectedMedia.type === 'image' && (e.key === '+' || e.key === '=')) { e.preventDefault(); zoomIn(); }
-      else if (selectedMedia.type === 'image' && (e.key === '-' || e.key === '_')) { e.preventDefault(); zoomOut(); }
-      else if (selectedMedia.type === 'image' && e.key === '0') { e.preventDefault(); zoomReset(); }
+    const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (event.key === 'Escape') {
+        if (editPanel) setEditPanel(null);
+        else setSelectedMedia(null);
+        return;
+      }
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+
+      const arrow = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+      if (arrow) {
+        event.preventDefault();
+        if (selectedMedia.type === 'video' && !event.ctrlKey && !event.metaKey) {
+          const video = videoRef.current;
+          if (video && videoDuration > 0) video.currentTime = Math.min(videoDuration, Math.max(0, video.currentTime + arrow * 5));
+        } else {
+          navigateMedia(arrow < 0 ? 'prev' : 'next');
+        }
+      } else if (selectedMedia.type === 'video' && !videoError) {
+        if (event.key === ' ' && !target?.closest?.('button')) { event.preventDefault(); toggleVideoPlay(); }
+        else if (event.key === 'f') toggleVideoFullscreen();
+        else if (event.key === 'm') toggleVideoMute();
+      } else if (selectedMedia.type === 'image') {
+        if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomIn(); }
+        else if (event.key === '-' || event.key === '_') { event.preventDefault(); zoomOut(); }
+        else if (event.key === '0') { event.preventDefault(); zoomReset(); }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedMedia, navigateMedia, zoomIn, zoomOut, zoomReset]);
+  }, [selectedMedia, navigateMedia, editPanel, toggleVideoPlay, toggleVideoFullscreen, toggleVideoMute,
+    videoError, videoDuration, zoomIn, zoomOut, zoomReset]);
 
   // Grid-level selection shortcuts: Ctrl/Cmd+A select all, Delete/Backspace remove
   // the selection, Escape clears it. Suppressed while the lightbox or a text field
@@ -1189,6 +1121,14 @@ export const Gallery: React.FC = () => {
         <div style={styles.toolbar}>
           <h2 style={styles.title}>{ALBUMS.find(a => a.id === selectedAlbum)?.name ?? 'All Media'}</h2>
           <div style={styles.toolbarRight}>
+            {nativeGallery && (
+              <button style={{ ...styles.viewBtn, width: 'auto', paddingInline: 8, background: 'var(--color-border)' }} onClick={importMedia} disabled={!!fileAction || loading}>
+                {fileAction === 'import' ? 'Importing…' : 'Import'}
+              </button>
+            )}
+            <button style={styles.viewBtn} onClick={reload} aria-label="Refresh Gallery" title="Refresh Gallery" disabled={loading || !!fileAction}>
+                <DexIcon name="refresh" size={16} />
+            </button>
             {/* Search within the current album */}
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <span style={{ position: 'absolute', left: 8, display: 'flex', color: 'var(--color-text-muted)', pointerEvents: 'none' }}>
@@ -1256,8 +1196,13 @@ export const Gallery: React.FC = () => {
         </div>
 
         {/* Gallery content */}
-        <div style={styles.content}>
-          {loading ? (
+        {galleryError && (
+          <div role="alert" style={{ padding: 'var(--space-2) var(--space-5)' }}>
+            {galleryError.message} <button onClick={reload}>Retry</button>
+          </div>
+        )}
+        <div ref={mediaScrollRef} style={styles.content}>
+          {loading && !loadedMedia ? (
             <div style={{ ...styles.grid, padding: 'var(--space-4)' }}>
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} style={{ ...styles.gridItem, background: 'var(--color-border-subtle)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
@@ -1293,13 +1238,9 @@ export const Gallery: React.FC = () => {
                   : selectedAlbum === 'videos' ? 'Add video files to your Videos folder and they\'ll appear here.'
                   : 'Add images and videos to your Pictures or Videos folder to see them here.'}
               </div>
-              <button
-                onClick={() => {
-                  try {
-                    const folder = selectedAlbum === 'videos' ? 'videos' : 'pictures';
-                    window.electron?.invoke?.('shell:openPath', folder);
-                  } catch { toast.error('Could not open folder'); }
-                }}
+              {nativeGallery && !searchQuery.trim() && selectedAlbum !== 'favorites' && <button
+                onClick={importMedia}
+                disabled={!!fileAction || loading}
                 style={{
                   padding: 'var(--space-2) var(--space-5)', borderRadius: 6,
                   background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)',
@@ -1307,12 +1248,12 @@ export const Gallery: React.FC = () => {
                   cursor: 'pointer', transition: 'opacity 0.2s',
                 }}
               >
-                Open {selectedAlbum === 'videos' ? 'Videos' : 'Pictures'} Folder
-              </button>
+                Import photos and videos
+              </button>}
             </div>
           ) : viewMode === 'grid' ? (
             (() => {
-              const renderGridItem = (item: typeof visibleMedia[number]) => (
+              const renderGridItem = (item: MediaItem) => (
                 <div key={item.id} style={styles.gridItem} onClick={(e) => handleItemActivate(item, e)} onContextMenu={(e) => { if (!selectedItems.has(item.id)) lastSelectedIndexRef.current = sortedMedia.findIndex(m => m.id === item.id); showCtxMenu(e, buildCtxItems(item)); }}>
                   {selectionMode && (
                     <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 5, width: 22, height: 22, borderRadius: 4, background: selectedItems.has(item.id) ? 'var(--color-accent)' : 'rgba(0,0,0,0.5)', border: '2px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -1365,22 +1306,10 @@ export const Gallery: React.FC = () => {
                   )}
                 </div>
               );
-              // Avoid layout shift on tiny libraries
-              if (visibleMedia.length < GRID_VIRTUALIZE_THRESHOLD) {
-                return <div style={styles.grid}>{visibleMedia.map(renderGridItem)}</div>;
-              }
-              return (
-                <VirtualizedMediaGrid
-                  parentRef={gridScrollRef}
-                  items={visibleMedia}
-                  columnsCount={columnsCount}
-                  renderItem={renderGridItem}
-                />
-              );
+              return <MediaRows scrollRef={mediaScrollRef} items={sortedMedia} layout="grid" renderItem={renderGridItem} />;
             })()
           ) : (
-            <div style={styles.list}>
-              {visibleMedia.map(item => (
+            <MediaRows scrollRef={mediaScrollRef} items={sortedMedia} layout="list" renderItem={item => (
                 <div key={item.id} style={styles.listItem} onClick={(e) => handleItemActivate(item, e)} onContextMenu={(e) => showCtxMenu(e, buildCtxItems(item))}>
                   <div style={{...styles.listThumb, background: getPlaceholderColor(item.id), overflow: 'hidden', position: 'relative'}}>
                     {item.src ? (
@@ -1424,21 +1353,7 @@ export const Gallery: React.FC = () => {
                     {favorites.includes(item.id) ? Icons.heart : Icons.heartOutline}
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Load More sentinel for infinite scroll */}
-          {hasMoreItems && (
-            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-5) 0 var(--space-2)' }}>
-              <button
-                onClick={() => setVisibleCount(c => c + ITEMS_PER_PAGE)}
-                aria-label="Load more media"
-                style={{ padding: 'var(--space-2) 28px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background 0.15s' }}
-              >
-                Load More ({sortedMedia.length - visibleCount} remaining)
-              </button>
-            </div>
+              )} />
           )}
 
           {/* Recent Media Section at Bottom */}
@@ -1452,14 +1367,11 @@ export const Gallery: React.FC = () => {
                 {recentMedia.map(item => (
                   <div key={`recent-${item.id}`} style={styles.recentItem} onClick={() => setSelectedMedia(item)}>
                     <div style={{...styles.recentThumb, background: getPlaceholderColor(item.id)}}>
-                      {item.src ? (
-                        item.type === 'video' ? (
-                          <video src={item.src} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} muted preload="metadata" />
-                        ) : (
-                          <img src={item.thumbnail || item.src} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        )
-                      ) : null}
+                      {(item.thumbnail || (item.type === 'image' && item.src)) && (
+                        <img src={item.thumbnail || item.src} alt={item.name} loading="lazy" decoding="async"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
+                          onError={e => { e.currentTarget.style.display = 'none'; }} />
+                      )}
                       {item.type === 'video' && <span style={{...styles.playBadge, position: 'absolute', bottom: 4, right: 4, width: 18, height: 18}}>{Icons.play}</span>}
                     </div>
                     <span style={styles.recentName}>{item.name}</span>
@@ -1477,9 +1389,6 @@ export const Gallery: React.FC = () => {
             { label: 'EXIF', fn: () => setShowExifPanel(v => !v), active: showExifPanel },
             { label: 'Faces', fn: () => setShowFaceDetection(v => !v), active: showFaceDetection },
             { label: 'Tags', fn: () => setShowTagSystem(v => !v), active: showTagSystem },
-            { label: 'Adjust', fn: () => setShowQuickAdjust(v => !v), active: showQuickAdjust },
-            { label: 'Crop', fn: () => setShowCropRotate(v => !v), active: showCropRotate },
-            { label: 'Presets', fn: () => setShowPresets(v => !v), active: showPresets },
             { label: 'Compare', fn: () => setShowCompareMode(v => !v), active: showCompareMode },
             { label: 'Slideshow', fn: () => setShowSlideshow(v => !v), active: showSlideshow },
           ].map(b => (
@@ -1602,118 +1511,71 @@ export const Gallery: React.FC = () => {
       )}
 
       {/* Quick Adjustments */}
-      {showQuickAdjust && (
+      {selectedMedia?.type === 'image' && editPanel === 'adjust' && (
         <div style={{ position: 'fixed', animation: "dex-panel-in 180ms ease-out", right: 20, top: 80, width: 'min(250px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-popover)', zIndex: 'var(--z-modal)' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Quick Adjust</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowQuickAdjust(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setEditPanel(null)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
-            {[{ label: 'Exposure', value: adjustExposure, set: setAdjustExposure, min: -100, max: 100, color: 'var(--color-warning)' }, { label: 'Contrast', value: adjustContrast, set: setAdjustContrast, min: -100, max: 100, color: 'var(--color-accent)' }, { label: 'Saturation', value: adjustSaturation, set: setAdjustSaturation, min: -100, max: 100, color: 'var(--color-success)' }, { label: 'Temperature', value: adjustTemp, set: setAdjustTemp, min: -100, max: 100, color: 'var(--color-warning)' }].map(s => (
+            {([
+              { label: 'Exposure', key: 'e', color: 'var(--color-warning)' },
+              { label: 'Contrast', key: 'c', color: 'var(--color-accent)' },
+              { label: 'Saturation', key: 's', color: 'var(--color-success)' },
+              { label: 'Temperature', key: 't', color: 'var(--color-warning)' },
+            ] as const).map(s => (
               <div key={s.label} style={{ marginBottom: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value > 0 ? '+' : ''}{s.value}</span></div>
-                <input type="range" min={s.min} max={s.max} value={s.value} onChange={e => s.set(Number(e.target.value))} aria-label={s.label} style={{ width: '100%', accentColor: s.color }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{s.label}</span><span style={{ fontSize: 11, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{edits[s.key] > 0 ? '+' : ''}{edits[s.key]}</span></div>
+                <input type="range" min={-100} max={100} value={edits[s.key]} onChange={e => updateEdits({ [s.key]: Number(e.target.value) })} aria-label={s.label} style={{ width: '100%', accentColor: s.color }} />
               </div>
             ))}
-            <button aria-label="Reset all adjustments" onClick={() => { setAdjustExposure(0); setAdjustContrast(0); setAdjustSaturation(0); setAdjustTemp(0); }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 4 }}>Reset All</button>
-            <button aria-label="Save edited image" onClick={() => {
-              if (!selectedMedia) return;
-              // Render adjusted image to canvas and trigger download
-              const img = new Image();
-              img.crossOrigin = 'anonymous';
-              img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                ctx.filter = getAdjustmentFilter();
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob(blob => {
-                  if (!blob) return;
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `edited_${selectedMedia.name}`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }, 'image/png');
-              };
-              img.src = selectedMedia.url;
-            }} style={{ width: '100%', padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Save Edited Image</button>
+            <button aria-label="Reset all adjustments" onClick={() => updateEdits({ e: 0, c: 0, s: 0, t: 0 })} style={{ width: '100%', padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', marginBottom: 4 }}>Reset All</button>
+            <button aria-label="Save edited image" onClick={saveEditedImage} disabled={!!fileAction || !!imageError} style={{ width: '100%', padding: '5px', borderRadius: 4, border: 'none', background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Save Edited Image</button>
           </div>
         </div>
       )}
 
       {/* Crop & Rotate */}
-      {showCropRotate && (
-        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+      {selectedMedia?.type === 'image' && editPanel === 'crop' && (
+        <div style={{ position: 'absolute', inset: '52px 12px auto auto', zIndex: 'calc(var(--z-modal) + 1)', pointerEvents: 'none' }}>
         <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(300px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Crop & Rotate</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowCropRotate(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setEditPanel(null)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
-              {(['free', '16:9', '4:3', '1:1', '3:2'] as const).map(a => (
-                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={cropRatio === a} onClick={() => setCropRatio(a)} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropRatio === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropRatio === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+              {CROP_RATIOS.map(a => (
+                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={edits.crop === a} onClick={() => updateEdits({ crop: a })} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: edits.crop === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: edits.crop === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Straighten</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{straightenAngle}°</span></div>
-            <input type="range" min="-45" max="45" value={straightenAngle} onChange={e => setStraightenAngle(Number(e.target.value))} aria-label="Straighten angle in degrees" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Straighten</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{edits.straighten}°</span></div>
+            <input type="range" min="-45" max="45" value={edits.straighten} onChange={e => updateEdits({ straighten: Number(e.target.value) })} aria-label="Straighten angle in degrees" style={{ width: '100%', accentColor: 'var(--color-accent)', marginBottom: 'var(--space-2)' }} />
             <div style={{ display: 'flex', gap: 4 }}>
-              <button aria-label="Rotate clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 90) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-cw" size={10} /> 90</button>
-              <button aria-label="Rotate counter-clockwise 90 degrees" onClick={() => setImgRotation(r => (r + 270) % 360)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-ccw" size={10} /> 90</button>
-              <button aria-label="Flip vertical" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
-              <button aria-label="Flip horizontal" style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
+              <button aria-label="Rotate clockwise 90 degrees" onClick={rotateImage} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-cw" size={10} /> 90</button>
+              <button aria-label="Rotate counter-clockwise 90 degrees" onClick={() => updateEdits({ rotation: (edits.rotation + 270) % 360 })} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="rotate-ccw" size={10} /> 90</button>
+              <button aria-label="Flip vertical" aria-pressed={edits.flipY} onClick={() => updateEdits({ flipY: !edits.flipY })} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
+              <button aria-label="Flip horizontal" aria-pressed={edits.flipX} onClick={() => updateEdits({ flipX: !edits.flipX })} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
             </div>
-            <button aria-label="Save edited image as copy" onClick={async () => {
-              if (!selectedMedia?.src) return;
-              try {
-                const canvas = document.createElement('canvas');
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.src = selectedMedia.src;
-                await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
-                const rot = imgRotation % 360;
-                const swap = rot === 90 || rot === 270;
-                canvas.width = swap ? img.height : img.width;
-                canvas.height = swap ? img.width : img.height;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate((rot * Math.PI) / 180);
-                ctx.filter = getAdjustmentFilter();
-                ctx.drawImage(img, -img.width / 2, -img.height / 2);
-                canvas.toBlob(blob => {
-                  if (!blob) return;
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `edited_${selectedMedia.name}`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }, 'image/png');
-              } catch { /* silent */ }
-            }} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Save Edited Copy</button>
+            <button aria-label="Save edited image as copy" onClick={saveEditedImage} disabled={!!fileAction || !!imageError} style={{ width: '100%', padding: '6px', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>Save Edited Copy</button>
           </div>
         </div>
         </div>
       )}
 
       {/* One-Click Presets */}
-      {showPresets && (
-        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 'var(--z-modal)', pointerEvents: 'none' }}>
+      {selectedMedia?.type === 'image' && editPanel === 'presets' && (
+        <div style={{ position: 'absolute', inset: '52px 12px auto auto', zIndex: 'calc(var(--z-modal) + 1)', pointerEvents: 'none' }}>
         <div style={{ animation: "dex-panel-in 180ms ease-out", width: 'min(340px, calc(100vw - 48px))', background: 'var(--color-bg-elevated)', borderRadius: 10, border: '1px solid var(--color-border-subtle)', boxShadow: 'var(--pg-shadow-modal)', pointerEvents: 'auto' }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-bg-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>One-Click Presets</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowPresets(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
+            <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setEditPanel(null)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
           </div>
           <div style={{ padding: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
               {[{ name: 'Auto Enhance', icon: 'sparkles', color: 'var(--color-accent)', e: 15, c: 10, s: 15, t: 0 }, { name: 'B&W Classic', icon: 'contrast', color: 'var(--color-text-tertiary)', e: 0, c: 20, s: -100, t: 0 }, { name: 'Vintage Film', icon: 'film', color: 'var(--color-warning)', e: -5, c: -10, s: -20, t: 30 }, { name: 'Vivid', icon: 'palette', color: 'var(--color-success)', e: 10, c: 25, s: 40, t: 0 }, { name: 'Warm Tone', icon: 'sun', color: 'var(--color-warning)', e: 5, c: 5, s: 10, t: 40 }, { name: 'Cool Tone', icon: 'snowflake', color: 'var(--color-info, #64d2ff)', e: 0, c: 10, s: -10, t: -40 }, { name: 'Dramatic', icon: 'diamond', color: 'var(--color-error)', e: -15, c: 50, s: 10, t: 0 }, { name: 'Cinematic', icon: 'clapperboard', color: 'var(--color-tag-purple, #bf5af2)', e: -10, c: 30, s: -15, t: 15 }, { name: 'Natural', icon: 'leaf', color: 'var(--color-success)', e: 5, c: 5, s: 5, t: 5 }].map(p => (
-                <button key={p.name} aria-label={`Apply preset: ${p.name}`} onClick={() => { setAdjustExposure(p.e); setAdjustContrast(p.c); setAdjustSaturation(p.s); setAdjustTemp(p.t); }} style={{ padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
+                <button key={p.name} aria-label={`Apply preset: ${p.name}`} onClick={() => updateEdits({ e: p.e, c: p.c, s: p.s, t: p.t })} style={{ padding: 10, borderRadius: 6, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', cursor: 'pointer', textAlign: 'center' }}>
                   <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><DexIcon name={p.icon} size={20} color={p.color} /></div>
                   <div style={{ fontSize: 11, color: p.color, fontWeight: 600 }}>{p.name}</div>
                 </button>
@@ -1739,7 +1601,7 @@ export const Gallery: React.FC = () => {
             </div>
             <div style={{ flex: 1, borderRadius: 6, background: 'var(--color-border-subtle)', border: '1px solid var(--color-bg-hover)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>AFTER</div>
-              {selectedMedia ? <div style={{ width: 60, height: 60, borderRadius: 4, background: getPlaceholderColor(selectedMedia.id), filter: `brightness(${1 + adjustExposure / 100}) contrast(${1 + adjustContrast / 100}) saturate(${1 + adjustSaturation / 100})` }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select image</span>}
+              {selectedMedia ? <div style={{ width: 60, height: 60, borderRadius: 4, background: getPlaceholderColor(selectedMedia.id), filter: adjustmentFilter }} /> : <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select image</span>}
             </div>
           </div>
         </div>
@@ -1830,8 +1692,16 @@ export const Gallery: React.FC = () => {
               <button style={{...styles.lightboxBtn, color: favorites.includes(selectedMedia.id) ? 'var(--color-error)' : 'var(--color-text-secondary)'}} aria-label={favorites.includes(selectedMedia.id) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => toggleFavorite(selectedMedia.id)}>
                 {favorites.includes(selectedMedia.id) ? Icons.heart : Icons.heartOutline}
               </button>
-              <button style={styles.lightboxBtn} onClick={copyImageToClipboard} aria-label="Copy image">{Icons.copy}</button>
-              <button style={styles.lightboxBtn} onClick={() => { if (navigator.clipboard && selectedMedia) navigator.clipboard.writeText(selectedMedia.src); }} aria-label="Share">{Icons.share}</button>
+              <button style={styles.lightboxBtn} onClick={() => exportOriginals([selectedMedia])} disabled={!!fileAction} aria-label="Export original" title="Export original">{Icons.download}</button>
+              <button style={styles.lightboxBtn} onClick={() => void navigator.clipboard.writeText(selectedMedia.path ?? selectedMedia.src).catch(() => toast.error('Could not copy the path.'))} aria-label="Copy file path" title="Copy file path">{Icons.share}</button>
+              {selectedMedia.type === 'image' && (
+                (['adjust', 'crop', 'presets'] as const).map(panel => {
+                  const labels = { adjust: 'Adjust photo', crop: 'Crop and rotate', presets: 'Photo presets' };
+                  const icons = { adjust: 'sliders', crop: 'crop', presets: 'sparkles' };
+                  return <button key={panel} style={styles.lightboxBtn} aria-label={labels[panel]} title={labels[panel]} aria-pressed={editPanel === panel}
+                    onClick={() => setEditPanel(editPanel === panel ? null : panel)}><DexIcon name={icons[panel]} size={16} /></button>;
+                })
+              )}
               {selectedMedia.type === 'image' && (
                 <button style={{...styles.lightboxBtn, color: 'var(--color-success)'}} aria-label="Edit in PRISM" title="Edit in PRISM" onClick={() => {
                   sendToApp({ name: selectedMedia.name, kind: 'image', data: selectedMedia.src, sourceApp: 'gallery' }, 'prism');
@@ -1861,13 +1731,22 @@ export const Gallery: React.FC = () => {
             ); })()}
             <div style={{...styles.lightboxImage, background: getPlaceholderColor(selectedMedia.id), overflow: 'hidden', position: 'relative'}}>
               {selectedMedia.type === 'video' ? (
-                selectedMedia.src ? (
+                videoError ? (
+                  <div role="status" style={{ display: 'grid', gap: 12, textAlign: 'center', padding: 16 }}>
+                    <span>Could not play this video.</span>
+                    {selectedMedia.path && <button onClick={async () => {
+                      const result = await invokePlatformIpc<{ success: boolean }>('media:openWithSystem', selectedMedia.path);
+                      if (!result?.success) toast.error('Could not open the video in your media player.');
+                    }}>Open in system player</button>}
+                  </div>
+                ) : selectedMedia.src ? (
                   <div
                     style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}
                     onMouseMove={handleVideoMouseMove}
                     onMouseLeave={() => { if (videoRef.current && !videoRef.current.paused) setShowVideoControls(false); }}
                   >
                     <video
+                      key={selectedMedia.id}
                       ref={videoRef}
                       src={selectedMedia.src}
                       preload="auto"
@@ -1875,6 +1754,7 @@ export const Gallery: React.FC = () => {
                       onClick={toggleVideoPlay}
                       onTimeUpdate={handleVideoTimeUpdate}
                       onLoadedMetadata={handleVideoLoadedMetadata}
+                      onError={() => setVideoError(true)}
                       onEnded={() => setVideoPlaying(false)}
                       onPlay={() => setVideoPlaying(true)}
                       onPause={() => setVideoPlaying(false)}
@@ -1946,11 +1826,11 @@ export const Gallery: React.FC = () => {
                           )}
                         </button>
                         <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
-                          {fmtTime(videoCurrentTime)}
+                          {formatClock(videoCurrentTime)}
                         </span>
                         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>/</span>
                         <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
-                          {fmtTime(videoDuration)}
+                          {formatClock(videoDuration)}
                         </span>
                         <div style={{ flex: 1 }} />
                         {/* Volume */}
@@ -2020,28 +1900,42 @@ export const Gallery: React.FC = () => {
                       cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'zoom-in',
                       touchAction: 'none', userSelect: 'none',
                     }}
-                    onWheel={handleImageWheel}
                     onPointerDown={handleImagePointerDown}
                     onPointerMove={handleImagePointerMove}
                     onPointerUp={handleImagePointerUp}
+                    onPointerCancel={handleImagePointerUp}
+                    onLostPointerCapture={handleImagePointerUp}
                     onDoubleClick={handleImageDoubleClick}
                   >
-                    <img
-                      src={selectedMedia.src}
-                      alt={selectedMedia.name}
-                      draggable={false}
-                      style={{
-                        width: '100%', height: '100%', objectFit: 'contain',
-                        transform: `scale(${imgZoom}) translate(${imgPan.x / imgZoom}px, ${imgPan.y / imgZoom}px) rotate(${imgRotation}deg)`,
-                        transition: imgDragging ? 'none' : 'transform 0.2s ease',
-                        willChange: 'transform',
-                        filter: getAdjustmentFilter(),
-                      }}
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+                    <div style={{
+                      position: 'absolute', left: '50%', top: '50%', overflow: 'hidden',
+                      width: editFrame.width * imageFit, height: editFrame.height * imageFit,
+                      transform: `translate(-50%, -50%) translate(${imgPan.x}px, ${imgPan.y}px) scale(${imgZoom})`,
+                      visibility: imageError ? 'hidden' : 'visible',
+                    }}>
+                      <img
+                        key={selectedMedia.id}
+                        src={selectedMedia.src}
+                        alt={selectedMedia.name}
+                        draggable={false}
+                        style={{
+                          position: 'absolute', left: '50%', top: '50%', maxWidth: 'none',
+                          width: imageSize.width * imageFit, height: imageSize.height * imageFit,
+                          transform: `translate(-50%, -50%) rotate(${editFrame.degrees}deg) scale(${editFrame.flipX}, ${editFrame.flipY})`,
+                          filter: adjustmentFilter,
+                        }}
+                        onLoad={event => {
+                          const image = event.currentTarget;
+                          setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
+                          setImageError(false);
+                        }}
+                        onError={() => setImageError(true)}
+                      />
+                    </div>
+                    {imageError && <span role="status" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>Could not load this image.</span>}
                     {/* Zoom toolbar - frosted glass */}
                     <div style={{
-                      position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                      position: 'absolute', bottom: 16, left: '50%', translate: '-50%',
                       display: 'flex', alignItems: 'center', gap: 4,
                       padding: '6px 10px', borderRadius: 8,
                       background: 'rgba(0,0,0,0.80)',
@@ -2054,7 +1948,7 @@ export const Gallery: React.FC = () => {
                       <button onClick={zoomIn} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Zoom in">{Icons.zoomIn}</button>
                       <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 4px' }} />
                       <button onClick={rotateImage} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Rotate">{Icons.rotateRight}</button>
-                      <button onClick={copyImageToClipboard} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Copy image">{Icons.copy}</button>
+                      <button onClick={() => void copyImageToClipboard(selectedMedia)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center' }} aria-label="Copy image">{Icons.copy}</button>
                     </div>
                   </div>
                 ) : (
@@ -2147,7 +2041,7 @@ export const Gallery: React.FC = () => {
                   ...(selectedMedia.fps ? [['Frame Rate', `${selectedMedia.fps} fps`]] : []),
                   ...(selectedMedia.codec ? [['Codec', selectedMedia.codec]] : []),
                   ...(selectedMedia.duration != null ? [['Duration', formatDuration(selectedMedia.duration)]] : []),
-                  ['Path', selectedMedia.src],
+                  ['Path', selectedMedia.path ?? selectedMedia.src],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
@@ -2195,7 +2089,7 @@ const styles: Record<string, React.CSSProperties> = {
   viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 3, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
 
   // Content
-  content: { flex: 1, overflow: 'auto', padding: 'var(--space-5)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
+  content: { flex: 1, position: 'relative', overflow: 'auto', padding: 'var(--space-5)', WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
   emptyState: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '60px var(--space-5)', textAlign: 'center' as const },
   emptyIcon: { fontSize: 48, color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' },
   emptyTitle: { fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' },
@@ -2203,7 +2097,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Grid View
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 'var(--space-4)', contain: 'layout' as any },
-  gridItem: { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)', cursor: 'pointer', transition: 'transform 0.15s ease, opacity 0.15s ease', contentVisibility: 'auto' as any, containIntrinsicSize: '140px 180px' as any },
+  gridItem: { display: 'flex', minWidth: 0, position: 'relative', flexDirection: 'column' as const, gap: 'var(--space-2)', cursor: 'pointer', transition: 'transform 0.15s ease, opacity 0.15s ease' },
   thumbnail: { aspectRatio: '1', borderRadius: 6, position: 'relative' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   videoOverlay: { position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: 6 },
   playBadge: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-primary)' },
@@ -2214,10 +2108,10 @@ const styles: Record<string, React.CSSProperties> = {
   // List View
   list: { display: 'flex', flexDirection: 'column' as const, gap: 2 },
   listItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 6, cursor: 'pointer' },
-  listThumb: { width: 48, height: 48, borderRadius: 4 },
-  listInfo: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 2 },
-  listName: { fontSize: 14, color: 'var(--color-text-primary)' },
-  listMeta: { fontSize: 12, color: 'var(--color-text-muted)' },
+  listThumb: { width: 48, height: 48, flexShrink: 0, borderRadius: 4 },
+  listInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' as const, gap: 2 },
+  listName: { fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-primary)' },
+  listMeta: { fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-muted)' },
   listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
 
   // Recent Media Section (bottom)
@@ -2237,9 +2131,9 @@ const styles: Record<string, React.CSSProperties> = {
   lightboxTitle: { flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' },
   lightboxActions: { display: 'flex', gap: 'var(--space-2)' },
   lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
-  lightboxContent: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)', gap: 'var(--space-5)' },
+  lightboxContent: { flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)', gap: 'var(--space-5)' },
   navBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'all 0.15s ease' },
-  lightboxImage: { flex: 1, maxWidth: '80%', aspectRatio: '16/10', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  lightboxImage: { flex: 1, minWidth: 0, maxWidth: '80%', height: '100%', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   lightboxFooter: { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-5)', fontSize: 13, color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)' },
 };
 

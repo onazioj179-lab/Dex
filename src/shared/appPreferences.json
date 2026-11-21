@@ -1,0 +1,132 @@
+{
+  "windowOpenMode": {
+    "label": "New floating windows",
+    "default": "default",
+    "options": {
+      "default": "Application default",
+      "maximized": "Maximized"
+    }
+  },
+  "windowSize": {
+    "label": "Default window size",
+    "default": "default",
+    "width": { "min": 260, "max": 3840 },
+    "height": { "min": 220, "max": 2160 }
+  },
+  "windowTheme": {
+    "label": "Window theme",
+    "default": "system",
+    "options": {
+      "system": "Use DEX theme",
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
+  "appMotion": {
+    "label": "App animations",
+    "default": "system",
+    "options": {
+      "system": "Use DEX setting",
+      "reduced": "Reduce motion"
+    }
+  },
+  "ukiContext": {
+    "label": "UKI app context",
+    "default": "off",
+    "options": {
+      "off": "Off",
+      "metadata": "App and file metadata",
+      "selection": "Metadata and selected text"
+    }
+  },
+  "ukiContextApps": ["browser", "notes", "files", "gallery", "dexcode", "tasks", "workflows", "presentation"],
+  "applications": {
+    "browser": {
+      "restoreTabs": {
+        "label": "Restore tabs on startup",
+        "default": true
+      },
+      "searchProvider": {
+        "label": "Address bar search",
+        "default": "duckduckgo",
+        "options": {
+          "duckduckgo": "DuckDuckGo",
+          "google": "Google",
+          "startpage": "Startpage",
+          "brave": "Brave"
+        }
+      }
+    },
+    "notes": {
+      "defaultEditorMode": {
+        "label": "Default editor layout",
+        "default": "edit",
+        "options": {
+          "edit": "Writing",
+          "preview": "Preview",
+          "split": "Writing and preview"
+        }
+      },
+      "defaultNoteList": {
+        "label": "Default note list",
+        "default": "list",
+        "options": {
+          "list": "List",
+          "grid": "Grid",
+          "compact": "Compact"
+        }
+      },
+      "autosaveDelay": {
+        "label": "Save after a pause in typing",
+        "default": "500",
+        "options": {
+          "500": "0.5 seconds",
+          "1500": "1.5 seconds",
+          "3000": "3 seconds"
+        }
+      },
+      "lineSpacing": {
+        "label": "Editor line spacing",
+        "default": "1.7",
+        "options": {
+          "1.4": "Compact",
+          "1.7": "Comfortable",
+          "2.0": "Spacious"
+        }
+      }
+    },
+    "gallery": {
+      "layout": {
+        "label": "Default library layout",
+        "default": "grid",
+        "options": {
+          "grid": "Grid",
+          "list": "List"
+        }
+      }
+    },
+    "dexcode": {
+      "fontSize": {
+        "label": "Default editor text size",
+        "default": "13",
+        "options": {
+          "11": "11 px",
+          "13": "13 px",
+          "15": "15 px",
+          "17": "17 px",
+          "19": "19 px"
+        }
+      },
+      "terminalFontSize": {
+        "label": "Integrated terminal text size",
+        "default": "12",
+        "options": {
+          "12": "12 px",
+          "14": "14 px",
+          "16": "16 px",
+          "18": "18 px"
+        }
+      }
+    }
+  }
+}

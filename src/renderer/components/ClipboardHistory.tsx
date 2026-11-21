@@ -19,6 +19,8 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { DexSearchInput } from '../styles/components';
+import { Button } from '../ui/Button';
+import { captureCurrentClipboard } from '../services/ClipboardMonitor';
 import {
   useClipboardEntries,
   useClipboardActions,
@@ -94,6 +96,9 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState('');
+  const captureRequest = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset transient UI each time the panel opens.
@@ -102,10 +107,41 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
       setQuery('');
       setFilter('all');
       setSelectedIndex(0);
+      setCapturing(false);
+      setCaptureStatus('');
       const t = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(t);
+      return () => {
+        clearTimeout(t);
+        captureRequest.current?.abort();
+        captureRequest.current = null;
+      };
     }
   }, [isOpen]);
+
+  const addFromClipboard = async () => {
+    if (captureRequest.current) return;
+    const request = new AbortController();
+    captureRequest.current = request;
+    setCapturing(true);
+    setCaptureStatus('');
+    try {
+      const captured = await captureCurrentClipboard(request.signal);
+      if (request.signal.aborted) return;
+      if (captured) {
+        setQuery('');
+        setFilter('all');
+        setSelectedIndex(0);
+      }
+      setCaptureStatus(captured ? 'Clipboard text added.' : 'No supported text on the clipboard.');
+    } catch {
+      if (!request.signal.aborted) setCaptureStatus('Could not read the clipboard.');
+    } finally {
+      if (captureRequest.current === request) {
+        captureRequest.current = null;
+        setCapturing(false);
+      }
+    }
+  };
 
   // Filter (type chip) + search (content / source / language), pinned first.
   const visible = useMemo(() => {
@@ -218,10 +254,12 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({ isOpen, onCl
           <span style={styles.headerIcon}>{Icons.clipboard}</span>
           <span style={styles.title}>Omni Clipboard</span>
           <span style={styles.countBadge}>{entries.length} {entries.length === 1 ? 'clip' : 'clips'}</span>
+          <Button size="xs" loading={capturing} onClick={() => void addFromClipboard()}>Add clipboard text</Button>
           {entries.length > pinnedCount && (
             <button style={styles.clearBtn} onClick={() => clearUnpinned()} aria-label="Clear unpinned clips" title="Clear all except pinned">Clear</button>
           )}
         </div>
+        {captureStatus && <div role="status" style={{ padding: '0 var(--space-4) var(--space-2)', fontSize: 12 }}>{captureStatus}</div>}
 
         <div style={styles.searchWrapper}>
           <DexSearchInput

@@ -21,6 +21,7 @@
 import { registerFlowIntake, type FlowPayload } from './FlowTransfer';
 import { useNotesStore } from '../store/notesStore';
 import { useCreativeSuite, createAssetId } from './CreativeSuiteBridge';
+import { DisposableGroup, type TeardownFn } from '../../shared/disposable';
 
 /** Creative image editors that already consume the CreativeSuiteBridge inbox. */
 const CREATIVE_IMAGE_APPS = ['prism', 'flux', 'forge', 'axl'] as const;
@@ -43,14 +44,16 @@ function textToTiptapDoc(text: string): string {
 let wired = false;
 
 /** Register DEX Flow's built-in rich intakes. Idempotent. */
-export function wireFlowIntakes(): void {
-  if (wired) return;
+export function wireFlowIntakes(): TeardownFn {
+  if (wired) return () => {};
   wired = true;
+  const resources = new DisposableGroup();
+  resources.add(() => { wired = false; });
 
   // Notes: create a real note from text (title = first line). Uses the Notes
   // app's own store, so the new note is exactly what the app shows. Images fall
   // through to the universal handler (open Notes + paste the image).
-  registerFlowIntake('notes', async (payload: FlowPayload) => {
+  resources.add(registerFlowIntake('notes', async (payload: FlowPayload) => {
     if (payload.kind === 'image') return false;
     const ns = useNotesStore.getState();
     const id = await ns.createNote();
@@ -59,13 +62,13 @@ export function wireFlowIntakes(): void {
     const title = (text.split('\n')[0] || 'Note').trim().slice(0, 80) || 'Note';
     await ns.updateNote(id, { title, content: textToTiptapDoc(text), plain_text: text });
     return true;
-  });
+  }));
 
   // Creative image editors: hand an image clip straight to the app's existing
   // CreativeSuiteBridge inbox (which they already consume on mount), so "Send
   // image to Prism" lands as a real import rather than a manual paste.
   for (const app of CREATIVE_IMAGE_APPS) {
-    registerFlowIntake(app, async (payload: FlowPayload) => {
+    resources.add(registerFlowIntake(app, async (payload: FlowPayload) => {
       if (payload.kind !== 'image') return false;
       return useCreativeSuite.getState().sendToApp({
         id: createAssetId(),
@@ -76,6 +79,7 @@ export function wireFlowIntakes(): void {
         mimeType: 'image/png',
         createdAt: Date.now(),
       }, app);
-    });
+    }));
   }
+  return resources.cleanup;
 }

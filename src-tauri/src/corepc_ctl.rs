@@ -84,8 +84,10 @@ fn core_artifacts() -> Vec<(String, std::path::PathBuf)> {
             .unwrap_or_else(|| "executable".to_string());
         out.push((label, exe.clone()));
 
-        // Sibling top-level resource files (e.g. WebView2Loader.dll, resources.pak)
+        // Sibling top-level resource files (e.g. resources.pak, .bin assets)
         // shipped next to the binary count as part of the immutable core.
+        // OS/runtime-managed libraries (WebView2Loader, MSVC redist) are excluded
+        // below because they update independently of DEX.
         if let Some(dir) = exe.parent() {
             if let Ok(entries) = std::fs::read_dir(dir) {
                 let mut sib: Vec<(String, std::path::PathBuf)> = Vec::new();
@@ -99,6 +101,19 @@ fn core_artifacts() -> Vec<(String, std::path::PathBuf)> {
                             let name = name.to_string_lossy().to_string();
                             // Only hash binary/runtime resources, not logs or db files.
                             let lower = name.to_lowercase();
+                            // Skip OS/runtime-managed libraries: the WebView2 evergreen
+                            // loader and the MSVC/VC++ redistributables are updated
+                            // independently of DEX, so hashing them yields false
+                            // "changed"/"missing" tamper reports on otherwise-intact
+                            // installs.
+                            let os_managed = lower.starts_with("webview2loader")
+                                || lower.starts_with("vcruntime")
+                                || lower.starts_with("msvcp")
+                                || lower.starts_with("concrt")
+                                || lower.starts_with("vccorlib");
+                            if os_managed {
+                                continue;
+                            }
                             if lower.ends_with(".dll")
                                 || lower.ends_with(".pak")
                                 || lower.ends_with(".bin")

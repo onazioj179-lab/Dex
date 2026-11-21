@@ -47,7 +47,7 @@ Standalone invocation: `bash dex-os/scripts/build-uki.sh KERNEL INITRD CMDLINE_F
 ## Remaining acceptance work
 
 - Audit every creative app against the requested workflows: actual repository apps include AXL, Forge, Imosion, Vinx, Notes, Canvas and PresentationBuilder. Branding in the request does not establish capability parity.
-- Complete and verify missing import/export/project schemas, media rendering, typography, vector/group/selection workflows and file recovery per app. Presentation local image import remains outstanding; browser autosave currently retains a single deck, with explicit project-file import/export for additional decks. Pointer drags are grouped into one undo step.
+- Complete and verify missing import/export/project schemas, media rendering, typography, vector/group/selection workflows and file recovery per app. Presentation local image import exists: automated coverage checks format/size rejection, fitted placement, persisted image content and undo/redo. Actual image decoding and export still need native visual verification. Browser autosave currently retains a single deck, with explicit project-file import/export for additional decks. Pointer drags are grouped into one undo step.
 - Extend workspace adoption and verify compact/high-DPI/touch layouts in the running native shell. Present can restore canvas space by collapsing panels; fully automatic compact navigation remains outstanding.
 - Audit DexCode project/file/replace/terminal workflows and all native diagnostics. DexCode already has project, search, syntax and terminal modules; this pass does not certify them. No simulated diagnostics were added.
 - Resolve native assistant authorization and atomic KV repository issues in `INTERNAL_PLATFORM_RUNTIME_AUDIT.md`. The assistant named UKI is distinct from Unified Kernel Images.
@@ -58,3 +58,14 @@ Standalone invocation: `bash dex-os/scripts/build-uki.sh KERNEL INITRD CMDLINE_F
 - Run full native/security/integration suites, package the app, smoke-test the installed artifact and reconcile all active release gates before publishing. No release was published.
 
 Completed work is recorded here without deleting unresolved historical backlogs.
+
+## Continuation checks — 2026-11-03
+
+- Fixed shared ResizablePanel reset to respect minimum/maximum dimensions, notify resize consumers and support Enter/Space activation. Empty touch-move events are ignored safely.
+- Added regression coverage for bounded pointer/keyboard reset and presentation image placement, persistence and undo/redo. The image test mocks file reading and decoding; it does not establish real decoder compatibility.
+- TypeScript check passed. Production renderer build passed (595 modules), with existing large-chunk and mixed-import warnings.
+- Six selected suites passed (22 tests); after adding image-placement coverage, the presentation suite passed again (6 tests). These runs cover 23 distinct tests in total.
+- Existing installed DEX was not removed or replaced. Native packaging, installed-app smoke testing, full application acceptance and real UKI boot verification remain outstanding.
+
+- Follow-up: Present inspector geometry now clamps positions and dimensions to the project schema bounds, preventing edits that cannot be reopened. Presentation suite passed (7 tests).
+- Follow-up: TypeScript passed after inspector geometry changes. Project download now validates against the import contract and reports validation errors without changing the deck. Presentation suite passed (8 tests), including refusal to download unsupported legacy image addresses.

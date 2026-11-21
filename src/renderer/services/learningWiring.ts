@@ -24,12 +24,13 @@
 
 import { useRunningApps } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
+import { makeDisposable, type TeardownFn } from '../../shared/disposable';
 
 let started = false;
 
 /** Begin feeding the silent learning store from app focus changes. Idempotent. */
-export function initLearningWiring(): void {
-  if (started || typeof window === 'undefined') return;
+export function initLearningWiring(): TeardownFn {
+  if (started || typeof window === 'undefined') return () => {};
   started = true;
 
   let lastSeen = useRunningApps.getState().currentAppId;
@@ -41,7 +42,7 @@ export function initLearningWiring(): void {
     /* store not ready -- the subscription below still captures later switches */
   }
 
-  useRunningApps.subscribe((state) => {
+  const unsubscribe = useRunningApps.subscribe((state) => {
     const id = state.currentAppId;
     if (id === lastSeen) return;
     lastSeen = id;
@@ -51,6 +52,10 @@ export function initLearningWiring(): void {
       /* learning disabled or store unavailable -- non-fatal */
     }
   });
+  return makeDisposable(() => {
+    unsubscribe();
+    started = false;
+  }).dispose;
 }
 
 export default initLearningWiring;

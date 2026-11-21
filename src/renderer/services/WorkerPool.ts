@@ -53,7 +53,10 @@ class WorkerPool {
   private initialized = false;
   private paused = false;
   private lifecycleInstalled = false;
+  private visibilityHandler: (() => void) | null = null;
   private suspendTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly taskTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private ownsWorkerUrl = false;
 
   constructor(options: WorkerPoolOptions = {}) {
     this.maxWorkers = options.maxWorkers || Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
@@ -71,6 +74,7 @@ class WorkerPool {
     // Create default worker blob if no URL provided
     if (!this.workerUrl) {
       this.workerUrl = this.createDefaultWorkerBlob();
+      this.ownsWorkerUrl = true;
     }
 
     // Pre-spawn one worker for immediate use
@@ -88,7 +92,7 @@ class WorkerPool {
   private installLifecycle(): void {
     if (this.lifecycleInstalled || typeof document === 'undefined') return;
     this.lifecycleInstalled = true;
-    document.addEventListener('visibilitychange', () => {
+    this.visibilityHandler = () => {
       if (document.hidden) {
         this.pause();
         // Defer worker teardown briefly so a quick alt-tab doesn't thrash spawns.
@@ -98,7 +102,14 @@ class WorkerPool {
         if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = null; }
         this.resume();
       }
-    });
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  private clearTaskTimer(taskId: string): void {
+    const timer = this.taskTimers.get(taskId);
+    if (timer) clearTimeout(timer);
+    this.taskTimers.delete(taskId);
   }
 
   /**
@@ -237,6 +248,7 @@ class WorkerPool {
     // Find and complete the task
     const task = this.taskQueue.find(t => t.id === id);
     if (task) {
+      this.clearTaskTimer(task.id);
       const index = this.taskQueue.indexOf(task);
       if (index > -1) this.taskQueue.splice(index, 1);
 
@@ -265,6 +277,7 @@ class WorkerPool {
     if (pooled.currentTask) {
       const task = this.taskQueue.find(t => t.id === pooled.currentTask);
       if (task) {
+        this.clearTaskTimer(task.id);
         task.reject(new Error(e.message || 'Worker error'));
         const index = this.taskQueue.indexOf(task);
         if (index > -1) this.taskQueue.splice(index, 1);
@@ -324,18 +337,24 @@ class WorkerPool {
 
     // Set timeout
     if (task.timeout || this.taskTimeout) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        this.taskTimers.delete(task.id);
         if (worker?.currentTask === task.id) {
           task.reject(new Error('Task timeout'));
-          worker.busy = false;
-          worker.currentTask = null;
-          
+
           const index = this.taskQueue.indexOf(task);
           if (index > -1) this.taskQueue.splice(index, 1);
-          
+
+          // A timed-out worker may still be executing and cannot safely accept
+          // another task. Terminate it rather than marking it idle.
+          worker.worker.terminate();
+          const workerIndex = this.workers.indexOf(worker);
+          if (workerIndex > -1) this.workers.splice(workerIndex, 1);
+
           this.processQueue();
         }
       }, task.timeout || this.taskTimeout);
+      this.taskTimers.set(task.id, timer);
     }
   }
 
@@ -474,7 +493,14 @@ class WorkerPool {
    */
   terminate(): void {
     if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = null; }
+    if (this.visibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+    }
+    this.visibilityHandler = null;
+    this.lifecycleInstalled = false;
     this.paused = false;
+    for (const timer of this.taskTimers.values()) clearTimeout(timer);
+    this.taskTimers.clear();
     // Reject pending tasks
     for (const task of this.taskQueue) {
       task.reject(new Error('Pool terminated'));
@@ -488,8 +514,10 @@ class WorkerPool {
     this.workers = [];
 
     // Revoke blob URL if we created it
-    if (this.workerUrl.startsWith('blob:')) {
+    if (this.ownsWorkerUrl && this.workerUrl.startsWith('blob:')) {
       URL.revokeObjectURL(this.workerUrl);
+      this.workerUrl = '';
+      this.ownsWorkerUrl = false;
     }
 
     this.initialized = false;

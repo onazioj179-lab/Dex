@@ -78,29 +78,20 @@ fi
 # ---------------------------------------------------------------------------
 # Generate ISO with xorriso (hybrid: EFI + BIOS)
 # ---------------------------------------------------------------------------
-if command -v xorriso > /dev/null 2>&1; then
-    ISO_OUT="${BINARIES_DIR}/dex-os-7.0.1-x86_64.iso"
-
-    xorriso -as mkisofs \
-        -o "$ISO_OUT" \
-        -isohybrid-mbr "${BINARIES_DIR}/grub-bios.img" \
-        -partition_offset 16 \
-        -b boot/grub/i386-pc/eltorito.img \
-        -no-emul-boot \
-        -boot-load-size 4 \
-        -boot-info-table \
-        --grub2-boot-info \
-        -eltorito-alt-boot \
-        -e EFI/BOOT/bootx64.efi \
-        -no-emul-boot \
-        -isohybrid-gpt-basdat \
-        -V "DEX_OS_701" \
-        "$ISO_DIR"
-
-    echo "[dex-post-image] ISO created: $ISO_OUT"
-else
-    echo "[dex-post-image] xorriso not found -- skipping ISO generation"
-    echo "[dex-post-image] Install with: sudo apt install xorriso"
-fi
-
-echo "[dex-post-image] Done."
+for tool in grub-mkrescue xorriso; do
+    command -v "$tool" >/dev/null 2>&1 || { echo "[dex-post-image] Missing dependency: $tool" >&2; exit 1; }
+done
+GRUB_MODULES_DIR="/usr/lib/grub"
+for platform in i386-pc x86_64-efi; do
+    [[ -f "${GRUB_MODULES_DIR}/${platform}/modinfo.sh" ]] || {
+        echo "[dex-post-image] Missing GRUB modules for $platform in $GRUB_MODULES_DIR" >&2
+        exit 1
+    }
+done
+ISO_OUT="${BINARIES_DIR}/dex-os-7.0.1-x86_64.iso"
+[[ ! -e "$ISO_OUT" ]] || { echo "[dex-post-image] Refusing to overwrite $ISO_OUT" >&2; exit 1; }
+# grub-mkrescue builds a real FAT EFI boot image and the BIOS El Torito image.
+# A loose bootx64.efi executable is not an El Torito EFI system partition.
+grub-mkrescue -o "$ISO_OUT" "$ISO_DIR"
+[[ -s "$ISO_OUT" ]] || { echo "[dex-post-image] ISO was not generated" >&2; exit 1; }
+echo "[dex-post-image] ISO created: $ISO_OUT (boot testing still required)"

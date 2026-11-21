@@ -1,0 +1,26 @@
+# DEX OS 7.0.2 candidate notes
+
+**Status: NOT READY**
+
+- **Application preferences.** Settings lists apps from the desktop registry. Floating apps can start at their application default or maximized. Browser tab restoration and search, Notes line spacing, Gallery's default layout, and DexCode editor and terminal text sizes use the same versioned preference service. Supported controls can be reset per app.
+- **App windows and motion.** Each app can use a light or dark window theme, reduce its animations, or use custom opening dimensions. Shared dropdowns can reverse during closing. Snap transitions start at the drop position and continue from the visible position if the user grabs the window again.
+- **Windows Audio Control.** Settings shows available playback outputs, the default output, and discoverable audio sessions. Users can adjust the default output's volume and mute, and control volume and mute for individual sessions. The Windows mixer and Sound pages handle output assignment.
+- **Browser.** Restore and search up to 500 saved tabs. The tab strip renders only nearby tabs in large sessions. Live HTTPS page windows report their current address and title. Windows uses WebView2 history, reload and Find controls. Downloads appear in Browser and start when the user chooses a save location. Bulk tab closing keeps live pages and pinned tabs. Desktop and detached Browser tabs have separate sessions. The page windows share an isolated profile and an eight-window limit. Pop-ups remain disabled.
+- **Version identity.** Package metadata, the Tauri configuration, and the Rust shell target 7.0.2.
+- **Notes.** Saved documents render on open. Settings controls the default editor view, list layout and autosave delay. Closing the editor or pressing Ctrl+S flushes the latest edit, including edits still waiting to be parsed. Failed note writes can be retried.
+- **Bulk file operations.** Files can copy nested folders, move selections, and send them to the system Trash. Batches show real item counts, support cancellation, and offer Skip or Keep both for conflicts. Retrying a subset preserves the other results. Files, PowerRename and Workflows check native failures.
+- **PowerRename.** Folder loading works with native listings. The preview flags invalid patterns and compares collisions within each folder. Native batch rename can swap filenames and restore original names if publication fails.
+- **Umari.** Files settings includes an approved-folder index with separate choices for metadata and supported text. The index supports cancellation and batches filesystem changes in the background. Ordinary filename search works independently.
+- **UKI.** Per-app foreground context defaults to off. Native permissions gate access, metadata removes full paths and browsing URLs, and selected text requires its own per-app choice. With the Read files grant, UKI can retrieve matching filenames from approved Umari folders.
+- **Spatial view.** The title bar opens a live workspace with zoom, pan and reset. Apps stay mounted while the view changes. The workspace remembers its last camera position and zoom.
+- **Shell motion.** App Menu opens beside the launcher. Menus, search results and the widget drawer can reverse during dismissal. Reduce Motion applies immediately from Settings and the title bar menu, while respecting the operating system preference.
+- **Task Manager.** Reports the native process count and distinguishes missing system samples from zero readings.
+- **Terminal and DexCode.** Native pseudo-terminals support live sizing and an interactive console with searchable ANSI scrollback. Tabs retain their shell profile and working directory. A split shows two independent sessions, and hiding the terminal panel keeps its open sessions running.
+- **DexCode project tasks.** The Tasks panel runs build, test and check commands for npm and Cargo projects. It shows live output, exit codes, cancellation results, and links from compiler diagnostics to source locations.
+- **DexCode project files.** Browse and search nested source files. Open a project through the folder picker to save its files in place. Saves check the disk revision, and the editor offers an explicit reload after external changes.
+- **DexCode editor tabs.** Open files keep separate drafts, cursor positions and scroll positions. Reopening DexCode restores the tab order and active file. When disk content changed while a draft was open, DexCode keeps the draft and offers to reload from disk or save a separate copy.
+- **DexCode Git.** View changes and staged or working-tree diffs inside the selected project folder. Open a changed source file in the editor or open the full repository in the Git app to work with branches and commits.
+- **DexCode diagnostics.** The Problems panel checks unsaved JavaScript, TypeScript, JSX and TSX and opens the reported locations. The line-number gutter only renders the rows near the viewport, and very long files stay editable in plain text.
+- **Gallery.** Wheel zoom follows the pointer, panning stays within the fitted image bounds, and a failed image load has a visible error state.
+
+See [release verification](DEX_7.0.2_VERIFICATION.md) for tested behavior and [remaining work](DEX_REMAINING_WORK.md) for outstanding features and release gates.

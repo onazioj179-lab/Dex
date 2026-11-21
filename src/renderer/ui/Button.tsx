@@ -15,7 +15,7 @@ import { space, radius, fontSize, fontWeight, button as buttonTokens } from '../
 import { cssTransitions } from '../utils/MotionController';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   variant?: ButtonVariant;
@@ -33,10 +33,10 @@ export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonE
 // caller `style` overrides are never clobbered by mouse handlers.
 
 const sizeStyle = (size: ButtonSize): React.CSSProperties => ({
-  height: buttonTokens.height[size],
-  fontSize: size === 'sm' ? fontSize.xs : size === 'lg' ? fontSize.base : fontSize.sm,
-  padding: size === 'sm' ? '0 10px' : size === 'lg' ? '0 18px' : '0 14px',
-  gap: space[2],
+  height: size === 'xs' ? 24 : buttonTokens.height[size],
+  fontSize: size === 'xs' || size === 'sm' ? fontSize.xs : size === 'lg' ? fontSize.base : fontSize.sm,
+  padding: size === 'xs' ? '0 7px' : size === 'sm' ? '0 10px' : size === 'lg' ? '0 18px' : '0 14px',
+  gap: size === 'xs' ? space[1] : space[2],
 });
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
@@ -77,7 +77,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       {...rest}
     >
       {loading
-        ? <Spinner size={size === 'lg' ? 14 : 12} />
+        ? <Spinner size={size === 'lg' ? 14 : size === 'xs' ? 10 : 12} />
         : leftIcon}
       {children}
       {!loading && rightIcon}
@@ -98,7 +98,7 @@ export interface IconButtonProps extends Omit<ButtonProps, 'leftIcon' | 'rightIc
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
   icon, ariaLabel, size = 'md', variant = 'ghost', style, ...rest
 }, ref) => {
-  const dim = buttonTokens.height[size];
+  const dim = size === 'xs' ? 24 : buttonTokens.height[size];
   return (
     <Button
       ref={ref}

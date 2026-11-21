@@ -17,7 +17,7 @@
 //   drawer (Now Playing + Calendar, both wired to real data). The choice
 //   persists, so widgets only ever appear once the user turns them on.
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
 import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
@@ -26,11 +26,12 @@ import { useLearningStore } from '../store/learningStore';
 import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
+import { useMotionPresence } from '../utils/useMotionPresence';
 
 const MOVE_THRESHOLD = 6; // px before a press becomes a drag
 const BAR_H = 44;         // collapsed capsule height
-const PILL_R = BAR_H / 2; // full-capsule radius when collapsed
-const PANEL_R = 16;       // rounded-rect radius when the widget drawer is open
+const PILL_R = 10;        // compact equipment profile, not a floating bubble
+const PANEL_R = 10;       // same geometry when the widget drawer is open
 const EXPAND_KEY = 'dex-nook-expanded';
 const SEARCH_W_KEY = 'dex-nook-search-w';
 const SEARCH_W_DEFAULT = 240;
@@ -79,12 +80,13 @@ function currentWeek(): { letter: string; day: number; isToday: boolean }[] {
 
 export interface FloatingLauncherProps {
   /** Opens the launcher surface (app grid + search). */
-  onOpen: () => void;
+  onOpen: (trigger: HTMLButtonElement) => void;
+  menuOpen?: boolean;
   /** Opens the universal Search overlay. */
   onSearch?: () => void;
 }
 
-export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSearch }) => {
+export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, menuOpen, onSearch }) => {
   const { x, y, enabled, setPosition, setEnabled } = useFloatingLauncher();
 
   // Widgets are opt-in: OFF by default. Persisted so they only ever show once
@@ -92,6 +94,8 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const [expanded, setExpanded] = useState<boolean>(() => {
     try { return localStorage.getItem(EXPAND_KEY) === '1'; } catch { return false; }
   });
+  const drawerPresent = useMotionPresence(expanded);
+  const drawerId = useId();
   const toggleExpanded = useCallback(() => {
     setExpanded(v => {
       const next = !v;
@@ -213,7 +217,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     setPos(p => clampBarToBounds(p.x, p.y, vw, vh, sizeRef.current.w, sizeRef.current.h));
   }, []);
 
-  useLayoutEffect(() => { clampNow(); }, [expanded, clampNow]);
+  useLayoutEffect(() => { clampNow(); }, [drawerPresent, clampNow]);
   useEffect(() => {
     window.addEventListener('resize', clampNow);
     return () => window.removeEventListener('resize', clampNow);
@@ -278,17 +282,14 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   const vDivider = (m = 0): React.CSSProperties => ({ width: 1, alignSelf: 'stretch', margin: `${m}px 0`, background: 'var(--color-border-subtle, rgba(255,255,255,0.10))' });
   const ctrlBtn: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 10, border: 'none', padding: 0,
+    width: 32, height: 32, borderRadius: 5, border: 'none', padding: 0,
     background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer',
-    transition: 'background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease',
+    transition: 'background-color var(--dex-motion-fast) var(--dex-ease), color var(--dex-motion-fast) var(--dex-ease)',
   };
-  // Premium "interactive glass" hover: soft fill, brighter glyph, and a faint
-  // inset rim so each control reads as its own lit glass chip (monochrome).
+  // Monolith interaction: contrast and a precise inset rim, never color/glow.
   const hoverIn = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; e.currentTarget.style.color = 'var(--color-text-primary)'; e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.10)'; };
   const hoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
-  // UKI mic keeps its accent tint on hover-out while she is awake, so the
-  // presence cue never flickers off mid-interaction.
-  const ukiHoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = ukiActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
+  const ukiHoverOut = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = ukiActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'; e.currentTarget.style.boxShadow = 'none'; };
 
   return (
     <div
@@ -322,9 +323,6 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           : '0 8px 28px rgba(0,0,0,0.42), 0 0 0 0.5px rgba(0,0,0,0.45)')
           + ', inset 0 1px 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(255,255,255,0.06)',
         userSelect: 'none',
-        // Premium one-time entrance: opacity-only (no transform) so it never
-        // fights the left/top drag positioning. Plays once on mount.
-        animation: 'dexBarIn 0.34s ease both',
         // No position transition: the bar tracks the pointer 1:1 while dragging
         // and settles exactly where released -- no ease that could read as a
         // snap-back. Only the chrome (shadow/radius) eases.
@@ -350,7 +348,9 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           </svg>
         </div>
 
-        <button type="button" className="dex-pressable" aria-label="Open launcher" onPointerDown={e => e.stopPropagation()} onClick={onOpen} style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+        <button type="button" className="dex-pressable" aria-label="App menu" aria-haspopup="dialog" aria-expanded={menuOpen}
+          data-dex-launchpad onPointerDown={e => e.stopPropagation()} onClick={e => onOpen(e.currentTarget)}
+          style={ctrlBtn} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
             {[[1, 1], [10, 1], [1, 10], [10, 10]].map(([rx, ry]) => <rect key={`${rx}-${ry}`} x={rx} y={ry} width="7" height="7" rx="2" fill="currentColor" />)}
           </svg>
@@ -395,12 +395,8 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           onClick={() => { try { useUkiStore.getState().togglePanel(); } catch { /* not ready */ } }}
           style={{
             ...ctrlBtn,
-            color: ukiActive ? 'var(--color-accent)' : ctrlBtn.color,
+            color: ukiActive ? 'var(--color-text-primary)' : ctrlBtn.color,
             opacity: ukiAsleep ? 0.45 : 1,
-            // Glow + breath ride on `filter` (driven by the .dex-uki-awake
-            // keyframe) so the bar's hover handlers, which only touch
-            // background/color/box-shadow, can never clobber the presence cue.
-            animation: ukiActive ? 'dexUkiBreath 2.4s ease-in-out infinite' : 'none',
             transition: 'opacity 0.25s ease, color 0.2s ease',
           }}
           onMouseEnter={hoverIn}
@@ -418,6 +414,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           type="button"
           aria-label={expanded ? 'Hide widgets' : 'Show widgets'}
           aria-expanded={expanded}
+          aria-controls={drawerPresent ? drawerId : undefined}
           onPointerDown={e => e.stopPropagation()}
           onClick={toggleExpanded}
           style={{ ...ctrlBtn, width: 28 }}
@@ -425,15 +422,14 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           onMouseLeave={hoverOut}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.16s ease' }}>
+            style={{ rotate: expanded ? '180deg' : '0deg', transition: 'rotate var(--dex-motion-fast) var(--dex-ease-move)' }}>
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
       </div>
 
-      {/* Widget drawer -- OPT-IN. Only present once the user expands. Springs in. */}
-      {expanded && (
-        <div className="dex-drawer-in">
+      {drawerPresent && (
+        <div id={drawerId} className="dex-motion-surface" data-open={expanded} {...(!expanded ? { inert: '' } : {})}>
         <div style={{ display: 'flex', alignItems: 'stretch', borderTop: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))' }}>
           {/* Now Playing */}
           <div style={{ width: 178, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -542,7 +538,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
                   width: 32, height: 32, flexShrink: 0, borderRadius: 8, padding: 0,
                   border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.10))',
                   background: 'var(--color-bg-inset, #101012)', cursor: 'pointer',
-                  color: app.color && app.color.startsWith('var(') ? app.color : (app.color || 'var(--color-text-secondary)'),
+                  color: 'var(--color-text-secondary)',
                   transition: 'background 0.12s ease, border-color 0.12s ease',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover, #1e1e22)'; }}

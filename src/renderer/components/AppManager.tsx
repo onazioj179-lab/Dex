@@ -15,9 +15,9 @@
 import React, { useState, useMemo, Suspense, lazy, useEffect, useCallback, useRef } from 'react';
 import { platform } from '../utils';
 import { useRunningApps, APP_DEFINITIONS, readLastSession, clearLastSession } from '../store/runningApps';
+import { appReducesMotion, observeAppPreferences, preferredWindowSize } from '../store/appPreferences';
 import { useRecentFiles } from '../store/useRecentFiles';
 
-import { useAppTransition } from '../utils/motionHooks';
 import { useDockPins, PERMANENT_PINS } from '../store/dockPinStore';
 import { useUkiStore } from '../store/ukiStore';
 import { glassModal, adaptiveShadow } from '../styles/glassMenu';
@@ -49,6 +49,9 @@ import { gestureEngine } from '../shell/GestureEngine';
 import type { GestureEvent } from '../shell/GestureEngine';
 import { gestureRecognizer, initializeTouchSystem } from '../utils/TouchInputSystem';
 import { AppOverview } from '../shell/AppOverview';
+import { SpatialWorkspace } from '../shell/SpatialWorkspace';
+import { resizeWindow, type ResizeEdge } from '../shell/spatialGeometry';
+import { isDetachedWindow } from '../services/detachedWindow';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { initVisualEffects, destroyVisualEffects } from '../shell/VisualEffects';
@@ -60,15 +63,21 @@ import { notify, readHubTarget } from '../services/notify';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import ControlCenter from './ControlCenter';
+import AppWindowControls from './AppWindowControls';
+import { AppSurface } from './AppSurface';
+import { appOpeningBounds, DEFAULT_APP_WINDOW_MIN_SIZE } from '../shell/appWindowPlacement';
+import { interruptWindowSnap, queueWindowSnap } from '../shell/windowSnapMotion';
 import { getAppPredictor, schedulePrewarm } from '../services/AppPredictor';
 import { idleContinuity } from '../services/IdleContinuity';
-import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, cascadeWindow } from '../../shared/shell/windowLayout';
+import { clampWindowToWorkspace, clampWindowForDrag, fitWindowToWorkspace, getWorkspaceBounds, isSameWindowBounds, type WindowBounds } from '../../shared/shell/windowLayout';
 import { computeTiling, type TilingLayout } from '../../shared/shell/tilingLayouts';
 import { zoneAtPoint, zoneToBounds, expandAcross, coveredZoneIds, layoutBounds, type ExpandDir } from '../../shared/shell/customZones';
 import { useZoneStore } from '../store/zoneStore';
 import ZoneEditor from './ZoneEditor';
 import { auditDomTargets } from '../../shared/a11y/targetSize';
-import { motionDurationForSize, prefersReducedMotion } from '../../shared/motion/motionScale';
+import { motionDurationForSize } from '../../shared/motion/motionScale';
+import { prefersReducedMotion, setReducedMotionPreference, useReducedMotion } from '../utils/useReducedMotion';
+import { useMotionPresence } from '../utils/useMotionPresence';
 import { scheduleWrite as scheduleWindowManifest, loadManifest as loadWindowManifest, type WindowSnapshot } from '../shell/WindowManifest';
 import { savePreset as saveWorkspacePreset, getPreset as getWorkspacePreset } from '../shell/WorkspacePresets';
 import { pushTimelineSnapshot, getTimelineSnapshot } from '../shell/workspaceTimelineStore';
@@ -84,6 +93,16 @@ import { Z_DROPDOWN_BASE } from '../../shared/zIndex';
 // Module-level singletons — one engine per renderer process lifetime.
 const _calmEngine = new CalmFocusEngine();
 const _wsStore = new WorkspaceSnapshotStore({ maxNamed: 20, maxAuto: 5 });
+const WINDOW_RESIZE_HANDLES: ReadonlyArray<{ name: string; edge: ResizeEdge; cursor: string }> = [
+  { name: 'right', edge: 'e', cursor: 'ew-resize' },
+  { name: 'bottom', edge: 's', cursor: 'ns-resize' },
+  { name: 'left', edge: 'w', cursor: 'ew-resize' },
+  { name: 'top', edge: 'n', cursor: 'ns-resize' },
+  { name: 'se', edge: 'se', cursor: 'nwse-resize' },
+  { name: 'sw', edge: 'sw', cursor: 'nesw-resize' },
+  { name: 'ne', edge: 'ne', cursor: 'nesw-resize' },
+  { name: 'nw', edge: 'nw', cursor: 'nwse-resize' },
+];
 
 // Hydrate snapshot store from localStorage on first load.
 try {
@@ -326,7 +345,7 @@ const getUsableFloatingBounds = (
   bounds: { x: number; y: number; w: number; h: number },
   workspace: { x: number; y: number; w: number; h: number },
 ) => {
-  const min = APP_WINDOW_MIN_SIZES[appId] ?? { w: 360, h: 280 };
+  const min = APP_WINDOW_MIN_SIZES[appId] ?? DEFAULT_APP_WINDOW_MIN_SIZE;
   return clampWindowToWorkspace(
     {
       ...bounds,
@@ -385,7 +404,7 @@ const AppIconPngs: Record<string, string> = {
 const AppIconImg: React.FC<{ appId: string; size?: number }> = ({ appId, size = 24 }) => {
   const src = AppIconPngs[appId];
   if (!src) return null;
-  return <img src={src} alt="" style={{ width: size, height: size, borderRadius: size > 20 ? 10 : 5, objectFit: 'cover' }} />;
+  return <img src={src} alt="" style={{ width: size, height: size, borderRadius: size > 20 ? 6 : 3, objectFit: 'cover', filter: 'grayscale(1) contrast(1.12)' }} />;
 };
 
 // -- SVG Icons -------------------------------------------------------------
@@ -506,6 +525,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'worldclock', label: 'World Clock' },
   { id: 'noisegenerator', label: 'Noise' },
   { id: 'dexcode', label: 'DexCode' },
+  { id: 'ssh', label: 'Terminal' },
   // Visualization
   { id: 'nexus', label: 'Nexus' },
   // Intelligence
@@ -532,22 +552,21 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
 const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }[] = (() => {
   const cats: { label: string; apps: typeof LAUNCHPAD_APPS }[] = [];
   const catMap: Record<string, typeof LAUNCHPAD_APPS> = {};
-  const catOrder = ['System', 'Productivity', 'Creative Suite', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards'];
+  const catOrder = ['Core Workspace', 'Creative Suite', 'Productivity', 'System', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards'];
   const appToCat: Record<string, string> = {
     settings: 'System', power: 'System', recyclebin: 'System',
-    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
-    videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
+    files: 'Core Workspace', transfers: 'Core Workspace', dexcode: 'Core Workspace', ssh: 'Core Workspace', nexus: 'Core Workspace',
+    browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
+    videoeditor: 'Creative Suite', imosion: 'Creative Suite', axl: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
     gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
-    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', rewind: 'Tools', powerrename: 'Tools',
+    calculator: 'Tools', passwordgenerator: 'Tools', rewind: 'Tools', powerrename: 'Tools',
     stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
     weather: 'Tools', worldclock: 'Tools',
     canvas: 'Tools', timer: 'Tools',
     maps: 'Tools',
-    nexus: 'Tools',
     learn: 'Tools',
     screenrecorder: 'Media', presentation: 'Productivity', pdfviewer: 'Productivity', pixelart: 'Creative Suite',
     kanban: 'Project Management',
-    axl: 'Entertainment',
     achievements: 'Rewards',
   };
   LAUNCHPAD_APPS.forEach(app => {
@@ -555,6 +574,17 @@ const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }
     if (!catMap[cat]) catMap[cat] = [];
     catMap[cat].push(app);
   });
+  const priority: Record<string, string[]> = {
+    'Core Workspace': ['nexus', 'files', 'transfers', 'dexcode', 'ssh'],
+    'Creative Suite': ['videoeditor', 'imosion', 'axl', 'prism', 'flux', 'forge'],
+  };
+  for (const [category, ids] of Object.entries(priority)) {
+    catMap[category]?.sort((a, b) => {
+      const ai = ids.indexOf(a.id);
+      const bi = ids.indexOf(b.id);
+      return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi);
+    });
+  }
   catOrder.forEach(c => { if (catMap[c]?.length) cats.push({ label: c, apps: catMap[c] }); });
   return cats;
 })();
@@ -715,13 +745,15 @@ export const AppManager: React.FC = () => {
 
   // Ctrl+K -> CommandPalette (App.tsx). Ctrl+Space -> UKI panel. No legacy unified search overlay.
   const [showAppMenu, setShowAppMenu] = useState(false);
-  const showAppMenuRef = useRef(false);
-  showAppMenuRef.current = showAppMenu;
+  const appMenuPresent = useMotionPresence(showAppMenu);
+  const appMenuPanel = useRef<HTMLDivElement>(null);
+  const appMenuTrigger = useRef<HTMLElement | null>(null);
+  const [appMenuAnchor, setAppMenuAnchor] = useState<{ x: number; y: number; above: boolean } | null>(null);
+  useEffect(() => { if (!appMenuPresent) setAppMenuAnchor(null); }, [appMenuPresent]);
   // Shared Spotlight search overlay (the dock Search button opens this). One
   // search surface, used everywhere -- real results, keyboard nav, categories.
   const [showSpotlight, setShowSpotlight] = useState(false);
   const [appMenuSearch, setAppMenuSearch] = useState('');
-  const appMenuSearchRef = useRef<HTMLInputElement>(null);
   // Immersive focus: hide the top bar so an open
   // app gets the full DEX frame with zero chrome — "clear the screen to
   // concentrate". Toggled with Ctrl+Shift+F, exited with Escape or the pill.
@@ -735,6 +767,7 @@ export const AppManager: React.FC = () => {
   navHistoryRef.current = navHistory;
   navIndexRef.current = navIndex;
   const [windowControls, setWindowControls] = useState<'system' | 'traffic'>(getWindowControlStyle);
+  useEffect(observeAppPreferences, []);
   const nativeOverlayWidth = 0; // Custom buttons rendered; no native overlay padding needed
   const [systemVolume, setSystemVolume] = useState(() => { try { return Number(localStorage.getItem('dex-system-volume') ?? '80'); } catch { return 80; } });
   const [spatialAudioOn, setSpatialAudioOn] = useState(() => isSoundEnabled());
@@ -893,17 +926,6 @@ export const AppManager: React.FC = () => {
     return () => window.removeEventListener('dex-notification', onNotify as EventListener);
   }, [notifyPush]);
 
-  // Session restore prompt removed (owner directive: the "Restore your workspace?"
-  // notification was unwanted). We still silently clear the stale last-session
-  // journal on boot so it can't resurface or accumulate -- but DEX never nags to
-  // reopen apps. Apps stay alive while running; a restart simply starts clean.
-  const restoreOfferShownRef = useRef(false);
-  useEffect(() => {
-    if (restoreOfferShownRef.current) return;
-    restoreOfferShownRef.current = true;
-    try { clearLastSession(); } catch { /* never block boot */ }
-  }, []);
-
   // -- Split-screen tiling ------------------------------------------------
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
 
@@ -918,6 +940,12 @@ export const AppManager: React.FC = () => {
   const splitDragging = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [spatialMode, setSpatialMode] = useState(false);
+  const spatialToggle = useRef<HTMLButtonElement>(null);
+  const exitSpatialMode = () => {
+    setSpatialMode(false);
+    spatialToggle.current?.focus();
+  };
 
   // -- Detached floating windows (macOS Tahoe style) -----------------------
   const [detachedApps, setDetachedApps] = useState<Map<string, { x: number; y: number; w: number; h: number; z: number }>>(new Map());
@@ -990,9 +1018,9 @@ export const AppManager: React.FC = () => {
   // Compute the focused (highest-z) floating app (drives window-focus highlight).
   const focusedFloatingAppId = useMemo(() => {
     let maxZ = -1, id: string | null = null;
-    detachedApps.forEach((b, appId) => { if (b.z > maxZ) { maxZ = b.z; id = appId; } });
+    detachedApps.forEach((b, appId) => { if (!minimizedApps.has(appId) && b.z > maxZ) { maxZ = b.z; id = appId; } });
     return id;
-  }, [detachedApps]);
+  }, [detachedApps, minimizedApps]);
 
   // No left strip is reserved (Stage Manager removed in 5.6); floating windows
   // use the full workspace width.
@@ -1035,30 +1063,6 @@ export const AppManager: React.FC = () => {
     const ws = getShellWorkspace(0);
     return { x: ws.x, y: ws.y, w: ws.w, h: ws.h };
   }, [getShellWorkspace]);
-
-  // Migrate legacy detached-window top offsets from older shell reserve logic.
-  useEffect(() => {
-    if (detachedApps.size === 0) return;
-    const workspace = getShellWorkspace(0);
-    setDetachedApps(prev => {
-      let changed = false;
-      const next = new Map(prev);
-      next.forEach((bounds, appId) => {
-        if (CREATIVE_APPS.has(appId) || isSameWindowBounds(bounds, getMaximizedWindowBounds(), 1)) return;
-        const legacyShift = bounds.y >= 64 ? 66 : (bounds.y >= 32 ? 34 : 0);
-        if (!legacyShift) return;
-        const migrated = clampWindowForDrag(
-          { x: bounds.x, y: bounds.y - legacyShift, w: bounds.w, h: bounds.h },
-          workspace,
-        );
-        if (!isSameWindowBounds(bounds, migrated, 1)) {
-          next.set(appId, { ...migrated, z: bounds.z });
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  }, [detachedApps.size, getMaximizedWindowBounds, getShellWorkspace]);
 
   // -- Engagement / achievements: one central apply -> check -> REWARD path -
   // Every stat change (the dex-stat-bump bus, session start, app usage) runs
@@ -1161,9 +1165,6 @@ export const AppManager: React.FC = () => {
 
 
 
-  // Smooth cross-fade on app switch
-  useAppTransition(currentAppId, contentRef);
-
   // Auto-navigate to Home when all non-home apps are closed
   useEffect(() => {
     const nonHome = runningApps.filter(a => a.id !== 'home');
@@ -1182,6 +1183,8 @@ export const AppManager: React.FC = () => {
     return `${d}  ${t}`;
   });
   const [titlebarMenuOpen, setTitlebarMenuOpen] = useState(false);
+  const titlebarMenuPresent = useMotionPresence(titlebarMenuOpen);
+  const reducedMotion = useReducedMotion();
 
   // -- CalmFocusEngine: record input activity so the engine can decide whether
   //    to suppress non-essential interruptions (hover glows, tips, badges)
@@ -1308,27 +1311,6 @@ export const AppManager: React.FC = () => {
     };
   }, [currentAppId, setCurrentRunningApp]);
 
-  // Keep the native search index fresh: a debounced `search:sync` on window focus
-  // (and once on mount). Fire-and-forget + caught — in the Tauri shell this runs
-  // the native snapshot-diff index_sync (incremental, no full rebuild); in Electron
-  // the self-maintaining indexer just acknowledges it. Throttled so rapid focus
-  // flutter can't spam it.
-  useEffect(() => {
-    let lastSync = 0;
-    const MIN_GAP_MS = 30_000;
-    const sync = () => {
-      const now = Date.now();
-      if (now - lastSync < MIN_GAP_MS) return;
-      lastSync = now;
-      try { window.dex?.invoke?.('search:sync').catch(() => { /* no-op / no handler */ }); }
-      catch { /* bridge unavailable */ }
-    };
-    sync(); // initial refresh on mount
-    const onFocus = () => sync();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
-
   // Idle fallback policy: when DEX enters idle/background modes and later
   // resumes, always land on Home instead of risking a wallpaper-only state.
   // This keeps user context stable even after long idle / sleep transitions.
@@ -1405,6 +1387,62 @@ export const AppManager: React.FC = () => {
   // Keep-alive: track which apps have been mounted
   const mountedAppsRef = useRef<Set<AppId>>(new Set(['home']));
   const [, forceUpdate] = useState(0);
+
+  // Silent Hot Exit restore. The setting already exists; this is its runtime
+  // implementation. Apps, focus, minimization, and floating geometry return
+  // without a prompt, while invalid/stale records fail closed to Home.
+  const restoredSessionRef = useRef(false);
+  useEffect(() => {
+    if (restoredSessionRef.current) return;
+    restoredSessionRef.current = true;
+
+    let restoreEnabled = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem('dex-settings') || '{}');
+      restoreEnabled = saved.restoreLastSession !== false;
+    } catch { /* default enabled */ }
+
+    const session = restoreEnabled ? readLastSession() : null;
+    const manifest = restoreEnabled ? loadWindowManifest() : null;
+    const freshEnough = session && Date.now() - session.timestamp < 7 * 24 * 60 * 60_000;
+
+    if (freshEnough && session.apps.length > 0) {
+      const validApps = session.apps.filter(app => app.id !== 'home' && !!APP_DEFINITIONS[app.id] && !!APP_COMPONENTS[app.id as AppId]);
+      for (const app of validApps) {
+        mountedAppsRef.current.add(app.id as AppId);
+        launchApp({ id: app.id, name: app.name, icon: app.icon, color: app.color });
+      }
+
+      if (manifest?.windows?.length) {
+        const restored = new Map<string, { x: number; y: number; w: number; h: number; z: number }>();
+        const minimized = new Set<string>();
+        const workspace = getShellWorkspace(0);
+        const validIds = new Set(validApps.map(app => app.id));
+        for (const windowState of manifest.windows) {
+          if (!windowState || !validIds.has(windowState.appId)
+            || ![windowState.x, windowState.y, windowState.width, windowState.height, windowState.z].every(Number.isFinite)) continue;
+          const saved = { x: windowState.x, y: windowState.y, w: windowState.width, h: windowState.height };
+          const bounds = windowState.maximized ? workspace : clampWindowToWorkspace(saved, workspace);
+          const z = Math.max(200, Math.min(4989, windowState.z));
+          restored.set(windowState.appId, { ...bounds, z });
+          detachZCounter.current = Math.max(detachZCounter.current, z);
+          const normal = windowState.restoreBounds;
+          if (normal && [normal.x, normal.y, normal.w, normal.h].every(Number.isFinite)) {
+            restoredWindowBoundsRef.current.set(windowState.appId, clampWindowToWorkspace(normal, workspace));
+          }
+          if (windowState.minimized) minimized.add(windowState.appId);
+        }
+        setDetachedApps(restored);
+        setMinimizedApps(minimized);
+      }
+
+      const focusId = session.currentAppId;
+      if (focusId !== 'home' && validApps.some(app => app.id === focusId)) setCurrentRunningApp(focusId);
+      forceUpdate(value => value + 1);
+    } else if (!restoreEnabled) {
+      clearLastSession();
+    }
+  }, [launchApp, setCurrentRunningApp]);
 
   // Device tier — read once, used for deferred mounting + max app limits
   const deviceTierRef = useRef<DeviceTier>(getStoredTier() || 'mid');
@@ -1636,6 +1674,11 @@ export const AppManager: React.FC = () => {
   // Close app menu when clicking outside (robust click-outside pattern)
   useEffect(() => {
     if (!showAppMenu) { setAppMenuSearch(''); return; }
+    const panel = appMenuPanel.current;
+    if (!panel?.contains(document.activeElement)) {
+      if (!appMenuTrigger.current) appMenuTrigger.current = document.activeElement as HTMLElement | null;
+      panel?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus({ preventScroll: true });
+    }
     const handler = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       // Ignore clicks on the launchpad button itself (button toggles menu)
@@ -1644,9 +1687,11 @@ export const AppManager: React.FC = () => {
       if (t.closest('[data-dex-app-menu-panel]')) return;
       setShowAppMenu(false);
     };
-    // setTimeout(0) skips the current event loop tick so the opening click doesn't immediately close
-    const id = setTimeout(() => document.addEventListener('mousedown', handler), 0);
-    return () => { clearTimeout(id); document.removeEventListener('mousedown', handler); };
+    document.addEventListener('pointerdown', handler, true);
+    return () => {
+      document.removeEventListener('pointerdown', handler, true);
+      appMenuTrigger.current = null;
+    };
   }, [showAppMenu]);
 
   // Navigation
@@ -1695,29 +1740,8 @@ export const AppManager: React.FC = () => {
           }
           const z = nextDetachZ();
           const next = new Map(prev);
-          // Open at predefined size centered in workspace — keeps content "in frame".
-          // Creative/heavy apps (videoeditor, imosion, etc.) open maximized.
           const workspace = getMaximizedWindowBounds();
-          const def = APP_WINDOW_SIZES[appId as string];
-          if (def?.maximized) {
-            next.set(appId, { ...workspace, z });
-          } else if (def) {
-            const fitted = fitWindowToWorkspace({ w: def.w, h: def.h }, workspace);
-            const baseX = Math.max(workspace.x, workspace.x + Math.round((workspace.w - fitted.w) / 2));
-            const baseY = workspace.y + 8;
-            const occupied = Array.from(prev.values()).map(b => ({ x: b.x, y: b.y }));
-            const placed = cascadeWindow({ x: baseX, y: baseY, w: fitted.w, h: fitted.h }, occupied, workspace);
-            next.set(appId, { ...placed, z });
-          } else {
-            // Unknown app: fall back to a reasonable default size, centered, cascaded.
-            const w = Math.min(900, Math.max(480, Math.round(workspace.w * 0.6)));
-            const h = Math.min(640, Math.max(380, Math.round(workspace.h * 0.7)));
-            const baseX = workspace.x + Math.round((workspace.w - w) / 2);
-            const baseY = workspace.y + 8;
-            const occupied = Array.from(prev.values()).map(b => ({ x: b.x, y: b.y }));
-            const placed = cascadeWindow({ x: baseX, y: baseY, w, h }, occupied, workspace);
-            next.set(appId, { ...placed, z });
-          }
+          next.set(appId, { ...appOpeningBounds(appId, workspace, prev.values(), APP_WINDOW_SIZES[appId], APP_WINDOW_MIN_SIZES[appId]), z });
           return next;
         });
       });
@@ -1800,19 +1824,18 @@ export const AppManager: React.FC = () => {
     }
     const z = nextDetachZ();
 
-    // UX: every detached app opens MAXIMIZED so it fills the DEX frame
-    // (no surrounding wallpaper gaps). Users can still drag-restore or
-    // resize from there. Creative apps explicitly mark `maximized: true`
-    // and are unaffected.
     setDetachedApps(prev => {
+      if (prev.has(appId)) return prev;
       const next = new Map(prev);
-      next.set(appId, { ...getMaximizedWindowBounds(), z });
+      const workspace = getMaximizedWindowBounds();
+      next.set(appId, { ...appOpeningBounds(appId, workspace, prev.values(), APP_WINDOW_SIZES[appId], APP_WINDOW_MIN_SIZES[appId], true), z });
       return next;
     });
     if (currentApp === appId) setCurrentApp('home');
   }, [currentApp, getMaximizedWindowBounds, setCurrentApp]);
 
   const bringToFront = useCallback((appId: AppId) => {
+    if (useRunningApps.getState().currentAppId !== appId) setCurrentRunningApp(appId);
     const z = nextDetachZ();
     setDetachedApps(prev => {
       const next = new Map(prev);
@@ -1820,7 +1843,7 @@ export const AppManager: React.FC = () => {
       if (b) next.set(appId, { ...b, z });
       return next;
     });
-  }, []);
+  }, [setCurrentRunningApp]);
 
   const openAppInWindow = useCallback((appId: AppId) => {
     if (appId === 'home') return;
@@ -1858,6 +1881,8 @@ export const AppManager: React.FC = () => {
         x: Math.round(b.x), y: Math.round(b.y),
         width: Math.round(b.w), height: Math.round(b.h),
         z: b.z,
+        maximized: isSameWindowBounds(b, getMaximizedWindowBounds(), 1),
+        restoreBounds: restoredWindowBoundsRef.current.get(appId),
         minimized: minimizedApps.has(appId),
         focused: focusedFloatingAppId === appId,
       });
@@ -1868,7 +1893,7 @@ export const AppManager: React.FC = () => {
     // last non-empty manifest is safe.
     if (snaps.length === 0) return;
     scheduleWindowManifest(snaps);
-  }, [detachedApps, minimizedApps, focusedFloatingAppId]);
+  }, [detachedApps, minimizedApps, focusedFloatingAppId, getMaximizedWindowBounds]);
 
   // -- Workspace presets ("workspace memory") --------------------------------
   // Save the current floating-window layout under a name, and restore a saved
@@ -2104,19 +2129,14 @@ export const AppManager: React.FC = () => {
 
       if (position === 'maximize' && current) {
         const restored = restoredWindowBoundsRef.current.get(appId);
-        if (isSameRect && restored) {
-          next.set(appId, { ...restored, z });
+        if (isSameRect) {
+          const normal = getUsableFloatingBounds(appId, restored
+            ?? fitWindowToWorkspace(preferredWindowSize(appId) ?? { w: workspace.w * 0.76, h: workspace.h * 0.8 }, workspace), workspace);
+          next.set(appId, { ...normal, z });
           restoredWindowBoundsRef.current.delete(appId);
           return next;
         }
-        if (!isSameRect) {
-          restoredWindowBoundsRef.current.set(appId, {
-            x: current.x,
-            y: current.y,
-            w: current.w,
-            h: current.h,
-          });
-        }
+        restoredWindowBoundsRef.current.set(appId, { x: current.x, y: current.y, w: current.w, h: current.h });
       } else {
         restoredWindowBoundsRef.current.delete(appId);
       }
@@ -2516,7 +2536,12 @@ export const AppManager: React.FC = () => {
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
     keyHandlerRef.current = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showAppMenu) { e.preventDefault(); setShowAppMenu(false); return; }
+      if (e.key === 'Escape' && showAppMenu) {
+        e.preventDefault();
+        appMenuTrigger.current?.focus({ preventScroll: true });
+        setShowAppMenu(false);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Q') {
         e.preventDefault();
         closeAllApps();
@@ -3049,6 +3074,101 @@ export const AppManager: React.FC = () => {
     setSplitApp(null);
   }, []);
 
+  const startWindowResize = (event: React.PointerEvent<HTMLDivElement>, appId: AppId, bounds: WindowBounds, edge: ResizeEdge) => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (focusedFloatingAppId !== appId) bringToFront(appId);
+    const handle = event.currentTarget;
+    const element = handle.parentElement!;
+    const live = interruptWindowSnap(element, bounds);
+    if (live) {
+      bounds = live;
+      setDetachedApps(previous => {
+        const current = previous.get(appId);
+        return current ? new Map(previous).set(appId, { ...live, z: current.z }) : previous;
+      });
+    }
+    const workspace = getShellWorkspace(0);
+    const scale = Number(element.parentElement?.dataset.spatialScale) || 1;
+    const { clientX: startX, clientY: startY, pointerId } = event;
+    const right = bounds.x + bounds.w;
+    const divider = edge === 'e' ? [...detachedApps].find(([id, other]) =>
+      id !== appId && !minimizedApps.has(id) && other.x - right >= -4 && other.x - right <= 18
+      && Math.min(bounds.y + bounds.h, other.y + other.h) - Math.max(bounds.y, other.y) > 40) : undefined;
+    const neighbor = divider && getUsableFloatingBounds(divider[0], divider[1], workspace);
+    const neighborElement = divider && element.parentElement?.querySelector<HTMLElement>(`[data-floating-window="${CSS.escape(divider[0])}"]`);
+    const gap = neighbor ? neighbor.x - right : 0;
+    const neighborMin = neighbor && divider
+      ? Math.min(neighbor.w, APP_WINDOW_MIN_SIZES[divider[0]]?.w ?? 360) : 0;
+    const limit = neighbor ? neighbor.x + neighbor.w - gap - neighborMin : workspace.x + workspace.w;
+    const resizeWorkspace = { ...workspace, w: Math.min(workspace.w, limit - workspace.x) };
+    const calculate = (x: number, y: number) => resizeWindow(bounds, resizeWorkspace, edge, (x - startX) / scale, (y - startY) / scale);
+    const nextNeighbor = (rect: WindowBounds) => {
+      if (!neighbor) return null;
+      const x = rect.x + rect.w + gap;
+      return { ...neighbor, x, w: neighbor.x + neighbor.w - x };
+    };
+    const paintBounds = (target: HTMLElement, rect: WindowBounds) => {
+      target.style.left = `${rect.x}px`;
+      target.style.top = `${rect.y}px`;
+      target.style.width = `${rect.w}px`;
+      target.style.height = `${rect.h}px`;
+    };
+    const paint = (rect: WindowBounds) => {
+      paintBounds(element, rect);
+      const other = nextNeighbor(rect);
+      if (neighborElement && other) paintBounds(neighborElement, other);
+    };
+    let frame = 0;
+    let latestX = startX;
+    let latestY = startY;
+    const move = (pointer: PointerEvent) => {
+      if (pointer.pointerId !== pointerId) return;
+      latestX = pointer.clientX;
+      latestY = pointer.clientY;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        paint(calculate(latestX, latestY));
+      });
+    };
+    const end = (pointer: PointerEvent) => {
+      if (pointer.pointerId !== pointerId) return;
+      cancelAnimationFrame(frame);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      handle.removeEventListener('lostpointercapture', end);
+      if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
+      element.removeAttribute('data-dragging');
+      if (pointer.type !== 'pointerup') {
+        paintBounds(element, bounds);
+        if (neighborElement && neighbor) paintBounds(neighborElement, neighbor);
+        return;
+      }
+      const resized = calculate(pointer.clientX, pointer.clientY);
+      paint(resized);
+      setDetachedApps(previous => {
+        const current = previous.get(appId);
+        if (!current) return previous;
+        const result = new Map(previous).set(appId, { ...resized, z: current.z });
+        if (divider) {
+          const other = previous.get(divider[0]);
+          const next = nextNeighbor(resized);
+          if (other && next) result.set(divider[0], { ...next, z: other.z });
+        }
+        return result;
+      });
+    };
+    handle.setPointerCapture(pointerId);
+    element.dataset.dragging = 'true';
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+    handle.addEventListener('lostpointercapture', end);
+  };
+
   // -- Keep-alive renderer -------------------------------------------------
   const mountedAppsSnapshot = Array.from(mountedAppsRef.current);
   // Hard safety net: home must always be in the mounted snapshot.
@@ -3086,11 +3206,13 @@ export const AppManager: React.FC = () => {
         const useGlass = false;
         const isFocused = focusedFloatingAppId === appId;
         return (
-          <div
+          <AppSurface
             key={appId}
+            appId={appId}
+            bounds={visibleBounds}
             data-floating-window={appId}
             data-testid={`app-instance-${appId}`}
-            data-app-state="foreground"
+            data-app-state={isMinimized ? 'background' : 'foreground'}
             data-window-glass={useGlass ? 'on' : 'off'}
             style={{
               position: 'fixed',
@@ -3109,15 +3231,13 @@ export const AppManager: React.FC = () => {
               // Focus hierarchy (Apple-style depth): the active window LIFTS with a
               // deeper shadow + a faint accent edge; inactive windows recede with a
               // softer, lower shadow. Animates via the box-shadow transition below.
-              border: isMaximized ? 'none' : `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
+              border: isMaximized ? 'none' : `1px solid var(${isFocused ? '--color-border-strong' : '--color-border-subtle'})`,
               ...adaptiveShadow(isMaximized ? 'none' : isFocused
-                ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(74,158,255,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)'
+                ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.18), inset 0 0.5px 0 rgba(255,255,255,0.10)'
                 : '0 10px 28px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.05)'),
-              contain: 'layout style paint',
+              contain: 'layout style',
               willChange: 'auto',
-              transition: 'box-shadow 0.2s ease',
             }}
-            className="dex-app-opening"
             onPointerDown={() => { if (focusedFloatingAppId !== appId) bringToFront(appId); }}
           >
             {/* Floating title bar -- ALWAYS rendered, even when maximized, so the
@@ -3130,9 +3250,9 @@ export const AppManager: React.FC = () => {
               style={{
                 height: 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
-                // Subtle top-lit gradient + hairline highlight gives the title bar real
-                // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
-                background: 'linear-gradient(180deg, #26262B 0%, #1C1C20 100%)',
+                // Solid machined rail: hierarchy comes from seams and contrast,
+                // never a decorative gradient.
+                background: 'var(--color-bg-secondary)',
                 borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
                 boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
                 justifyContent: 'center',
@@ -3145,30 +3265,46 @@ export const AppManager: React.FC = () => {
                 position: 'relative',
                 zIndex: 50,
               } as React.CSSProperties}
-              onDoubleClick={() => { tileWindow(appId, 'maximize'); }}
+              onDoubleClick={event => {
+                if (!(event.target as Element).closest('button')) tileWindow(appId, 'maximize');
+              }}
               onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest('button')) return;
+                if (e.button !== 0 || !e.isPrimary || (e.target as HTMLElement).closest('button')) return;
                 e.preventDefault();
                 const titleBar = e.currentTarget;
+                const pointerId = e.pointerId;
                 titleBar.setPointerCapture(e.pointerId);
                 titleBar.style.cursor = 'grabbing';
                 const startX = e.clientX;
                 const startY = e.clientY;
-                let dragBounds = { ...visibleBounds, z: detBounds.z };
-                if (isMaximized) {
+                const el = titleBar.parentElement as HTMLElement;
+                const cameraScale = Number(el.parentElement?.dataset.spatialScale) || 1;
+                const spatial = el.parentElement?.dataset.spatialScale !== undefined;
+                const interrupted = interruptWindowSnap(el, visibleBounds);
+                let dragBounds = { ...(interrupted ?? visibleBounds), z: detBounds.z };
+                if (interrupted) {
+                  setDetachedApps(previous => {
+                    const current = previous.get(appId);
+                    return current ? new Map(previous).set(appId, { ...interrupted, z: current.z }) : previous;
+                  });
+                }
+                if (isMaximized && !interrupted) {
                   const workspace = getMaximizedWindowBounds();
-                  const restored = restoredWindowBoundsRef.current.get(appId)
+                  const restored = getUsableFloatingBounds(appId, restoredWindowBoundsRef.current.get(appId)
                     ?? fitWindowToWorkspace(
-                      {
+                      preferredWindowSize(appId) ?? {
                         w: Math.max(680, Math.round(workspace.w * 0.7)),
                         h: Math.max(460, Math.round(workspace.h * 0.8)),
                       },
                       workspace,
-                    );
-                  const pointerRatio = (e.clientX - workspace.x) / Math.max(workspace.w, 1);
-                  const anchoredX = Math.round(e.clientX - restored.w * pointerRatio);
+                    ), workspace);
+                  const layerRect = el.parentElement!.getBoundingClientRect();
+                  const localX = (e.clientX - layerRect.left) / cameraScale;
+                  const localY = (e.clientY - layerRect.top) / cameraScale;
+                  const pointerRatio = (localX - workspace.x) / Math.max(workspace.w, 1);
+                  const anchoredX = Math.round(localX - restored.w * pointerRatio);
                   const clampedRestored = clampWindowToWorkspace(
-                    { ...restored, x: anchoredX, y: workspace.y + 8 },
+                    { ...restored, x: anchoredX, y: localY - 12 },
                     workspace,
                   );
                   dragBounds = { ...clampedRestored, z: detBounds.z };
@@ -3194,7 +3330,6 @@ export const AppManager: React.FC = () => {
                 // work area cannot change mid-drag, so a single read is both correct
                 // and smooth -- matching the FloatingLauncher's cheap per-frame path.
                 const dragWorkspace = getShellWorkspace(0);
-                const el = titleBar.parentElement as HTMLElement;
                 if (el) {
                   // Disable transitions and enable GPU acceleration for smooth drag
                   el.style.transition = 'none';
@@ -3212,6 +3347,7 @@ export const AppManager: React.FC = () => {
                 let pendingPX = startX;
                 let pendingPY = startY;
                 const onMove = (ev: PointerEvent) => {
+                  if (ev.pointerId !== pointerId) return;
                   pendingPX = ev.clientX;
                   pendingPY = ev.clientY;
                   if (rafScheduled) return;
@@ -3220,7 +3356,7 @@ export const AppManager: React.FC = () => {
                     rafScheduled = false;
                     // Free-drag: allow movement past edges, only keep part of title bar reachable
                     const loose = clampWindowForDrag(
-                      { x: origX + pendingPX - startX, y: origY + pendingPY - startY, w: dragBounds.w, h: dragBounds.h },
+                      { x: origX + (pendingPX - startX) / cameraScale, y: origY + (pendingPY - startY) / cameraScale, w: dragBounds.w, h: dragBounds.h },
                       dragWorkspace,
                     );
                     currentX = loose.x;
@@ -3238,7 +3374,7 @@ export const AppManager: React.FC = () => {
                     // plus a setState, too costly to run every frame and unnecessary
                     // at frame cadence.
                     const now = performance.now();
-                    if (now - lastSnapCheck >= 64) {
+                    if (!spatial && now - lastSnapCheck >= 64) {
                       lastSnapCheck = now;
                       const zone = detectDragSnapZone(pendingPX, pendingPY);
                       if (zone !== snapPreviewRef.current) {
@@ -3249,12 +3385,14 @@ export const AppManager: React.FC = () => {
                   });
                 };
                 const onUp = (ev: PointerEvent) => {
+                  if (ev.pointerId !== pointerId) return;
                   cancelAnimationFrame(rafId);
-                  titleBar.releasePointerCapture(ev.pointerId);
                   titleBar.style.cursor = 'grab';
                   titleBar.removeEventListener('pointermove', onMove);
                   titleBar.removeEventListener('pointerup', onUp);
+                  titleBar.removeEventListener('pointercancel', onUp);
                   titleBar.removeEventListener('lostpointercapture', onUp);
+                  if (titleBar.hasPointerCapture(pointerId)) titleBar.releasePointerCapture(pointerId);
                   if (el) {
                     el.removeAttribute('data-dragging');
                     el.style.willChange = 'auto';
@@ -3263,11 +3401,15 @@ export const AppManager: React.FC = () => {
                   // Clear preview
                   snapPreviewRef.current = null;
                   setSnapPreviewZone(null);
+                  if (ev.type !== 'pointerup') {
+                    el.style.transform = '';
+                    return;
+                  }
                   // Final position — free drag (only require a slice of title bar visible).
                   // Reuse the cached work area (same drag, unchanged) — no extra reflow.
                   const workspace = dragWorkspace;
                   const looseFinal = clampWindowForDrag(
-                    { x: origX + ev.clientX - startX, y: origY + ev.clientY - startY, w: dragBounds.w, h: dragBounds.h },
+                    { x: origX + (ev.clientX - startX) / cameraScale, y: origY + (ev.clientY - startY) / cameraScale, w: dragBounds.w, h: dragBounds.h },
                     workspace,
                   );
                   const finalX = looseFinal.x;
@@ -3276,16 +3418,16 @@ export const AppManager: React.FC = () => {
                   // editor) takes priority: drop onto the zone under the cursor.
                   // Size-proportional motion (Fluent): a larger window animates
                   // longer; reduced-motion collapses it to a single frame.
-                  const snapMs = motionDurationForSize(Math.max(dragBounds.w, dragBounds.h), { reducedMotion: prefersReducedMotion() });
-                  const ease = 'cubic-bezier(0.2,0.9,0.3,1)';
-                  const snapEase = `left ${snapMs}ms ${ease}, top ${snapMs}ms ${ease}, width ${snapMs}ms ${ease}, height ${snapMs}ms ${ease}`;
-                  if (snapToCustomZone(appId, ev.clientX, ev.clientY)) {
-                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
+                  const snapMs = motionDurationForSize(Math.max(dragBounds.w, dragBounds.h), {
+                    reducedMotion: prefersReducedMotion() || appReducesMotion(appId),
+                  });
+                  if (!spatial && snapToCustomZone(appId, ev.clientX, ev.clientY)) {
+                    queueWindowSnap(el, looseFinal, snapMs);
                     return;
                   }
-                  const zone = detectDragSnapZone(ev.clientX, ev.clientY);
+                  const zone = spatial ? null : detectDragSnapZone(ev.clientX, ev.clientY);
                   if (zone) {
-                    if (el) { el.style.transform = ''; el.style.transition = snapEase; }
+                    queueWindowSnap(el, looseFinal, snapMs);
                     tileWindow(appId, zone);
                   } else {
                     // Strict in-frame clamp on drop: windows always end up fully inside the workspace.
@@ -3309,18 +3451,17 @@ export const AppManager: React.FC = () => {
                 };
                 titleBar.addEventListener('pointermove', onMove);
                 titleBar.addEventListener('pointerup', onUp);
+                titleBar.addEventListener('pointercancel', onUp);
                 titleBar.addEventListener('lostpointercapture', onUp);
               }}
             >
-              {/* App icon with color background */}
+              {/* Monochrome app identity badge; shape and glyph carry identity. */}
               {(() => {
-                const appDef = APP_DEFINITIONS[appId];
-                const appColor = appDef?.color || LAUNCHPAD_APPS.find(a => a.id === appId)?.color || 'var(--color-text-tertiary)';
                 return (
-                  <div style={{ width: 22, height: 22, borderRadius: 4, background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 4, background: AppIconPngs[appId] ? 'transparent' : 'var(--color-bg-active)', border: AppIconPngs[appId] ? 'none' : '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                     {AppIconPngs[appId]
                       ? <AppIconImg appId={appId} size={22} />
-                      : <span style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={16} color="#fff" />}</span>}
+                      : <span style={{ color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={14} color="currentColor" />}</span>}
                   </div>
                 );
               })()}
@@ -3343,530 +3484,27 @@ export const AppManager: React.FC = () => {
                   title's minWidth:0 above guarantee these are never pushed off the
                   right edge by a long title or a narrow/maximized window. */}
               {windowControls !== 'traffic' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  {/* Minimize button */}
-                  <button
-                    onClick={() => minimizeFloatingApp(appId)}
-                    title="Minimize"
-                    aria-label={`Minimize ${getLabel(appId)}`}
-                    style={{
-                      width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 4,
-                      color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <line x1="4" y1="18" x2="20" y2="18"/>
-                    </svg>
-                  </button>
-                  {/* Maximize button. The hover snap-layout popup was removed
-                      (intrusive); maximize/restore is a direct click, and edge-snap
-                      still works by dragging a window to a screen edge. */}
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      onClick={() => tileWindow(appId, 'maximize')}
-                      title={isMaximized ? 'Restore' : 'Maximize'}
-                      aria-label={isMaximized ? `Restore ${getLabel(appId)}` : `Maximize ${getLabel(appId)}`}
-                      style={{
-                        width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'transparent', border: 'none', borderRadius: 4,
-                        color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#fff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-                    >
-                      {isMaximized ? (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="8" y="3" width="13" height="13" rx="2"/>
-                          <path d="M16 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/>
-                        </svg>
-                      ) : (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <rect x="4" y="4" width="16" height="16" rx="2"/>
-                        </svg>
-                      )}
-                    </button>
-                    {/* Snap-layout popup retired (intrusive); maximize/restore is a
-                        direct click and edge-snap still works by dragging to a screen
-                        edge. The state that drove this was removed. */}
-                  </div>
-                  {/* Close button */}
-                  <button
-                    onClick={() => handleCloseApp(appId)}
-                    title={`Close ${getLabel(appId)}`}
-                    aria-label={`Close ${getLabel(appId)}`}
-                    style={{
-                      width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 4,
-                      color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.18)'; e.currentTarget.style.color = 'var(--color-error)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
+                <AppWindowControls
+                  appName={getLabel(appId)}
+                  maximized={isMaximized}
+                  onMinimize={() => minimizeFloatingApp(appId)}
+                  onToggleMaximize={() => tileWindow(appId, 'maximize')}
+                  onClose={() => handleCloseApp(appId)}
+                />
               )}
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', WebkitAppRegion: 'no-drag', isolation: 'isolate', zIndex: 0 } as React.CSSProperties}>
               <AppErrorBoundary appId={appId}>
                 <Suspense fallback={<Loading appId={appId} />}>
-                  <Comp />
+                  {appId === 'taskmanager' ? <TaskManager observing={isFocused && !isMinimized} /> : <Comp />}
                 </Suspense>
               </AppErrorBoundary>
             </div>
-            {/* Resize handles -- all 4 edges + corners for proper OS-like resizing */}
-            {!isMaximized && (
-              <>
-                {/* Right edge */}
-                <div
-                  data-resize-handle="right"
-                  style={{ position: 'absolute', right: 0, top: 30, bottom: 20, width: 6, cursor: 'ew-resize', zIndex: 2, background: 'transparent' }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const startX = e.clientX;
-                    const startW = detBounds.w;
-                    const el = e.currentTarget.parentElement as HTMLElement;
-                    if (el) el.setAttribute('data-dragging', 'true');
-                    // Neighbor rebalance: a window flush to this one's right edge
-                    // becomes the other half of a divider — its right stays fixed
-                    // while its left follows ours (floored at its min-width).
-                    const GAP = 6;
-                    let neighborId: string | null = null;
-                    let neighborStart: { x: number; y: number; w: number; h: number } | null = null;
-                    detachedApps.forEach((nb, id) => {
-                      if (id === appId || minimizedApps.has(id)) return;
-                      const gap = nb.x - (detBounds.x + detBounds.w);
-                      const vOverlap = Math.min(detBounds.y + detBounds.h, nb.y + nb.h) - Math.max(detBounds.y, nb.y);
-                      if (gap >= -4 && gap <= 18 && vOverlap > 40) { neighborId = id; neighborStart = { x: nb.x, y: nb.y, w: nb.w, h: nb.h }; }
-                    });
-                    const neighborEl = neighborId ? (document.querySelector(`[data-floating-window="${neighborId}"]`) as HTMLElement | null) : null;
-                    const neighborMinW = neighborId ? (APP_WINDOW_MIN_SIZES[neighborId]?.w ?? 360) : 360;
-                    const computeW = (ev: PointerEvent, workspace: { x: number; w: number }) => {
-                      const ns = neighborStart;
-                      const maxW = ns
-                        ? (ns.x + ns.w) - GAP - detBounds.x - neighborMinW
-                        : workspace.x + workspace.w - detBounds.x;
-                      return Math.min(Math.max(360, startW + ev.clientX - startX), maxW);
-                    };
-                    let rafId = 0;
-                    const onMove = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      rafId = requestAnimationFrame(() => {
-                        const nw = computeW(ev, getShellWorkspace(0));
-                        if (el) el.style.width = nw + 'px';
-                        const ns = neighborStart;
-                        if (neighborEl && ns) {
-                          const nbX = detBounds.x + nw + GAP;
-                          neighborEl.style.left = nbX + 'px';
-                          neighborEl.style.width = ((ns.x + ns.w) - nbX) + 'px';
-                        }
-                      });
-                    };
-                    const onUp = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      document.removeEventListener('pointermove', onMove);
-                      document.removeEventListener('pointerup', onUp);
-                      if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(0);
-                      const nw = computeW(ev, workspace);
-                      setDetachedApps(prev => {
-                        const b = prev.get(appId);
-                        if (!b) return prev;
-                        const next = new Map(prev);
-                        const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: nw, h: b.h }, workspace);
-                        next.set(appId, { ...b, ...clamped });
-                        const ns = neighborStart;
-                        if (neighborId && ns) {
-                          const nbX = b.x + nw + GAP;
-                          const nbW = Math.max(neighborMinW, (ns.x + ns.w) - nbX);
-                          const nbPrev = prev.get(neighborId);
-                          if (nbPrev) next.set(neighborId, { ...nbPrev, ...clampWindowToWorkspace({ x: nbX, y: ns.y, w: nbW, h: ns.h }, workspace) });
-                        }
-                        return next;
-                      });
-                    };
-                    document.addEventListener('pointermove', onMove);
-                    document.addEventListener('pointerup', onUp);
-                  }}
-                />
-                {/* Bottom edge */}
-                <div
-                  data-resize-handle="bottom"
-                  style={{ position: 'absolute', bottom: 0, left: 20, right: 20, height: 6, cursor: 'ns-resize', zIndex: 2, background: 'transparent' }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const startY = e.clientY;
-                    const startH = detBounds.h;
-                    const el = e.currentTarget.parentElement as HTMLElement;
-                    if (el) el.setAttribute('data-dragging', 'true');
-                    let rafId = 0;
-                    const onMove = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(0);
-                        const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                        if (el) el.style.height = nh + 'px';
-                      });
-                    };
-                    const onUp = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      document.removeEventListener('pointermove', onMove);
-                      document.removeEventListener('pointerup', onUp);
-                      if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(0);
-                      const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                      setDetachedApps(prev => {
-                        const b = prev.get(appId);
-                        if (!b) return prev;
-                        const next = new Map(prev);
-                        const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: b.w, h: nh }, workspace);
-                        next.set(appId, { ...b, ...clamped });
-                        return next;
-                      });
-                    };
-                    document.addEventListener('pointermove', onMove);
-                    document.addEventListener('pointerup', onUp);
-                  }}
-                />
-                {/* Left edge */}
-                <div
-                  data-resize-handle="left"
-                  style={{ position: 'absolute', left: 0, top: 30, bottom: 20, width: 6, cursor: 'ew-resize', zIndex: 2, background: 'transparent' }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const startX = e.clientX;
-                    const startW = detBounds.w;
-                    const startLeft = detBounds.x;
-                    const el = e.currentTarget.parentElement as HTMLElement;
-                    if (el) el.setAttribute('data-dragging', 'true');
-                    // Neighbor rebalance: a window flush to our LEFT is the other
-                    // half of a divider — its left stays fixed while its right
-                    // follows our left edge (floored at its min-width).
-                    const GAP = 6;
-                    let neighborId: string | null = null;
-                    let neighborStart: { x: number; y: number; w: number; h: number } | null = null;
-                    detachedApps.forEach((nb, id) => {
-                      if (id === appId || minimizedApps.has(id)) return;
-                      const gap = detBounds.x - (nb.x + nb.w);
-                      const vOverlap = Math.min(detBounds.y + detBounds.h, nb.y + nb.h) - Math.max(detBounds.y, nb.y);
-                      if (gap >= -4 && gap <= 18 && vOverlap > 40) { neighborId = id; neighborStart = { x: nb.x, y: nb.y, w: nb.w, h: nb.h }; }
-                    });
-                    const neighborEl = neighborId ? (document.querySelector(`[data-floating-window="${neighborId}"]`) as HTMLElement | null) : null;
-                    const neighborMinW = neighborId ? (APP_WINDOW_MIN_SIZES[neighborId]?.w ?? 360) : 360;
-                    const computeLeft = (ev: PointerEvent, workspace: { x: number }) => {
-                      const ns = neighborStart;
-                      const deltaX = ev.clientX - startX;
-                      const desiredW = Math.max(360, startW - deltaX);
-                      const desiredLeft = startLeft + (startW - desiredW);
-                      const minLeft = ns ? Math.max(workspace.x, ns.x + neighborMinW + GAP) : workspace.x;
-                      return Math.max(minLeft, desiredLeft);
-                    };
-                    let rafId = 0;
-                    const onMove = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(0);
-                        const nl = computeLeft(ev, workspace);
-                        const nw = startLeft + startW - nl;
-                        if (el) { el.style.width = nw + 'px'; el.style.left = nl + 'px'; }
-                        const ns = neighborStart;
-                        if (neighborEl && ns) neighborEl.style.width = ((nl - GAP) - ns.x) + 'px';
-                      });
-                    };
-                    const onUp = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      document.removeEventListener('pointermove', onMove);
-                      document.removeEventListener('pointerup', onUp);
-                      if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(0);
-                      const nl = computeLeft(ev, workspace);
-                      const nw = startLeft + startW - nl;
-                      setDetachedApps(prev => {
-                        const b = prev.get(appId);
-                        if (!b) return prev;
-                        const next = new Map(prev);
-                        const clamped = clampWindowToWorkspace({ x: nl, y: b.y, w: nw, h: b.h }, workspace);
-                        next.set(appId, { ...b, ...clamped });
-                        const ns = neighborStart;
-                        if (neighborId && ns) {
-                          const nbW = Math.max(neighborMinW, (nl - GAP) - ns.x);
-                          const nbPrev = prev.get(neighborId);
-                          if (nbPrev) next.set(neighborId, { ...nbPrev, ...clampWindowToWorkspace({ x: ns.x, y: ns.y, w: nbW, h: ns.h }, workspace) });
-                        }
-                        return next;
-                      });
-                    };
-                    document.addEventListener('pointermove', onMove);
-                    document.addEventListener('pointerup', onUp);
-                  }}
-                />
-                {/* Top edge */}
-                <div
-                  data-resize-handle="top"
-                  style={{ position: 'absolute', top: 0, left: 20, right: 20, height: 6, cursor: 'ns-resize', zIndex: 2, background: 'transparent' }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const startY = e.clientY;
-                    const startH = detBounds.h;
-                    const startTop = detBounds.y;
-                    const el = e.currentTarget.parentElement as HTMLElement;
-                    if (el) el.setAttribute('data-dragging', 'true');
-                    let rafId = 0;
-                    const onMove = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      rafId = requestAnimationFrame(() => {
-                        const workspace = getShellWorkspace(0);
-                        const deltaY = ev.clientY - startY;
-                        const desiredH = Math.max(280, startH - deltaY);
-                        const desiredTop = startTop + (startH - desiredH);
-                        const nt = Math.max(workspace.y, desiredTop);
-                        const nh = startTop + startH - nt;
-                        if (el) {
-                          el.style.height = nh + 'px';
-                          el.style.top = nt + 'px';
-                        }
-                      });
-                    };
-                    const onUp = (ev: PointerEvent) => {
-                      cancelAnimationFrame(rafId);
-                      document.removeEventListener('pointermove', onMove);
-                      document.removeEventListener('pointerup', onUp);
-                      if (el) el.removeAttribute('data-dragging');
-                      const workspace = getShellWorkspace(0);
-                      const deltaY = ev.clientY - startY;
-                      const desiredH = Math.max(280, startH - deltaY);
-                      const desiredTop = startTop + (startH - desiredH);
-                      const nt = Math.max(workspace.y, desiredTop);
-                      const nh = startTop + startH - nt;
-                      setDetachedApps(prev => {
-                        const b = prev.get(appId);
-                        if (!b) return prev;
-                        const next = new Map(prev);
-                        const clamped = clampWindowToWorkspace({ x: b.x, y: nt, w: b.w, h: nh }, workspace);
-                        next.set(appId, { ...b, ...clamped });
-                        return next;
-                      });
-                    };
-                    document.addEventListener('pointermove', onMove);
-                    document.addEventListener('pointerup', onUp);
-                  }}
-                />
-                {/* Bottom-right corner (SE) with visible resize grip */}
-                <div
-                  data-resize-handle="se"
-                  style={{ 
-                    position: 'absolute', right: 0, bottom: 0, width: 20, height: 20, 
-                    cursor: 'nwse-resize', zIndex: 3, borderRadius: '0 0 10px 0',
-                    display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end',
-                    padding: 4,
-                  }}
-                  onPointerDown={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const startX = e.clientX; const startY = e.clientY;
-                const startW = detBounds.w; const startH = detBounds.h;
-                let rafId = 0;
-                const el = e.currentTarget.parentElement as HTMLElement;
-                if (el) el.setAttribute('data-dragging', 'true');
-                const onMove = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(0);
-                    const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
-                    const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                    if (el) {
-                      el.style.width = nw + 'px';
-                      el.style.height = nh + 'px';
-                    }
-                  });
-                };
-                const onUp = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  document.removeEventListener('pointermove', onMove);
-                  document.removeEventListener('pointerup', onUp);
-                  if (el) el.removeAttribute('data-dragging');
-                  const workspace = getShellWorkspace(0);
-                  const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
-                  const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                  setDetachedApps(prev => {
-                    const b = prev.get(appId);
-                    if (!b) return prev;
-                    const next = new Map(prev);
-                    const clamped = clampWindowToWorkspace({ x: b.x, y: b.y, w: nw, h: nh }, workspace);
-                    next.set(appId, { ...b, ...clamped });
-                    return next;
-                  });
-                };
-                document.addEventListener('pointermove', onMove);
-                document.addEventListener('pointerup', onUp);
-              }}
-            >
-              {/* Resize grip indicator */}
-              <svg width="10" height="10" viewBox="0 0 10 10" style={{ opacity: 0.4, pointerEvents: 'none' }}>
-                <path d="M8 2L2 8" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M8 5L5 8" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M8 8L8 8" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            {/* Bottom-left corner (SW) */}
-            <div
-              data-resize-handle="sw"
-              style={{ position: 'absolute', left: 0, bottom: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
-              onPointerDown={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const startX = e.clientX; const startY = e.clientY;
-                const startW = detBounds.w; const startH = detBounds.h; const startLeft = detBounds.x;
-                let rafId = 0;
-                const el = e.currentTarget.parentElement as HTMLElement;
-                if (el) el.setAttribute('data-dragging', 'true');
-                const onMove = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(0);
-                    const dx = ev.clientX - startX;
-                    const desiredW = Math.max(360, startW - dx);
-                    const desiredLeft = startLeft + (startW - desiredW);
-                    const nl = Math.max(workspace.x, desiredLeft);
-                    const nw = startLeft + startW - nl;
-                    const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                    if (el) { el.style.width = nw + 'px'; el.style.left = nl + 'px'; el.style.height = nh + 'px'; }
-                  });
-                };
-                const onUp = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  document.removeEventListener('pointermove', onMove);
-                  document.removeEventListener('pointerup', onUp);
-                  if (el) el.removeAttribute('data-dragging');
-                  const workspace = getShellWorkspace(0);
-                  const dx = ev.clientX - startX;
-                  const desiredW = Math.max(360, startW - dx);
-                  const desiredLeft = startLeft + (startW - desiredW);
-                  const nl = Math.max(workspace.x, desiredLeft);
-                  const nw = startLeft + startW - nl;
-                  const nh = Math.min(Math.max(280, startH + ev.clientY - startY), workspace.y + workspace.h - detBounds.y);
-                  setDetachedApps(prev => {
-                    const b = prev.get(appId);
-                    if (!b) return prev;
-                    const next = new Map(prev);
-                    const clamped = clampWindowToWorkspace({ x: nl, y: b.y, w: nw, h: nh }, workspace);
-                    next.set(appId, { ...b, ...clamped });
-                    return next;
-                  });
-                };
-                document.addEventListener('pointermove', onMove);
-                document.addEventListener('pointerup', onUp);
-              }}
-            />
-            {/* Top-right corner (NE) */}
-            <div
-              data-resize-handle="ne"
-              style={{ position: 'absolute', right: 0, top: 0, width: 18, height: 18, cursor: 'nesw-resize', zIndex: 3 }}
-              onPointerDown={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const startX = e.clientX; const startY = e.clientY;
-                const startW = detBounds.w; const startH = detBounds.h; const startTop = detBounds.y;
-                let rafId = 0;
-                const el = e.currentTarget.parentElement as HTMLElement;
-                if (el) el.setAttribute('data-dragging', 'true');
-                const onMove = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(0);
-                    const dy = ev.clientY - startY;
-                    const desiredH = Math.max(280, startH - dy);
-                    const desiredTop = startTop + (startH - desiredH);
-                    const nt = Math.max(workspace.y, desiredTop);
-                    const nh = startTop + startH - nt;
-                    const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
-                    if (el) { el.style.width = nw + 'px'; el.style.height = nh + 'px'; el.style.top = nt + 'px'; }
-                  });
-                };
-                const onUp = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  document.removeEventListener('pointermove', onMove);
-                  document.removeEventListener('pointerup', onUp);
-                  if (el) el.removeAttribute('data-dragging');
-                  const workspace = getShellWorkspace(0);
-                  const dy = ev.clientY - startY;
-                  const desiredH = Math.max(280, startH - dy);
-                  const desiredTop = startTop + (startH - desiredH);
-                  const nt = Math.max(workspace.y, desiredTop);
-                  const nh = startTop + startH - nt;
-                  const nw = Math.min(Math.max(360, startW + ev.clientX - startX), workspace.x + workspace.w - detBounds.x);
-                  setDetachedApps(prev => {
-                    const b = prev.get(appId);
-                    if (!b) return prev;
-                    const next = new Map(prev);
-                    const clamped = clampWindowToWorkspace({ x: b.x, y: nt, w: nw, h: nh }, workspace);
-                    next.set(appId, { ...b, ...clamped });
-                    return next;
-                  });
-                };
-                document.addEventListener('pointermove', onMove);
-                document.addEventListener('pointerup', onUp);
-              }}
-            />
-            {/* Top-left corner (NW) */}
-            <div
-              data-resize-handle="nw"
-              style={{ position: 'absolute', left: 0, top: 0, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 3 }}
-              onPointerDown={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const startX = e.clientX; const startY = e.clientY;
-                const startW = detBounds.w; const startH = detBounds.h;
-                const startLeft = detBounds.x; const startTop = detBounds.y;
-                let rafId = 0;
-                const el = e.currentTarget.parentElement as HTMLElement;
-                if (el) el.setAttribute('data-dragging', 'true');
-                const onMove = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  rafId = requestAnimationFrame(() => {
-                    const workspace = getShellWorkspace(0);
-                    const dx = ev.clientX - startX;
-                    const dy = ev.clientY - startY;
-                    const desiredW = Math.max(360, startW - dx);
-                    const desiredH = Math.max(280, startH - dy);
-                    const nl = Math.max(workspace.x, startLeft + (startW - desiredW));
-                    const nt = Math.max(workspace.y, startTop + (startH - desiredH));
-                    const nw = startLeft + startW - nl;
-                    const nh = startTop + startH - nt;
-                    if (el) { el.style.width = nw + 'px'; el.style.height = nh + 'px'; el.style.left = nl + 'px'; el.style.top = nt + 'px'; }
-                  });
-                };
-                const onUp = (ev: PointerEvent) => {
-                  cancelAnimationFrame(rafId);
-                  document.removeEventListener('pointermove', onMove);
-                  document.removeEventListener('pointerup', onUp);
-                  if (el) el.removeAttribute('data-dragging');
-                  const workspace = getShellWorkspace(0);
-                  const dx = ev.clientX - startX;
-                  const dy = ev.clientY - startY;
-                  const desiredW = Math.max(360, startW - dx);
-                  const desiredH = Math.max(280, startH - dy);
-                  const nl = Math.max(workspace.x, startLeft + (startW - desiredW));
-                  const nt = Math.max(workspace.y, startTop + (startH - desiredH));
-                  const nw = startLeft + startW - nl;
-                  const nh = startTop + startH - nt;
-                  setDetachedApps(prev => {
-                    const b = prev.get(appId);
-                    if (!b) return prev;
-                    const next = new Map(prev);
-                    const clamped = clampWindowToWorkspace({ x: nl, y: nt, w: nw, h: nh }, workspace);
-                    next.set(appId, { ...b, ...clamped });
-                    return next;
-                  });
-                };
-                document.addEventListener('pointermove', onMove);
-                document.addEventListener('pointerup', onUp);
-              }}
-            />
-          </>
-          )}
-          </div>
+            {!isMaximized && WINDOW_RESIZE_HANDLES.map(({ name, edge, cursor }) => (
+              <div key={edge} data-resize-handle={name} style={{ cursor }}
+                onPointerDown={event => startWindowResize(event, appId, visibleBounds, edge)} />
+            ))}
+          </AppSurface>
         );
       }
 
@@ -3883,8 +3521,9 @@ export const AppManager: React.FC = () => {
       }
 
       return (
-        <div
+        <AppSurface
           key={appId}
+          appId={appId}
           data-app-id={appId}
           data-testid={`app-instance-${appId}`}
           data-app-container=""
@@ -3911,7 +3550,8 @@ export const AppManager: React.FC = () => {
             // come back blank. Layout/style containment alone is safe.
             contain: 'layout style' as any,
           }}
-          className={`dex-app-container ${showInline ? 'dex-app-opening' : ''}`}
+          {...(!showInline ? { inert: '' } : {})}
+          className="dex-app-container dex-workspace-inline"
         >
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
             <AppErrorBoundary appId={appId}>
@@ -3920,7 +3560,7 @@ export const AppManager: React.FC = () => {
               </Suspense>
             </AppErrorBoundary>
           </div>
-        </div>
+        </AppSurface>
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4192,13 +3832,13 @@ export const AppManager: React.FC = () => {
             className="traffic-light-group"
             style={{ display: 'flex', gap: 'var(--space-2)', marginRight: 'var(--space-2)', alignItems: 'center' }}
           >
-            <button onClick={handleClose} data-tip="Close" aria-label="Close window" style={trafficBtn('#ff5f57')}>
+            <button onClick={handleClose} data-tip="Close" aria-label="Close window" style={trafficBtn('#d8d8d8')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
-            <button onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window" style={trafficBtn('#febc2e')}>
+            <button onClick={handleMinimize} data-tip="Minimize" aria-label="Minimize window" style={trafficBtn('#9c9c9c')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 4H7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
-            <button onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window" style={trafficBtn('#28c840')}>
+            <button onClick={handleMaximize} data-tip="Maximize" aria-label="Maximize window" style={trafficBtn('#6f6f6f')}>
               <svg className="tl-glyph" width="8" height="8" viewBox="0 0 8 8" style={{ color: 'rgba(0,0,0,0.55)' }}><path d="M1 1L4 4L7 1M1 7L4 4L7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/></svg>
             </button>
           </div>
@@ -4212,6 +3852,20 @@ export const AppManager: React.FC = () => {
         <button style={navBtnStyle} onClick={() => setCurrentApp('home' as AppId)} onContextMenu={(e) => { e.preventDefault(); setTitlebarMenuOpen(true); }} data-tip="Home" aria-label="Go to Home">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
         </button>
+        {!isDetachedWindow() && (
+          <button type="button" style={navBtnStyle} aria-label="Open apps" aria-haspopup="dialog"
+            aria-expanded={showOverview} data-tip="Open apps (F3)" onClick={() => setShowOverview(value => !value)}>
+            <DexIcon name="grid" size={14} />
+          </button>
+        )}
+        {!isDetachedWindow() && splitMode === 'off' && (
+          <button ref={spatialToggle} type="button" style={navBtnStyle} aria-label="Spatial view"
+            aria-pressed={spatialMode} data-tip="Spatial view" onClick={() => setSpatialMode(value => !value)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+              <rect x="3" y="4" width="12" height="10" rx="2" /><path d="M9 17v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
+            </svg>
+          </button>
+        )}
         <button style={{...navBtnStyle, color: currentApp === 'browser' ? 'var(--dex-focus-color, #fff)' : undefined}} onClick={() => setCurrentApp('browser' as AppId)} data-tip={`Browser (${platform.isMac ? '⌘' : 'Ctrl'}+6)`} aria-label="Open Browser">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
@@ -4255,13 +3909,12 @@ export const AppManager: React.FC = () => {
             }}>
               {activeCreative.slice(0, 3).map(a => {
                 const def = APP_DEFINITIONS[a.id];
-                const col = def?.color || 'var(--color-text-tertiary)';
                 return (
                   <button key={a.id} onClick={() => { if (minimizedApps.has(a.id)) restoreFloatingApp(a.id); setCurrentApp(a.id as AppId); }}
                     title={def?.name || a.id}
                     aria-label={`Switch to ${def?.name || a.id}`}
                     style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: 'inherit' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: 1, background: 'var(--color-text-secondary)', flexShrink: 0 }} />
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def?.name || a.id}</span>
                   </button>
                 );
@@ -4280,12 +3933,12 @@ export const AppManager: React.FC = () => {
         <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
           {/* Battery */}
           <div style={{ position: 'relative', width: 18, height: 9, borderRadius: 2, border: '1px solid var(--color-text-tertiary)', display: 'flex', alignItems: 'center', padding: '0.5px' }}>
-            <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1.5, background: batteryLevel > 20 ? 'var(--color-success)' : 'var(--color-error)', transition: 'width 0.3s ease' }} />
+            <div style={{ height: '100%', width: `${batteryLevel}%`, borderRadius: 1, background: batteryLevel > 20 ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', transition: 'width 0.3s ease' }} />
             <div style={{ position: 'absolute', right: -2.5, width: 1.5, height: 3.5, borderRadius: '0 0.5px 0.5px 0', background: 'var(--color-text-tertiary)' }} />
           </div>
           {batteryCharging && <svg width="7" height="7" viewBox="0 0 24 24" fill="var(--color-warning)" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>}
           {/* WiFi indicator - compact dot */}
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: navigator.onLine ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
+          <span style={{ width: 6, height: 6, borderRadius: 1, background: navigator.onLine ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', flexShrink: 0 }} />
           {/* Quick Controls -- network mode + permission pills with popovers */}
           <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
         </div>
@@ -4336,12 +3989,14 @@ export const AppManager: React.FC = () => {
             </svg>
           </button>
           {/* Dropdown panel */}
-          {titlebarMenuOpen && (
+          {titlebarMenuPresent && (
             <>
-              <style>{`@keyframes titlebarDropIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
               <div
                 role="menu"
                 aria-label="Control center"
+                className="dex-motion-surface"
+                data-open={titlebarMenuOpen}
+                {...(!titlebarMenuOpen ? { inert: '' } : {})}
                 style={{
                   position: 'absolute', top: 24, right: 0, zIndex: 'var(--z-max)',
                   minWidth: 220, padding: '6px 0',
@@ -4351,7 +4006,6 @@ export const AppManager: React.FC = () => {
                   WebkitBackdropFilter: 'var(--glass-blur, blur(20px))',
                   borderRadius: 10, border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
                   boxShadow: 'var(--pg-shadow-modal)',
-                  animation: 'titlebarDropIn 0.18s cubic-bezier(0.23,1,0.32,1)',
                   transformOrigin: 'top right',
                 }}
               >
@@ -4422,7 +4076,8 @@ export const AppManager: React.FC = () => {
                   <input
                     type="range" min={0} max={100} value={systemVolume}
                     onChange={e => setSystemVolume(Number(e.target.value))}
-                    aria-label="System volume"
+                    aria-label="DEX media volume"
+                    title="DEX media volume"
                     style={{ flex: 1, height: 3, accentColor: '#fff', cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', minWidth: 22, textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' as any }}>{systemVolume}</span>
@@ -4432,11 +4087,11 @@ export const AppManager: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={spatialAudioOn ? 'var(--color-success)' : 'var(--color-text-secondary)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 10s3-4 10-4 10 4 10 4"/><path d="M2 14s3 4 10 4 10-4 10-4"/><circle cx="12" cy="12" r="2"/></svg>
-                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Spatial Audio</span>
+                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Interface sounds</span>
                   </div>
                   <button
                     onClick={() => setSpatialAudioOn(p => !p)}
-                    aria-label={spatialAudioOn ? 'Disable spatial audio' : 'Enable spatial audio'}
+                    aria-label={spatialAudioOn ? 'Disable interface sounds' : 'Enable interface sounds'}
                     style={{
                       width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
                       background: spatialAudioOn ? 'var(--color-success)' : 'var(--color-border)',
@@ -4456,22 +4111,22 @@ export const AppManager: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px' }}>
                   <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>Reduce Motion</span>
                   <button
-                    onClick={() => {
-                      const cur = isReduceMotion();
-                      try { localStorage.setItem('dex-reduce-motion', String(!cur)); } catch (e) { console.warn('[DEX]', e); }
-                      window.location.reload();
-                    }}
+                    onClick={() => setReducedMotionPreference(!reducedMotion)}
+                    type="button"
+                    role="switch"
+                    aria-checked={reducedMotion}
+                    disabled={typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches}
                     aria-label="Toggle reduce motion"
                     style={{
                       width: 32, height: 18, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: isReduceMotion() ? 'var(--color-success)' : 'var(--color-border)',
+                      background: reducedMotion ? 'var(--color-success)' : 'var(--color-border)',
                       position: 'relative', transition: 'background 0.2s ease', padding: 0,
                     }}
                   >
                     <div style={{
                       width: 14, height: 14, borderRadius: '50%', background: '#fff',
                       position: 'absolute', top: 2, left: 2,
-                      transform: isReduceMotion() ? 'translateX(14px)' : 'translateX(0)',
+                      transform: reducedMotion ? 'translateX(14px)' : 'translateX(0)',
                       transition: 'transform 0.2s ease',
                       boxShadow: 'var(--pg-shadow-chip)',
                     }} />
@@ -4591,18 +4246,10 @@ export const AppManager: React.FC = () => {
 
       {/* Content area -- supports split-screen tiling */}
       {splitMode === 'off' ? (
-        <div ref={contentRef} role="main" aria-label="App content" style={{
-          flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden',
-          // Transparent so the Home desktop (the wallpaper layer, always mounted at
-          // z0 inside here) is what shows behind floating app windows -- minimizing
-          // a window reveals the desktop, never a flat black void. Apps don't bleed
-          // because every non-home app surface is opaque (see the app container bg).
-          background: 'transparent',
-          borderRadius: 0,
-          contain: 'layout style',
-        }}>
+        <SpatialWorkspace active={spatialMode} viewportRef={contentRef} onExit={exitSpatialMode}
+          hasOpenWindows={Array.from(detachedApps.keys()).some(id => !minimizedApps.has(id))}>
           {keepAliveElements}
-        </div>
+        </SpatialWorkspace>
       ) : (
         <div ref={splitContainerRef} style={{
           flex: 1, minWidth: 0, minHeight: 0, display: 'flex',
@@ -4621,7 +4268,7 @@ export const AppManager: React.FC = () => {
             {(() => {
               const Comp = APP_COMPONENTS[currentApp];
               return Comp ? (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)' }}>
+                <AppSurface appId={currentApp} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)' }}>
                   <div style={{ height: 28, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', background: 'var(--color-border-subtle)', borderBottom: '0.5px solid var(--color-border-subtle)', flexShrink: 0 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)' }}>{getLabel(currentApp)}</span>
                     <button onClick={exitSplit} data-tip="Exit Split" aria-label="Exit split view" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2, fontSize: 11, fontWeight: 600 }}>Exit Split</button>
@@ -4629,7 +4276,7 @@ export const AppManager: React.FC = () => {
                   <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
                     <AppErrorBoundary appId={currentApp}><Suspense fallback={<Loading appId={currentApp} />}><Comp /></Suspense></AppErrorBoundary>
                   </div>
-                </div>
+                </AppSurface>
               ) : null;
             })()}
           </div>
@@ -4653,7 +4300,7 @@ export const AppManager: React.FC = () => {
               if (!sApp) return null;
               const Comp = APP_COMPONENTS[sApp];
               return Comp ? (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+                <AppSurface appId={sApp} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)' }}>
                   <div style={{ height: 28, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', background: 'var(--color-border-subtle)', borderBottom: '0.5px solid var(--color-border-subtle)', flexShrink: 0 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)' }}>{getLabel(sApp)}</span>
                     <button onClick={() => { setSplitApp(null); setSplitMode('off'); }} data-tip="Close" aria-label="Close split pane" style={{ background: 'none', border: 'none', color: 'rgba(255,69,58,0.8)', cursor: 'pointer', padding: 2, fontSize: 11, fontWeight: 600 }}>Close</button>
@@ -4661,7 +4308,7 @@ export const AppManager: React.FC = () => {
                   <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                     <AppErrorBoundary appId={sApp}><Suspense fallback={<Loading appId={sApp} />}><Comp /></Suspense></AppErrorBoundary>
                   </div>
-                </div>
+                </AppSurface>
               ) : null;
             })()}
           </div>
@@ -4736,24 +4383,20 @@ export const AppManager: React.FC = () => {
           so there is no separate centered modal. */}
 
       {/* App Menu Overlay -- the launcher's own panel (no dock inheritance) */}
-      {showAppMenu && (
+      {appMenuPresent && (
         <>
           <div
             data-dex-overlay
-            onClick={() => { setShowAppMenu(false); setAppMenuSearch(''); }}
+            className="dex-motion-surface"
+            data-open={showAppMenu}
+            aria-hidden="true"
             style={{
               position: 'fixed', inset: 0,
               background: 'rgba(0,0,0,0.18)',
               zIndex: 9000,
-              pointerEvents: 'auto',
+              pointerEvents: 'none',
             } as React.CSSProperties}
           />
-          {/* Centering happens via this flex wrapper -- NOT a transform on the
-              panel. A global low-perf-tier rule strips `transform` on hover/focus
-              (transform: none !important), which would otherwise yank a
-              transform-centred panel sideways the moment the cursor entered it.
-              Flexbox centering is layout, immune to that, so the panel is rock
-              steady -- same place every time, never moves under the cursor. */}
           <div
             style={{
               position: 'fixed', inset: 0, zIndex: 9700,
@@ -4762,18 +4405,25 @@ export const AppManager: React.FC = () => {
             } as React.CSSProperties}
           >
           <div
+            ref={appMenuPanel}
             data-dex-overlay
             data-dex-app-menu-panel
+            className="dex-motion-surface"
+            data-open={showAppMenu}
+            data-anchored={!!appMenuAnchor}
+            {...(!showAppMenu ? { inert: '' } : {})}
             role="dialog"
             aria-label="App menu"
             style={{
-              // Own system, not the dock: a STATIC, dead-centred panel. Same
-              // location, dimensions, and alignment every time it opens -- no
-              // edge anchoring, no dock-relative math, nothing that moves.
-              position: 'relative',
+              position: appMenuAnchor ? 'absolute' : 'relative',
               pointerEvents: 'auto',
               width: 'min(520px, 92vw)',
-              maxHeight: 'min(620px, calc(100vh - 96px))',
+              ...(appMenuAnchor ? {
+                left: `clamp(10px, calc(${appMenuAnchor.x}px - min(260px, 46vw)), calc(100vw - min(520px, 92vw) - 10px))`,
+                [appMenuAnchor.above ? 'bottom' : 'top']: appMenuAnchor.y,
+                maxHeight: `min(620px, calc(100vh - ${appMenuAnchor.y + 10}px))`,
+                transformOrigin: appMenuAnchor.above ? 'bottom center' : 'top center',
+              } : { maxHeight: 'min(620px, calc(100vh - 96px))' }),
               overflowY: 'auto',
               overflowX: 'hidden',
               scrollbarWidth: 'none',
@@ -4787,13 +4437,8 @@ export const AppManager: React.FC = () => {
               borderRadius: 14,
               padding: 'var(--space-4)',
               boxShadow: 'var(--pg-shadow-modal)',
-              // Precision motion: pure opacity fade, no movement / scale / bounce.
-              animation: 'appMenuFade 0.15s ease-out',
             } as React.CSSProperties}
           >
-            <style>{`
-              @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
-            `}</style>
             {/* App search consolidated to the single dock search pill (+ the
                 universal overlay it opens) -- this panel is now a clean app grid
                 with no duplicate inline search bar. */}
@@ -4894,11 +4539,7 @@ export const AppManager: React.FC = () => {
                 if (e.key === 'ArrowRight') next = (idx + 1) % btns.length;
                 else if (e.key === 'ArrowLeft') next = (idx - 1 + btns.length) % btns.length;
                 else if (e.key === 'ArrowDown') next = Math.min(idx + cols, btns.length - 1);
-                else if (e.key === 'ArrowUp') {
-                  // From the top row, step back up into the search field.
-                  if (idx < cols) { e.preventDefault(); appMenuSearchRef.current?.focus(); return; }
-                  next = Math.max(idx - cols, 0);
-                }
+                else if (e.key === 'ArrowUp') next = idx < cols ? idx : idx - cols;
                 else if (e.key === 'Home') next = 0;
                 else if (e.key === 'End') next = btns.length - 1;
                 else return;
@@ -4992,7 +4633,15 @@ export const AppManager: React.FC = () => {
       {/* Floating Launcher -- a draggable orb, placeable anywhere, that opens the
           app grid + search. A stable alternative to the fixed dock that never
           shifts as apps open/close. */}
-      <FloatingLauncher onOpen={() => { setShowAppMenu(true); }} />
+      <FloatingLauncher menuOpen={showAppMenu} onOpen={trigger => {
+        appMenuTrigger.current = trigger;
+        if (!showAppMenu) {
+          const bounds = trigger.getBoundingClientRect();
+          const above = bounds.top + bounds.height / 2 > window.innerHeight / 2;
+          setAppMenuAnchor({ x: bounds.left + bounds.width / 2, y: (above ? window.innerHeight - bounds.top : bounds.bottom) + 8, above });
+        }
+        setShowAppMenu(open => !open);
+      }} />
 
       {/* Control Center -- right-side glass panel; self-manages open state via
           the `dex-toggle-control-center` window event dispatched from the top bar. */}
@@ -5007,10 +4656,15 @@ export const AppManager: React.FC = () => {
         apps={runningApps.map(a => ({
           id: a.id,
           name: a.name,
-          element: contentRef.current?.querySelector(`[data-app-id="${a.id}"]`) as HTMLElement | null,
+          icon: a.icon,
+          color: a.color,
+          minimized: minimizedApps.has(a.id),
         }))}
         activeAppId={currentApp}
-        onSelectApp={(id) => { setCurrentApp(id as AppId); setShowOverview(false); }}
+        onSelectApp={id => {
+          if (detachedApps.has(id)) openAppInWindow(id as AppId);
+          else setCurrentApp(id as AppId);
+        }}
         onCloseApp={(id) => { if (id !== 'home') handleCloseApp(id); }}
         onDismiss={() => setShowOverview(false)}
       />

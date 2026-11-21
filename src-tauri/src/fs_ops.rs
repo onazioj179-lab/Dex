@@ -55,13 +55,13 @@ pub fn get_media_files(media_type: &str, home: &Path) -> Value {
         "videos" => ("Videos", &[".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]),
         _ => return json!([]),
     };
-    let scan_path = home.join(sub);
+    json!(scan_media(&home.join(sub), exts))
+}
+
+pub(crate) fn scan_media(scan_path: &Path, exts: &[&str]) -> Vec<Value> {
     let mut results: Vec<Value> = Vec::new();
-    if scan_path.exists() {
-        scan_dir(&scan_path, 0, exts, &mut results);
-    }
-    results.truncate(500);
-    json!(results)
+    scan_dir(scan_path, 0, exts, &mut results);
+    results
 }
 
 fn scan_dir(dir: &Path, depth: usize, exts: &[&str], results: &mut Vec<Value>) {
@@ -92,22 +92,27 @@ fn scan_dir(dir: &Path, depth: usize, exts: &[&str], results: &mut Vec<Value>) {
                 None => String::new(),
             };
             if exts.contains(&ext.as_str()) {
-                if let Ok(meta) = entry.metadata() {
-                    let modified = meta
-                        .modified()
-                        .ok()
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| d.as_millis() as f64)
-                        .unwrap_or(0.0);
-                    results.push(json!({
-                        "path": path.to_string_lossy(),
-                        "name": name,
-                        "extension": ext,
-                        "size": meta.len(),
-                        "modified": modified,
-                    }));
+                if let Ok(record) = media_record(&path) {
+                    results.push(record);
                 }
             }
         }
     }
+}
+
+pub(crate) fn media_record(path: &Path) -> std::io::Result<Value> {
+    let meta = std::fs::metadata(path)?;
+    if !meta.is_file() {
+        return Err(std::io::Error::other("Expected a regular media file"));
+    }
+    let modified = meta.modified().ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0.0, |duration| duration.as_millis() as f64);
+    Ok(json!({
+        "path": path.to_string_lossy(),
+        "name": path.file_name().unwrap_or_default().to_string_lossy(),
+        "extension": path.extension().and_then(|ext| ext.to_str()).map(|ext| format!(".{}", ext.to_lowercase())),
+        "size": meta.len(),
+        "modified": modified,
+    }))
 }

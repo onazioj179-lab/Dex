@@ -30,6 +30,7 @@
 /** The core tools UKI's agent loop can always call. */
 export const KNOWN_TOOLS = [
   'web_search',
+  'search_indexed_files',
   'open_app',
   'close_app',
   'notify',
@@ -66,6 +67,13 @@ export const CORE_TOOLS: ToolSpec[] = [
     example: '{"query": "..."}',
   },
   {
+    name: 'search_indexed_files',
+    argline: '{"query": string}',
+    description: 'find file names in folders the user approved for Umari. Use when the user asks to find a local file.',
+    args: [{ name: 'query', type: 'string' }],
+    example: '{"query": "project brief"}',
+  },
+  {
     name: 'open_app',
     argline: '{"app": string}',
     description: 'open a DEX app for the user (name or id, e.g. "notes", "Settings", "kanban").',
@@ -89,7 +97,7 @@ export const CORE_TOOLS: ToolSpec[] = [
   {
     name: 'get_context',
     argline: '{}',
-    description: 'see what the user is currently looking at (active app, file, selection).',
+    description: 'read the foreground app context allowed by the user’s per-app settings.',
     args: [],
     example: '{}',
   },

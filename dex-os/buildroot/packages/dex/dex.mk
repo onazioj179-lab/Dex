@@ -1,11 +1,11 @@
 # ===========================================================================
 # DEX OS -- Buildroot Package Recipe
 # ===========================================================================
-# Installs the pre-built DEX Electron application into the root filesystem.
-# The Electron binary and app resources are staged from the host build output.
+# Installs the pre-built DEX Tauri application into the root filesystem.
+# The Tauri executable and resources are staged from the host build output.
 # ===========================================================================
 
-DEX_VERSION = 3.6.0
+DEX_VERSION = 7.0.1
 DEX_SITE = $(BR2_EXTERNAL_DEX_PATH)/app
 DEX_SITE_METHOD = local
 DEX_LICENSE = Proprietary
@@ -22,6 +22,7 @@ DEX_DEPENDENCIES = \
 	cups \
 	at-spi2-core \
 	gtk3 \
+	webkitgtk \
 	libxkbcommon \
 	fontconfig \
 	pango \
@@ -37,8 +38,8 @@ define DEX_INSTALL_TARGET_CMDS
 	# Create application directory
 	mkdir -p $(TARGET_DIR)/opt/dex
 
-	# Copy the packaged Electron app (linux-unpacked output from electron-builder)
-	cp -a $(DEX_SITE)/linux-unpacked/* $(TARGET_DIR)/opt/dex/
+	# Copy the target-compatible Tauri executable
+	install -m 755 $(@D)/dex $(TARGET_DIR)/opt/dex/dex
 
 	# Create symlink for the launcher
 	mkdir -p $(TARGET_DIR)/usr/local/bin
@@ -65,7 +66,7 @@ define DEX_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/etc/X11/xorg.conf
 
 	# Install audio config
-	mkdir -p $(TARGET_DIR)/etc/pulse
+	mkdir -p $(TARGET_DIR)/etc/pulse/default.pa.d
 	cp $(BR2_EXTERNAL_DEX_PATH)/../system/audio.conf \
 		$(TARGET_DIR)/etc/pulse/default.pa.d/dex.pa
 

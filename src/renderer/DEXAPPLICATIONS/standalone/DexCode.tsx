@@ -6,12 +6,17 @@
 // =============================================================================
 // DexCode — code editor for DexScript (DEX's scripting language).
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
-import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, useId, memo } from 'react';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
+import { useAppAppearance } from '../../utils/appAppearanceContext';
 import { TerminalTabs } from '../../components/TerminalTabs';
-import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
+import { useConfirm } from '../../components/ConfirmDialog';
+import { ProjectTasks } from './dexCode/ProjectTasks';
+import { ProjectGit } from './dexCode/ProjectGit';
+import { useSyntaxDiagnostics } from './dexCode/useSyntaxDiagnostics';
+import { TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
 import { hasConfiguredProvider, askConfiguredLLM } from '../../uki/providers/connect';
 import { runUkiAgent } from '../../uki/agentRunner';
@@ -22,18 +27,25 @@ import { extractSymbols, lineStartOffset, SYMBOL_TAG } from './dexCode/symbols';
 import {
   getRecentFiles,
   addRecentFile,
-  removeRecentFile,
   openFileDialog,
   saveFileDialog,
   saveFile,
 } from './dexCode/fileIO';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import {
-  pickProjectFolder, loadProject, getStoredProjectRoot, clearStoredProject,
-  readProjectFile, searchProject, projectName, buildSymbolIndex,
+  pickProjectFolder, loadProject, restoreProject, getStoredProjectRoot, closeProjectFolder,
+  readProjectFile, searchWorkspaceFiles, projectName, buildSymbolIndex, projectContains, sameProjectPath,
+  openProjectDocument, saveProjectDocument,
   type DexProject, type WorkspaceHit, type ProjectSymbol, type ProjectFile,
 } from './dexCode/project';
+import {
+  appendEditorTab, editorTabIsDirty, makeEditorTab, mergeEditorDisk, useEditorSession,
+  type EditorAccess, type EditorTab,
+} from './dexCode/editorSession';
+import { EditorTabs, editorTabElementId } from './dexCode/EditorTabs';
+import { ProjectFileList } from './dexCode/ProjectFileList';
 import { fuzzyFilter, type QuickOpenResult } from './dexCode/quickOpen';
+import { loadAppPreferences, useAppPreference } from '../../store/appPreferences';
 
 // Re-export for any external consumer that previously imported these from
 // DexCode.tsx directly.
@@ -72,16 +84,27 @@ function stripCodeFences(text: string): string {
   return t.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
 }
 
-// Gutter line numbers, memoized so typing on a single line does not rebuild the
-// whole column of <div>s every keystroke -- it only re-renders when the line
-// count actually changes. A meaningful win on large files (the gutter was the
-// hottest list in the editor's render path).
-const LineNumbers = memo(function LineNumbers({ count }: { count: number }) {
+function reportEditorError(message: string) {
+  window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message } }));
+}
+
+const EDITOR_LINE_HEIGHT = 20;
+const DEFAULT_GUTTER_HEIGHT = 600;
+const HIGHLIGHT_CHARACTER_LIMIT = 300_000;
+const HIGHLIGHT_LINE_LIMIT = 10_000;
+
+const LineNumbers = memo(function LineNumbers({ count, top, height, width }: {
+  count: number; top: number; height: number; width: number;
+}) {
+  const first = Math.min(count - 1, Math.max(0, Math.floor(top / EDITOR_LINE_HEIGHT) - 1));
+  const rows = Math.min(count - first, Math.ceil(height / EDITOR_LINE_HEIGHT) + 3);
   return (
-    <div style={S.lineNumbers} aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} style={S.lineNum}>{i + 1}</div>
-      ))}
+    <div style={{ ...S.lineNumbers, width }} aria-hidden="true" data-editor-gutter>
+      <div style={{ transform: `translateY(${first * EDITOR_LINE_HEIGHT - top}px)` }}>
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={first + index} style={S.lineNum}>{first + index + 1}</div>
+        ))}
+      </div>
     </div>
   );
 });
@@ -122,15 +145,34 @@ const QuickOpenRow = memo(function QuickOpenRow({
 });
 
 const DexCode: React.FC = () => {
-  const [code, setCode] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) || DEFAULT_CODE; } catch { return DEFAULT_CODE; }
-  });
-  const [fileName, setFileName] = useState(() => {
-    try { return localStorage.getItem(FILE_KEY) || 'main.dex'; } catch { return 'main.dex'; }
-  });
-  // File system state
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
-  const [isModified, setIsModified] = useState(false);
+  const appearance = useAppAppearance();
+  const { session, current: editorSession, ready: sessionReady, draftState, update: updateSession, patch: patchTab } = useEditorSession();
+  const activeTab = session.tabs.find(tab => tab.id === session.activeId)!;
+  const code = activeTab.text;
+  const fileName = activeTab.name;
+  const currentFilePath = activeTab.path;
+  const isModified = editorTabIsDirty(activeTab);
+  const editorReadOnly = !sessionReady || activeTab.status === 'pending' ||
+    (activeTab.status === 'unavailable' && !isModified);
+  const editorPanelId = useId();
+  const problemsId = useId();
+  const [showProblems, setShowProblems] = useState(false);
+  const setCode = useCallback((text: string) => {
+    if (!editorReadOnly) patchTab(activeTab.id, tab => tab.text === text ? tab : { ...tab, text });
+  }, [activeTab.id, editorReadOnly, patchTab]);
+  const [project, setProject] = useState<DexProject | null>(null);
+  const [gitOpen, setGitOpen] = useState(false);
+  const [gitRevision, setGitRevision] = useState(0);
+  const [projectReady, setProjectReady] = useState(false);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const projectRequest = useRef(0);
+  const projectBusy = useRef(false);
+  const savingDocument = useRef<string | null>(null);
+  const savingDestination = useRef<string | null>(null);
+  const openingDialog = useRef(false);
+  const reloadingDocument = useRef<string | null>(null);
+  const editorJump = useRef<{ id: string; line: number; column?: number } | null>(null);
   const [recentFiles, setRecentFiles] = useState<string[]>(() => getRecentFiles());
   const [showRecentFiles, setShowRecentFiles] = useState(false);
   
@@ -154,16 +196,33 @@ const DexCode: React.FC = () => {
     try { return localStorage.getItem('dex-code-plain-text') || ''; } catch { return ''; }
   });
   useEffect(() => { try { localStorage.setItem('dex-code-lang-mode', langMode); } catch { /* quota */ } }, [langMode]);
+  const syntax = useSyntaxDiagnostics({
+    id: activeTab.id,
+    name: fileName,
+    text: code,
+    enabled: !editorReadOnly && langMode === 'dexscript',
+  });
   useEffect(() => { try { localStorage.setItem('dex-code-plain-mode', plainMode); } catch { /* quota */ } }, [plainMode]);
   useEffect(() => { try { localStorage.setItem('dex-code-plain-text', plainText); } catch { /* quota */ } }, [plainText]);
   // Verb for the Run button while UKI is working a plain-English request.
   const aiPhrase = useWorkingPhrase(isRunning && langMode === 'plain', plainMode === 'doit' ? 'run' : 'generic');
 
-  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalState, setTerminalState] = useState<'closed' | 'visible' | 'hidden'>('closed');
+  const [taskState, setTaskState] = useState<'closed' | 'visible' | 'hidden'>('closed');
+  const terminalOpen = terminalState === 'visible';
+  const tasksOpen = taskState === 'visible';
+  const { confirm, ConfirmHost } = useConfirm();
+  const toggleTerminal = useCallback(() => {
+    setTaskState(state => state === 'visible' ? 'hidden' : state);
+    setTerminalState(state => state === 'visible' ? 'hidden' : 'visible');
+  }, []);
+  const toggleProjectTasks = useCallback(() => {
+    setTerminalState(state => state === 'visible' ? 'hidden' : state);
+    setTaskState(state => state === 'visible' ? 'hidden' : 'visible');
+  }, []);
   // Autosave status for the status bar. 'saving' while the debounce is pending,
   // 'saved' briefly after the write lands, then idle. Purely a UI affordance --
   // the autosave timing itself is unchanged.
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   // Collapsible sidebar (DEX 5.6: IDE-like, "nothing locked"). Toggle from the
   // Navigator activity-bar button or Ctrl+B (VS Code convention). Persisted.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -198,11 +257,21 @@ const DexCode: React.FC = () => {
     } catch { return 240; }
   });
   const workspaceRef = useRef<HTMLElement>(null);
+  const editorShellRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [gutter, setGutter] = useState({ top: 0, height: DEFAULT_GUTTER_HEIGHT });
+  const measureGutter = useCallback((editor: HTMLTextAreaElement) => {
+    const top = editor.scrollTop;
+    const height = editor.clientHeight || DEFAULT_GUTTER_HEIGHT;
+    setGutter(previous => previous.top === top && previous.height === height ? previous : { top, height });
+  }, []);
   const highlightRef = useRef<HTMLPreElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
-  const [fontSize, setFontSize] = useState(13);
+  const defaultFontSize = Number(useAppPreference('dexcode', 'fontSize'));
+  const [fontSize, setFontSize] = useState(defaultFontSize);
+  useEffect(() => { void loadAppPreferences(); }, []);
+  useEffect(() => setFontSize(defaultFontSize), [defaultFontSize]);
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
   const [selStats, setSelStats] = useState<{ chars: number; lines: number } | null>(null);
   const [showFind, setShowFind] = useState(false);
@@ -245,8 +314,6 @@ const DexCode: React.FC = () => {
   const quickOpenRef = useRef<HTMLInputElement>(null);
   // Output -> ecosystem (copy / send via DEX Flow).
   const [outputCopied, setOutputCopied] = useState(false);
-  // Track original content for modified detection
-  const originalCodeRef = useRef(code);
 
   // UKI dev-workspace awareness (DEX 5.6): expose the open file + language +
   // dirty state + cursor so UKI knows what code the user is editing. A ref keeps
@@ -273,104 +340,294 @@ const DexCode: React.FC = () => {
     return () => unregisterUkiAppContext('dexcode');
   }, []);
 
-  // File system handlers
-  const handleOpenFile = useCallback(async () => {
-    const result = await openFileDialog();
-    if (result) {
-      setCode(result.content);
-      setCurrentFilePath(result.path);
-      setFileName(result.path.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = result.content;
-      setIsModified(false);
-      addRecentFile(result.path);
-      setRecentFiles(getRecentFiles());
+  const jumpToLine = useCallback((line: number, column = 1) => {
+    const tabId = editorSession.current.activeId;
+    requestAnimationFrame(() => {
+      if (editorSession.current.activeId !== tabId) return;
+      const ta = editorRef.current;
+      if (!ta) return;
+      const text = ta.value;
+      const start = lineStartOffset(text, line);
+      const end = text.indexOf('\n', start);
+      const pos = Math.min(start + column - 1, end === -1 ? text.length : end);
+      ta.selectionStart = ta.selectionEnd = pos;
+      ta.focus();
+      ta.scrollTop = Math.max(0, (line - 1) * EDITOR_LINE_HEIGHT - ta.clientHeight / 2);
+      measureGutter(ta);
+    });
+  }, [editorSession, measureGutter]);
+
+  const recordEditorView = useCallback(() => {
+    const editor = editorRef.current;
+    const tab = editorSession.current.tabs.find(entry => entry.id === editorSession.current.activeId);
+    if (!editor || !tab || editor.dataset.documentId !== tab.id || tab.status === 'pending') return;
+    const view = { start: editor.selectionStart, end: editor.selectionEnd, top: editor.scrollTop, left: editor.scrollLeft };
+    patchTab(tab.id, current => {
+      const saved = current.view;
+      return saved && saved.start === view.start && saved.end === view.end &&
+        saved.top === view.top && saved.left === view.left ? current : { ...current, view };
+    });
+  }, [editorSession, patchTab]);
+
+  const activateTab = useCallback((tab: EditorTab, line?: number, column?: number) => {
+    recordEditorView();
+    editorJump.current = line && line > 0 ? { id: tab.id, line, column } : null;
+    if (editorSession.current.activeId === tab.id) {
+      if (line && tab.status !== 'pending') {
+        editorJump.current = null;
+        jumpToLine(line, column);
+      }
+      return;
     }
+    updateSession(previous => ({ ...previous, activeId: tab.id }));
+  }, [editorSession, jumpToLine, recordEditorView, updateSession]);
+
+  const showNewTab = useCallback((tab: EditorTab) => {
+    recordEditorView();
+    editorJump.current = null;
+    updateSession(previous => appendEditorTab(previous, tab));
+  }, [recordEditorView, updateSession]);
+
+  const readEditorDisk = useCallback(async (path: string) => {
+    const workspace = projectRef.current;
+    const workspaceVersion = projectRequest.current;
+    if (workspace?.writable && projectContains(workspace, path)) {
+      const { content: text, ...document } = await openProjectDocument(workspace, path);
+      const access: EditorAccess = { type: 'project', document, workspaceVersion };
+      return { path: document.path, text, access };
+    }
+    const text = await readProjectFile(path);
+    if (text === null) throw new Error('The file could not be read.');
+    return { path, text, access: null };
   }, []);
 
-  const handleSaveFile = useCallback(async () => {
-    if (currentFilePath) {
-      const success = await saveFile(currentFilePath, code);
-      if (success) {
-        originalCodeRef.current = code;
-        setIsModified(false);
-      }
-    } else {
-      // Save As if no current file
-      const path = await saveFileDialog(code, fileName);
-      if (path) {
-        setCurrentFilePath(path);
-        setFileName(path.split(/[\\/]/).pop() || 'file.dex');
-        originalCodeRef.current = code;
-        setIsModified(false);
-        addRecentFile(path);
-        setRecentFiles(getRecentFiles());
-      }
-    }
-  }, [code, currentFilePath, fileName]);
-
-  const handleSaveAs = useCallback(async () => {
-    const path = await saveFileDialog(code, fileName);
-    if (path) {
-      setCurrentFilePath(path);
-      setFileName(path.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = code;
-      setIsModified(false);
-      addRecentFile(path);
-      setRecentFiles(getRecentFiles());
-    }
-  }, [code, fileName]);
-
-  const handleNewFile = useCallback(() => {
-    setCode(DEFAULT_CODE);
-    setCurrentFilePath(null);
-    setFileName('untitled.dex');
-    originalCodeRef.current = DEFAULT_CODE;
-    setIsModified(false);
+  const rememberEditorFile = useCallback((path: string) => {
+    addRecentFile(path);
+    setRecentFiles(getRecentFiles());
   }, []);
 
-  const handleOpenRecent = useCallback(async (filePath: string) => {
+  useEffect(() => {
+    if (!sessionReady || !projectReady || activeTab.status !== 'pending' || !activeTab.path) return;
+    let cancelled = false;
+    const id = activeTab.id;
+    const version = projectRequest.current;
+    void readEditorDisk(activeTab.path).then(disk => {
+      if (cancelled || version !== projectRequest.current) return;
+      patchTab(id, tab => mergeEditorDisk({ ...tab, path: disk.path }, disk.text, disk.access ?? tab.access));
+      rememberEditorFile(disk.path);
+    }).catch(() => {
+      if (!cancelled && version === projectRequest.current) {
+        patchTab(id, tab => ({ ...tab, status: 'unavailable', access: null }));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeTab.id, activeTab.path, activeTab.status, patchTab, project, projectReady, readEditorDisk, rememberEditorFile, sessionReady]);
+
+  const confirmFileChange = useRef(false);
+  const confirmDiscard = useCallback(async (tab: EditorTab, title: string) => {
+    if (!editorTabIsDirty(tab)) return true;
+    if (confirmFileChange.current) return false;
+    confirmFileChange.current = true;
     try {
-      const content = await window.dex?.invoke('fs:read-file', filePath);
-      setCode(content);
-      setCurrentFilePath(filePath);
-      setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = content;
-      setIsModified(false);
-      addRecentFile(filePath);
-      setRecentFiles(getRecentFiles());
-      setShowRecentFiles(false);
-    } catch {
-      // File might not exist anymore
-      const updated = removeRecentFile(filePath);
-      setRecentFiles(updated);
+      return await confirm({
+        title,
+        message: `${tab.name} has unsaved changes.`,
+        confirmLabel: 'Discard changes',
+        cancelLabel: 'Keep editing',
+        tone: 'destructive',
+      });
+    } finally {
+      confirmFileChange.current = false;
     }
-  }, [recentFiles]);
+  }, [confirm]);
 
-  // Track modifications
-  useEffect(() => {
-    setIsModified(code !== originalCodeRef.current);
-  }, [code]);
+  const closeEditorTab = useCallback(async (id: string) => {
+    const before = editorSession.current.tabs.find(tab => tab.id === id);
+    if (!before || savingDocument.current === id || reloadingDocument.current === id) return;
+    if (!await confirmDiscard(before, 'Close this tab?')) return;
+    recordEditorView();
+    updateSession(previous => {
+      const index = previous.tabs.findIndex(tab => tab.id === id);
+      if (index < 0 || previous.tabs[index].text !== before.text || savingDocument.current === id ||
+        reloadingDocument.current === id) return previous;
+      const tabs = previous.tabs.filter(tab => tab.id !== id);
+      if (!tabs.length) tabs.push(makeEditorTab());
+      return { tabs, activeId: previous.activeId === id ? tabs[Math.min(index, tabs.length - 1)].id : previous.activeId };
+    });
+  }, [confirmDiscard, editorSession, recordEditorView, updateSession]);
 
-  // Auto-save
-  useEffect(() => {
-    setSaveState('saving');
-    const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, code);
-        localStorage.setItem(FILE_KEY, fileName);
-      } catch { /* ignore */ }
-      setSaveState('saved');
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [code, fileName]);
+  const openEditorPath = useCallback(async (path: string, line?: number, column?: number, reload = false) => {
+    if (!sessionReady) return;
+    if (savingDestination.current && sameProjectPath(savingDestination.current, path)) {
+      throw new Error('Wait for this file to finish saving before opening it.');
+    }
+    const existing = editorSession.current.tabs.find(tab => tab.path && sameProjectPath(tab.path, path));
+    if (!existing) {
+      const tab = makeEditorTab(path.split(/[\\/]/).pop() || path, '', path);
+      showNewTab(tab);
+      if (line && line > 0) editorJump.current = { id: tab.id, line, column };
+      return;
+    }
+    activateTab(existing, reload ? undefined : line, column);
+    if (!reload || existing.status === 'pending' || savingDocument.current === existing.id || reloadingDocument.current) return;
+    reloadingDocument.current = existing.id;
+    try {
+      if (!await confirmDiscard(existing, 'Reload from disk?')) return;
+      const version = projectRequest.current;
+      const disk = await readEditorDisk(path);
+      if (version !== projectRequest.current) throw new Error('The project changed while reloading. Try again.');
+      patchTab(existing.id, tab => tab.text !== existing.text || tab.base !== existing.base ? tab : {
+        ...tab, text: disk.text, base: disk.text, path: disk.path, access: disk.access ?? tab.access, status: 'ready',
+      });
+      if (line && editorSession.current.activeId === existing.id) jumpToLine(line, column);
+    } finally {
+      reloadingDocument.current = null;
+    }
+  }, [activateTab, confirmDiscard, editorSession, jumpToLine, patchTab, readEditorDisk, sessionReady, showNewTab]);
 
-  // After "Saved" shows briefly, fade the indicator back to idle. Reset on each
-  // new save so the message stays visible while edits are in flight.
-  useEffect(() => {
-    if (saveState !== 'saved') return;
-    const timer = window.setTimeout(() => setSaveState('idle'), 1500);
-    return () => window.clearTimeout(timer);
-  }, [saveState]);
+  const handleOpenFile = useCallback(async () => {
+    if (!sessionReady || openingDialog.current) return;
+    openingDialog.current = true;
+    try {
+      const result = await openFileDialog();
+      if (!result) return;
+      if (savingDestination.current && sameProjectPath(savingDestination.current, result.path)) {
+        reportEditorError('Wait for this file to finish saving before opening it.');
+        return;
+      }
+      const existing = editorSession.current.tabs.find(tab => tab.path && sameProjectPath(tab.path, result.path));
+      const access: EditorAccess = { type: 'file' };
+      if (existing) {
+        if (savingDocument.current !== existing.id && reloadingDocument.current !== existing.id &&
+          (!existing.access || existing.access.type === 'file')) {
+          patchTab(existing.id, tab => mergeEditorDisk({ ...tab, path: result.path }, result.content, access));
+        }
+        activateTab(existing);
+      } else {
+        const tab = makeEditorTab(result.path.split(/[\\/]/).pop() || result.path, '', result.path);
+        showNewTab(mergeEditorDisk(tab, result.content, access));
+      }
+      rememberEditorFile(result.path);
+    } finally {
+      openingDialog.current = false;
+    }
+  }, [activateTab, editorSession, patchTab, rememberEditorFile, sessionReady, showNewTab]);
+
+  const saveEditorTab = useCallback(async (saveAs: boolean) => {
+    const before = editorSession.current.tabs.find(tab => tab.id === editorSession.current.activeId);
+    if (!sessionReady || !before || before.status === 'pending' ||
+      savingDocument.current || reloadingDocument.current === before.id) return;
+    if (before.status === 'unavailable' && !editorTabIsDirty(before)) return;
+    if (!saveAs && before.status !== 'ready') {
+      reportEditorError('Use Save As to keep your draft or reload the file from disk.');
+      return;
+    }
+    savingDocument.current = before.id;
+    try {
+      const workspace = projectRef.current;
+      let access = before.access;
+      let path = before.path;
+      if (!saveAs && path && workspace?.writable && projectContains(workspace, path)) {
+        if (access?.type !== 'project' || access.workspaceVersion !== projectRequest.current) {
+          const disk = await readEditorDisk(path);
+          if (disk.text !== before.base) {
+            patchTab(before.id, tab => ({ ...tab, status: 'conflict', access: null }));
+            return;
+          }
+          access = disk.access;
+        }
+        if (access?.type !== 'project' || access.workspaceVersion !== projectRequest.current) {
+          throw new Error('The project changed before the file was saved. Try again.');
+        }
+        const revision = await saveProjectDocument(access.document, before.text);
+        access = { ...access, document: { ...access.document, revision } };
+      } else if (!saveAs && path && access?.type === 'file') {
+        if (await readProjectFile(path) !== before.base) {
+          patchTab(before.id, tab => ({ ...tab, status: 'conflict', access: null }));
+          return;
+        }
+        if (!await saveFile(path, before.text)) return;
+      } else {
+        const differentFile = before.status === 'conflict' || before.status === 'unavailable';
+        path = await saveFileDialog(before.text, differentFile ? 'recovered-' + before.name : path || before.name, destination => {
+          if (differentFile && before.path && sameProjectPath(destination, before.path)) {
+            reportEditorError('Choose a different file to preserve the version on disk.');
+            return false;
+          }
+          if (editorSession.current.tabs.some(tab => tab.id !== before.id && tab.path && sameProjectPath(tab.path, destination))) {
+            reportEditorError('That file is open in another editor tab. Choose a different file.');
+            return false;
+          }
+          savingDestination.current = destination;
+          return true;
+        });
+        if (!path) return;
+        access = { type: 'file' };
+        rememberEditorFile(path);
+      }
+      const savedPath = path;
+      patchTab(before.id, tab => ({
+        ...tab, path: savedPath, name: savedPath?.split(/[\\/]/).pop() || tab.name,
+        base: before.text, status: 'ready', access, welcome: false,
+      }));
+      if (savedPath && projectRef.current && projectContains(projectRef.current, savedPath)) {
+        setGitRevision(value => value + 1);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The file could not be saved.';
+      if (/changed outside DEX|editor revision is stale/i.test(message)) {
+        patchTab(before.id, tab => ({ ...tab, status: 'conflict', access: null }));
+      }
+      reportEditorError(message);
+    } finally {
+      savingDocument.current = null;
+      savingDestination.current = null;
+    }
+  }, [editorSession, patchTab, readEditorDisk, rememberEditorFile, sessionReady]);
+
+  const handleSaveFile = useCallback(() => { void saveEditorTab(false); }, [saveEditorTab]);
+  const handleSaveAs = useCallback(() => { void saveEditorTab(true); }, [saveEditorTab]);
+  const handleNewFile = useCallback(() => { if (sessionReady) showNewTab(makeEditorTab()); }, [sessionReady, showNewTab]);
+  const openGeneratedTab = useCallback((name: string, text: string) => {
+    if (sessionReady) showNewTab({ ...makeEditorTab(name, text), base: '' });
+  }, [sessionReady, showNewTab]);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (activeTab.status === 'pending') {
+      measureGutter(editor);
+      return;
+    }
+    const view = editorSession.current.tabs.find(tab => tab.id === activeTab.id)?.view;
+    editor.setSelectionRange(view?.start ?? 0, view?.end ?? 0);
+    editor.scrollTop = view?.top ?? 0;
+    editor.scrollLeft = view?.left ?? 0;
+    measureGutter(editor);
+    const precedingText = editor.value.slice(0, editor.selectionStart);
+    setCursorPos({ line: precedingText.split('\n').length, col: editor.selectionStart - precedingText.lastIndexOf('\n') });
+    const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+    setSelStats(selected ? { chars: selected.length, lines: selected.split('\n').length } : null);
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = editor.scrollTop;
+      highlightRef.current.scrollLeft = editor.scrollLeft;
+    }
+    const jump = editorJump.current;
+    if (jump?.id === activeTab.id) {
+      editorJump.current = null;
+      if (activeTab.status === 'ready') jumpToLine(jump.line, jump.column);
+    }
+  }, [activeTab.id, activeTab.status, editorSession, jumpToLine, langMode, measureGutter]);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || typeof ResizeObserver !== 'function') return;
+    const observer = new ResizeObserver(() => {
+      if (editorRef.current === editor) measureGutter(editor);
+    });
+    observer.observe(editor);
+    return () => observer.disconnect();
+  }, [activeTab.id, langMode, measureGutter]);
 
   // Persist the bottom panel height (debounced) so it restores on next mount.
   useEffect(() => {
@@ -419,11 +676,15 @@ const DexCode: React.FC = () => {
 
   // Sync scroll between editor and highlight overlay
   const handleScroll = useCallback(() => {
-    if (editorRef.current && highlightRef.current) {
-      highlightRef.current.scrollTop = editorRef.current.scrollTop;
-      highlightRef.current.scrollLeft = editorRef.current.scrollLeft;
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = editor.scrollTop;
+      highlightRef.current.scrollLeft = editor.scrollLeft;
     }
-  }, []);
+    measureGutter(editor);
+    recordEditorView();
+  }, [measureGutter, recordEditorView]);
 
   // Run code
   const runCode = useCallback(() => {
@@ -473,7 +734,7 @@ const DexCode: React.FC = () => {
         if (!generated) { setError('Could not turn that into code. Try rephrasing.'); return; }
         // Surface the generated program in the editor so it's transparent and
         // the user can tweak + re-run it as DexScript.
-        setCode(generated);
+        openGeneratedTab('generated.dex', generated);
         setLangMode('dexscript');
         const result = executeDexScript(generated);
         setOutput([`// Generated from: ${intent}`, ...result.output]);
@@ -493,7 +754,7 @@ const DexCode: React.FC = () => {
       setIsRunning(false);
       setTimeout(() => { if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight; }, 0);
     }
-  }, [plainText, plainMode, setOutputCollapsedPersist]);
+  }, [openGeneratedTab, plainText, plainMode, setOutputCollapsedPersist]);
 
   // -- REPL: evaluate a single DexScript expression in isolation and append its
   // output to the console (DEX 5.7). The runtime is stateless per call, so each
@@ -516,6 +777,8 @@ const DexCode: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const scope = editorShellRef.current;
+      if (!scope?.contains(e.target instanceof Node ? e.target : document.activeElement)) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         runCode();
@@ -598,12 +861,12 @@ const DexCode: React.FC = () => {
       // Toggle terminal panel (Ctrl+`)
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault();
-        setTerminalOpen(v => !v);
+        toggleTerminal();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [code, fileName, runCode, showFind, showGoToLine, showQuickOpen, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, fullscreen]);
+  }, [code, fileName, runCode, showFind, showGoToLine, showQuickOpen, handleSaveFile, handleSaveAs, handleOpenFile, handleNewFile, toggleSidebar, toggleFullscreen, toggleTerminal, fullscreen]);
 
   // Tab key, bracket auto-close, auto-indent
   // Live symbol map of the current file (functions / classes / top-level vars).
@@ -616,19 +879,6 @@ const DexCode: React.FC = () => {
   // Precision navigation: move the caret to a 1-indexed line, focus, and center
   // it in the viewport. The textarea's onScroll keeps the highlight overlay in
   // sync. Used by the Outline so a click jumps straight to a symbol.
-  const jumpToLine = useCallback((line: number) => {
-    const ta = editorRef.current;
-    if (!ta) return;
-    const pos = lineStartOffset(code, line);
-    const totalLines = Math.max(1, code.split('\n').length);
-    requestAnimationFrame(() => {
-      ta.selectionStart = ta.selectionEnd = pos;
-      ta.focus();
-      const lineHeight = ta.scrollHeight / totalLines;
-      ta.scrollTop = Math.max(0, (line - 1) * lineHeight - ta.clientHeight / 2);
-    });
-  }, [code]);
-
   const handleGoToLine = useCallback(() => {
     const n = parseInt(goToLineInput.trim(), 10);
     if (!Number.isFinite(n) || n < 1) return;
@@ -638,35 +888,40 @@ const DexCode: React.FC = () => {
   }, [goToLineInput, jumpToLine]);
 
   // --- Project awareness: open a folder, browse + search its source files ---
-  const [project, setProject] = useState<DexProject | null>(null);
   const [showProject, setShowProject] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [workspaceSearchNote, setWorkspaceSearchNote] = useState('');
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [workspaceHits, setWorkspaceHits] = useState<WorkspaceHit[]>([]);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceSearched, setWorkspaceSearched] = useState(false);
+  const projectSearch = useRef<AbortController | null>(null);
   // Live verb for the project-wide code search status.
   const searchPhrase = useWorkingPhrase(workspaceBusy, 'search');
 
   // Restore the last-opened project folder on mount.
   useEffect(() => {
-    const root = getStoredProjectRoot();
-    if (root) loadProject(root).then(p => { if (p) setProject(p); });
+    const request = ++projectRequest.current;
+    restoreProject().then(proj => {
+      if (request === projectRequest.current) setProject(proj);
+    }).catch(error => {
+      if (request === projectRequest.current) setWorkspaceError(String(error.message ?? error));
+    }).finally(() => {
+      if (request === projectRequest.current) setProjectReady(true);
+    });
+    return () => { projectRequest.current += 1; };
   }, []);
 
-  // Load a project file into the editor (mirrors handleOpenRecent), optionally
-  // jumping to a line once the new content has rendered.
-  const loadEditorFromPath = useCallback(async (filePath: string, line?: number) => {
-    const content = await readProjectFile(filePath);
-    if (content == null) return;
-    setCode(content);
-    setCurrentFilePath(filePath);
-    setFileName(filePath.split(/[\\/]/).pop() || 'file.dex');
-    originalCodeRef.current = content;
-    setIsModified(false);
-    addRecentFile(filePath);
-    setRecentFiles(getRecentFiles());
-    if (line && line > 0) setTimeout(() => jumpToLine(line), 60);
-  }, [jumpToLine]);
+  const loadEditorFromPath = useCallback((path: string, line?: number, reload = false) => {
+    void openEditorPath(path, line, undefined, reload).catch(error => {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: error.message } }));
+    });
+  }, [openEditorPath]);
 
+  const handleOpenRecent = useCallback((path: string) => {
+    setShowRecentFiles(false);
+    loadEditorFromPath(path);
+  }, [loadEditorFromPath]);
   // Quick Open results: fuzzy-rank the project's files against the query. Recent
   // files (without an open project) are folded in so Ctrl+P is useful even before
   // a folder is opened. Recomputed only when the inputs change.
@@ -708,33 +963,102 @@ const DexCode: React.FC = () => {
   }, [quickOpenResults, quickOpenIndex, loadEditorFromPath]);
 
   const openFolder = useCallback(async () => {
-    const proj = await pickProjectFolder();
-    if (proj) { setProject(proj); setWorkspaceHits([]); setWorkspaceQuery(''); }
+    if (projectBusy.current) return;
+    projectBusy.current = true;
+    setWorkspaceError('');
+    try {
+      const proj = await pickProjectFolder();
+      if (!proj) return;
+      projectRequest.current += 1;
+      projectSearch.current?.abort();
+      setProject(proj);
+      setProjectReady(true);
+      setWorkspaceHits([]);
+      setWorkspaceQuery('');
+      setWorkspaceBusy(false);
+      setWorkspaceSearched(false);
+      setWorkspaceSearchNote('');
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'The project could not be opened.');
+    } finally {
+      projectBusy.current = false;
+    }
   }, []);
 
-  const closeProject = useCallback(() => {
-    clearStoredProject();
-    setProject(null);
+  const closeProject = useCallback(async () => {
+    if (!project || projectBusy.current) return;
+    projectBusy.current = true;
+    setWorkspaceError('');
+    try {
+      await closeProjectFolder(project);
+      projectRequest.current += 1;
+      projectSearch.current?.abort();
+      setProject(null);
+      setProjectReady(true);
+      setWorkspaceHits([]);
+      setWorkspaceQuery('');
+      setWorkspaceBusy(false);
+      setWorkspaceSearched(false);
+      setWorkspaceSearchNote('');
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'The project could not be closed.');
+    } finally {
+      projectBusy.current = false;
+    }
+  }, [project]);
+
+  const refreshProject = useCallback(async () => {
+    if (!project || projectBusy.current) return;
+    projectBusy.current = true;
+    try {
+      const next = await loadProject(project.root);
+      if (next) setProject(next);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'The project could not be refreshed.');
+    } finally {
+      projectBusy.current = false;
+    }
+  }, [project]);
+
+  const searchWorkspace = useCallback(async (query: string) => {
+    projectSearch.current?.abort();
     setWorkspaceHits([]);
-    setWorkspaceQuery('');
-  }, []);
-
-  const runWorkspaceSearch = useCallback(async () => {
-    if (!project) return;
-    const q = workspaceQuery.trim();
-    if (!q) { setWorkspaceHits([]); return; }
+    setWorkspaceSearched(false);
+    setWorkspaceSearchNote('');
+    setWorkspaceError('');
+    const q = query.trim();
+    if (!project || !q) { setWorkspaceBusy(false); return; }
+    const request = new AbortController();
+    projectSearch.current = request;
     setWorkspaceBusy(true);
-    try { setWorkspaceHits(await searchProject(project, q)); }
-    finally { setWorkspaceBusy(false); }
-  }, [project, workspaceQuery]);
+    try {
+      const results = await searchWorkspaceFiles(project, q, request.signal);
+      if (!request.signal.aborted) {
+        setWorkspaceHits(results.hits);
+        setWorkspaceSearched(true);
+        setWorkspaceSearchNote([
+          results.limited ? 'Search limit reached.' : '',
+          results.skipped ? `${results.skipped} entries skipped.` : '',
+        ].filter(Boolean).join(' '));
+      }
+    } catch (error) {
+      if (!request.signal.aborted) setWorkspaceError(error instanceof Error ? error.message : 'Project search failed.');
+    } finally {
+      if (projectSearch.current === request && !request.signal.aborted) setWorkspaceBusy(false);
+    }
+  }, [project]);
+  useEffect(() => () => projectSearch.current?.abort(), []);
 
   // Cross-file symbol index for go-to-definition; rebuilt when the project changes.
   const [symbolIndex, setSymbolIndex] = useState<Map<string, ProjectSymbol[]>>(new Map());
   useEffect(() => {
     if (!project) { setSymbolIndex(new Map()); return; }
-    let cancelled = false;
-    buildSymbolIndex(project).then(idx => { if (!cancelled) setSymbolIndex(idx); });
-    return () => { cancelled = true; };
+    const request = new AbortController();
+    setSymbolIndex(new Map());
+    buildSymbolIndex(project, 200, request.signal).then(idx => {
+      if (!request.signal.aborted) setSymbolIndex(idx);
+    });
+    return () => request.abort();
   }, [project]);
 
   // The identifier under the editor caret (for go-to-definition / find-references).
@@ -772,11 +1096,11 @@ const DexCode: React.FC = () => {
     if (!w || !project) return;
     setWorkspaceQuery(w);
     setShowProject(true);
-    setWorkspaceBusy(true);
-    searchProject(project, w).then(hits => { setWorkspaceHits(hits); setWorkspaceBusy(false); });
-  }, [project]);
+    void searchWorkspace(w);
+  }, [project, searchWorkspace]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.currentTarget.readOnly) return;
     const ta = e.currentTarget;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
@@ -886,9 +1210,20 @@ const DexCode: React.FC = () => {
     }
   }, [code, identifierAt, gotoDefinition, findReferences]);
 
-  const highlighted = useMemo(() => highlightDexScript(code), [code]);
-
-  const lineCount = useMemo(() => code.split('\n').length, [code]);
+  const lineCount = useMemo(() => {
+    let count = 1;
+    for (let index = code.indexOf('\n'); index !== -1; index = code.indexOf('\n', index + 1)) count++;
+    return count;
+  }, [code]);
+  const gutterWidth = Math.max(40, 14 + String(lineCount).length * 7);
+  const useHighlight = code.length <= HIGHLIGHT_CHARACTER_LIMIT && lineCount <= HIGHLIGHT_LINE_LIMIT;
+  const highlighted = useMemo(() => useHighlight ? highlightDexScript(code) : '', [code, useHighlight]);
+  useLayoutEffect(() => {
+    if (editorRef.current && highlightRef.current) {
+      highlightRef.current.scrollTop = editorRef.current.scrollTop;
+      highlightRef.current.scrollLeft = editorRef.current.scrollLeft;
+    }
+  }, [useHighlight, langMode]);
 
   // Cursor position tracking
   const updateCursorPos = useCallback(() => {
@@ -906,7 +1241,8 @@ const DexCode: React.FC = () => {
     } else {
       setSelStats(null);
     }
-  }, [code]);
+    recordEditorView();
+  }, [code, recordEditorView]);
 
   // Find/replace logic
   const findNext = useCallback(() => {
@@ -980,7 +1316,7 @@ const DexCode: React.FC = () => {
   }, [code]);
 
   const shell = (
-    <div style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)', ...(fullscreen ? { height: '100vh', width: '100vw' } : null) }}>
+    <div ref={editorShellRef} style={{ ...S.container, gridTemplateColumns: sidebarCollapsed ? '44px minmax(0, 1fr)' : '44px 220px minmax(0, 1fr)', ...(fullscreen ? { height: '100vh', width: '100vw' } : null) }}>
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
         <button
@@ -1032,7 +1368,7 @@ const DexCode: React.FC = () => {
           aria-label="Toggle terminal"
           aria-pressed={terminalOpen}
           style={terminalOpen ? S.activityBtnActive : S.activityBtn}
-          onClick={() => setTerminalOpen(o => !o)}
+          onClick={toggleTerminal}
           onMouseEnter={e => { if (!terminalOpen) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
           onMouseLeave={e => { if (!terminalOpen) e.currentTarget.style.background = 'transparent'; }}
         >
@@ -1126,18 +1462,37 @@ const DexCode: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 var(--space-2)' }}>
                   <DexIcon name="folder-open" size={11} />
                   <span style={{ fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={project.root}>{projectName(project.root)}</span>
-                  <button onClick={openFolder} title="Open a different folder" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="folder-open" size={11} /></button>
-                  <button onClick={closeProject} title="Close project" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="x" size={11} /></button>
+                  <button onClick={openFolder} title="Open a different folder" aria-label="Open a different folder" style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="folder-open" size={11} /></button>
+                  <button onClick={refreshProject} aria-label="Refresh project files" title="Refresh project files" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="refresh" size={11} /></button>
+                  <button onClick={closeProject} title="Close project" aria-label="Close project" style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 2 }}><DexIcon name="close" size={11} /></button>
                 </div>
+                {currentFilePath && projectContains(project, currentFilePath) && (
+                  <button type="button" style={S.fileActionBtn} onClick={() => loadEditorFromPath(currentFilePath, undefined, true)}>
+                    Reload current file
+                  </button>
+                )}
+                {project.writable === false && <div style={{ padding: '0 8px', fontSize: 11 }}>
+                  <button type="button" onClick={openFolder}>Select folder to enable editing</button>
+                </div>}
+                {project.limited && <div style={{ padding: '0 8px', fontSize: 11 }}>Project listing limit reached.</div>}
+                {!!project.unreadable && <div style={{ padding: '0 8px', fontSize: 11 }}>{project.unreadable} entries could not be listed.</div>}
                 <input
                   value={workspaceQuery}
-                  onChange={e => setWorkspaceQuery(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') runWorkspaceSearch(); }}
+                  onChange={e => {
+                    projectSearch.current?.abort();
+                    setWorkspaceQuery(e.target.value);
+                    setWorkspaceHits([]);
+                    setWorkspaceBusy(false);
+                    setWorkspaceSearched(false);
+                    setWorkspaceSearchNote('');
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') void searchWorkspace(workspaceQuery); }}
                   placeholder="Search in project…"
                   aria-label="Search in project"
                   style={{ width: '100%', boxSizing: 'border-box', padding: '4px 8px', fontSize: 11, background: 'var(--color-bg-inset, rgba(255,255,255,0.04))', border: '1px solid var(--color-border-subtle)', borderRadius: 10, color: 'var(--color-text-primary)', outline: 'none' }}
                 />
                 {workspaceBusy && <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{searchPhrase}…</div>}
+                {workspaceSearchNote && <div role="status" style={{ padding: '0 8px', fontSize: 11 }}>{workspaceSearchNote}</div>}
                 {workspaceHits.length > 0 ? (
                   <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 200, overflow: 'auto' }}>
                     <div style={{ fontSize: 10, opacity: 0.5, padding: '2px var(--space-2)' }}>{workspaceHits.length} match{workspaceHits.length === 1 ? '' : 'es'}</div>
@@ -1155,28 +1510,16 @@ const DexCode: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                ) : workspaceSearched ? (
+                  <div role="status" style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No project matches</div>
                 ) : (
-                  <div className="dex-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflow: 'auto' }}>
-                    {project.files.length === 0 ? (
-                      <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '4px var(--space-2)' }}>No source files</div>
-                    ) : project.files.map((f, i) => (
-                      <button
-                        key={`${f.path}-${i}`}
-                        onClick={() => loadEditorFromPath(f.path)}
-                        style={{ ...S.recentFileBtn, ...(currentFilePath === f.path ? { background: 'var(--color-bg-hover)' } : null) }}
-                        title={f.path}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = currentFilePath === f.path ? 'var(--color-bg-hover)' : 'transparent')}
-                      >
-                        <DexIcon name="code" size={11} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <ProjectFileList key={`${project.root}:${project.files.length}`} files={project.files}
+                    active={currentFilePath} onOpen={loadEditorFromPath} />
                 )}
               </div>
             )
           )}
+          {!!workspaceError && <div role="alert" style={{ fontSize: 11, padding: '4px 8px' }}>{workspaceError}</div>}
         </div>
 
         {/* Outline — live symbol map (precision navigation, DEX signature) */}
@@ -1289,7 +1632,7 @@ const DexCode: React.FC = () => {
               {TEMPLATES.map(t => (
                 <button
                   key={t.id}
-                  onClick={() => { setFileName(t.fileName); setCode(t.code); }}
+                  onClick={() => openGeneratedTab(t.fileName, t.code)}
                   style={{...S.templateBtn, padding: '6px var(--space-2)'}}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-bg-inset, var(--color-border-subtle, rgba(255,255,255,0.04)))')}
@@ -1318,8 +1661,12 @@ const DexCode: React.FC = () => {
         <div className="dex-liquid-glass-strong" style={S.topBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <input
-              value={fileName + (isModified ? ' •' : '')}
-              onChange={e => setFileName(e.target.value.replace(' •', ''))}
+              value={fileName}
+              readOnly={!sessionReady || !!currentFilePath}
+              onChange={e => {
+                const name = e.target.value;
+                patchTab(activeTab.id, tab => ({ ...tab, name, welcome: false }));
+              }}
               style={S.fileInput}
               aria-label="File name"
               title={currentFilePath || 'Unsaved file'}
@@ -1477,14 +1824,55 @@ const DexCode: React.FC = () => {
           </div>
         )}
 
+        {gitOpen && <ProjectGit
+          key={project?.root ?? ''}
+          project={project}
+          revision={gitRevision}
+          onClose={() => setGitOpen(false)}
+          onOpenFile={loadEditorFromPath}
+        />}
+
         {/* Editor + Output */}
         <div style={{ ...S.editorLayout, gridTemplateColumns: outputCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 3fr) minmax(0, 2fr)' }}>
           {/* Code Editor */}
           <div style={S.editorPane}>
+            <EditorTabs session={session} panelId={editorPanelId} onSelect={activateTab} onClose={closeEditorTab} onNew={handleNewFile} />
+            <div role="tabpanel" id={editorPanelId} aria-labelledby={editorTabElementId(editorPanelId, activeTab.id)}
+              style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}>
+            {(!sessionReady || activeTab.status === 'pending') && (
+              <div role="status" className="dex-editor-recovery-status">{sessionReady ? 'Opening file…' : 'Restoring editor tabs…'}</div>
+            )}
+            {(activeTab.status === 'conflict' || activeTab.status === 'unavailable') && (
+              <div className="dex-editor-recovery-status">
+                <span role="status">{activeTab.status === 'conflict' ? 'The file has changed on disk. Your draft is still open.' : 'This file could not be read from disk.'}</span>
+                {currentFilePath && <button type="button" onClick={() => loadEditorFromPath(currentFilePath, undefined, true)}>Reload from disk</button>}
+                {isModified && <button type="button" onClick={handleSaveAs}>Save draft as…</button>}
+              </div>
+            )}
+            {syntax.status !== 'unsupported' && showProblems && (
+              <section id={problemsId} aria-label="Syntax diagnostics" className="dex-editor-problems">
+                {syntax.status === 'checking' && <div role="status">Checking syntax…</div>}
+                {syntax.status === 'error' && <div role="status">{syntax.error}</div>}
+                {syntax.status === 'ready' && (syntax.problems.length ? (
+                  <ul>
+                    {syntax.problems.map(problem => (
+                      <li key={`${problem.line}:${problem.column}:${problem.code}`}>
+                        <button type="button" onClick={() => jumpToLine(problem.line, problem.column)}>
+                          <span className="dex-editor-problem-location">{problem.line}:{problem.column}</span>
+                          <span>{problem.message}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <div role="status">No syntax errors.</div>)}
+              </section>
+            )}
             <div style={S.paneHeader}>
               <span>Editor</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>.dex</span>
+                <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
+                  {fileName.includes('.') ? '.' + fileName.split('.').pop() : ''}
+                </span>
                 {outputCollapsed && (
                   <button
                     onClick={() => setOutputCollapsedPersist(false)}
@@ -1576,19 +1964,21 @@ const DexCode: React.FC = () => {
               </div>
             ) : (
               <div style={S.editorWrapper}>
-                {/* Line numbers — memoized; only re-renders when the count changes */}
-                <LineNumbers count={lineCount} />
+                <LineNumbers count={lineCount} top={gutter.top} height={gutter.height} width={gutterWidth} />
                 {/* Syntax highlight overlay */}
-                <pre
+                {useHighlight && <pre
                   ref={highlightRef}
-                  style={{...S.highlightOverlay, fontSize}}
+                  style={{...S.highlightOverlay, fontSize, left: gutterWidth}}
                   dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
                   aria-hidden="true"
-                />
+                />}
                 {/* Actual textarea */}
                 <textarea
+                  key={activeTab.id}
                   ref={editorRef}
+                  data-document-id={activeTab.id}
                   value={code}
+                  readOnly={editorReadOnly}
                   onChange={e => setCode(e.target.value)}
                   onScroll={handleScroll}
                   onKeyDown={handleKeyDown}
@@ -1599,11 +1989,12 @@ const DexCode: React.FC = () => {
                   spellCheck={false}
                   autoCapitalize="off"
                   autoCorrect="off"
-                  style={{...S.editor, fontSize}}
+                  style={{...S.editor, fontSize, left: gutterWidth, color: useHighlight ? 'transparent' : 'var(--color-text-primary)'}}
                   aria-label="DexScript code editor"
                 />
               </div>
             )}
+            </div>
           </div>
 
           {/* Output Panel */}
@@ -1692,16 +2083,13 @@ const DexCode: React.FC = () => {
           )}
           <span>{stats.chars} chars</span>
           <span style={{ fontSize: 9 }}>{fontSize}px</span>
-          {/* Autosave indicator -- mirrors the local-storage autosave state */}
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              opacity: saveState === 'idle' ? 0.45 : 1,
-              transition: 'opacity 0.2s',
             }}
-            title="Editor content is autosaved to this device"
+            title="Draft recovery stores working copies on this device"
           >
             <span
               aria-hidden="true"
@@ -1709,21 +2097,33 @@ const DexCode: React.FC = () => {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: saveState === 'saving'
+                background: draftState === 'storing'
                   ? 'var(--color-text-tertiary)'
                   : 'var(--color-accent, #4A9EFF)',
               }}
             />
-            {saveState === 'saving' ? 'Saving…' : 'Saved'}
+            {draftState === 'error' ? 'Draft recovery unavailable' :
+              draftState === 'storing' ? 'Storing drafts…' :
+              isModified ? 'Unsaved edits' :
+              currentFilePath && activeTab.status === 'ready' ? 'Saved' : 'Draft recovery'}
           </span>
+          <button type="button" onClick={toggleProjectTasks} aria-pressed={tasksOpen} className="dex-project-tasks-toggle">
+            Tasks
+          </button>
+          <button type="button" onClick={() => setGitOpen(value => !value)} aria-pressed={gitOpen} className="dex-project-tasks-toggle">
+            Git
+          </button>
+          {syntax.status !== 'unsupported' && <button type="button" className="dex-project-tasks-toggle"
+            onClick={() => setShowProblems(value => !value)} aria-expanded={showProblems} aria-controls={problemsId}>
+            Problems{syntax.status === 'ready' ? ` (${syntax.problems.length})` : ''}
+          </button>}
           <button
             type="button"
-            onClick={() => setTerminalOpen(v => !v)}
+            onClick={toggleTerminal}
             title="Toggle terminal (Ctrl+`)"
             aria-label="Toggle terminal"
             aria-pressed={terminalOpen}
             style={{
-              marginLeft: 'auto',
               background: terminalOpen ? 'var(--color-accent, #4A9EFF)' : 'transparent',
               color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
               border: '1px solid var(--color-border)',
@@ -1739,24 +2139,29 @@ const DexCode: React.FC = () => {
           <span>Ctrl+F find · Ctrl+H replace · Ctrl+S export · Ctrl+` terminal</span>
         </div>
 
-        {terminalOpen && (
-          <div style={{ ...S.panelDock, height: panelHeight }}>
+        {(terminalState !== 'closed' || taskState !== 'closed') && (
+          <div hidden={!terminalOpen && !tasksOpen} style={{ ...S.panelDock, display: terminalOpen || tasksOpen ? 'flex' : 'none', height: panelHeight }}>
             {/* Draggable divider — drag up/down to resize the panel */}
             <div
               style={S.panelResizer}
               onMouseDown={handlePanelResizeStart}
               role="separator"
               aria-orientation="horizontal"
-              aria-label="Resize terminal panel"
+              aria-label="Resize bottom panel"
               title="Drag to resize"
             >
               <div style={S.panelResizerGrip} aria-hidden="true" />
             </div>
-            <div style={S.panelBody}>
-              <TerminalTabs onClose={() => setTerminalOpen(false)} />
-            </div>
+            {terminalState !== 'closed' && <div hidden={!terminalOpen} style={{ ...S.panelBody, display: terminalOpen ? 'flex' : 'none' }}>
+              <TerminalTabs cwd={project?.root ?? getStoredProjectRoot() ?? undefined}
+                visible={terminalOpen} onClose={() => setTerminalState('closed')} />
+            </div>}
+            {taskState !== 'closed' && <div hidden={!tasksOpen} style={{ ...S.panelBody, display: tasksOpen ? 'flex' : 'none' }}>
+              <ProjectTasks root={project?.root ?? null} visible={tasksOpen} dirty={isModified} onOpenLocation={openEditorPath} />
+            </div>}
           </div>
         )}
+        <ConfirmHost />
       </section>
     </div>
   );
@@ -1766,7 +2171,7 @@ const DexCode: React.FC = () => {
   // would otherwise trap a fixed overlay inside the app window.
   return fullscreen
     ? createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'var(--color-bg-base)' }}>{shell}</div>,
+        <div {...appearance} style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'var(--color-bg-base)' }}>{shell}</div>,
         document.body,
       )
     : shell;
@@ -2058,7 +2463,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   lineNum: {
     fontSize: 11,
-    lineHeight: '20px',
+    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
     color: 'var(--color-text-tertiary)',
     paddingRight: 'var(--space-2)',
     fontFamily: 'var(--font-mono)',
@@ -2072,7 +2477,7 @@ const S: Record<string, React.CSSProperties> = {
     margin: 0,
     padding: 'var(--space-3)',
     fontSize: 13,
-    lineHeight: '20px',
+    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
     fontFamily: 'var(--font-mono)',
     whiteSpace: 'pre' as const,
     overflow: 'hidden',
@@ -2090,7 +2495,7 @@ const S: Record<string, React.CSSProperties> = {
     bottom: 0,
     padding: 'var(--space-3)',
     fontSize: 13,
-    lineHeight: '20px',
+    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
     fontFamily: 'var(--font-mono)',
     // MUST be transparent: the textarea is layered ON TOP of the syntax-highlight
     // <pre>. An opaque background here hides the coloured code (the long-standing

@@ -10,7 +10,7 @@
  * is visible given scrollTop, viewport height, and a bufferRows pad.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export interface VirtualSlice {
   start: number;
@@ -33,7 +33,8 @@ export function computeSlice(
     return { start: 0, end: 0, padTop: 0, padBottom: 0, totalHeight: 0 };
   }
   const totalHeight = itemCount * rowHeight;
-  const firstVisible = Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows);
+  const clampedScroll = Math.max(0, Math.min(scrollTop, totalHeight - Math.max(rowHeight, viewportHeight)));
+  const firstVisible = Math.max(0, Math.floor(clampedScroll / rowHeight) - bufferRows);
   const visibleCount = Math.ceil(viewportHeight / rowHeight) + bufferRows * 2;
   const end = Math.min(itemCount, firstVisible + visibleCount);
   return {
@@ -53,29 +54,28 @@ export interface UseVirtualListOptions {
 }
 
 export function useVirtualList(opts: UseVirtualListOptions): {
-  ref: React.RefObject<HTMLDivElement>;
+  ref: React.RefCallback<HTMLDivElement>;
   slice: VirtualSlice;
   onScroll: () => void;
 } {
-  const ref = useRef<HTMLDivElement>(null);
+  const [element, ref] = useState<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
 
   const onScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    setScrollTop(el.scrollTop);
-  }, []);
+    if (element) setScrollTop(element.scrollTop);
+  }, [element]);
 
   useEffect(() => {
-    const el = ref.current;
+    const el = element;
     if (!el) return;
+    setScrollTop(el.scrollTop);
     setViewportHeight(el.clientHeight);
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => setViewportHeight(el.clientHeight));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [element]);
 
   const slice = computeSlice(opts.itemCount, opts.rowHeight, scrollTop, viewportHeight, opts.bufferRows);
   return { ref, slice, onScroll };

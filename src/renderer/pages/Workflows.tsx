@@ -14,6 +14,7 @@ import { DexLoader } from '../components/LoadingStates';
 import { useAppTracking } from '../services/usePatternLearning';
 import { glassSidebar } from '../styles/glassMenu';
 import { useToastHelpers } from '../components/Toast';
+import { invokeFileOperation } from '../services/platform/ipc';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
@@ -998,32 +999,28 @@ export const Workflows: React.FC = () => {
             case 'a2': { // Copy File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
-              if (src && dest && window.electron?.invoke) {
-                await window.electron.invoke('files:copy', src, dest);
-              }
+              if (!src || !dest) throw new Error('Copy File needs a source and destination.');
+              await invokeFileOperation('files:copy', src, dest);
               break;
             }
             case 'a3': { // Move File (config: source, dest)
               const src = node.config.source || context.files?.[0]?.path;
               const dest = node.config.dest || '';
-              if (src && dest && window.electron?.invoke) {
-                await window.electron.invoke('files:move', src, dest);
-              }
+              if (!src || !dest) throw new Error('Move File needs a source and destination.');
+              await invokeFileOperation('files:move', src, dest);
               break;
             }
             case 'a11': { // Delete File (config: path)
               const path = node.config.path || context.files?.[0]?.path;
-              if (path && window.electron?.invoke) {
-                await window.electron.invoke('files:delete', path);
-              }
+              if (!path) throw new Error('Delete File needs a path.');
+              await invokeFileOperation('files:delete', path);
               break;
             }
             case 'a12': { // Rename File (config: path, newName)
               const path = node.config.path || '';
               const newName = node.config.newName || '';
-              if (path && newName && window.electron?.invoke) {
-                await window.electron.invoke('files:rename', path, newName);
-              }
+              if (!path || !newName) throw new Error('Rename File needs a path and new name.');
+              await invokeFileOperation('files:rename', path, newName);
               break;
             }
             case 'a36': { // Open File with default app (config: path)

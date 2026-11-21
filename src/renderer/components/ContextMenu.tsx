@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useAppAppearance } from '../utils/appAppearanceContext';
 
 export interface ContextMenuItem {
   id?: string;
@@ -52,6 +53,7 @@ export function useContextMenu() {
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) => {
+  const appearance = useAppAppearance();
   const menuRef = useRef<HTMLDivElement>(null);
   const [focusIdx, setFocusIdx] = useState(-1);
   const [openSub, setOpenSub] = useState<string | null>(null);
@@ -118,6 +120,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
   // (which would otherwise clip a position:fixed element to its parent).
   return createPortal(
     <div
+      {...appearance}
       ref={menuRef}
       role="menu"
       aria-label="Context menu"

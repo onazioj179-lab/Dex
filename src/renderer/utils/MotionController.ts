@@ -22,6 +22,8 @@
  * change behaviour, which the zero-behaviour-change rule forbids.
  */
 
+import { prefersReducedMotion, subscribeToReducedMotion } from './useReducedMotion';
+
 // ---------------------------------------------------------------------------
 // SPRING PRESETS
 // ---------------------------------------------------------------------------
@@ -140,22 +142,12 @@ export function cssTransitions(
 // ---------------------------------------------------------------------------
 
 let _reduceMotion = false;
-let _mediaQuery: MediaQueryList | null = null;
-let _mediaQueryHandler: ((e: MediaQueryListEvent) => void) | null = null;
+let _unsubscribeMotion: (() => void) | null = null;
 const _listeners: Set<(reduced: boolean) => void> = new Set();
 
 // User override (set by the Reduce Motion toggle in the system menu). When
 // present this beats the OS preference so users can force the calm path even
 // on systems where the media query is unavailable or reports the opposite.
-function readUserOverride(): boolean | null {
-  try {
-    const raw = localStorage.getItem('dex-reduce-motion');
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
-  } catch { /* storage unavailable — fall through */ }
-  return null;
-}
-
 function applyClass(reduced: boolean): void {
   if (reduced) document.documentElement.classList.add('reduce-motion');
   else document.documentElement.classList.remove('reduce-motion');
@@ -163,29 +155,20 @@ function applyClass(reduced: boolean): void {
 
 export function initReduceMotion(): void {
   if (typeof window === 'undefined') return;
-  // Cleanup previous listener if re-initialized (e.g., HMR)
-  if (_mediaQuery && _mediaQueryHandler) {
-    _mediaQuery.removeEventListener('change', _mediaQueryHandler);
-  }
-  _mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const override = readUserOverride();
-  _reduceMotion = override ?? _mediaQuery.matches;
-  _mediaQueryHandler = (e: MediaQueryListEvent) => {
-    const cur = readUserOverride();
-    _reduceMotion = cur ?? e.matches;
+  _unsubscribeMotion?.();
+  const refresh = () => {
+    _reduceMotion = prefersReducedMotion();
     _listeners.forEach(fn => fn(_reduceMotion));
     applyClass(_reduceMotion);
   };
-  applyClass(_reduceMotion);
-  _mediaQuery.addEventListener('change', _mediaQueryHandler);
+  refresh();
+  _unsubscribeMotion = subscribeToReducedMotion(refresh);
 }
 
 /** Cleanup reduce-motion listener (call on HMR or teardown) */
 export function destroyReduceMotion(): void {
-  if (_mediaQuery && _mediaQueryHandler) {
-    _mediaQuery.removeEventListener('change', _mediaQueryHandler);
-    _mediaQueryHandler = null;
-  }
+  _unsubscribeMotion?.();
+  _unsubscribeMotion = null;
   _listeners.clear();
 }
 
