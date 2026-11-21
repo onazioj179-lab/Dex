@@ -10,6 +10,7 @@
  * Grid + list views, favorites, albums, lightbox with video playback.
  */
 
+import { useCreativeInput } from '../services/creativeIntake';
 import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useAsyncResource } from '../utils/useAsyncResource';
@@ -1137,10 +1138,18 @@ export const Gallery: React.FC = () => {
     },
     { timeoutMs: 8000 },
   );
+  const galleryHandoff = useRef<string | null>(null);
   useEffect(() => { setLoading(galleryLoading); }, [galleryLoading]);
   useEffect(() => {
     if (!loadedGallery) return;
     setMedia(loadedGallery.media);
+    if (galleryHandoff.current) {
+      const incoming = loadedGallery.media.find(item => item.id === galleryHandoff.current);
+      if (incoming) {
+        galleryHandoff.current = null;
+        setSelectedMedia(incoming);
+      }
+    }
     if (!favoritesLoadedRef.current) setFavorites(loadedGallery.favorites);
     favoritesLoadedRef.current = true; // Mark initial load complete
   }, [loadedGallery]);
@@ -1181,6 +1190,30 @@ export const Gallery: React.FC = () => {
       setImporting(false);
     }
   };
+
+  const galleryHandoffRequest = useRef(0);
+  useCreativeInput('gallery', async path => {
+    const request = ++galleryHandoffRequest.current;
+    galleryHandoff.current = null;
+    const existing = media.find(item => item.id === path);
+    if (existing) {
+      setSelectedMedia(existing);
+      return;
+    }
+    const entry = await window.dex?.invoke?.('gallery:loadImage', path).catch(() => null);
+    if (request !== galleryHandoffRequest.current) return;
+    if (!entry?.path) {
+      toast.error('Gallery could not open this file');
+      return;
+    }
+    galleryHandoff.current = entry.path;
+    setSelectedAlbum('all');
+    setSearchQuery('');
+    setFolderFilter('');
+    setTagFilter('');
+    setDuplicateFilter(false);
+    reload();
+  });
 
   // Save favorites to storage (only after initial load)
   useEffect(() => { 

@@ -23,6 +23,7 @@ import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
 import { useToastHelpers } from '../components/Toast';
 import { getAppsForFile, inferCategoryFromFilename } from '../services/FileTypeRegistry';
+import { sendCreativeInput } from '../services/creativeIntake';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { requestTerminalAt } from '../components/terminalProfiles';
@@ -378,8 +379,9 @@ export const Files: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'column'>('list');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [history, setHistory] = useState<string[]>(['documents']);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const listingRequest = useRef(0);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
   // Column view (Miller columns): per-path entry cache + in-flight set so each
@@ -661,6 +663,7 @@ export const Files: React.FC = () => {
 
   // Load files from the system
   const loadFiles = useCallback(async (location: string) => {
+    const request = ++listingRequest.current;
     setLoading(true);
     setLoadError(null);
     // Invalidate the per-column listing cache so deeper Miller columns re-fetch
@@ -673,6 +676,7 @@ export const Files: React.FC = () => {
     try {
       if (window.dex?.invoke) {
         const result = await window.dex.invoke('files:list', location);
+        if (request !== listingRequest.current) return;
         if (result?.success && Array.isArray(result.files)) {
           const filesWithCategory = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
             ...f,
@@ -708,6 +712,7 @@ export const Files: React.FC = () => {
         setCurrentPath(`/${location}`);
       }
     } catch (error) {
+      if (request !== listingRequest.current) return;
       console.error('Failed to load files:', error);
       setLoadError('Unable to load files. Check folder permissions or try again.');
       toast.error('Failed to load files');
@@ -769,6 +774,8 @@ export const Files: React.FC = () => {
   }, [dragFile, currentPath, loadFiles]);
 
   useEffect(() => {
+    setSelectedFile(null);
+    setSelectedFiles(new Set());
     loadFiles(selectedLocation);
   }, [selectedLocation, loadFiles]);
 
@@ -809,23 +816,27 @@ export const Files: React.FC = () => {
   }, [selectedFile, files, historyIndex, currentPath]);
 
   const navigateTo = (path: string) => {
+    setActiveCollection(null);
+    if (path === history[historyIndex]) return;
     const newHistory = [...history.slice(0, historyIndex + 1), path];
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-    loadFiles(path);
+    setSelectedLocation(path);
   };
 
   const goBack = () => {
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1);
-      loadFiles(history[historyIndex - 1]);
+      setSelectedLocation(history[historyIndex - 1]);
+      setActiveCollection(null);
     }
   };
 
   const goForward = () => {
     if (historyIndex < history.length - 1) {
       setHistoryIndex(historyIndex + 1);
-      loadFiles(history[historyIndex + 1]);
+      setSelectedLocation(history[historyIndex + 1]);
+      setActiveCollection(null);
     }
   };
 
@@ -1096,8 +1107,12 @@ export const Files: React.FC = () => {
     setContextMenu(null);
     try {
       let rel = file.name;
-      if (currentPath && file.path.startsWith(currentPath)) {
-        rel = file.path.slice(currentPath.length).replace(/^[\\/]+/, '') || file.name;
+      if (currentPath) {
+        const folder = currentPath.replace(/[\\/]/g, '/').replace(/\/+$/, '') + '/';
+        const path = file.path.replace(/[\\/]/g, '/');
+        const windowsPath = /^[a-z]:\/|^\/\//i.test(folder);
+        const withinFolder = windowsPath ? path.toLowerCase().startsWith(folder.toLowerCase()) : path.startsWith(folder);
+        if (withinFolder) rel = file.path.slice(folder.length) || file.name;
       }
       await navigator.clipboard.writeText(rel);
       toast.success('Relative path copied');
@@ -1385,13 +1400,11 @@ export const Files: React.FC = () => {
 
   // Smart filtering with multiple criteria
   const filteredFiles = useMemo(() => {
-    let result = showHiddenFiles ? [...files] : files.filter(f => !f.hidden && !f.name.startsWith('.'));
+    const source = activeCollection === 'recent' ? recentFiles : files;
+    let result = showHiddenFiles ? [...source] : source.filter(f => !f.hidden && !f.name.startsWith('.'));
 
     // If viewing a smart collection, filter by category
-    if (activeCollection) {
-      if (activeCollection === 'recent') {
-        return recentFiles;
-      }
+    if (activeCollection && activeCollection !== 'recent') {
       result = result.filter(f => f.category === activeCollection);
     }
 
@@ -1579,11 +1592,7 @@ export const Files: React.FC = () => {
                   background: isActive ? 'var(--color-accent-soft)' : 'transparent',
                   color: isActive ? 'var(--color-accent)' : 'var(--color-text-primary)',
                 }}
-                onClick={() => {
-                  setSelectedLocation(item.path);
-                  setSelectedFile(null);
-                  setActiveCollection(null);
-                }}
+                onClick={() => navigateTo(item.path)}
                 aria-label={item.name}
               >
                 <Icon size={16} />
@@ -1902,13 +1911,12 @@ export const Files: React.FC = () => {
             {/* Pin / unpin the current folder to Favorites */}
             {currentPath && (() => {
               const folderName = currentPath.split(/[\\/]/).filter(Boolean).pop() || currentPath;
-              const matchingPin = pinnedFolders.find(p => (p as any).path === currentPath);
-              const isPinned = !!matchingPin;
+              const isPinned = isFolderPinned(currentPath);
               return (
                 <button
                   className="dex-toolbtn"
                   style={{ ...styles.navBtn, color: isPinned ? 'var(--color-accent)' : undefined }}
-                  onClick={() => { if (isPinned && matchingPin) unpinRegistry(matchingPin.id); else pinFolder(currentPath, folderName); }}
+                  onClick={() => togglePinFolder(currentPath, folderName)}
                   aria-label={isPinned ? `Unpin folder ${folderName}` : `Pin folder ${folderName}`}
                   aria-pressed={isPinned}
                   title={isPinned ? 'Unpin from Favorites' : 'Pin to Favorites'}
@@ -2424,12 +2432,16 @@ export const Files: React.FC = () => {
             position: 'absolute', left: contextMenu.x, top: contextMenu.y,
             background: 'var(--color-bg-elevated, #1c1c1e)', border: '1px solid var(--color-border, var(--color-border))',
             borderRadius: '6px', boxShadow: 'var(--pg-shadow-popover)', padding: '4px 0', minWidth: '180px',
-          }} onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => handleItemDoubleClick(contextMenu.file)} aria-label={`Open ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+          }} onMouseDown={e => e.stopPropagation()}>
+            <button onClick={() => {
+              if (contextMenu.file.isDirectory) navigateTo(contextMenu.file.path);
+              else void handleItemDoubleClick(contextMenu.file);
+              setContextMenu(null);
+            }} aria-label={`Open ${contextMenu.file.name}`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Open
             </button>
             {!contextMenu.file.isDirectory && (() => {
-              const apps = getAppsForFile(contextMenu.file.name);
+              const apps = getAppsForFile(contextMenu.file.name).filter(app => app === 'dexcode' || app === 'gallery');
               return apps.length > 0 ? (
                 <>
                   <div style={{ padding: '4px var(--space-4)', fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>Open With</div>
@@ -2440,7 +2452,8 @@ export const Files: React.FC = () => {
                       <button
                         key={appId}
                         onClick={() => {
-                          launchApp({ id: appId, name: def.name, icon: def.icon || appId, color: def.color });
+                          if (appId === 'dexcode') sendCreativeInput('dexcode', { kind: 'file', path: contextMenu.file.path });
+                          else sendCreativeInput('gallery', contextMenu.file.path);
                           setContextMenu(null);
                         }}
                         style={{ display: 'block', width: '100%', padding: '6px var(--space-4) 6px 28px', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}
@@ -2453,6 +2466,14 @@ export const Files: React.FC = () => {
                 </>
               ) : null;
             })()}
+            {contextMenu.file.isDirectory && (
+              <button onClick={() => {
+                sendCreativeInput('dexcode', { kind: 'folder', path: contextMenu.file.path });
+                setContextMenu(null);
+              }} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: 12, textAlign: 'left', cursor: 'pointer' }}>
+                Open as DEX Code project
+              </button>
+            )}
             <button onClick={() => handleShowInExplorer(contextMenu.file)} aria-label={`Show ${contextMenu.file.name} in Explorer`} style={{ display: 'block', width: '100%', padding: 'var(--space-2) var(--space-4)', background: 'transparent', border: 'none', color: 'var(--color-text, #e4e4e7)', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
               Show in Explorer
             </button>
