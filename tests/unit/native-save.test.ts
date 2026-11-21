@@ -8,16 +8,20 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 
 vi.mock('../../src/renderer/services/notify', () => ({ notify: vi.fn(async () => 1) }));
 
-import { safeFileName, isCapturableDownload, installDownloadCapture } from '../../src/renderer/services/nativeSave';
+import { safeFileName, isCapturableDownload, installDownloadCapture, saveBlobAs } from '../../src/renderer/services/nativeSave';
+import { notify } from '../../src/renderer/services/notify';
 
 const calls: { ch: string; args: unknown[] }[] = [];
 const files = new Map<string, string>();
+let pickPath: (() => unknown) | undefined;
 
 beforeAll(() => {
   (globalThis as any).dex = {
     invoke: async (ch: string, ...args: unknown[]) => {
       calls.push({ ch, args });
-      if (ch === 'dialog:showSaveDialog') return { canceled: false, filePath: 'C:\\Users\\me\\Downloads\\' + (args[0] as any).defaultPath };
+      if (ch === 'dialog:showSaveDialog') return pickPath
+        ? pickPath()
+        : { canceled: false, filePath: 'C:\\Users\\me\\Downloads\\' + (args[0] as any).defaultPath };
       if (ch === 'fs:writeBase64') { files.set(args[0] as string, args[1] as string); return { ok: true, bytes: 3 }; }
       if (ch === 'shell:openExternal') return { success: true };
       return null;
@@ -25,7 +29,7 @@ beforeAll(() => {
   };
   installDownloadCapture();
 });
-afterEach(() => { calls.length = 0; files.clear(); });
+afterEach(() => { calls.length = 0; files.clear(); pickPath = undefined; vi.mocked(notify).mockClear(); });
 
 const settle = () => new Promise((r) => setTimeout(r, 30));
 
@@ -65,6 +69,63 @@ describe('native save / download capture', () => {
     URL.revokeObjectURL(url); // the usual pattern: revoke immediately
     await settle();
     expect(files.get('C:\\Users\\me\\Downloads\\clip.webm')).toBe('AQID');
+  });
+
+  it('keeps a shared blob URL until every export has read it', async () => {
+    const originalFetch = globalThis.fetch;
+    let releaseSecond!: () => void;
+    const secondReader = new Promise<void>(resolve => { releaseSecond = resolve; });
+    const fetchExport = vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce((...args) => originalFetch(...args))
+      .mockImplementationOnce(async (...args) => {
+        await secondReader;
+        return originalFetch(...args);
+      });
+    const anchor = document.createElement('a');
+    anchor.href = URL.createObjectURL(new Blob([new Uint8Array([1, 2, 3])]));
+    try {
+      anchor.download = 'first.bin';
+      anchor.click();
+      anchor.download = 'second.bin';
+      anchor.click();
+      URL.revokeObjectURL(anchor.href);
+      await vi.waitFor(() => expect(files.get('C:\\Users\\me\\Downloads\\first.bin')).toBe('AQID'));
+      releaseSecond();
+      await vi.waitFor(() => expect(files.get('C:\\Users\\me\\Downloads\\second.bin')).toBe('AQID'));
+    } finally {
+      releaseSecond();
+      fetchExport.mockRestore();
+      URL.revokeObjectURL(anchor.href);
+    }
+  });
+
+  it('canceling the Save dialog leaves the filesystem and notifications alone', async () => {
+    pickPath = () => ({ canceled: true, filePath: null });
+    await expect(saveBlobAs('draft.txt', new Blob(['draft']))).resolves.toBeNull();
+    expect(calls.map(call => call.ch)).toEqual(['dialog:showSaveDialog']);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('reports a Save dialog failure before any write', async () => {
+    pickPath = () => { throw new Error('Save dialog unavailable'); };
+    await expect(saveBlobAs('draft.txt', new Blob(['draft']))).rejects.toThrow('Save dialog unavailable');
+    expect(calls.map(call => call.ch)).toEqual(['dialog:showSaveDialog']);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't save draft.txt", body: 'Save dialog unavailable', icon: 'error',
+    }));
+  });
+
+  it('reports an unreadable export without opening a Save dialog', async () => {
+    const blobUrl = URL.createObjectURL(new Blob(['draft']));
+    URL.revokeObjectURL(blobUrl);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = 'draft.txt';
+    anchor.click();
+    await vi.waitFor(() => expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Couldn't save draft.txt", icon: 'error',
+    })));
+    expect(calls).toEqual([]);
   });
 
   it('window.open of a web link goes to the system browser, not a new window', () => {

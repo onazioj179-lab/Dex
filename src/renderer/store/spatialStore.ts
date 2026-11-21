@@ -25,7 +25,14 @@ import {
   presetZoneRects,
 } from '../shell/spatial/spatialMath';
 
-export interface SpatialWindow extends Rect { id: string; title: string; z: number; minimized: boolean }
+export interface SpatialWindow extends Rect {
+  id: string;
+  title: string;
+  z: number;
+  minimized: boolean;
+  /** Hidden solely by its collapsed group. */
+  groupHidden?: boolean;
+}
 export interface SpatialGroup { id: string; name: string; color: string; appIds: string[]; collapsed: boolean }
 
 /** What AppManager lets the spatial layer do to real windows. */
@@ -119,6 +126,7 @@ interface SpatialState {
   renameGroup(id: string, name: string): void;
   setGroupColor(id: string, color: string): void;
   setGroupCollapsed(id: string, collapsed: boolean): void;
+  expandGroupForWindow(id: string): void;
   removeFromGroups(appId: string): void;
   ungroup(id: string): void;
   focusGroup(id: string): void;
@@ -187,7 +195,9 @@ export const useSpatialStore = create<SpatialState>()(
         return get().viewport;
       };
       const visibleWindows = () => Object.values(get().windows).filter((w) => !w.minimized);
-      const groupBounds = (g: SpatialGroup) => boundsOf(g.appIds.map((id) => get().windows[id]).filter(Boolean));
+      const groupBounds = (g: SpatialGroup) => boundsOf(g.appIds
+        .map(id => get().windows[id])
+        .filter(w => w && (!w.minimized || w.groupHidden)));
 
       return {
         enabled: false,
@@ -229,7 +239,8 @@ export const useSpatialStore = create<SpatialState>()(
         focusWindow: (id) => {
           const w = get().windows[id];
           if (!w) return;
-          if (w.minimized) get().host?.setMinimized(id, false);
+          get().expandGroupForWindow(id);
+          if (w.minimized && !w.groupHidden) get().host?.setMinimized(id, false);
           get().host?.focus(id);
           const viewport = vp();
           animateTo(fitRect(w, viewport.w, viewport.h, 32, get().limits), true);
@@ -296,10 +307,15 @@ export const useSpatialStore = create<SpatialState>()(
         renameGroup: (id, name) => set({ groups: get().groups.map((g) => (g.id === id && name.trim() ? { ...g, name: name.trim() } : g)) }),
         setGroupColor: (id, color) => set({ groups: get().groups.map((g) => (g.id === id ? { ...g, color } : g)) }),
         setGroupCollapsed: (id, collapsed) => {
-          const g = get().groups.find((x) => x.id === id);
-          if (!g) return;
-          for (const a of g.appIds) get().host?.setMinimized(a, collapsed);
-          set({ groups: get().groups.map((x) => (x.id === id ? { ...x, collapsed } : x)) });
+          const { groups } = get();
+          if (!groups.some(g => g.id === id && g.collapsed !== collapsed)) return;
+          set({ groups: groups.map(g => g.id === id ? { ...g, collapsed } : g) });
+        },
+        expandGroupForWindow: (id) => {
+          const { groups } = get();
+          const containsHiddenWindow = (g: SpatialGroup) => g.collapsed && g.appIds.includes(id);
+          if (!groups.some(containsHiddenWindow)) return;
+          set({ groups: groups.map(g => containsHiddenWindow(g) ? { ...g, collapsed: false } : g) });
         },
         removeFromGroups: (appId) => set({
           groups: get().groups.map((g) => ({ ...g, appIds: g.appIds.filter((a) => a !== appId) })).filter((g) => g.appIds.length > 0),
@@ -484,8 +500,11 @@ export const useSpatialStore = create<SpatialState>()(
   ),
 );
 
-const okRect = (r: unknown): r is Rect => !!r && typeof r === 'object'
-  && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite((r as Record<string, number>)[k]));
+// Persist can validate rectangles synchronously while the store initializes.
+function okRect(r: unknown): r is Rect {
+  return !!r && typeof r === 'object'
+    && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite((r as Record<string, number>)[k]));
+}
 function rectMap(o: unknown): Record<string, Rect> {
   return Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, r]) => okRect(r))) as Record<string, Rect>;
 }

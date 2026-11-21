@@ -127,7 +127,9 @@ fn write_state(app: &tauri::AppHandle, patch: &[(&str, Value)]) -> bool {
         }
     }
     match serde_json::to_string_pretty(&state) {
-        Ok(raw) => std::fs::write(store_path(app, STATE_FILE), raw).is_ok(),
+        Ok(raw) => crate::native_ops::write_text(&json!([store_path(app, STATE_FILE), raw]))["ok"]
+            .as_bool()
+            .unwrap_or(false),
         Err(_) => false,
     }
 }
@@ -543,8 +545,11 @@ fn load_image(app: &tauri::AppHandle, file_path: &str) -> Value {
     match build_image_record(Path::new(file_path)) {
         Some(rec) => {
             images.push(rec.clone());
-            write_state(app, &[("images", json!(images))]);
-            rec
+            if write_state(app, &[("images", json!(images))]) {
+                rec
+            } else {
+                Value::Null
+            }
         }
         None => Value::Null,
     }
@@ -1006,7 +1011,21 @@ fn set_view(app: &tauri::AppHandle, view: &str) -> Value {
 /// gallery channel falls through to Value::Null so the renderer degrades
 /// honestly rather than receiving faked data.
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
+    static STATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = STATE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     match channel {
+        "gallery:getImportedMedia" => {
+            let items: Vec<_> = read_images(app)
+                .into_iter()
+                .filter(|item| {
+                    let ext = extension_of(item).trim_start_matches('.');
+                    crate::media_protocol::content_type(ext)
+                        .is_some_and(|mime| mime.starts_with("image/") || mime.starts_with("video/"))
+                        && Path::new(path_of(item)).is_file()
+                })
+                .collect();
+            json!(items)
+        }
         "gallery:getImages" => {
             let filter = args.get(0).cloned().unwrap_or(Value::Null);
             json!(get_images(app, &filter))

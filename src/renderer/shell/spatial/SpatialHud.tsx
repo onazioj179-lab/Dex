@@ -21,18 +21,19 @@ import { SegmentedControl } from '../../components/controls';
 import { useSpatialStore, GROUP_COLORS, type SpatialWindow } from '../../store/spatialStore';
 import { boundsOf, viewRect, type ArrangeKind, type AlignKind } from './spatialMath';
 import { downloadText } from '../../improvements500/downloadBlob';
+import { useOverlay } from '../../services/overlayStack';
 import { toLocalDateInput } from '../../utils/localDate';
 
 const btn: React.CSSProperties = {
-  height: 28, minWidth: 28, padding: '0 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  borderRadius: 'var(--radius-sm, 6px)', border: '1px solid transparent', background: 'transparent',
+  height: 26, minWidth: 26, padding: '0 7px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  borderRadius: 4, border: '1px solid transparent', background: 'transparent',
   color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
 };
 const panel: React.CSSProperties = {
   // Shell glass material (follows Settings > Liquid Glass; solid when off).
   background: 'var(--color-bg-glass-strong)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
   border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-lg, 14px)', boxShadow: '0 8px 24px rgba(0,0,0,0.28)', color: 'var(--color-text-primary)',
+  borderRadius: 7, boxShadow: '0 8px 24px rgba(0,0,0,0.28)', color: 'var(--color-text-primary)',
 };
 
 const Icon: React.FC<{ d: string; size?: number }> = ({ d, size = 14 }) => (
@@ -94,11 +95,11 @@ export const SpatialHud: React.FC = () => {
   }, [pct]);
 
   return (
-    <div data-spatial-hud="" style={{ position: 'absolute', right: 16, top: 16, zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, pointerEvents: 'none' }}>
-      <div aria-hidden="true" style={{
+    <div data-spatial-hud="" style={{ position: 'absolute', right: 12, top: 12, maxWidth: 'calc(100% - 24px)', zIndex: 6000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', pointerEvents: 'none' }}>
+      {!panelOpen && <div aria-hidden="true" style={{
         ...panel, padding: '4px 10px', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
         opacity: showZoom ? 1 : 0, transition: 'opacity 160ms var(--ease-standard, ease)',
-      }}>{pct}%</div>
+      }}>{pct}%</div>}
       {panelOpen && <WindowsPanel onClose={() => setPanelOpen(false)} />}
       <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{`Zoom ${pct}%`}</span>
     </div>
@@ -113,7 +114,7 @@ export const SpatialHud: React.FC = () => {
 // ---------------------------------------------------------------------------
 
 const field: React.CSSProperties = {
-  height: 28, padding: '0 8px', borderRadius: 'var(--radius-sm, 6px)', border: '1px solid var(--color-border-control)',
+  height: 26, padding: '0 8px', borderRadius: 4, border: '1px solid var(--color-border-control)',
   background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, boxSizing: 'border-box', minWidth: 0,
 };
 const sectionLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', padding: '6px 8px 2px' };
@@ -147,6 +148,10 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const { isTop } = useOverlay(true, onClose, { ref: panelRef, ownEscape: true });
+  useEffect(() => searchRef.current?.focus({ preventScroll: true }), []);
 
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -161,8 +166,8 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const exportLayout = () => {
     const data = st().exportLayout();
+    setMsg(null);
     downloadText(`dex-spatial-layout-${toLocalDateInput(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json');
-    setMsg('Layout exported to your downloads.');
   };
   const importLayout = async (f: File | undefined) => {
     if (!f) return;
@@ -178,14 +183,15 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const tabs: Array<[PanelTab, string]> = [['windows', 'Windows'], ['zones', 'Zones'], ['views', 'Views'], ['layout', 'Layout']];
 
   return (
-    <div role="dialog" aria-label="Spatial desktop panel" style={{ ...panel, width: 340, maxHeight: '64vh', display: 'flex', flexDirection: 'column', pointerEvents: 'auto' }}
-      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
-      <div style={{ padding: 4, borderBottom: '1px solid var(--color-border)' }}>
+    <div ref={panelRef} role="dialog" aria-label="Spatial desktop panel" style={{ ...panel, width: 'min(330px, calc(100vw - 24px))', maxHeight: 'min(360px, 52vh)', display: 'flex', flexDirection: 'column', overflow: 'hidden', pointerEvents: 'auto' }}
+      onKeyDown={(e) => { if (e.key === 'Escape' && isTop()) { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
+      <div style={{ padding: 4, flexShrink: 0, borderBottom: '1px solid var(--color-border)' }}>
         <SegmentedControl
           semantics="tabs"
           variant="subtle"
-          size="md"
+          size="sm"
           fill
+          className="dex-spatial-tabs"
           aria-label="Panel sections"
           options={tabs.map(([t, label]) => ({ value: t, label }))}
           value={tab}
@@ -195,12 +201,12 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       {tab === 'windows' && (
         <>
-          <div style={{ padding: 8, borderBottom: '1px solid var(--color-border)' }}>
-            <input autoFocus aria-label="Find a window" placeholder="Find a window" value={q} onChange={(e) => setQ(e.target.value)}
+          <div style={{ padding: 5, flexShrink: 0, borderBottom: '1px solid var(--color-border)' }}>
+            <input ref={searchRef} aria-label="Find a window" placeholder="Find a window" value={q} onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && list[0]) { st().focusWindow(list[0].id); onClose(); } }}
               style={{ ...field, width: '100%' }} />
           </div>
-          <div style={{ overflowY: 'auto', padding: 4, flex: 1 }}>
+          <div style={{ overflowY: 'auto', padding: 4, flex: 1, minHeight: 0 }}>
             {list.length === 0 && <div style={{ padding: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>{Object.keys(windows).length === 0 ? 'No open windows.' : 'No matching windows.'}</div>}
             <ul role="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {list.map((w: SpatialWindow) => {
@@ -213,7 +219,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                       onClick={() => { st().focusWindow(w.id); onClose(); }} aria-label={`Go to ${w.title}${w.minimized ? ' (minimized)' : ''}${g ? `, in group ${g.name}` : ''}${isLocked ? ', locked' : ''}`}>
                       {g && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 9999, background: g.color, flexShrink: 0 }} />}
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.title}</span>
-                      {w.minimized && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-tertiary)' }}>minimized</span>}
+                      {w.minimized && <span aria-hidden="true" title="Minimized" style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)' }}><Icon d="M6 17h12" /></span>}
                     </button>
                     <button className="dex-spatial-btn" style={{ ...btn, padding: '0 6px' }} aria-pressed={isLocked} onClick={() => st().toggleLock(w.id)}
                       aria-label={isLocked ? `Unlock ${w.title}` : `Lock ${w.title} in place`} title={isLocked ? 'Unlock' : 'Lock position and size'}>
@@ -276,9 +282,6 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)', flex: 1 }} onClick={() => st().createZone(`Zone ${zones.length + 1}`)}>Zone from this view</button>
             <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)', flex: 1 }} onClick={() => st().createPresetZones()}>Add standard zones</button>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', padding: '2px 8px 6px', lineHeight: 1.4 }}>
-            Standard zones: Work, Creative, Development, Research, Communication, Entertainment. Drag a zone label to move it with its windows.
-          </div>
           {zones.length === 0 && <div style={{ padding: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>No zones yet.</div>}
           {zones.map((z) => (
             <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
@@ -306,7 +309,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <div style={{ padding: 4 }}>
             <button className="dex-spatial-btn" style={{ ...btn, background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', width: '100%' }} onClick={() => st().saveView()}>Save this view</button>
           </div>
-          {views.length === 0 && <div style={{ padding: 12, fontSize: 12, color: 'var(--color-text-secondary)' }}>No saved views. A view remembers where you were and how far you were zoomed in.</div>}
+          {views.length === 0 && <div style={{ padding: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>No saved views.</div>}
           {views.map((v) => (
             <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px' }}>
               {renaming === v.id
@@ -325,10 +328,7 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       )}
 
       {tab === 'layout' && (
-        <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
-            A layout file holds window places, groups, zones, saved views and the camera. It never contains what is inside your apps.
-          </div>
+        <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', minHeight: 0 }}>
           <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} onClick={exportLayout}>Export layout…</button>
           <button className="dex-spatial-btn" style={{ ...btn, border: '1px solid var(--color-border)' }} onClick={() => fileRef.current?.click()}>Import layout…</button>
           <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Layout file to import" style={{ display: 'none' }}
@@ -351,7 +351,8 @@ const WindowsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 // ---------------------------------------------------------------------------
 
-const FRAME_PAD = 24;
+const FRAME_PAD = 16;
+const FRAME_HEADER = 22;
 
 /** World-space frames behind grouped windows. Drag the label to move the group. */
 export const SpatialGroupFrames: React.FC = () => {
@@ -365,15 +366,15 @@ export const SpatialGroupFrames: React.FC = () => {
         if (!b) return null;
         return (
           <div key={g.id} data-spatial-group={g.id} aria-hidden="true" style={{
-            position: 'fixed', left: b.x - FRAME_PAD, top: b.y - FRAME_PAD - 28, width: b.w + FRAME_PAD * 2, height: b.h + FRAME_PAD * 2 + 28,
-            border: `1.5px solid ${g.color}`, borderRadius: 'var(--radius-xl, 18px)',
+            position: 'fixed', left: b.x - FRAME_PAD, top: b.y - FRAME_PAD - FRAME_HEADER, width: b.w + FRAME_PAD * 2, height: b.h + FRAME_PAD * 2 + FRAME_HEADER,
+            border: `1px solid ${g.color}`, borderRadius: 7,
             background: `color-mix(in srgb, ${g.color} 6%, transparent)`, zIndex: 100, pointerEvents: 'none',
           }}>
             <div
               title="Drag to move the group"
               style={{
-                position: 'absolute', left: 12, top: 4, height: 22, padding: '0 10px', display: 'flex', alignItems: 'center',
-                borderRadius: 9999, background: g.color, color: 'var(--color-accent-text)', fontSize: 12, fontWeight: 600,
+                position: 'absolute', left: 7, top: 4, height: 20, padding: '0 7px', display: 'flex', alignItems: 'center',
+                borderRadius: 4, border: `1px solid ${g.color}`, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600,
                 cursor: 'grab', pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
               }}
               onPointerDown={(e) => {
@@ -457,14 +458,14 @@ export const SpatialZones: React.FC = () => {
       {zones.map((z) => (
         <div key={z.id} data-spatial-zone={z.id} aria-hidden="true" style={{
           position: 'fixed', left: z.x, top: z.y, width: z.w, height: z.h, zIndex: 50, pointerEvents: 'none',
-          border: `2px dashed color-mix(in srgb, ${z.color} 55%, transparent)`, borderRadius: 'var(--radius-2xl, 24px)',
+          border: `1px dashed color-mix(in srgb, ${z.color} 70%, transparent)`, borderRadius: 8,
           background: `color-mix(in srgb, ${z.color} 4%, transparent)`,
         }}>
           <div title="Drag to move the zone and its windows" onPointerDown={(e) => startDrag(e, z.id, 'move')}
             onDoubleClick={() => useSpatialStore.getState().focusZone(z.id)}
             style={{
-              position: 'absolute', left: 20, top: -18, height: 32, padding: '0 14px', display: 'flex', alignItems: 'center',
-              borderRadius: 9999, background: z.color, color: 'var(--color-accent-text)', fontSize: 15, fontWeight: 600, letterSpacing: '0.01em',
+              position: 'absolute', left: 10, top: -12, height: 22, padding: '0 8px', display: 'flex', alignItems: 'center',
+              borderRadius: 4, border: `1px solid ${z.color}`, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600,
               cursor: 'grab', pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
             }}>{z.name}</div>
           <div title="Drag to resize the zone" onPointerDown={(e) => startDrag(e, z.id, 'resize')} style={{

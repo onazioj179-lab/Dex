@@ -914,6 +914,8 @@ const DexNotesInner: React.FC = () => {
         /* Favorite star: hidden until the note row is hovered; always shown once on. */
         .dexnotes-app .dn-star { opacity: 0; transition: opacity 0.12s ease, transform 0.12s ease; }
         .dexnotes-app .dn-note-item:hover .dn-star { opacity: 0.55; }
+        .dexnotes-app .dn-note-item:hover { background: var(--color-accent-soft); }
+        .dexnotes-app .dn-note-item[data-selected] { background: var(--color-accent-light); }
         .dexnotes-app .dn-star.dn-star-on { opacity: 1; }
         .dexnotes-app .dn-star:hover { opacity: 1 !important; }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }

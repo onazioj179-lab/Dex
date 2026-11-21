@@ -54,6 +54,36 @@ async function open(page: Page, id: string): Promise<void> {
 }
 
 test.describe('DEX shell (web renderer)', () => {
+  test('Stage filter and keyboard controls act on the intended window', async ({ page }) => {
+    await boot(page);
+    await open(page, 'browser');
+    await open(page, 'notes');
+    await page.keyboard.press('F3');
+    const stage = page.getByRole('dialog', { name: 'Stage Manager' });
+    const search = stage.getByRole('textbox', { name: 'Filter apps' });
+    await expect(search).toBeFocused();
+    await search.fill('  NOTES  ');
+    await expect(stage.getByRole('button', { name: /^Switch to Browser$/i })).toBeDisabled();
+    await stage.getByRole('button', { name: /^Close Notes$/i }).press('Enter');
+    await expect(stage.getByRole('button', { name: /^Switch to Notes$/i })).toHaveCount(0);
+    await expect(stage).toBeVisible();
+    await expect(search).toBeFocused();
+    await search.fill('browser');
+    await search.press('Enter');
+    await expect(stage).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.__dexRunningApps?.getState().currentAppId)).toBe('browser');
+
+    const browser = page.getByTestId('app-instance-browser');
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('dex-app-command', { detail: { appId: 'browser', command: 'minimize' } }));
+    });
+    await expect(browser).toBeHidden();
+    await page.keyboard.press('F3');
+    await stage.getByRole('button', { name: /^Restore Browser$/i }).click();
+    await expect(stage).toBeHidden();
+    await expect(browser).toBeVisible();
+  });
+
   test('boots to Home with no page error and no error boundary', async ({ page }) => {
     const errors = await boot(page);
     await expect(page.locator('#root')).not.toBeEmpty();

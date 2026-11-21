@@ -15,7 +15,7 @@
 //   - where focus goes back to when it closes.
 // Plus a viewport clamp shared by every popup so none opens off-screen.
 
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export interface OverlayEntry {
   id: string;
@@ -32,10 +32,11 @@ export interface OverlayEntry {
 }
 
 const BASE_Z = 7000;
-const stack: OverlayEntry[] = [];
+type StackEntry = OverlayEntry & { z: number };
+const stack: StackEntry[] = [];
 let wired = false;
 
-function top(): OverlayEntry | undefined { return stack[stack.length - 1]; }
+function top(): StackEntry | undefined { return stack[stack.length - 1]; }
 
 function onKey(e: KeyboardEvent): void {
   if (e.key !== 'Escape' || !stack.length) return;
@@ -70,18 +71,22 @@ wire();
 /** Register an open overlay; returns its z-index and an unregister function. */
 export function pushOverlay(entry: OverlayEntry): { z: number; release: () => void } {
   wire();
+  const registered = { ...entry, z: (top()?.z ?? BASE_Z) + 10 };
   const existing = stack.findIndex((o) => o.id === entry.id);
   if (existing >= 0) stack.splice(existing, 1);
-  stack.push(entry);
-  const z = BASE_Z + stack.length * 10;
+  stack.push(registered);
   return {
-    z,
+    z: registered.z,
     release: () => {
-      const i = stack.findIndex((o) => o.id === entry.id);
+      const i = stack.indexOf(registered);
       if (i < 0) return;
+      const wasTop = registered === top();
       stack.splice(i, 1);
       const back = entry.restoreFocus;
-      if (back && back.isConnected) { try { back.focus({ preventScroll: true }); } catch { /* detached */ } }
+      const contains = top()?.contains;
+      if (wasTop && back?.isConnected && (!contains || contains(back))) {
+        back.focus({ preventScroll: true });
+      }
     },
   };
 }
@@ -107,25 +112,27 @@ export function useOverlay(
   onClose: () => void,
   opts: { ref?: React.RefObject<HTMLElement>; anchorRef?: React.RefObject<HTMLElement>; dismissOnOutside?: boolean; ownEscape?: boolean } = {},
 ): { zIndex: number; isTop: () => boolean } {
-  const idRef = useRef(`ov-${++seq}`);
+  const [id] = useState(() => `ov-${++seq}`);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  const zRef = useRef(BASE_Z);
-  useEffect(() => {
+  const [zIndex, setZIndex] = useState(BASE_Z);
+  useLayoutEffect(() => {
     if (!open) return;
     const { z, release } = pushOverlay({
-      id: idRef.current,
+      id,
       close: () => closeRef.current(),
       dismissOnOutside: opts.dismissOnOutside,
       ownEscape: opts.ownEscape,
       restoreFocus: typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null,
-      contains: (t) => !!(opts.ref?.current?.contains(t) || opts.anchorRef?.current?.contains(t)),
+      contains: opts.ref || opts.anchorRef
+        ? (t) => !!(opts.ref?.current?.contains(t) || opts.anchorRef?.current?.contains(t))
+        : undefined,
     });
-    zRef.current = z;
+    setZIndex(z);
     return release;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-  return { zIndex: zRef.current, isTop: () => isTopOverlay(idRef.current) };
+  }, [open, id]);
+  return { zIndex, isTop: () => isTopOverlay(id) };
 }
 
 /** Test-only reset. */

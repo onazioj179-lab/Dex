@@ -1224,7 +1224,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             aria-label="Toggle outline"
             aria-pressed={outlineOpen}
             title="Outline — jump to document headings"
-            style={{ ...styles.toolbarBtn, ...(outlineOpen ? { background: 'var(--color-bg-active, rgba(255,255,255,0.12))', color: 'var(--color-accent, #4a9eff)' } : {}) }}
+            style={{ ...styles.toolbarBtn, ...(outlineOpen ? { background: 'var(--color-accent-light)', color: 'var(--color-accent)' } : {}) }}
             onMouseDown={e => { e.preventDefault(); setOutlineOpen(o => !o); }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1347,7 +1347,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       fontWeight: h.level === 1 ? 600 : 400,
                     }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-accent-soft)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
                     {h.text}
@@ -1422,7 +1422,7 @@ const EDITOR_CSS = `
   text-decoration: line-through;
   opacity: 0.55;
 }
-div[contenteditable] h1 { font-size: 28px; font-weight: 700; margin: 20px 0 8px; color: #ffffff; }
+div[contenteditable] h1 { font-size: 28px; font-weight: 700; margin: 20px 0 8px; color: var(--color-text-primary); }
 div[contenteditable] h2 { font-size: 22px; font-weight: 600; margin: 16px 0 6px; color: #f0f0f0; }
 div[contenteditable] h3 { font-size: 18px; font-weight: 600; margin: 14px 0 4px; color: #e0e0e0; }
 div[contenteditable] h4 { font-size: 16px; font-weight: 600; margin: 12px 0 4px; }

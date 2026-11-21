@@ -18,6 +18,7 @@
 //
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { ADBLOCK_CONSOLE_PREFIX } from '../DEXAPPLICATIONS/browser/adblockContentScript';
+import { useSpatialStore } from '../store/spatialStore';
 
 type Invoke = (channel: string, ...args: unknown[]) => Promise<any>;
 const invoke: Invoke = (channel, ...args) =>
@@ -318,17 +319,21 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     createView(src);
   }, [src, alive, tabId, createView]);
 
-  // Keep the native view glued to the placeholder. Cheap checks on a slow
-  // timer; every frame only while a pointer is down (window drags, resizes).
+  // The native view lives outside the DOM compositor. Follow window drags and
+  // camera changes, while keeping the regular occlusion check on a slow timer.
   useEffect(() => {
     if (!alive) return;
     sync();
     const el = elRef.current;
     let raf = 0;
     let dragging = false;
-    const frame = () => { sync(); if (dragging) raf = requestAnimationFrame(frame); };
-    const down = () => { if (!dragging) { dragging = true; raf = requestAnimationFrame(frame); } };
-    const up = () => { dragging = false; cancelAnimationFrame(raf); sync(); };
+    const queue = () => { if (!raf) raf = requestAnimationFrame(frame); };
+    const frame = () => { raf = 0; sync(); if (dragging) queue(); };
+    const down = () => { if (activeRef.current) { dragging = true; queue(); } };
+    const up = () => { dragging = false; cancelAnimationFrame(raf); raf = 0; sync(); };
+    const unsubscribe = useSpatialStore.subscribe((state, prev) => {
+      if (activeRef.current && (state.enabled !== prev.enabled || (state.enabled && state.camera !== prev.camera))) queue();
+    });
     const timer = window.setInterval(() => {
       if (!created.current && pendingUrl.current) createView(pendingUrl.current);
       sync();
@@ -337,14 +342,19 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     if (el && ro) ro.observe(el);
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    window.addEventListener('blur', up);
     window.addEventListener('resize', sync);
     document.addEventListener('visibilitychange', sync);
     return () => {
       window.clearInterval(timer);
       cancelAnimationFrame(raf);
+      unsubscribe();
       ro?.disconnect();
       window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+      window.removeEventListener('blur', up);
       window.removeEventListener('resize', sync);
       document.removeEventListener('visibilitychange', sync);
     };

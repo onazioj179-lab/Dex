@@ -94,6 +94,17 @@ describe('useRunningApps', () => {
     expect(currentAppId).toBe('browser');
   });
 
+  it('keeps a minimized tab hidden when the last visible app closes', () => {
+    const state = store.getState();
+    state.launchApp(testApp);
+    state.launchApp({ id: 'notes', name: 'Notes', icon: 'file-text', color: '#30d158' });
+    state.minimizeApp('browser');
+    expect(store.getState().currentAppId).toBe('notes');
+    state.closeApp('notes');
+    expect(store.getState().currentAppId).toBe('home');
+    expect(store.getState().runningApps).toEqual([expect.objectContaining({ id: 'browser', isMinimized: true })]);
+  });
+
   it('closeAllApps clears everything back to home', () => {
     store.getState().launchApp(testApp);
     store.getState().launchApp({ id: 'notes', name: 'Notes', icon: 'file-text', color: '#30d158' });

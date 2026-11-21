@@ -112,7 +112,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             paddingLeft: 8 + depth * 16,
             borderRadius: 4,
             cursor: 'pointer',
-            background: isSelected ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+            background: isSelected ? 'var(--color-accent-light)' : 'transparent',
             color: isSelected ? 'var(--color-text-primary)' : colors.text,
             fontSize: 13,
             transition: 'background 0.1s',
@@ -182,7 +182,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           padding: '6px var(--space-2)',
           borderRadius: 4,
           cursor: 'pointer',
-          background: selectedFolderId === null ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 12%, transparent)' : 'transparent',
+          background: selectedFolderId === null ? 'var(--color-accent-light)' : 'transparent',
           color: selectedFolderId === null ? 'var(--color-text-primary)' : colors.text,
           fontSize: 13,
           fontWeight: 500,
@@ -409,18 +409,15 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       <div
         key={note.id}
         className="dn-note-item"
+        data-selected={isSelected || undefined}
         onContextMenu={e => {
           onSelect(note.id);
           showCtx(e, buildNoteCtxItems(note));
         }}
         style={{
-          padding: viewMode === 'compact' ? '6px 10px' : '8px 12px',
-          // Selection is a quiet rounded fill. No left stripes: with many
-          // notes they stacked into a column of accent bars. A colour label
-          // shows as the small dot beside the title only.
-          borderRadius: 10,
+          padding: viewMode === 'compact' ? '5px 8px' : '7px 9px',
+          borderRadius: 5,
           cursor: 'pointer',
-          background: isSelected ? 'rgba(255,255,255,0.09)' : 'transparent',
           transition: 'background 0.1s',
           marginBottom: 2,
         }}
@@ -497,7 +494,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
               <span key={tag} style={{
                 fontSize: 10,
                 color: colors.textDim,
-                background: 'rgba(255,255,255,0.06)',
+                background: 'var(--color-accent-soft)',
                 padding: '1px 7px',
                 borderRadius: 9999,
               }}>{tag}</span>
@@ -536,9 +533,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         flexShrink: 0,
       }}>
         <span>
-          {searchQuery.trim()
-            ? `${notes.length} match${notes.length !== 1 ? 'es' : ''}`
-            : `${notes.length} note${notes.length !== 1 ? 's' : ''}`}
+          {searchQuery.trim() ? `${notes.length} match${notes.length !== 1 ? 'es' : ''}` : ''}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {onViewModeChange && (
@@ -550,8 +545,8 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
                   aria-pressed={viewMode === m}
                   onClick={() => onViewModeChange(m)}
                   style={{
-                    background: viewMode === m ? 'var(--color-bg-active)' : 'transparent',
-                    border: 'none', color: viewMode === m ? 'var(--color-text-primary)' : colors.textDim,
+                    background: viewMode === m ? 'var(--color-accent-light)' : 'transparent',
+                    border: 'none', color: viewMode === m ? 'var(--color-accent)' : colors.textDim,
                     cursor: 'pointer', fontSize: 10, padding: '2px 5px', borderRadius: 2,
                   }}
                 >{m === 'list'
@@ -947,7 +942,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                     style={{
                       width: 18, height: 18, borderRadius: '50%', cursor: 'pointer',
                       background: c.hex === 'transparent' ? 'var(--color-bg-hover)' : c.hex,
-                      border: (noteColorName(note.color_label) ?? null) === c.value ? '2px solid #fff' : '2px solid transparent',
+                      border: (noteColorName(note.color_label) ?? null) === c.value ? '2px solid var(--color-accent)' : '2px solid transparent',
                     }}
                     onClick={() => { onColorLabel(c.value); setShowColorMenu(false); }}
                   />
