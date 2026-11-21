@@ -4,7 +4,7 @@ import DexIcon from './DexIcon';
 import { Button } from '../ui/Button';
 import { useSoftwareUpdate, type UpdatePhase } from '../services/softwareUpdate';
 import { isTauri } from '../services/platform/tauriCompat';
-import { getDisplayVersion } from '../utils/appVersion';
+import { getBuildInfo, getDisplayVersion } from '../utils/appVersion';
 import { openWithShell } from '../utils/openWithShell';
 
 const RELEASES = 'https://github.com/onazioj179-lab/Dex/releases/latest';
@@ -24,9 +24,11 @@ export function SoftwareUpdatePanel() {
   const state = useSoftwareUpdate();
   const { phase, version, notes, received, total, error } = state;
   const desktop = isTauri();
+  const remoteUpdates = getBuildInfo().channel === 'stable';
+  const hasUpdater = desktop && remoteUpdates;
   const busy = ['checking', 'downloading', 'verifying', 'installing'].includes(phase);
   const percent = total && total > 0 ? Math.min(100, Math.floor(received / total * 100)) : undefined;
-  const title = phase === 'available' ? `DEX ${version} is available` : progressLabels[phase];
+  const title = !remoteUpdates ? 'Local DEX build' : phase === 'available' ? `DEX ${version} is available` : progressLabels[phase];
   return (
     <section aria-label="Software Update" style={{ width: '100%', height: '100%', boxSizing: 'border-box', overflowY: 'auto', padding: 'clamp(16px, 4vw, 40px)' }}>
       <div style={{ maxWidth: 560, margin: '0 auto', display: 'grid', gap: 16 }}>
@@ -50,8 +52,9 @@ export function SoftwareUpdatePanel() {
           ) : null}
           {phase === 'ready' && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Save your work before restarting DEX.</p>}
           {phase === 'error' && <p role="alert" style={{ margin: 0, maxWidth: 420, fontSize: 13, color: 'var(--color-error)', overflowWrap: 'anywhere' }}>{error}</p>}
-          {!desktop && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Install the Windows desktop app to enable in-app updates.</p>}
-          {desktop && (
+          {!remoteUpdates && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Updates are installed on this computer when you approve a new build.</p>}
+          {remoteUpdates && !desktop && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Install the Windows desktop app to enable in-app updates.</p>}
+          {hasUpdater && (
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               {phase === 'available' ? <Button onClick={() => void state.download()}>Download update</Button>
                 : phase === 'ready' ? <Button onClick={() => void state.install()}>Install and restart</Button>
@@ -64,9 +67,9 @@ export function SoftwareUpdatePanel() {
           <summary style={{ cursor: 'pointer', color: 'var(--color-text-primary)' }}>What’s new in DEX {version}</summary>
           <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{notes}</p>
         </details>}
-        <Button variant="ghost" size="sm" onClick={() => void openWithShell('external', RELEASES, 'DEX releases')} style={{ justifySelf: 'center' }}>
+        {remoteUpdates && <Button variant="ghost" size="sm" onClick={() => void openWithShell('external', RELEASES, 'DEX releases')} style={{ justifySelf: 'center' }}>
           View GitHub releases
-        </Button>
+        </Button>}
       </div>
     </section>
   );
