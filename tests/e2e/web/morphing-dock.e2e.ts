@@ -55,6 +55,53 @@ function inside(b: Box, v: { w: number; h: number }) {
 }
 
 test.describe('Morphing Dock', () => {
+  test('Search keeps the panel and input in place from app grid through empty results', async ({ page }) => {
+    await boot(page);
+    await page.locator('[data-dock-item="__trigger"]').click();
+    const menu = page.getByRole('dialog', { name: 'App menu' });
+    const input = menu.getByRole('combobox', { name: 'Search apps and actions' });
+    await expect(input).toBeFocused();
+    const start = await menu.boundingBox();
+    const field = await input.boundingBox();
+    await input.fill('calculator');
+    await expect(menu.getByRole('option').first()).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    expect(await input.boundingBox()).toEqual(field);
+    await input.fill('qqqqzzzzxxxx');
+    await expect(menu.getByText(/Nothing matches/)).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    await input.press('Escape');
+    await expect(input).toHaveValue('');
+    await expect(menu.getByLabel('Applications')).toBeVisible();
+    expect(await menu.boundingBox()).toEqual(start);
+    await input.press('Escape');
+    await expect(menu).toBeHidden();
+  });
+
+  test('Classic dock search stays in the viewport and lets Tab leave the results', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 620 });
+    await page.addInitScript(() => {
+      localStorage.setItem('dex-dock-prefs-v1', JSON.stringify({ style: 'classic', acV2: true }));
+      localStorage.setItem('dex-floating-launcher-v2', JSON.stringify({ x: 0, y: 530, enabled: true }));
+    });
+    await page.goto('/');
+    const input = page.getByRole('combobox', { name: 'Spotlight Search' });
+    await expect(input).toBeVisible();
+    const field = await input.boundingBox();
+    const results = page.getByRole('listbox', { name: 'Search results' });
+    await input.fill('calculator');
+    await expect(results.getByRole('option').first()).toBeVisible();
+    const panel = await results.boundingBox();
+    expect(panel).not.toBeNull();
+    inside({ x: panel!.x, y: panel!.y, w: panel!.width, h: panel!.height }, { w: 800, h: 620 });
+    await input.fill('notes');
+    await expect(results.getByRole('option').filter({ hasText: 'Notes' }).first()).toBeVisible();
+    expect(await results.boundingBox()).toEqual(panel);
+    expect(await input.boundingBox()).toEqual(field);
+    await input.press('Tab');
+    await expect(results).toBeHidden();
+  });
+
   test('stays centred open and collapsed, collapse is faster, nothing leaves the screen', async ({ page }) => {
     await boot(page);
     const v = await vp(page);

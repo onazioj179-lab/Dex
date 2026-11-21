@@ -240,6 +240,8 @@ const ColorPicker: React.FC = () => {
           className="dex-liquid-glass cp-chip" style={s.valueChip}>
           Send to {app === 'canvas' ? 'Canvas' : 'Pixel Art'}
         </button>)}
+        <button type="button" onClick={() => sendCreativeInput('qrcode-color', hex)}
+          className="dex-liquid-glass cp-chip" style={s.valueChip}>Use in QR Code</button>
         <button
           onClick={() => sendToNotes(
             `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,

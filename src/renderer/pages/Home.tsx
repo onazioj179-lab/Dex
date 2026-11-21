@@ -19,7 +19,6 @@ import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS } from '../store/wallpaperStore';
 import { glassOverlay } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
-import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { useRecentFiles } from '../store/useRecentFiles';
 import { HomeWidgets } from '../components/HomeWidgets';
 import { useWidgetStore } from '../store/widgetStore';
@@ -358,14 +357,6 @@ export const Home: React.FC = () => {
   const desktopRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [repaintNonce, setRepaintNonce] = useState(0);
-  // When the embedded Spotlight has results open, fade the widget layer out so
-  // the clock/widgets never paint over (and obscure) the results dropdown.
-  const [searchActive, setSearchActive] = useState(false);
-  useEffect(() => {
-    const onSearchActive = (e: Event) => setSearchActive(!!(e as CustomEvent).detail?.active);
-    window.addEventListener('dex-home-search-active', onSearchActive as EventListener);
-    return () => window.removeEventListener('dex-home-search-active', onSearchActive as EventListener);
-  }, []);
   const recents = useMemo(() => recentFiles.slice(0, 6), [recentFiles]);
 
   // Data state - backend hydration via centralized Zustand store
@@ -639,16 +630,7 @@ export const Home: React.FC = () => {
         <div style={{ height: 80 }} />
       </div>
 
-      {/* Widget layer -- draggable widgets on home screen.
-          Faded + click-through while the Spotlight search has results open so
-          the clock/widgets never obscure the results dropdown. */}
-      <div style={{
-        opacity: searchActive ? 0 : 1,
-        pointerEvents: searchActive ? 'none' : 'auto',
-        transition: 'opacity 0.15s ease',
-      }}>
-        <HomeWidgets />
-      </div>
+      <HomeWidgets />
 
       {/* User-pinned file shortcuts -- draggable anywhere on the Home desktop */}
       {pinnedFiles.map(file => (

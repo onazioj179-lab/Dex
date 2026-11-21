@@ -4,7 +4,7 @@
  * Generate QR codes from text, URLs, Wi-Fi, contacts, and geo coordinates
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react';
-import { qrMatrixToSVG } from '../../../shared/format/qrSvg';
+import { qrMatrixToSVG, qrModuleStyleAt, type QrModuleStyle } from '../../../shared/format/qrSvg';
 import { colorInputValue } from '../../utils/canvasTheme';
 import { createQrBatch, createQrMatrix, qrBatchToSVG, type QrErrorLevel } from './qrEncoding';
 import { useCreativeInput } from '../../services/creativeIntake';
@@ -16,9 +16,8 @@ import { useUtilityInput } from '../../services/utilityInput';
 type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo' | 'email' | 'event' | 'batch';
 type ECLevel = QrErrorLevel;
 
-// Quiet zone (spec recommends 4 modules) — matches the SVG export margin and
-// keeps the rendered/exported PNG scannable.
-const QUIET_ZONE = 4;
+// Preserve at least four light modules around each preview and export.
+const MIN_QUIET_ZONE = 4;
 const HISTORY_KEY = 'dex.qrcode.history.v1';
 const HISTORY_LIMIT = 10;
 
@@ -38,7 +37,7 @@ const loadHistory = (): HistoryEntry[] => {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(e => e && typeof e.data === 'string') : [];
+    return Array.isArray(parsed) ? parsed.filter(e => e && typeof e.data === 'string' && !/^WIFI:/i.test(e.data)).slice(0, HISTORY_LIMIT) : [];
   } catch {
     return [];
   }
@@ -88,6 +87,9 @@ const QRCodeGenerator: React.FC = () => {
   const [bgColor, setBgColor] = useState('#ffffff');
   const [ecLevel, setEcLevel] = useState<ECLevel>('M');
   const [pxSize, setPxSize] = useState(240);
+  const [quietZone, setQuietZone] = useState(MIN_QUIET_ZONE);
+  const [moduleStyle, setModuleStyle] = useState<QrModuleStyle>('square');
+  const [swatchTarget, setSwatchTarget] = useState<'foreground' | 'background'>('foreground');
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   // Disables the clipboard-backed buttons while an async read/write is pending so
   // rapid double-clicks can't overlap (and stack toasts).
@@ -121,7 +123,7 @@ const QRCodeGenerator: React.FC = () => {
   }, [qrData, ecLevel]);
 
   const batch = useMemo(() => mode === 'batch' ? createQrBatch(batchText, ecLevel) : null, [mode, batchText, ecLevel]);
-  const batchOptions = { fg: fgColor, bg: bgColor, margin: QUIET_ZONE, pixelSize: pxSize };
+  const batchOptions = { fg: fgColor, bg: bgColor, margin: quietZone, pixelSize: pxSize, moduleStyle };
   const saveBatch = async () => {
     if (!batch?.items.length || savingBatch) return;
     const matrices = batch.items.flatMap(item => item.matrix ? [item.matrix] : []);
@@ -145,7 +147,7 @@ const QRCodeGenerator: React.FC = () => {
     if (!ctx) return;
 
     const size = qrMatrix.length;
-    const totalModules = size + QUIET_ZONE * 2;
+    const totalModules = size + quietZone * 2;
     const cellSize = Math.max(1, Math.floor(pxSize / totalModules));
     const totalSize = cellSize * totalModules;
     canvas.width = totalSize;
@@ -157,16 +159,23 @@ const QRCodeGenerator: React.FC = () => {
     ctx.fillStyle = fgColor;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        if (qrMatrix[y][x]) {
-          ctx.fillRect((x + QUIET_ZONE) * cellSize, (y + QUIET_ZONE) * cellSize, cellSize, cellSize);
+        if (!qrMatrix[y][x]) continue;
+        const left = (x + quietZone) * cellSize, top = (y + quietZone) * cellSize;
+        const shape = qrModuleStyleAt(moduleStyle, y, x, size);
+        if (shape === 'square') ctx.fillRect(left, top, cellSize, cellSize);
+        else {
+          ctx.beginPath();
+          if (shape === 'dots') ctx.arc(left + cellSize / 2, top + cellSize / 2, cellSize * 0.48, 0, 2 * Math.PI);
+          else ctx.roundRect(left, top, cellSize, cellSize, cellSize * 0.2);
+          ctx.fill();
         }
       }
     }
-  }, [qrMatrix, fgColor, bgColor, pxSize]);
+  }, [qrMatrix, fgColor, bgColor, pxSize, quietZone, moduleStyle]);
 
   // Record successfully generated codes into history (debounced via settle effect).
   useEffect(() => {
-    if (!qrMatrix || !qrData || mode === 'email' || mode === 'event') return;
+    if (!qrMatrix || !qrData || mode === 'email' || mode === 'event' || /^WIFI:/i.test(qrData)) return;
     const key = `${mode}:${ecLevel}:${qrData}`;
     if (recordedRef.current === key) return;
     const handle = window.setTimeout(() => {
@@ -284,7 +293,7 @@ const QRCodeGenerator: React.FC = () => {
   const downloadSVG = useCallback(() => {
     if (!qrMatrix) return;
     try {
-      const svg = qrMatrixToSVG(qrMatrix, { fg: fgColor, bg: bgColor, margin: QUIET_ZONE, pixelSize: pxSize });
+      const svg = qrMatrixToSVG(qrMatrix, { fg: fgColor, bg: bgColor, margin: quietZone, pixelSize: pxSize, moduleStyle });
       const blob = new Blob([svg], { type: 'image/svg+xml' });
       const link = document.createElement('a');
       link.download = 'dex-qrcode.svg';
@@ -296,7 +305,7 @@ const QRCodeGenerator: React.FC = () => {
       console.warn('[QRCode] SVG download failed:', e);
       toast('error', 'Could not save SVG');
     }
-  }, [qrMatrix, fgColor, bgColor, pxSize]);
+  }, [qrMatrix, fgColor, bgColor, pxSize, quietZone, moduleStyle]);
 
   const copyQR = useCallback(async () => {
     if (busy) return;
@@ -329,6 +338,10 @@ const QRCodeGenerator: React.FC = () => {
   }, [qrMatrix, qrData]);
 
   useCreativeInput('qrcode', value => { setMode('text'); setText(value); });
+  useCreativeInput('qrcode-color', value => {
+    if (swatchTarget === 'foreground') setFgColor(colorInputValue(value));
+    else setBgColor(colorInputValue(value));
+  });
 
   return (
     <div style={s.container} data-dex-qr-root>
@@ -482,6 +495,13 @@ const QRCodeGenerator: React.FC = () => {
 
         {/* Color pickers */}
         <div style={s.colorRow}>
+          <label style={s.colorLabel}>Apply Color Picker swatch to
+            <select value={swatchTarget} style={s.select} aria-label="Color Picker swatch target"
+              onChange={event => setSwatchTarget(event.target.value === 'background' ? 'background' : 'foreground')}>
+              <option value="foreground">Foreground</option>
+              <option value="background">Background</option>
+            </select>
+          </label>
           <label style={s.colorLabel}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>FG</span>
             <input type="color" value={colorInputValue(fgColor)} onChange={e => setFgColor(e.target.value)} style={s.colorInput} title="Foreground color" aria-label="Foreground color" />
@@ -494,6 +514,18 @@ const QRCodeGenerator: React.FC = () => {
 
         {/* Error-correction level + size */}
         <div style={s.settingsRow}>
+          <label style={s.settingGroup}>Quiet zone
+            <select aria-label="Quiet zone" style={s.select} value={quietZone} onChange={event => setQuietZone(Number(event.target.value))}>
+              {[4, 6, 8, 12].map(value => <option key={value} value={value}>{value} modules</option>)}
+            </select>
+          </label>
+          <label style={s.settingGroup}>Modules
+            <select aria-label="Module style" style={s.select} value={moduleStyle} onChange={event => setModuleStyle(event.target.value as QrModuleStyle)}>
+              <option value="square">Square</option>
+              <option value="rounded">Rounded</option>
+              <option value="dots">Dots</option>
+            </select>
+          </label>
           <div style={s.settingGroup}>
             <span style={s.settingLabel}>Error correction</span>
             <div className="dex-liquid-glass" style={s.segmented} role="group" aria-label="Error correction level">

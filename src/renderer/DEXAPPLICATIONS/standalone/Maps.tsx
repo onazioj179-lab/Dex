@@ -37,6 +37,8 @@ import { DexSearchInput } from '../../styles/components';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
+import { sendCreativeInput } from '../../services/creativeIntake';
+import { openCalendarDraft } from '../../services/calendarDraft';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // Free, key-less basemap styles. Vector styles come from OpenFreeMap; the
@@ -264,7 +266,7 @@ const DexMaps: React.FC = () => {
   // Current dropped pin (for copy / save / send-to-notes), and the latest goTo target.
   const [pin, setPin] = useState<{ lat: number; lon: number; name: string; detail: string } | null>(null);
 
-  // Distance measuring: collect up to two points.
+  // Distance measuring uses a path of up to 32 points.
   const [measuring, setMeasuring] = useState(false);
   const [measurePts, setMeasurePts] = useState<Pin[]>([]);
 
@@ -314,58 +316,10 @@ const DexMaps: React.FC = () => {
   }, []);
 
   // -- measure mode -----------------------------------------------------------
-  const clearMeasure = useCallback(() => {
-    measureMarkersRef.current.forEach((m) => m.remove());
-    measureMarkersRef.current = [];
-    setMeasurePts([]);
-    const map = mapRef.current;
-    if (map) {
-      try {
-        if (map.getLayer(measureLineId)) map.removeLayer(measureLineId);
-        if (map.getSource(measureLineId)) map.removeSource(measureLineId);
-      } catch { /* style not ready */ }
-    }
-  }, []);
+  const clearMeasure = useCallback(() => setMeasurePts([]), []);
 
   const addMeasurePoint = useCallback((lat: number, lon: number) => {
-    const map = mapRef.current;
-    if (!map) return;
-    setMeasurePts((prev) => {
-      // After two points, a new click starts a fresh measurement.
-      let pts = prev.length >= 2 ? [] : prev.slice();
-      if (pts.length === 0) {
-        measureMarkersRef.current.forEach((m) => m.remove());
-        measureMarkersRef.current = [];
-        try {
-          if (map.getLayer(measureLineId)) map.removeLayer(measureLineId);
-          if (map.getSource(measureLineId)) map.removeSource(measureLineId);
-        } catch { /* noop */ }
-      }
-      pts = [...pts, { lat, lon }];
-      const mk = new maplibregl.Marker({ color: pts.length === 1 ? canvasColor('--color-accent') : canvasColor('--color-text-secondary') })
-        .setLngLat([lon, lat]).addTo(map);
-      measureMarkersRef.current.push(mk);
-
-      if (pts.length === 2) {
-        const geo: GeoJSON.Feature = {
-          type: 'Feature', properties: {},
-          geometry: { type: 'LineString', coordinates: pts.map((p) => [p.lon, p.lat]) },
-        };
-        try {
-          if (map.getSource(measureLineId)) {
-            (map.getSource(measureLineId) as maplibregl.GeoJSONSource).setData(geo as any);
-          } else {
-            map.addSource(measureLineId, { type: 'geojson', data: geo as any });
-            map.addLayer({
-              id: measureLineId, type: 'line', source: measureLineId,
-              paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
-            });
-          }
-          map.fitBounds([[pts[0].lon, pts[0].lat], [pts[1].lon, pts[1].lat]], { padding: 120, maxZoom: 12, duration: 600 });
-        } catch { /* style swapping -- ignore */ }
-      }
-      return pts;
-    });
+    setMeasurePts(points => points.length < 32 ? [...points, { lat, lon }] : points);
   }, []);
 
   // Add a saved place as a measure endpoint.
@@ -375,7 +329,7 @@ const DexMaps: React.FC = () => {
     addMeasurePoint(s.lat, s.lon);
   }, [addMeasurePoint]);
 
-  const distanceKm = measurePts.length === 2 ? haversineKm(measurePts[0], measurePts[1]) : null;
+  const distanceKm = measurePts.slice(1).reduce((total, point, i) => total + haversineKm(measurePts[i], point), 0);
 
   // Initialise the map once.
   useEffect(() => {
@@ -450,36 +404,43 @@ const DexMaps: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addMeasurePoint]);
 
-  // Swap the basemap style when toggled (preserves camera; redraws measure line).
+  useEffect(() => {
+    mapRef.current?.setStyle(MAP_STYLES[styleKey].style);
+  }, [styleKey]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(MAP_STYLES[styleKey].style as any);
-    // Re-add the measure line once the new style finishes loading.
-    if (measurePts.length === 2) {
-      const pts = measurePts;
-      const onLoad = () => {
-        try {
-          const geo: GeoJSON.Feature = {
-            type: 'Feature', properties: {},
-            geometry: { type: 'LineString', coordinates: pts.map((p) => [p.lon, p.lat]) },
-          };
-          if (!map.getSource(measureLineId)) {
-            map.addSource(measureLineId, { type: 'geojson', data: geo as any });
-            map.addLayer({
-              id: measureLineId, type: 'line', source: measureLineId,
-              paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
-            });
-          }
-        } catch { /* noop */ }
+    measureMarkersRef.current.forEach(marker => marker.remove());
+    measureMarkersRef.current = measurePts.map((point, i) => new maplibregl.Marker({
+      color: canvasColor(i === 0 ? '--color-accent' : '--color-text-secondary'),
+    }).setLngLat([point.lon, point.lat]).addTo(map));
+
+    const draw = () => {
+      const source = map.getSource<maplibregl.GeoJSONSource>(measureLineId);
+      if (measurePts.length < 2) {
+        if (map.getLayer(measureLineId)) map.removeLayer(measureLineId);
+        if (source) map.removeSource(measureLineId);
+        return;
+      }
+      const data: GeoJSON.Feature<GeoJSON.LineString> = {
+        type: 'Feature', properties: {},
+        geometry: { type: 'LineString', coordinates: measurePts.map(point => [point.lon, point.lat]) },
       };
-      map.once('styledata', onLoad);
-      // If the style is swapped again before `styledata` fires, drop the stale
-      // one-shot listener so it can't run against a torn-down/different style.
-      return () => { try { map.off('styledata', onLoad); } catch { /* noop */ } };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [styleKey]);
+      if (source) source.setData(data);
+      else {
+        map.addSource(measureLineId, { type: 'geojson', data });
+        map.addLayer({
+          id: measureLineId, type: 'line', source: measureLineId,
+          paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 2.5, 'line-dasharray': [2, 1.5] },
+        });
+      }
+    };
+    if (map.isStyleLoaded() || map.getSource(measureLineId)) draw();
+    else map.once('idle', draw);
+    map.on('style.load', draw);
+    return () => { map.off('style.load', draw); map.off('idle', draw); };
+  }, [measurePts, styleKey]);
 
   // UKI-driven navigation: assistant dispatches `dex-maps-goto`.
   useEffect(() => {
@@ -523,8 +484,10 @@ const DexMaps: React.FC = () => {
 
   // Debounced search-as-you-type.
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
+    if (!query.trim()) { setResults([]); setSearchError(null); setSearching(false); return; }
     let cancelled = false;
+    setResults([]);
+    setSearchError(null);
     setSearching(true);
     const t = setTimeout(async () => {
       const { results: hits, error } = await geocode(query);
@@ -560,12 +523,24 @@ const DexMaps: React.FC = () => {
   const copyPin = useCallback(async () => {
     if (!pin) return;
     try {
-      await navigator.clipboard?.writeText(fmtCoord(pin.lat, pin.lon));
+      await navigator.clipboard.writeText(fmtCoord(pin.lat, pin.lon));
       toast('success', 'Coordinates copied');
     } catch {
       toast('error', 'Could not copy coordinates');
     }
   }, [pin]);
+
+  const sendPinToCalendar = () => {
+    if (!pin) return;
+    const start = new Date();
+    start.setMinutes(Math.floor(start.getMinutes() / 30) * 30 + 30, 0, 0);
+    openCalendarDraft({
+      title: pin.name,
+      start,
+      end: new Date(start.getTime() + 30 * 60_000),
+      description: [pin.detail, fmtCoord(pin.lat, pin.lon)].filter(Boolean).join('\n'),
+    });
+  };
 
   // Send current pin to Notes.
   const sendPinToNotes = useCallback(async () => {
@@ -641,7 +616,7 @@ const DexMaps: React.FC = () => {
                 </button>
                 <button aria-label={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'} title={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'}
                   className="dex-maps-iconbtn"
-                  onMouseDown={(e) => { e.preventDefault(); toggleSaved(r); }}
+                  onClick={() => toggleSaved(r)}
                   style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: isSaved(r.lat, r.lon) ? '#FFD60A' : 'var(--color-text-tertiary)' }}>
                   <DexIcon name={isSaved(r.lat, r.lon) ? 'star' : 'star-outline'} size={15} />
                 </button>
@@ -653,11 +628,11 @@ const DexMaps: React.FC = () => {
           <div role="listbox" aria-label="Recent searches" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--color-border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: 0.4 }}>Recent</span>
-              <button onMouseDown={(e) => { e.preventDefault(); setRecent([]); }} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
+              <button onClick={() => setRecent([])} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
             </div>
             {recent.map((r, i) => (
               <button key={`rec-${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg dex-maps-result"
-                onMouseDown={(e) => { e.preventDefault(); pick(r); }} style={{ ...rowBtn, borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
+                onClick={() => pick(r)} style={{ ...rowBtn, borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
                 <DexIcon name="clock" size={14} color="var(--color-text-tertiary)" />
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{r.name}</span>
@@ -698,7 +673,7 @@ const DexMaps: React.FC = () => {
           <DexIcon name="star" size={14} color="#FFD60A" />
           Saved{saved.length ? ` (${saved.length})` : ''}
         </button>
-        <button aria-label="Measure distance" title="Measure distance between two points"
+        <button aria-label="Measure distance" title="Measure distance along a path"
           onClick={() => {
             setMeasuring((m) => {
               const next = !m;
@@ -765,19 +740,19 @@ const DexMaps: React.FC = () => {
           <div style={{ padding: '12px' }}>
             {measurePts.length < 2 ? (
               <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-                {measuring ? 'Click two points on the map' : 'Turn on Measure, then click two points'} — or pick saved places using the crosshair button.
+                {measuring ? 'Click points on the map' : 'Turn on Measure, then click points'} or choose saved places.
                 {measurePts.length === 1 && <div style={{ marginTop: 6, color: 'var(--color-text-secondary)' }}>First point set. Choose a second.</div>}
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)' }}>{(distanceKm ?? 0).toFixed(1)}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)' }}>{distanceKm.toFixed(1)}</span>
                   <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>km</span>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{((distanceKm ?? 0) * 0.621371).toFixed(1)} mi</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>{(distanceKm * 0.621371).toFixed(1)} mi · {measurePts.length} points</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 8, lineHeight: 1.5 }}>
                   A: {fmtCoord(measurePts[0].lat, measurePts[0].lon)}<br />
-                  B: {fmtCoord(measurePts[1].lat, measurePts[1].lon)}
+                  End: {fmtCoord(measurePts[measurePts.length - 1].lat, measurePts[measurePts.length - 1].lon)}
                 </div>
               </>
             )}
@@ -786,6 +761,9 @@ const DexMaps: React.FC = () => {
                 <DexIcon name="refresh" size={13} /> Reset
               </button>
             )}
+            {measurePts.length > 0 && <button type="button" style={cardBtn}
+              onClick={() => setMeasurePts(points => points.slice(0, -1))}>Remove last point</button>}
+            {measurePts.length === 32 && <p role="status">Path limit reached (32 points).</p>}
           </div>
         </div>
       )}
@@ -804,7 +782,7 @@ const DexMaps: React.FC = () => {
                 <DexIcon name="close" size={15} />
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
               <button onClick={copyPin} title="Copy coordinates" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="copy" size={13} /> Copy
               </button>
@@ -814,6 +792,8 @@ const DexMaps: React.FC = () => {
               <button onClick={sendPinToNotes} title="Send location to Notes" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="send" size={13} /> Notes
               </button>
+              <button type="button" style={cardBtn} onClick={sendPinToCalendar}>Calendar</button>
+              <button type="button" style={cardBtn} onClick={() => sendCreativeInput('qrcode', `geo:${pin.lat},${pin.lon}`)}>QR code</button>
             </div>
           </div>
         </div>
