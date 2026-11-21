@@ -17,6 +17,11 @@ if (installers.length !== 1) throw new Error('Expected one official DEX setup ex
 const installer = installers[0];
 const signature = (await readFile(join(assets, installer + '.sig'), 'utf8')).trim();
 if (!/^[A-Za-z0-9+/]+={0,2}$/.test(signature)) throw new Error('The installer has no valid updater signature.');
+const trustedComment = Buffer.from(signature, 'base64').toString('utf8').split(/\r?\n/)
+  .find(line => line.startsWith('trusted comment: '));
+if (!trustedComment?.split('\t').includes('version:' + version)) {
+  throw new Error('The updater signature is not bound to the release version.');
+}
 const manifest = {
   version,
   notes: (await readFile('release-notes.md', 'utf8')).trim(),
