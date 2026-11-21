@@ -78,33 +78,20 @@ Install over the previous release on a test profile and check that it starts,
 reports the new version in Settings › About, and uninstalls cleanly. Record the
 results in `DEX_X.Y.Z_VERIFICATION.md`.
 
-## 5. Publish
+## 5. Local Windows previews
 
-Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, which builds the
-installers on a Windows runner, publishes the GitHub release "DEX OS X.Y.Z",
-and mirrors it to the update channel (`onazioj179-lab/dex-updates`, tag
-`dex-vX.Y.Z`) when the `DEX_UPDATES_TOKEN` secret is set.
+DEX is in local preview. Run the installer produced in step 1 on the test PC
+when the owner approves an update. Use the same installer path each time so the
+new preview replaces the previous setup. Settings › Software Update shows the
+installed build. CI runs the renderer checks without packaging installers.
 
-The stable release publishes one x64 setup, its updater signature, a SHA-256
-checksum, and `latest.json`. Settings › Updates checks the latest DEX release
-on GitHub. Tauri verifies the installer signature and the signed version before
-DEX offers to restart. The first updater-enabled build needs a one-time install
-from GitHub. Subsequent in-app updates require a higher released version.
-Development commits and build serials do not publish a new installer.
-
-The workflow reads the repository secret `TAURI_SIGNING_PRIVATE_KEY` and, if
-configured, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep the private key outside
-the repository and retain its backup. The matching public key is embedded in
-`src-tauri/tauri.conf.json`. Updater signing and optional Windows Authenticode
-signing use separate keys.
-
-```bash
-git tag -a vX.Y.Z -m "DEX OS X.Y.Z"
-```
-
-```bash
-git push origin vX.Y.Z
-```
+The GitHub Release workflow is disabled during local preview. When the owner
+approves public distribution, enable it explicitly and dispatch it with the
+approved version tag. The stable workflow builds one x64 setup, a signature,
+a checksum and the GitHub update manifest. Stable builds verify the package and
+its version before offering to restart. Each update requires a higher published
+version. The signing key is stored outside the repository. The workflow reads
+the GitHub secret TAURI_SIGNING_PRIVATE_KEY and optionally its password.
 
 ## 6. Old releases
 

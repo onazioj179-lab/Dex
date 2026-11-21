@@ -1,13 +1,10 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g. v6.1.0)'
+        description: 'Owner-approved stable tag to publish (for example, v7.0.2)'
         required: true
 
 permissions:

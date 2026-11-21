@@ -139,5 +139,4 @@ jobs:
           path: test-results/
           retention-days: 7
 
-  # Installers are NOT built here. The one official Windows setup (Tauri NSIS)
-  # is built and published by .github/workflows/release.yml on a v* tag.
+  # Windows preview installers are built locally with npm run build:tauri.
