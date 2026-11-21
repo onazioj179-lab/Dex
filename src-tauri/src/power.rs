@@ -245,10 +245,11 @@ pub fn set_profile(app: &tauri::AppHandle, profile: &str) -> Value {
     let profile = normalize_profile(profile);
     let st = lock_state(app);
     let mut g = st.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(actual) = active_scheme_profile() {
+    let active = active_scheme_profile();
+    if let Some(actual) = active {
         g.current_profile = actual.to_string();
     }
-    if g.current_profile == profile {
+    if g.current_profile == profile && (!cfg!(target_os = "windows") || active == Some(profile)) {
         return json!({ "success": true, "message": format!("Already in {} mode", profile), "changes": [] });
     }
     let previous = g.current_profile.clone();

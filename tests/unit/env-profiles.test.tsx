@@ -1,6 +1,6 @@
 // DEX Platform - Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import EnvManager from '../../src/renderer/DEXAPPLICATIONS/standalone/EnvManager';
 
@@ -37,7 +37,7 @@ it('preserves legacy required keys and edits and links each profile independentl
   expect(screen.queryByRole('button', { name: 'Remove required API_URL' })).toBeNull();
   expect(screen.queryByText('C:/Projects/Example')).toBeNull();
   view.unmount();
-  render(<EnvManager />);
+  await act(async () => { render(<EnvManager />); });
   fireEvent.change(select(), { target: { value: 'profile:dev' } });
   expect(screen.getByRole('button', { name: 'Remove required API_URL' })).toBeVisible();
   expect(screen.getByText('C:/Projects/Example')).toBeVisible();

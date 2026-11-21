@@ -11,14 +11,15 @@ export function FolderAnalysis({ path }: { path: string }) {
   const [result, setResult] = useState<Result | null>(null);
   const [pending, setPending] = useState<'duplicates' | 'usage' | null>(null);
   const [error, setError] = useState('');
-  if (!window.dex?.invoke) return null;
+  const dex = window.dex;
+  if (!dex?.invoke) return null;
 
   const scan = async (kind: 'duplicates' | 'usage') => {
     setResult(null);
     setError('');
     setPending(kind);
     try {
-      const result = await window.dex.invoke(kind === 'duplicates' ? 'fileIntel:findDuplicates' : 'fileIntel:groupByType', path);
+      const result = await dex.invoke(kind === 'duplicates' ? 'fileIntel:findDuplicates' : 'fileIntel:groupByType', path);
       if (!result?.success || !Array.isArray(result.groups)) throw new Error('Folder scan did not return any results.');
       if (kind === 'usage') {
         const groups = result.groups as SizeGroup[];
