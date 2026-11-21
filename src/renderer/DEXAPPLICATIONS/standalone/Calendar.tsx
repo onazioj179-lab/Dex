@@ -7,6 +7,7 @@
  */
 import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { notify } from '../../services/notify';
+import { CALENDAR_DRAFT_EVENT, takeCalendarDraft } from '../../services/calendarDraft';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
@@ -272,6 +273,26 @@ const Calendar: React.FC = () => {
     }));
     setShowEventModal(true);
   };
+
+  useEffect(() => {
+    if (showEventModal) return;
+    const applyDraft = () => {
+      const draft = takeCalendarDraft();
+      if (!draft) return;
+      const clock = (date: Date) => [date.getHours(), date.getMinutes()].map(value => String(value).padStart(2, '0')).join(':');
+      setEditingId(null);
+      setCurrentDate(draft.start);
+      setSelectedDate(draft.start);
+      setNewEvent({
+        title: draft.title, description: draft.description, time: clock(draft.start), endTime: clock(draft.end),
+        color: 'var(--color-accent)', icon: '', recurring: 'none', category: 'general', recurUntil: '', alertMinutes: null,
+      });
+      setShowEventModal(true);
+    };
+    applyDraft();
+    window.addEventListener(CALENDAR_DRAFT_EVENT, applyDraft);
+    return () => window.removeEventListener(CALENDAR_DRAFT_EVENT, applyDraft);
+  }, [showEventModal]);
 
   // Open the inline editor pre-filled with an existing event for editing.
   const openEditEvent = (e: CalendarEvent) => {
@@ -1297,6 +1318,7 @@ const Calendar: React.FC = () => {
                 <input
                   style={styles.timeInput}
                   type="time"
+                  aria-label="Start time"
                   value={newEvent.time}
                   onChange={e => setNewEvent({ ...newEvent, time: e.target.value })}
                 />
@@ -1304,6 +1326,7 @@ const Calendar: React.FC = () => {
                 <input
                   style={styles.timeInput}
                   type="time"
+                  aria-label="End time"
                   value={newEvent.endTime}
                   onChange={e => setNewEvent({ ...newEvent, endTime: e.target.value })}
                 />

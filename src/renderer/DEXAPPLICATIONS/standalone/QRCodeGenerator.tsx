@@ -6,9 +6,13 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react';
 import { qrMatrixToSVG } from '../../../shared/format/qrSvg';
 import { colorInputValue } from '../../utils/canvasTheme';
+import { createQrBatch, createQrMatrix, qrBatchToSVG, type QrErrorLevel } from './qrEncoding';
+import { calendarQrPayload, mailtoPayload } from '../../../shared/format/qrPayloads';
+import { saveBlobAs } from '../../services/nativeSave';
+import { Button } from '../../ui/Button';
 
-type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo';
-type ECLevel = 'L' | 'M' | 'Q' | 'H';
+type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo' | 'email' | 'event' | 'batch';
+type ECLevel = QrErrorLevel;
 
 // Quiet zone (spec recommends 4 modules) — matches the SVG export margin and
 // keeps the rendered/exported PNG scannable.
@@ -50,8 +54,6 @@ const QR_SCOPED_CSS = `
 [data-dex-qr-root] .qr-field:focus-within { border-color: var(--color-border-strong); }
 `;
 
-// Minimal QR code generator (byte mode, version 1-10 auto, selectable EC level)
-// Uses canvas for rendering — no external dependencies
 const QRCodeGenerator: React.FC = () => {
   const [mode, setMode] = useState<QRMode>('text');
   const [text, setText] = useState('');
@@ -64,6 +66,16 @@ const QRCodeGenerator: React.FC = () => {
   const [contactEmail, setContactEmail] = useState('');
   const [geoLat, setGeoLat] = useState('');
   const [geoLng, setGeoLng] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventStart, setEventStart] = useState('');
+  const [eventEnd, setEventEnd] = useState('');
+  const [eventId] = useState(() => crypto.randomUUID());
+  const [eventStamp] = useState(() => new Date());
+  const [batchText, setBatchText] = useState('');
+  const [savingBatch, setSavingBatch] = useState(false);
   // These are written directly to a <canvas> fillStyle and an <input type="color">,
   // neither of which can resolve CSS custom properties -- they must be literal
   // hex. (A prior token sweep set bg to 'var(--color-text-primary)', which a
@@ -87,19 +99,41 @@ const QRCodeGenerator: React.FC = () => {
       case 'wifi': return `WIFI:T:${wifiType};S:${escapeWifi(wifiSSID)};P:${escapeWifi(wifiPass)};;`;
       case 'contact': return `BEGIN:VCARD\nVERSION:3.0\nFN:${contactName}\nTEL:${contactPhone}\nEMAIL:${contactEmail}\nEND:VCARD`;
       case 'geo': return geoLat && geoLng ? `geo:${geoLat},${geoLng}` : '';
+      case 'email': return mailtoPayload(recipient, subject, message);
+      case 'event': return calendarQrPayload(eventTitle, new Date(eventStart), new Date(eventEnd), eventId, eventStamp);
+      case 'batch': return '';
     }
-  }, [mode, text, url, wifiSSID, wifiPass, wifiType, contactName, contactPhone, contactEmail, geoLat, geoLng]);
+  }, [mode, text, url, wifiSSID, wifiPass, wifiType, contactName, contactPhone, contactEmail, geoLat, geoLng,
+    recipient, subject, message, eventTitle, eventStart, eventEnd, eventId, eventStamp]);
 
   // QR matrix generation (byte mode, selectable error-correction level)
   const qrMatrix = useMemo(() => {
     if (!qrData || qrData.length === 0) return null;
     try {
-      return generateQRMatrix(qrData, ecLevel);
+      return createQrMatrix(qrData, ecLevel);
     } catch (e) {
       console.warn('[QRCode] Generation failed:', e);
       return null;
     }
   }, [qrData, ecLevel]);
+
+  const batch = useMemo(() => mode === 'batch' ? createQrBatch(batchText, ecLevel) : null, [mode, batchText, ecLevel]);
+  const batchOptions = { fg: fgColor, bg: bgColor, margin: QUIET_ZONE, pixelSize: pxSize };
+  const saveBatch = async () => {
+    if (!batch?.items.length || savingBatch) return;
+    const matrices = batch.items.flatMap(item => item.matrix ? [item.matrix] : []);
+    if (matrices.length !== batch.items.length) return;
+    setSavingBatch(true);
+    try {
+      const sheet = qrBatchToSVG(matrices, batchOptions);
+      await saveBlobAs('dex-qr-batch.svg', new Blob([sheet], { type: 'image/svg+xml' }),
+        { title: 'Save QR code sheet', source: 'QR Code' });
+    } catch {
+      // The shared save bridge reports native write failures.
+    } finally {
+      setSavingBatch(false);
+    }
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -129,7 +163,7 @@ const QRCodeGenerator: React.FC = () => {
 
   // Record successfully generated codes into history (debounced via settle effect).
   useEffect(() => {
-    if (!qrMatrix || !qrData) return;
+    if (!qrMatrix || !qrData || mode === 'email' || mode === 'event') return;
     const key = `${mode}:${ecLevel}:${qrData}`;
     if (recordedRef.current === key) return;
     const handle = window.setTimeout(() => {
@@ -188,6 +222,8 @@ const QRCodeGenerator: React.FC = () => {
         return;
       }
       if (mode === 'url') setUrl(clip);
+      else if (mode === 'batch') setBatchText(clip);
+      else if (mode === 'email') setRecipient(clip);
       else { setMode('text'); setText(clip); }
       toast('success', 'Pasted from clipboard');
     } catch (e) {
@@ -300,6 +336,9 @@ const QRCodeGenerator: React.FC = () => {
           { id: 'wifi' as QRMode, label: 'Wi-Fi', icon: 'W' },
           { id: 'contact' as QRMode, label: 'Contact', icon: 'C' },
           { id: 'geo' as QRMode, label: 'Geo', icon: 'G' },
+          { id: 'email' as QRMode, label: 'Email', icon: '' },
+          { id: 'event' as QRMode, label: 'Event', icon: '' },
+          { id: 'batch' as QRMode, label: 'Batch', icon: '' },
         ]).map(m => (
           <button
             key={m.id}
@@ -309,7 +348,7 @@ const QRCodeGenerator: React.FC = () => {
             aria-label={`${m.label} mode`}
             aria-pressed={mode === m.id}
           >
-            <span style={s.tabIcon} aria-hidden="true">{m.icon}</span> {m.label}
+            {m.icon && <span style={s.tabIcon} aria-hidden="true">{m.icon}</span>} {m.label}
           </button>
         ))}
       </div>
@@ -329,6 +368,23 @@ const QRCodeGenerator: React.FC = () => {
 
         {/* Input area */}
         <div style={s.inputArea}>
+          {mode === 'batch' && <textarea value={batchText} onChange={event => setBatchText(event.target.value)}
+            aria-label="Batch data, one code per line" placeholder="One code per line, up to 24"
+            style={s.textarea} />}
+          {mode === 'email' && <div style={{ display: 'grid', gap: 8 }}>
+            <input type="email" value={recipient} onChange={event => setRecipient(event.target.value)}
+              aria-label="Email recipient" placeholder="Email address" maxLength={254} style={s.input} />
+            <input value={subject} onChange={event => setSubject(event.target.value)}
+              aria-label="Email subject" placeholder="Subject" maxLength={120} style={s.input} />
+            <textarea value={message} onChange={event => setMessage(event.target.value)}
+              aria-label="Email message" placeholder="Message" maxLength={600} style={s.textarea} />
+          </div>}
+          {mode === 'event' && <div style={{ display: 'grid', gap: 8 }}>
+            <input value={eventTitle} onChange={event => setEventTitle(event.target.value)}
+              aria-label="Event title" placeholder="Event title" maxLength={120} style={s.input} />
+            <label>Starts (local time)<input type="datetime-local" value={eventStart} onChange={event => setEventStart(event.target.value)} style={s.input} /></label>
+            <label>Ends (local time)<input type="datetime-local" value={eventEnd} onChange={event => setEventEnd(event.target.value)} style={s.input} /></label>
+          </div>}
           {mode === 'text' && (
             <textarea
               value={text}
@@ -377,13 +433,29 @@ const QRCodeGenerator: React.FC = () => {
         </div>
 
         {/* QR preview */}
-        <div style={s.preview}>
+        {batch ? <div style={{ padding: '0 var(--space-4)', display: 'grid', gap: 8 }}>
+          {batch.error && <div role="alert">{batch.error}</div>}
+          {batch.items.length > 0 && <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))', gap: 8 }}>
+              {batch.items.map(item => <div key={item.line} style={{ display: 'grid', gap: 4, justifyItems: 'center' }}>
+                {item.matrix
+                  ? <img alt={'QR code for line ' + item.line} width={96} height={96}
+                    src={'data:image/svg+xml,' + encodeURIComponent(qrMatrixToSVG(item.matrix, batchOptions))} />
+                  : <span role="status">Too large at this error-correction level</span>}
+                <span>Line {item.line}</span>
+              </div>)}
+            </div>
+            <Button size="sm" disabled={savingBatch || batch.items.some(item => !item.matrix)} onClick={() => void saveBatch()}>Save QR sheet</Button>
+          </>}
+        </div> : <div style={s.preview}>
           {qrMatrix ? (
             <canvas ref={canvasRef} style={s.canvas} />
           ) : (
-            <div style={s.placeholder}>Enter data to generate QR code</div>
+            <div role="status" style={s.placeholder}>{qrData ? 'Data is too large at this error-correction level'
+              : mode === 'event' ? 'Enter a title and a valid time range'
+                : mode === 'email' ? 'Enter a valid email address' : 'Enter data to generate QR code'}</div>
           )}
-        </div>
+        </div>}
 
         {/* Actions */}
         {qrMatrix && (
@@ -484,22 +556,12 @@ const EC_LABELS: Record<ECLevel, string> = {
   L: 'Low (~7%)', M: 'Medium (~15%)', Q: 'Quartile (~25%)', H: 'High (~30%)',
 };
 const MODE_ICONS: Record<QRMode, string> = {
-  text: 'T', url: 'U', wifi: 'W', contact: 'C', geo: 'G',
+  text: 'T', url: 'U', wifi: 'W', contact: 'C', geo: 'G', email: '', event: '', batch: '',
 };
 
 // WIFI: payload escaping per the de-facto spec (\, ;, ,, : and " are special).
 function escapeWifi(value: string): string {
   return value.replace(/([\\;,:"])/g, '\\$1');
-}
-
-// Trim a string so its UTF-8 byte length fits within `maxBytes` without
-// splitting a multi-byte character.
-function sliceToByteCap(data: string, maxBytes: number): string {
-  let out = data;
-  while (new TextEncoder().encode(out).length > maxBytes && out.length > 0) {
-    out = out.slice(0, -1);
-  }
-  return out;
 }
 
 // Best-effort discovery of the active browser tab's URL exposed by the DEX
@@ -522,211 +584,6 @@ function getActiveBrowserUrl(): string | null {
   return null;
 }
 
-// ===========================================================================
-// Real QR Code Generator — Version 1-10 byte mode, selectable EC level (L/M/Q/H)
-// Produces standards-compliant scannable QR codes, no external library needed
-// ===========================================================================
-// Per-EC-level metadata, indexed by version (1-N).
-// This generator does single-block Reed-Solomon (no block interleaving), so the
-// `caps` list is intentionally truncated to the versions that use a SINGLE EC
-// block at each level (the only ones we can emit correctly). Anything longer is
-// trimmed to the largest single-block capacity so every code stays scannable.
-// caps: max byte-mode data capacity; total: total codewords; ec: EC codewords.
-const EC_META: Record<ECLevel, { caps: number[]; total: number[]; ec: number[] }> = {
-  // L: single-block through version 5 (cap 106 bytes)
-  L: {
-    caps: [17, 32, 53, 78, 106],
-    total: [26, 44, 70, 100, 134],
-    ec: [7, 10, 15, 20, 26],
-  },
-  // M: single-block through version 3 (cap 42 bytes)
-  M: {
-    caps: [14, 26, 42],
-    total: [26, 44, 70],
-    ec: [10, 16, 26],
-  },
-  // Q: single-block through version 2 (cap 20 bytes)
-  Q: {
-    caps: [11, 20],
-    total: [26, 44],
-    ec: [13, 22],
-  },
-  // H: single-block through version 2 (cap 14 bytes)
-  H: {
-    caps: [7, 14],
-    total: [26, 44],
-    ec: [17, 28],
-  },
-};
-// 15-bit format-info strings for mask pattern 0, per EC level (already masked
-// with the QR format mask 0b101010000010010).
-const FORMAT_BITS: Record<ECLevel, number[]> = {
-  L: [1,1,1,0,1,1,1,1,1,0,0,0,1,0,0],
-  M: [1,0,1,0,1,0,0,0,0,0,1,0,0,1,0],
-  Q: [0,1,1,0,1,0,1,0,1,0,1,1,1,1,1],
-  H: [0,0,1,0,1,1,0,1,0,0,0,1,0,0,1],
-};
-
-function generateQRMatrix(data: string, ecLevel: ECLevel = 'M'): boolean[][] {
-  const meta = EC_META[ecLevel];
-  const bytes = new TextEncoder().encode(data);
-  const len = bytes.length;
-  // Select version (1-10) based on data length for the chosen EC level
-  const caps = meta.caps;
-  const ver = caps.findIndex(c => len <= c);
-  if (ver < 0) {
-    // Too large for the supported version range at this EC level — trim to fit
-    // the largest available capacity so we still produce a scannable code.
-    return generateQRMatrix(sliceToByteCap(data, caps[caps.length - 1]), ecLevel);
-  }
-  const version = ver + 1;
-  const size = 17 + version * 4;
-  const matrix: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
-  const reserved: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
-
-  const setModule = (r: number, c: number, v: boolean) => {
-    if (r >= 0 && r < size && c >= 0 && c < size) { matrix[r][c] = v; reserved[r][c] = true; }
-  };
-  const drawFinder = (row: number, col: number) => {
-    for (let dr = -1; dr <= 7; dr++) for (let dc = -1; dc <= 7; dc++) {
-      const r = row + dr, c = col + dc;
-      if (r < 0 || r >= size || c < 0 || c >= size) continue;
-      const isInBorder = dr === -1 || dr === 7 || dc === -1 || dc === 7;
-      const isOuter = dr === 0 || dr === 6 || dc === 0 || dc === 6;
-      const isInner = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
-      setModule(r, c, !isInBorder && (isOuter || isInner));
-    }
-  };
-  drawFinder(0, 0);
-  drawFinder(0, size - 7);
-  drawFinder(size - 7, 0);
-
-  // Timing patterns
-  for (let i = 8; i < size - 8; i++) {
-    setModule(6, i, i % 2 === 0);
-    setModule(i, 6, i % 2 === 0);
-  }
-
-  // Alignment pattern (version >= 2)
-  if (version >= 2) {
-    const pos = [6, size - 7];
-    for (const ar of pos) for (const ac of pos) {
-      if (reserved[ar]?.[ac]) continue;
-      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
-        const isEdge = Math.abs(dr) === 2 || Math.abs(dc) === 2;
-        const isCenter = dr === 0 && dc === 0;
-        setModule(ar + dr, ac + dc, isEdge || isCenter);
-      }
-    }
-  }
-
-  // Dark module + reserved areas
-  setModule(size - 8, 8, true);
-  for (let i = 0; i < 9; i++) { reserved[8][i] = true; reserved[i][8] = true; }
-  for (let i = 0; i < 8; i++) { reserved[8][size - 1 - i] = true; reserved[size - 1 - i][8] = true; }
-
-  // Encode data: byte mode indicator (0100), character count, data, EC
-  const totalCodewords = meta.total[ver];
-  const ecCodewords = meta.ec[ver];
-  const dataCodewords = totalCodewords - ecCodewords;
-  const bits: number[] = [];
-  const pushBits = (val: number, count: number) => {
-    for (let i = count - 1; i >= 0; i--) bits.push((val >> i) & 1);
-  };
-  pushBits(0b0100, 4); // Byte mode
-  pushBits(len, version >= 10 ? 16 : 8); // Char count
-  for (const b of bytes) pushBits(b, 8);
-  pushBits(0, Math.min(4, dataCodewords * 8 - bits.length)); // Terminator
-  while (bits.length % 8 !== 0) bits.push(0);
-  const padBytes = [0xEC, 0x11];
-  let padIdx = 0;
-  while (bits.length < dataCodewords * 8) {
-    pushBits(padBytes[padIdx % 2], 8);
-    padIdx++;
-  }
-
-  // Convert to codewords
-  const codewords: number[] = [];
-  for (let i = 0; i < bits.length; i += 8) {
-    let val = 0;
-    for (let j = 0; j < 8; j++) val = (val << 1) | (bits[i + j] || 0);
-    codewords.push(val);
-  }
-
-  // Reed-Solomon EC (GF(256) with primitive polynomial 0x11D)
-  const gfExp: number[] = new Array(512);
-  const gfLog: number[] = new Array(256);
-  let x = 1;
-  for (let i = 0; i < 255; i++) { gfExp[i] = x; gfLog[x] = i; x = (x << 1) ^ (x >= 128 ? 0x11D : 0); }
-  for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
-  const gfMul = (a: number, b: number) => a === 0 || b === 0 ? 0 : gfExp[gfLog[a] + gfLog[b]];
-
-  // Generator polynomial
-  let gen = [1];
-  for (let i = 0; i < ecCodewords; i++) {
-    const next = new Array(gen.length + 1).fill(0);
-    for (let j = 0; j < gen.length; j++) {
-      next[j] ^= gen[j];
-      next[j + 1] ^= gfMul(gen[j], gfExp[i]);
-    }
-    gen = next;
-  }
-
-  // Polynomial division
-  const msgOut = new Array(dataCodewords + ecCodewords).fill(0);
-  for (let i = 0; i < dataCodewords; i++) msgOut[i] = codewords[i] || 0;
-  for (let i = 0; i < dataCodewords; i++) {
-    const coef = msgOut[i];
-    if (coef !== 0) {
-      for (let j = 1; j < gen.length; j++) {
-        msgOut[i + j] ^= gfMul(coef, gen[j]);
-      }
-    }
-  }
-  const ec = msgOut.slice(dataCodewords);
-
-  // Final bitstream: data + EC
-  const finalBits: number[] = [];
-  for (const cw of codewords) for (let b = 7; b >= 0; b--) finalBits.push((cw >> b) & 1);
-  for (const cw of ec) for (let b = 7; b >= 0; b--) finalBits.push((cw >> b) & 1);
-
-  // Place data bits (upward zigzag)
-  let bitIndex = 0;
-  let upward = true;
-  for (let col = size - 1; col >= 1; col -= 2) {
-    if (col === 6) col--;
-    const rows = upward ? Array.from({ length: size }, (_, i) => size - 1 - i) : Array.from({ length: size }, (_, i) => i);
-    for (const row of rows) {
-      for (const dc of [0, 1]) {
-        const c = col - dc;
-        if (!reserved[row][c]) {
-          matrix[row][c] = bitIndex < finalBits.length ? finalBits[bitIndex] === 1 : false;
-          bitIndex++;
-        }
-      }
-    }
-    upward = !upward;
-  }
-
-  // Apply mask pattern 0 (checkerboard)
-  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
-    if (!reserved[r][c] && (r + c) % 2 === 0) matrix[r][c] = !matrix[r][c];
-  }
-
-  // Write format info (mask 0, EC level-specific format bits)
-  const formatBits = FORMAT_BITS[ecLevel];
-  for (let i = 0; i < 15; i++) {
-    const bit = formatBits[i] === 1;
-    if (i < 6) matrix[8][i] = bit;
-    else if (i < 8) matrix[8][i + 1] = bit;
-    else matrix[14 - i][8] = bit;
-    if (i < 8) matrix[size - 1 - i][8] = bit;
-    else matrix[8][size - 15 + i] = bit;
-  }
-
-  return matrix;
-}
-
 const s: Record<string, React.CSSProperties> = {
   container: {
     height: '100%', display: 'flex', flexDirection: 'column',
@@ -734,7 +591,7 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-family)', overflow: 'hidden',
   },
   tabs: {
-    display: 'flex', gap: 4, padding: 'var(--space-3) var(--space-4)', flexShrink: 0,
+    display: 'flex', flexWrap: 'wrap', gap: 4, padding: 'var(--space-3) var(--space-4)', flexShrink: 0,
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   tab: {

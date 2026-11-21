@@ -7,10 +7,11 @@ import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from '
 import { SegmentedControl } from '../../components/controls';
 import { resolveUnitQuery } from '../../../shared/format/unitSearch';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { Button } from '../../ui/Button';
 
 interface RecentConversion { cat: Category; from: number; to: number; }
 
-type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy';
+type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy' | 'cooking';
 
 interface UnitDef { label: string; symbol: string; toBase: (v: number) => number; fromBase: (v: number) => number }
 
@@ -67,13 +68,35 @@ const UNITS: Record<Category, UnitDef[]> = {
     { label: 'Watt-hours', symbol: 'Wh', toBase: v => v * 3600, fromBase: v => v / 3600 },
     { label: 'Kilowatt-hours', symbol: 'kWh', toBase: v => v * 3.6e6, fromBase: v => v / 3.6e6 },
   ],
+  cooking: [
+    { label: 'US Cups', symbol: 'cup', toBase: v => v * 236.5882365, fromBase: v => v / 236.5882365 },
+    { label: 'Milliliters', symbol: 'mL', toBase: v => v, fromBase: v => v },
+    { label: 'US Tablespoons', symbol: 'tbsp', toBase: v => v * 14.78676478125, fromBase: v => v / 14.78676478125 },
+    { label: 'US Teaspoons', symbol: 'tsp', toBase: v => v * 4.92892159375, fromBase: v => v / 4.92892159375 },
+    { label: 'US Fluid Ounces', symbol: 'fl oz', toBase: v => v * 29.5735295625, fromBase: v => v / 29.5735295625 },
+    { label: 'Metric Cups', symbol: 'metric cup', toBase: v => v * 250, fromBase: v => v / 250 },
+  ],
 };
 
 const CAT_ICONS: Record<Category, string> = {
-  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E',
+  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E', cooking: 'C',
 };
 
-const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy'];
+const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy', 'cooking'];
+const pairKey = ({ cat, from, to }: RecentConversion) => cat + ':' + from + ':' + to;
+const MAX_PINNED = 8;
+type Precision = { mode: 'decimals' | 'significant'; digits: number };
+const DEFAULT_PRECISION: Precision = { mode: 'decimals', digits: 8 };
+
+function readPairs(key: string): RecentConversion[] {
+  try {
+    const items = JSON.parse(localStorage.getItem(key) || '[]');
+    if (Array.isArray(items)) return items.filter(item =>
+      item && CATEGORIES.includes(item.cat) && Number.isInteger(item.from) && Number.isInteger(item.to)
+      && UNITS[item.cat as Category][item.from] && UNITS[item.cat as Category][item.to] && item.from !== item.to);
+  } catch { /* Use defaults when storage is unavailable. */ }
+  return [];
+}
 
 const UnitConverter: React.FC = () => {
   const [category, setCategory] = useState<Category>('length');
@@ -81,19 +104,37 @@ const UnitConverter: React.FC = () => {
   const [toIdx, setToIdx] = useState(1);
   const [inputValue, setInputValue] = useState('1');
   const [unitQuery, setUnitQuery] = useState('');
-  const [recents, setRecents] = useState<RecentConversion[]>(() => {
-    try { return JSON.parse(localStorage.getItem('dex-unit-recents') || '[]'); } catch { return []; }
+  const [recents, setRecents] = useState(() => readPairs('dex-unit-recents'));
+  const [pins, setPins] = useState(() => readPairs('dex-unit-pins').slice(0, MAX_PINNED));
+  const [allTargets, setAllTargets] = useState(false);
+  const [precisions, setPrecisions] = useState<Partial<Record<Category, Precision>>>(() => {
+    try { return JSON.parse(localStorage.getItem('dex-unit-precision') || '{}') || {}; } catch { return {}; }
   });
 
   const units = UNITS[category];
+  const saved = precisions[category];
+  const precision = saved && Number.isInteger(saved.digits) && saved.digits >= (saved.mode === 'decimals' ? 0 : 1) && saved.digits <= 12
+    && (saved.mode === 'decimals' || saved.mode === 'significant') ? saved : DEFAULT_PRECISION;
+  const currentPair = { cat: category, from: fromIdx, to: toIdx };
+  const pinned = pins.some(pair => pairKey(pair) === pairKey(currentPair));
+
+  useEffect(() => {
+    try { localStorage.setItem('dex-unit-pins', JSON.stringify(pins)); } catch { /* Session remains usable. */ }
+  }, [pins]);
+  useEffect(() => {
+    try { localStorage.setItem('dex-unit-precision', JSON.stringify(precisions)); } catch { /* Session remains usable. */ }
+  }, [precisions]);
+  const setPrecision = (value: Precision) => setPrecisions(previous => ({ ...previous, [category]: value }));
+  const togglePin = () => setPins(previous => pinned
+    ? previous.filter(pair => pairKey(pair) !== pairKey(currentPair))
+    : previous.length < MAX_PINNED ? [currentPair, ...previous] : previous);
 
   // Track recent distinct conversions for one-tap reuse.
   useEffect(() => {
     if (fromIdx === toIdx) return;
     setRecents(prev => {
       const entry: RecentConversion = { cat: category, from: fromIdx, to: toIdx };
-      const k = (e: RecentConversion) => `${e.cat}:${e.from}:${e.to}`;
-      const next = [entry, ...prev.filter(e => k(e) !== k(entry))].slice(0, 6);
+      const next = [entry, ...prev.filter(e => pairKey(e) !== pairKey(entry))].slice(0, 6);
       try { localStorage.setItem('dex-unit-recents', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
@@ -106,19 +147,20 @@ const UnitConverter: React.FC = () => {
     const cat = match.category as Category;
     setCategory(cat);
     setFromIdx(match.index);
-    setToIdx(prev => prev === match.index ? (match.index + 1) % UNITS[cat].length : prev);
+    setToIdx(prev => prev === match.index || !UNITS[cat][prev] ? (match.index + 1) % UNITS[cat].length : prev);
     setUnitQuery('');
   }, [unitQuery]);
 
-  const result = useMemo(() => {
-    const val = parseFloat(inputValue);
-    if (isNaN(val)) return '';
-    const fromUnit = units[fromIdx], toUnit = units[toIdx];
-    if (!fromUnit || !toUnit) return '';
-    const base = fromUnit.toBase(val);
-    const out = toUnit.fromBase(base);
-    return out.toLocaleString('en-US', { maximumFractionDigits: 8 });
-  }, [inputValue, fromIdx, toIdx, units]);
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', precision.mode === 'significant'
+    ? { maximumSignificantDigits: precision.digits }
+    : { maximumFractionDigits: precision.digits }), [precision.mode, precision.digits]);
+  const value = inputValue.trim() ? Number(inputValue) : NaN;
+  const base = Number.isFinite(value) ? units[fromIdx]?.toBase(value) : undefined;
+  const targets = units.map(unit => {
+    const converted = base === undefined ? NaN : unit.fromBase(base);
+    return Number.isFinite(converted) ? formatter.format(converted) : '';
+  });
+  const result = targets[toIdx] ?? '';
 
   const swap = useCallback(() => {
     setFromIdx(toIdx);
@@ -278,6 +320,27 @@ const UnitConverter: React.FC = () => {
           </div>
         </div>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '4px var(--space-5) 12px' }}>
+        <Button size="sm" variant="subtle" onClick={togglePin} aria-pressed={pinned}
+          title={pins.length >= MAX_PINNED && !pinned ? 'Unpin a pair to add another' : undefined}
+          disabled={fromIdx === toIdx || (pins.length >= MAX_PINNED && !pinned)}>
+          {pinned ? 'Unpin pair' : 'Pin pair'}
+        </Button>
+        <Button size="sm" variant="subtle" onClick={() => setAllTargets(current => !current)} aria-pressed={allTargets}>All units</Button>
+        <select aria-label="Precision mode" value={precision.mode} style={s.select}
+          onChange={event => {
+            const mode = event.target.value as Precision['mode'];
+            setPrecision({ mode, digits: Math.max(mode === 'decimals' ? 0 : 1, precision.digits) });
+          }}>
+          <option value="decimals">Decimal places</option>
+          <option value="significant">Significant digits</option>
+        </select>
+        <select aria-label="Precision digits" value={precision.digits} style={s.select}
+          onChange={event => setPrecision({ ...precision, digits: Number(event.target.value) })}>
+          {precision.mode === 'decimals' && <option value="0">0</option>}
+          {Array.from({ length: 12 }, (_, index) => <option key={index + 1}>{index + 1}</option>)}
+        </select>
+      </div>
 
       {/* Formula */}
       {inputValue && result && units[fromIdx] && units[toIdx] && (
@@ -286,21 +349,31 @@ const UnitConverter: React.FC = () => {
         </div>
       )}
 
-      {/* Recent conversions — one-tap reuse */}
-      {recents.length > 0 && (
+      {allTargets && <div className="dex-liquid-glass-strong" style={s.refGrid} role="region" aria-label="All converted units">
+        {units.map((unit, index) => (
+          <div key={unit.symbol} style={s.refRow}>
+            <span style={s.refFrom}>{unit.label}</span>
+            <span style={s.refTo}>{targets[index] ? targets[index] + ' ' + unit.symbol : '—'}</span>
+          </div>
+        ))}
+      </div>}
+
+      {/* Pinned pairs lead the recent conversion list. */}
+      {pins.length + recents.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 var(--space-5) var(--space-3)' }}>
-          {recents.map((r, i) => {
+          {[...pins, ...recents.filter(recent => !pins.some(pin => pairKey(pin) === pairKey(recent)))].map(r => {
             const fu = UNITS[r.cat]?.[r.from], tu = UNITS[r.cat]?.[r.to];
             if (!fu || !tu) return null;
             return (
               <button
-                key={i}
+                key={pairKey(r)}
                 onClick={() => { setCategory(r.cat); setFromIdx(r.from); setToIdx(r.to); }}
                 title={`${fu.label} → ${tu.label}`}
+                aria-label={`${fu.label} → ${tu.label}`}
                 className="uc-recent"
                 style={{ padding: '4px 10px', borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                {fu.symbol} → {tu.symbol}
+                {pins.some(pin => pairKey(pin) === pairKey(r)) ? '★ ' : ''}{fu.symbol} → {tu.symbol}
               </button>
             );
           })}
@@ -320,7 +393,7 @@ const UnitConverter: React.FC = () => {
               <div key={val} style={s.refRow}>
                 <span style={s.refFrom}>{val.toLocaleString()} {fu.symbol}</span>
                 <span style={s.refArrow}>→</span>
-                <span style={s.refTo}>{converted.toLocaleString('en-US', { maximumFractionDigits: 4 })} {tu.symbol}</span>
+                <span style={s.refTo}>{formatter.format(converted)} {tu.symbol}</span>
               </div>
             );
           })}
