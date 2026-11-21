@@ -33,6 +33,7 @@ import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentSt
 import DexIcon from '../../components/DexIcon';
 import SketchPad, { type SketchMode } from './SketchPad';
 import { dexPrompt } from '../../components/dexConfirm';
+import { sendToTasks } from '../../services/taskIntake';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -1220,6 +1221,22 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
           </div>
           {/* Outline toggle — opens the heading table of contents */}
           <div style={styles.toolbarSep} />
+          <button type="button" aria-label="Copy note line to Tasks" title="Copy note line to Tasks"
+            style={styles.toolbarBtn}
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => {
+              const selection = window.getSelection();
+              const anchor = selection?.anchorNode;
+              const editor = editorRef.current;
+              if (anchor && editor?.contains(anchor) && editor.contains(selection?.focusNode ?? null)) {
+                const element = anchor instanceof Element ? anchor : anchor.parentElement;
+                const block = element?.closest('p, li, h1, h2, h3, blockquote');
+                const value = selection?.toString().trim() || (block && editor.contains(block) ? block.textContent : '');
+                const line = value?.split(/\r?\n/).find(text => text.trim()) ?? '';
+                if (sendToTasks({ title: line })) return;
+              }
+              window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: 'Select a line in the note first.' } }));
+            }}><DexIcon name="tasks" size={16} /></button>
           <button
             aria-label="Toggle outline"
             aria-pressed={outlineOpen}

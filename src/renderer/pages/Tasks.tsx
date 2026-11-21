@@ -25,6 +25,12 @@ import { DexSearchInput } from '../styles/components';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
 import { parseLocalDate, toLocalDateInput, repairPickedDay } from '../utils/localDate';
+import { Button } from '../ui/Button';
+import { hasNativeFiles, pickOpenPath } from '../services/nativeFiles';
+import { openWithShell } from '../utils/openWithShell';
+import { useTimerStore } from '../store/timerStore';
+import { persistOrWarn } from '../utils/persistOrWarn';
+import { takeIncomingTasks, TASK_INTAKE_EVENT } from '../services/taskIntake';
 
 // ===========================================================================
 // TYPES
@@ -247,19 +253,29 @@ const taskDueDateTime = (task: { dueDate: Date | null; dueTime?: string | null }
   const d = new Date(task.dueDate);
   if (task.dueTime) {
     const [h, m] = task.dueTime.split(':').map(Number);
-    if (!isNaN(h) && !isNaN(m)) d.setHours(h, m, 0, 0);
+    if (Number.isInteger(h) && h >= 0 && h < 24 && Number.isInteger(m) && m >= 0 && m < 60) {
+      d.setHours(h, m, 0, 0);
+      return d;
+    }
   }
+  d.setHours(23, 59, 59, 999);
   return d;
 };
 
 /** Advance a date by one recurrence step, preserving the day-of-month for monthly. */
-const advanceRecurrence = (date: Date, recurring: NonNullable<Task['recurring']>): Date => {
+export const advanceTaskRecurrence = (date: Date, recurring: NonNullable<Task['recurring']>, days = 1, monthDay = date.getDate()): Date => {
   const d = new Date(date);
   switch (recurring) {
     case 'daily': d.setDate(d.getDate() + 1); break;
     case 'weekly': d.setDate(d.getDate() + 7); break;
-    case 'monthly': d.setMonth(d.getMonth() + 1); break;
-    default: d.setDate(d.getDate() + 1); break;
+    case 'monthly': {
+      d.setDate(1);
+      d.setMonth(d.getMonth() + 1);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(Math.max(1, monthDay), lastDay));
+      break;
+    }
+    case 'custom': d.setDate(d.getDate() + (Number.isInteger(days) ? Math.max(1, Math.min(365, days)) : 1)); break;
   }
   return d;
 };
@@ -293,6 +309,12 @@ interface Task {
   notes: string;
   subtasks?: { id: string; title: string; completed: boolean }[];
   recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  recurrenceDays?: number;
+  recurrenceMonthDay?: number;
+  nextOccurrenceId?: string;
+  completedAt?: string | null;
+  tags?: string[];
+  attachmentPaths?: string[];
   description?: string;
   /** User-flagged/starred for the Flagged smart list. Optional for backward compat. */
   flagged?: boolean;
@@ -327,10 +349,43 @@ const LISTS: (TaskList & { smart?: boolean })[] = [
   { id: 'flagged', name: 'Flagged', color: 'var(--color-warning)', icon: 'star', smart: true },
   { id: 'scheduled', name: 'Scheduled', color: 'var(--color-error)', icon: 'calendar', smart: true },
   { id: 'completed', name: 'Completed', color: 'var(--color-success)', icon: 'check-circle', smart: true },
+  { id: 'completed-today', name: 'Completed Today', color: 'var(--color-success)', icon: 'check-circle', smart: true },
   { id: 'all', name: 'All', color: 'var(--color-text-tertiary)', icon: 'list' },
   { id: 'personal', name: 'Personal', color: 'var(--color-success)', icon: 'user' },
   { id: 'work', name: 'Work', color: 'var(--color-warning)', icon: 'briefcase' },
 ];
+
+const MOVABLE_LISTS = LISTS.filter(list => !list.smart && list.id !== 'all');
+const PINNED_TAGS_KEY = 'dex-tasks-saved-tags';
+const parseTags = (input: string) => [...new Set(input.split(',').map(tag => tag.trim().toLowerCase().slice(0, 40)).filter(Boolean))].slice(0, 12);
+
+function loadSavedTags(): string[] {
+  try {
+    const tags: unknown = JSON.parse(localStorage.getItem(PINNED_TAGS_KEY) || '[]');
+    return Array.isArray(tags) ? parseTags(tags.filter(tag => typeof tag === 'string').join(',')) : [];
+  } catch { return []; }
+}
+
+function completeTaskRows(tasks: Task[], ids: Set<string>, completedAt: string): Task[] {
+  return tasks.flatMap(task => {
+    if (!ids.has(task.id) || task.completed) return [task];
+    const completed = { ...task, completed: true, completedAt };
+    if (!task.dueDate || !task.recurring || task.recurring === 'none' || task.nextOccurrenceId) return [completed];
+    const monthDay = task.recurrenceMonthDay ?? task.dueDate.getDate();
+    const next: Task = {
+      ...task,
+      id: crypto.randomUUID(),
+      completed: false,
+      completedAt: null,
+      dueDate: advanceTaskRecurrence(task.dueDate, task.recurring, task.recurrenceDays, monthDay),
+      recurrenceMonthDay: monthDay,
+      actualMinutes: null,
+      snoozedUntil: null,
+      subtasks: task.subtasks?.map(sub => ({ ...sub, id: crypto.randomUUID(), completed: false })),
+    };
+    return [{ ...completed, nextOccurrenceId: next.id }, next];
+  });
+}
 
 const TASK_TEMPLATES: { name: string; tasks: Omit<Task, 'id'>[] }[] = [
   {
@@ -506,6 +561,17 @@ export const Tasks: React.FC = () => {
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [savedTags, setSavedTags] = useState(loadSavedTags);
+  const [tagDraft, setTagDraft] = useState('');
+  const [moveTo, setMoveTo] = useState('');
+  const attachmentPicker = useRef(false);
+  const availableTags = useMemo(() => [...new Set([...savedTags, ...tasks.flatMap(task => task.tags || [])])].sort(), [tasks, savedTags]);
+  useEffect(() => {
+    setTagDraft((tasks.find(task => task.id === expandedTask)?.tags || []).join(', '));
+    // Only a task switch should reload the editor's draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedTask]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'done'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | Task['priority']>('all');
   const [recentlyCompleted, setRecentlyCompleted] = useState<string | null>(null);
@@ -538,6 +604,9 @@ export const Tasks: React.FC = () => {
     registerUkiAppContext('tasks', () => {
       const c = ukiCtxRef.current;
       const active = c.tasks.filter(t => !t.completed).length;
+      const now = new Date();
+      const dueToday = c.tasks.filter(t => !t.completed && !isSnoozed(t, now)
+        && t.dueDate?.toDateString() === now.toDateString());
       const focused = c.expandedTask ? c.tasks.find(t => t.id === c.expandedTask) : undefined;
       return {
         appId: 'tasks',
@@ -548,6 +617,8 @@ export const Tasks: React.FC = () => {
           total: c.tasks.length,
           active,
           done: c.tasks.length - active,
+          dueToday: dueToday.length,
+          todayTaskTitles: dueToday.slice(0, 10).map(task => task.title),
           search: c.searchQuery || undefined,
           statusFilter: c.statusFilter,
           priorityFilter: c.priorityFilter,
@@ -627,6 +698,12 @@ export const Tasks: React.FC = () => {
   }, []);
   // Load tasks from backend on mount
   useEffect(() => {
+    let live = true;
+    let loaded = false;
+    const drainIntake = (): Task[] => takeIncomingTasks().map(item => ({
+      id: crypto.randomUUID(), title: item.title, completed: false,
+      priority: 'medium', dueDate: parseLocalDate(item.dueDate), list: 'personal', notes: item.notes || '',
+    }));
     // Drain any tasks uki chat queued ("add a task: ...") and clear the queue, so
     // the task lands here for real whether Tasks was opened by us or already open.
     const drainPending = (): Task[] => {
@@ -642,14 +719,36 @@ export const Tasks: React.FC = () => {
     const loadTasks = async () => {
       setIsLoading(true);
       const loadedTasks = await loadTasksFromBackend();
-      const pending = drainPending();
-      setTasks(pending.length ? [...pending, ...loadedTasks] : loadedTasks);
+      if (!live) return;
+      loaded = true;
+      const incoming = drainIntake();
+      setTasks([...incoming, ...drainPending(), ...loadedTasks]);
+      if (incoming.length) setSelectedList('personal');
       setIsLoading(false);
     };
     loadTasks();
-    const onPending = () => { const p = drainPending(); if (p.length) setTasks(prev => [...p, ...prev]); };
+    const onPending = () => { if (!loaded) return; const p = drainPending(); if (p.length) setTasks(prev => [...p, ...prev]); };
+    const onIntake = () => {
+      if (!loaded) return;
+      const incoming = drainIntake();
+      if (!incoming.length) return;
+      setTasks(prev => [...incoming, ...prev]);
+      setSelectedList('personal');
+      setTagFilter('');
+      setSearchQuery('');
+      setStatusFilter('all');
+      setPriorityFilter('all');
+      setChipPriority(null);
+      setChipList(null);
+      setChipHasDue(false);
+    };
     window.addEventListener('uki:tasks-pending', onPending);
-    return () => window.removeEventListener('uki:tasks-pending', onPending);
+    window.addEventListener(TASK_INTAKE_EVENT, onIntake);
+    return () => {
+      live = false;
+      window.removeEventListener('uki:tasks-pending', onPending);
+      window.removeEventListener(TASK_INTAKE_EVENT, onIntake);
+    };
   }, []);
 
   // Save to backend and localStorage when tasks change
@@ -674,7 +773,7 @@ export const Tasks: React.FC = () => {
 
   const filteredTasks = useMemo(() => tasks.filter(task => {
     // The Completed smart list is the one view that must always show done tasks.
-    if (selectedList !== 'completed' && !showCompleted && task.completed) return false;
+    if (selectedList !== 'completed' && selectedList !== 'completed-today' && !showCompleted && task.completed) return false;
     // Status filter (all / active / done)
     if (statusFilter === 'active' && task.completed) return false;
     if (statusFilter === 'done' && !task.completed) return false;
@@ -684,10 +783,11 @@ export const Tasks: React.FC = () => {
     if (chipPriority && task.priority !== chipPriority) return false;
     if (chipList && task.list !== chipList) return false;
     if (chipHasDue && !task.dueDate) return false;
+    if (tagFilter && !(task.tags || []).includes(tagFilter)) return false;
     // Search filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      if (!task.title.toLowerCase().includes(q) && !(task.description || '').toLowerCase().includes(q)) return false;
+      const q = searchQuery.trim().toLowerCase();
+      if (![task.title, task.description, task.notes, ...(task.tags || [])].some(value => value?.toLowerCase().includes(q))) return false;
     }
     const now = new Date();
     switch (selectedList) {
@@ -709,6 +809,8 @@ export const Tasks: React.FC = () => {
         return !!task.flagged;
       case 'completed':
         return task.completed;
+      case 'completed-today':
+        return task.completed && !!task.completedAt && new Date(task.completedAt).toDateString() === now.toDateString();
       case 'scheduled':
         return task.dueDate !== null;
       case 'all':
@@ -716,7 +818,7 @@ export const Tasks: React.FC = () => {
       default:
         return task.list === selectedList;
     }
-  }), [tasks, showCompleted, selectedList, searchQuery, statusFilter, priorityFilter, chipPriority, chipList, chipHasDue]);
+  }), [tasks, showCompleted, selectedList, searchQuery, statusFilter, priorityFilter, chipPriority, chipList, chipHasDue, tagFilter]);
 
   const reorderTasks = useCallback((sourceId: string, targetId: string) => {
     setTasks(prev => {
@@ -791,17 +893,28 @@ export const Tasks: React.FC = () => {
   /** Toggle a blocker link on `task` for blocker id `blockerId` (no self-links). */
   const toggleBlocker = useCallback((taskId: string, blockerId: string) => {
     if (taskId === blockerId) return;
+    if (!tasksById.get(taskId)?.blockedBy?.includes(blockerId)) {
+      const pending = [blockerId];
+      const visited = new Set<string>();
+      while (pending.length) {
+        const id = pending.pop()!;
+        if (id === taskId) { toast.info('That link would create a dependency cycle.'); return; }
+        if (visited.has(id)) continue;
+        visited.add(id);
+        pending.push(...(tasksById.get(id)?.blockedBy || []));
+      }
+    }
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
       const cur = t.blockedBy || [];
       const next = cur.includes(blockerId) ? cur.filter(b => b !== blockerId) : [...cur, blockerId];
       return { ...t, blockedBy: next.length ? next : undefined };
     }));
-  }, []);
+  }, [tasksById, toast]);
 
   const toggleTask = (id: string) => {
     const task = tasks.find(t => t.id === id);
-    // Guard: completing a task with open blockers requires a confirmation; warn instead.
+    // Single and bulk completion both respect open blockers.
     if (task && !task.completed) {
       const blockers = openBlockers(task);
       if (blockers.length > 0) {
@@ -809,30 +922,17 @@ export const Tasks: React.FC = () => {
         return;
       }
     }
-    setTasks(prev => {
-      const next = prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
-      // Recurring rollover: completing a daily/weekly/monthly task spawns the next
-      // occurrence with its due date advanced one step, fresh (uncompleted) subtasks,
-      // and the recurrence preserved. The completed instance stays as history.
-      if (task && !task.completed && task.recurring && task.recurring !== 'none' && task.dueDate) {
-        const nextDue = advanceRecurrence(new Date(task.dueDate), task.recurring);
-        const spawned: Task = {
-          ...task,
-          id: crypto.randomUUID(),
-          completed: false,
-          dueDate: nextDue,
-          subtasks: task.subtasks?.map(s => ({ ...s, id: crypto.randomUUID(), completed: false })),
-        };
-        return [spawned, ...next];
-      }
-      return next;
-    });
+    if (!task) return;
+    const at = new Date().toISOString();
+    setTasks(prev => task.completed
+      ? prev.map(row => row.id === id ? { ...row, completed: false, completedAt: null } : row)
+      : completeTaskRows(prev, new Set([id]), at));
     if (task && !task.completed) {
       // Trigger the brief completion animation, then clear the flag so it can replay.
       setRecentlyCompleted(id);
       window.setTimeout(() => setRecentlyCompleted(prev => (prev === id ? null : prev)), 400);
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: 1 } }));
-      if (task.recurring && task.recurring !== 'none' && task.dueDate) {
+      if (task.recurring && task.recurring !== 'none' && task.dueDate && !task.nextOccurrenceId) {
         window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `Next ${task.recurring} occurrence scheduled` } }));
       }
     }
@@ -898,7 +998,7 @@ export const Tasks: React.FC = () => {
       notes: '',
       flagged: selectedList === 'flagged' ? true : undefined,
     };
-    setTasks([newTask, ...tasks]);
+    setTasks(previous => [newTask, ...previous]);
     setNewTaskTitle('');
     setNewTaskDue('');
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCreated', amount: 1 } }));
@@ -947,7 +1047,26 @@ export const Tasks: React.FC = () => {
   };
 
   const setRecurring = (taskId: string, recurring: Task['recurring']) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, recurring } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, recurring, recurrenceMonthDay: t.dueDate?.getDate() } : t));
+  };
+
+  const addAttachment = async (taskId: string) => {
+    if (attachmentPicker.current) return;
+    attachmentPicker.current = true;
+    try {
+      const path = await pickOpenPath();
+      if (path) setTasks(previous => previous.map(task => task.id === taskId
+        ? { ...task, attachmentPaths: [...new Set([...(task.attachmentPaths || []), path])] }
+        : task));
+    } catch { toast.error('Could not attach the file'); }
+    finally { attachmentPicker.current = false; }
+  };
+
+  const toggleSavedTag = () => {
+    if (!tagFilter) return;
+    const next = savedTags.includes(tagFilter) ? savedTags.filter(tag => tag !== tagFilter) : [...savedTags, tagFilter];
+    setSavedTags(next);
+    persistOrWarn(PINNED_TAGS_KEY, JSON.stringify(next), 'your saved task tags');
   };
 
   const toggleFlag = (taskId: string) => {
@@ -971,45 +1090,42 @@ export const Tasks: React.FC = () => {
     });
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => { setSelectedIds(new Set()); setMoveTo(''); };
 
   const selectAllVisible = () => {
     setSelectedIds(new Set(sortedTasks.map(t => t.id)));
   };
 
   const bulkComplete = () => {
-    if (selectedIds.size === 0) return;
-    const ids = selectedIds;
-    let spawnedCount = 0;
-    setTasks(prev => {
-      const result: Task[] = [];
-      for (const t of prev) {
-        const willComplete = ids.has(t.id) && !t.completed;
-        // Mirror single-toggle recurrence rollover for any recurring task we complete.
-        if (willComplete && t.recurring && t.recurring !== 'none' && t.dueDate) {
-          result.push({
-            ...t,
-            id: crypto.randomUUID(),
-            completed: false,
-            dueDate: advanceRecurrence(new Date(t.dueDate), t.recurring),
-            subtasks: t.subtasks?.map(s => ({ ...s, id: crypto.randomUUID(), completed: false })),
-          });
-          spawnedCount++;
-        }
-        result.push(ids.has(t.id) ? { ...t, completed: true } : t);
-      }
-      return result;
-    });
-    window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: ids.size } }));
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Completed ${ids.size} task${ids.size === 1 ? '' : 's'}${spawnedCount ? ` · ${spawnedCount} re-scheduled` : ''}` } }));
-    clearSelection();
+    const pending = tasks.filter(task => selectedIds.has(task.id) && !task.completed);
+    const eligible = new Set(pending.filter(task => openBlockers(task).length === 0).map(task => task.id));
+    if (eligible.size) {
+      const at = new Date().toISOString();
+      setTasks(prev => completeTaskRows(prev, eligible, at));
+      window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: eligible.size } }));
+    }
+    const blocked = pending.filter(task => !eligible.has(task.id));
+    setSelectedIds(new Set(blocked.map(task => task.id)));
+    if (blocked.length) toast.info(`${eligible.size} completed · ${blocked.length} still blocked`);
   };
 
   const bulkDelete = () => {
-    if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
-    setTasks(prev => prev.filter(t => !selectedIds.has(t.id)));
-    window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: `Deleted ${count} task${count === 1 ? '' : 's'}` } }));
+    const removed = tasks.filter(task => selectedIds.has(task.id));
+    if (!removed.length) return;
+    const ids = new Set(removed.map(task => task.id));
+    setTasks(prev => prev.filter(task => !ids.has(task.id)));
+    void notify({
+      title: `Deleted ${removed.length} tasks`,
+      source: 'Tasks',
+      priority: 'low',
+      undo: () => setTasks(prev => [...removed.filter(task => !prev.some(row => row.id === task.id)), ...prev]),
+    });
+    clearSelection();
+  };
+
+  const moveTasks = (ids: Set<string>, list: string) => {
+    if (!MOVABLE_LISTS.some(target => target.id === list)) return;
+    setTasks(prev => prev.map(task => ids.has(task.id) ? { ...task, list } : task));
     clearSelection();
   };
 
@@ -1021,7 +1137,7 @@ export const Tasks: React.FC = () => {
   };
 
   const setDescription = (taskId: string, description: string) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, description } : t));
+    setTasks(previous => previous.map(t => t.id === taskId ? { ...t, description, notes: description } : t));
   };
 
   const { menuState, show: showCtx, close: closeCtx } = useContextMenu();
@@ -1128,10 +1244,11 @@ export const Tasks: React.FC = () => {
     return tasks.filter(t => {
       // The Completed list counts done tasks; every other list counts open ones.
       if (listId === 'completed') return t.completed;
+      if (listId === 'completed-today') return t.completed && !!t.completedAt && new Date(t.completedAt).toDateString() === now.toDateString();
       if (t.completed) return false;
       switch (listId) {
         case 'today':
-          return !!t.dueDate && new Date(t.dueDate).toDateString() === now.toDateString();
+          return !isSnoozed(t, now) && t.dueDate?.toDateString() === now.toDateString();
         case 'upcoming':
           return !!t.dueDate && atStartOfDay(new Date(t.dueDate)).getTime() > atStartOfDay(now).getTime();
         case 'overdue': {
@@ -1306,7 +1423,15 @@ export const Tasks: React.FC = () => {
                     ...styles.listItem,
                     background: isActive ? 'var(--color-border-subtle)' : 'transparent',
                   }}
-                  onClick={() => { setSelectedList(list.id); clearSelection(); }}
+                  onClick={() => { setSelectedList(list.id); setTagFilter(''); setStatusFilter('all'); clearSelection(); }}
+                  onDragOver={event => { if (dragIdRef.current && MOVABLE_LISTS.includes(list)) event.preventDefault(); }}
+                  onDrop={event => {
+                    if (!dragIdRef.current || !MOVABLE_LISTS.includes(list)) return;
+                    event.preventDefault();
+                    moveTasks(new Set([dragIdRef.current]), list.id);
+                    dragIdRef.current = null;
+                    setDragOverId(null);
+                  }}
                 >
                   <div style={styles.listIcon}>
                     <Icon color={list.color} />
@@ -1321,6 +1446,10 @@ export const Tasks: React.FC = () => {
               </React.Fragment>
             );
           })}
+          {savedTags.length > 0 && <div style={styles.sectionLabel}>Saved tags</div>}
+          {savedTags.map(tag => <button key={tag} type="button" style={styles.listItem}
+            aria-current={tagFilter === tag ? 'true' : undefined}
+            onClick={() => { setSelectedList('all'); setTagFilter(tag); clearSelection(); }}>#{tag}</button>)}
         </div>
       </div>
 
@@ -1332,7 +1461,7 @@ export const Tasks: React.FC = () => {
               {selectedListData.name}
             </span>
             <span style={styles.taskCount}>
-              {sortedTasks.filter(t => !t.completed).length} tasks
+              {selectedList === 'completed-today' ? `${sortedTasks.length} completed` : `${sortedTasks.filter(t => !t.completed).length} tasks`}
               {(timeTotals.est > 0 || timeTotals.act > 0) && (
                 <span style={{ marginLeft: 8, color: 'var(--color-text-tertiary)' }} title="Estimated vs actual time across these tasks">
                   · est {formatMinutes(timeTotals.est)} / act {formatMinutes(timeTotals.act)}
@@ -1624,6 +1753,16 @@ export const Tasks: React.FC = () => {
         )}
 
         {/* Bulk action toolbar: appears while one or more tasks are selected. */}
+        {availableTags.length > 0 && <div style={{ padding: '0 var(--space-6) var(--space-2)', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select aria-label="Filter tasks by tag" value={tagFilter}
+            onChange={event => { setTagFilter(event.target.value); clearSelection(); }}>
+            <option value="">All tags</option>
+            {availableTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
+          {tagFilter && <Button size="sm" type="button" onClick={toggleSavedTag}>
+            {savedTags.includes(tagFilter) ? 'Unsave tag' : 'Save tag'}
+          </Button>}
+        </div>}
         {selectedIds.size > 0 && (
           <div style={styles.bulkBar}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>
@@ -1631,6 +1770,11 @@ export const Tasks: React.FC = () => {
             </span>
             <button style={styles.bulkBtn} onClick={bulkComplete} aria-label="Complete selected tasks">Complete</button>
             <button style={styles.bulkBtn} onClick={bulkFlag} aria-label="Flag selected tasks">Flag</button>
+            <select aria-label="Move selected tasks to list" value={moveTo} onChange={event => setMoveTo(event.target.value)}>
+              <option value="">Move to…</option>
+              {MOVABLE_LISTS.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
+            </select>
+            <Button size="sm" type="button" disabled={!moveTo} onClick={() => moveTasks(selectedIds, moveTo)}>Move</Button>
             <button style={{ ...styles.bulkBtn, color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={bulkDelete} aria-label="Delete selected tasks">Delete</button>
             <button style={styles.bulkBtn} onClick={selectAllVisible} aria-label="Select all visible tasks">Select All</button>
             <button style={{ ...styles.bulkBtn, marginLeft: 'auto' }} onClick={clearSelection} aria-label="Clear selection">Clear</button>
@@ -1676,7 +1820,11 @@ export const Tasks: React.FC = () => {
               <div
                 className={`dex-task-item dex-tasks-task-row${recentlyCompleted === task.id ? ' dex-task-complete' : ''}`}
                 draggable={sortBy === 'manual'}
-                onDragStart={() => { dragIdRef.current = task.id; }}
+                onDragStart={event => {
+                  dragIdRef.current = task.id;
+                  event.dataTransfer.setData('application/x-dex-task', task.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
                 onDragOver={e => { if (sortBy !== 'manual') return; e.preventDefault(); setDragOverId(task.id); }}
                 onDrop={e => { e.preventDefault(); if (dragIdRef.current && dragIdRef.current !== task.id) reorderTasks(dragIdRef.current, task.id); setDragOverId(null); dragIdRef.current = null; }}
                 onDragEnd={() => { setDragOverId(null); dragIdRef.current = null; }}
@@ -1870,7 +2018,7 @@ export const Tasks: React.FC = () => {
                   <div style={{ marginBottom: 'var(--space-3)' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Description</div>
                     <AssistedTextarea
-                      value={task.description || ''}
+                      value={task.description ?? task.notes ?? ''}
                       onChange={(e) => setDescription(task.id, e.target.value)}
                       placeholder="Add a description..."
                       style={{ width: '100%', minHeight: 48, padding: 'var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
@@ -1879,6 +2027,15 @@ export const Tasks: React.FC = () => {
 
                   {/* Priority + Due time */}
                   <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                    <label>Due date
+                      <input type="date" aria-label="Set task due date" value={task.dueDate ? toLocalDateInput(task.dueDate) : ''}
+                        onChange={event => {
+                          const date = parseLocalDate(event.target.value);
+                          setTasks(previous => previous.map(row => row.id === task.id
+                            ? { ...row, dueDate: date, dueTime: date ? row.dueTime : null, recurrenceMonthDay: date?.getDate() }
+                            : row));
+                        }} />
+                    </label>
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Priority</div>
                       <select
@@ -1914,6 +2071,38 @@ export const Tasks: React.FC = () => {
                         }}
                       />
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+                    <label>Tags
+                      <input aria-label="Task tags" placeholder="Comma-separated tags" value={tagDraft}
+                        onChange={event => setTagDraft(event.target.value)} />
+                    </label>
+                    <Button size="sm" type="button" onClick={() => {
+                      const tags = parseTags(tagDraft);
+                      setTasks(previous => previous.map(row => row.id === task.id ? { ...row, tags } : row));
+                      setTagDraft(tags.join(', '));
+                    }}>Save tags</Button>
+                    {!task.completed && <Button size="sm" type="button" onClick={() => {
+                      if (!useTimerStore.getState().startTaskFocus({ id: task.id, title: task.title })) {
+                        toast.info('Finish or reset the current Pomodoro first.');
+                        return;
+                      }
+                      window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'pomodoro' } }));
+                    }}>Start Pomodoro</Button>}
+                  </div>
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    {(task.attachmentPaths || []).map(path => {
+                      const name = path.split(/[\\/]/).at(-1) || path;
+                      return <div key={path} style={{ display: 'flex', gap: 8 }}>
+                        <Button size="sm" type="button" title={path} onClick={() => void openWithShell('path', path, name)}>{name}</Button>
+                        <Button size="sm" type="button" aria-label={`Remove attachment ${name}`} onClick={() => {
+                          setTasks(previous => previous.map(row => row.id === task.id
+                            ? { ...row, attachmentPaths: row.attachmentPaths?.filter(item => item !== path) } : row));
+                        }}>Remove</Button>
+                      </div>;
+                    })}
+                    {hasNativeFiles() && <Button size="sm" type="button" onClick={() => void addAttachment(task.id)}>Attach file</Button>}
                   </div>
 
                   {/* Estimated vs actual time */}
@@ -2011,7 +2200,7 @@ export const Tasks: React.FC = () => {
                   <div style={{ marginBottom: 'var(--space-3)' }}>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4, fontWeight: 600 }}>Repeat</div>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => (
+                      {(['none', 'daily', 'weekly', 'monthly', 'custom'] as const).map(r => (
                         <button key={r} aria-label={`Set repeat to ${r}`} onClick={() => setRecurring(task.id, r)} style={{
                           padding: '4px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer',
                           border: '1px solid var(--color-border-subtle)',
@@ -2021,6 +2210,13 @@ export const Tasks: React.FC = () => {
                         }}>{r === 'none' ? 'None' : r.charAt(0).toUpperCase() + r.slice(1)}</button>
                       ))}
                     </div>
+                    {task.recurring === 'custom' && <label>Repeat every
+                      <input type="number" min={1} max={365} aria-label="Custom recurrence days" value={task.recurrenceDays ?? 1}
+                        onChange={event => {
+                          const days = Math.max(1, Math.min(365, Math.trunc(Number(event.target.value) || 1)));
+                          setTasks(previous => previous.map(row => row.id === task.id ? { ...row, recurrenceDays: days } : row));
+                        }} /> days
+                    </label>}
                   </div>
 
                   {/* Subtasks */}
@@ -2071,7 +2267,7 @@ export const Tasks: React.FC = () => {
           {sortedTasks.length === 0 && (() => {
             // List-aware empty states. A search/filter that hides everything gets its
             // own copy so the user knows it's a filter, not an empty list.
-            const isFiltered = !!searchQuery.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || chipPriority || chipList || chipHasDue;
+            const isFiltered = !!searchQuery.trim() || statusFilter !== 'all' || priorityFilter !== 'all' || chipPriority || chipList || chipHasDue || tagFilter;
             const accent = isFiltered
               ? 'var(--color-accent, #0a84ff)'
               : selectedList === 'overdue'
@@ -2120,6 +2316,7 @@ export const Tasks: React.FC = () => {
                 onClick={() => {
                   if (isFiltered) {
                     setSearchQuery(''); setStatusFilter('all'); setPriorityFilter('all');
+                    setTagFilter('');
                     setChipPriority(null); setChipList(null); setChipHasDue(false);
                   } else {
                     newTaskInputRef.current?.focus();

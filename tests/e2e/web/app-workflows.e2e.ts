@@ -60,6 +60,19 @@ test.describe('App workflows (web renderer)', () => {
     await expect(done).toBeVisible();
     await done.click();
     await expect(page.getByRole('button', { name: `Mark "${title}" incomplete` })).toBeVisible();
+    await page.getByRole('button', { name: 'Select Completed Today list' }).click();
+    await expect(page.getByRole('button', { name: `Mark "${title}" incomplete` })).toBeVisible();
+  });
+
+  test('Tasks: start a focus session and see its title in Pomodoro', async ({ page }) => {
+    await boot(page);
+    await open(page, 'tasks');
+    const input = page.getByLabel('Add a task', { exact: true });
+    await input.fill('Draft project outline');
+    await input.press('Enter');
+    await page.getByText('Draft project outline', { exact: true }).click();
+    await page.getByRole('button', { name: 'Start Pomodoro', exact: true }).click();
+    await expect(page.getByText('Task · Draft project outline', { exact: true })).toBeVisible();
   });
 
   test('Calendar: next and previous month move the title and come back', async ({ page }) => {

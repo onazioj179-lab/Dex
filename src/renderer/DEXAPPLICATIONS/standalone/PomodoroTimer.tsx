@@ -147,6 +147,9 @@ const PomodoroTimer: React.FC = () => {
           </div>
 
           {/* Controls */}
+          {pomodoro.task && <div role="status" style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+            Task · {pomodoro.task.title}
+          </div>}
           <div style={s.controls}>
             <button onClick={resetPomodoro} className="pomo-icon-btn" style={s.secondaryBtn} title="Reset" aria-label="Reset">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -219,7 +222,9 @@ const PomodoroTimer: React.FC = () => {
               <div style={s.logList}>
                 {log.entries.slice(0, 8).map((e, i) => (
                   <div key={i} style={s.logRow}>
-                    <span style={{ color: PHASE_COLORS[e.phase], fontWeight: 600, fontSize: 12 }}>{PHASE_LABELS[e.phase]}</span>
+                    <span style={{ color: PHASE_COLORS[e.phase], fontWeight: 600, fontSize: 12 }}>
+                      {PHASE_LABELS[e.phase]}{e.task ? ` · ${e.task.title}` : ''}
+                    </span>
                     <span style={s.logMeta}>{e.minutes}m</span>
                     <span style={s.logMeta}>{fmtClock(e.at)}</span>
                   </div>

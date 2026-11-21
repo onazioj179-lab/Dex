@@ -233,3 +233,17 @@ CI on `main` and on every PR since 2026-11-14 00:13 UTC is red without running: 
 | # | App | Item | Priority | Status | What changed | Next check |
 |---|---|---|---|---|---|---|
 | 246 | CI | GitHub Actions jobs not starting | HIGH | BLOCKED (owner: billing) | Nothing to change in the repo | Owner fixes Billing & plans, then re-run the latest `main` run |
+
+## 2026-11-21 Tasks and Pomodoro batch
+
+This pass covers 20 rows from the retired small-app backlog. Row numbers below refer to that backlog.
+
+| Rows | Result |
+|---|---|
+| #26, #28, #31, #36, #40, #43, #44 | Reviewed the existing natural-language quick-add, subtasks and completion rollup, quick-add tokens, estimated/actual time, keyboard triage, sorting, and filter chips. |
+| #27, #29, #38, #39, #41 | Added custom recurrence in days and month-end clamping. Reopening a completed occurrence leaves its successor in place, and completing it again keeps a single successor. Date-only tasks become overdue after their due day. Completed Today tracks actual completion timestamps. Both completion paths respect blockers, and new dependency cycles are prevented. Snoozed items stay out of the Today count and Home preview. |
+| #30, #35, #37 | Added drag-to-list destinations in Manual sort, bulk list moves, undo for bulk delete, and persistent saved tag filters. |
+| #32, #33, #34 | Notes can copy a line to Tasks. Kanban can copy a card with its description and date. UKI's Tasks context identifies today's open items. Tasks can reference existing files through the native picker. |
+| #42, #78 | A task can start a Pomodoro, and completed focus phases retain the task link in the session log. The link applies to a task. General project-linked sessions remain open. |
+
+Open: packaged Windows file-picker verification, project-linked focus sessions, and completion dates for older tasks whose records have no timestamp.
