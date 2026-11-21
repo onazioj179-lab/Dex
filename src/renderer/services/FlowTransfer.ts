@@ -30,6 +30,7 @@
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { ContextBus } from './ContextBus';
 import type { ClipKind } from '../store/clipboardStore';
+import { isUtilityTarget, queueUtilityInput } from './utilityInput';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,14 +64,14 @@ export type FlowIntake = (payload: FlowPayload) => boolean | Promise<boolean>;
 // ---------------------------------------------------------------------------
 
 const TARGETS_BY_KIND: Record<FlowKind, string[]> = {
-  text:    ['notes', 'dexcode', 'browser', 'tasks'],
-  snippet: ['notes', 'dexcode', 'browser'],
+  text:    ['notes', 'calculator', 'qrcode', 'dexcode', 'browser', 'tasks'],
+  snippet: ['notes', 'calculator', 'qrcode', 'dexcode', 'browser'],
   code:    ['dexcode', 'notes'],
-  link:    ['browser', 'notes'],
+  link:    ['browser', 'notes', 'qrcode'],
   color:   ['colorpicker', 'prism', 'flux'],
   email:   ['notes', 'browser'],
   path:    ['files', 'dexcode'],
-  number:  ['calculator', 'notes'],
+  number:  ['calculator', 'unitconverter', 'notes', 'qrcode'],
   image:   ['prism', 'flux', 'gallery', 'forge'],
   file:    ['files', 'forge'],
 };
@@ -164,6 +165,13 @@ export async function sendFlow(appId: string, payload: FlowPayload): Promise<voi
       : `https://www.google.com/search?q=${encodeURIComponent(payload.content.slice(0, 400))}`;
     openApp('browser', url);
     toast('success', payload.kind === 'link' ? `Opening in ${name}` : `Searching ${name}`);
+    return;
+  }
+
+  if (isUtilityTarget(appId) && payload.kind !== 'image' && payload.kind !== 'file') {
+    queueUtilityInput(appId, payload.content);
+    openApp(appId);
+    toast('success', `Sent to ${name}`);
     return;
   }
 

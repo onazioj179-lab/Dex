@@ -44,12 +44,13 @@ describe('macOS Blue Modern palette', () => {
     expect(token(dark, '--color-text-secondary')).toBe('#AEAEB2');
   });
 
-  it('light tokens match the table (accent darkened for AA, documented)', () => {
+  it('light tokens match the palette with accessible accent and secondary text', () => {
     expect(token(light, '--color-bg-base')).toBe('#F5F5F7');
     expect(token(light, '--color-bg-surface')).toBe('#FFFFFF');
     expect(token(light, '--color-bg-secondary')).toBe('#F2F2F7');
     expect(token(light, '--color-text-primary')).toBe('#1D1D1F');
-    expect(token(light, '--color-text-secondary')).toBe('#636366');
+    expect(token(light, '--color-text-secondary')).toBe('#545458');
+    expect(ratio(token(light, '--color-text-secondary')!, '#DCDCE0')).toBeGreaterThanOrEqual(4.5);
     expect(token(light, '--color-border')).toBe('#D1D1D6');
     // Table says #007AFF; on white that is 4.02:1, so DEX uses #0066CC (5.57:1).
     expect(ratio('#007AFF', '#FFFFFF')).toBeLessThan(4.5);

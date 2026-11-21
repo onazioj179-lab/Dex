@@ -8,10 +8,12 @@ import { SegmentedControl } from '../../components/controls';
 import { resolveUnitQuery } from '../../../shared/format/unitSearch';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { Button } from '../../ui/Button';
+import { sendFlow } from '../../services/FlowTransfer';
+import { openUtilityInput, useUtilityInput } from '../../services/utilityInput';
 
 interface RecentConversion { cat: Category; from: number; to: number; }
 
-type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy' | 'cooking';
+type Category = 'length' | 'weight' | 'temperature' | 'volume' | 'speed' | 'data' | 'energy' | 'cooking' | 'fuel' | 'density';
 
 interface UnitDef { label: string; symbol: string; toBase: (v: number) => number; fromBase: (v: number) => number }
 
@@ -76,24 +78,70 @@ const UNITS: Record<Category, UnitDef[]> = {
     { label: 'US Fluid Ounces', symbol: 'fl oz', toBase: v => v * 29.5735295625, fromBase: v => v / 29.5735295625 },
     { label: 'Metric Cups', symbol: 'metric cup', toBase: v => v * 250, fromBase: v => v / 250 },
   ],
+  fuel: [
+    { label: 'Liters per 100 km', symbol: 'L/100 km', toBase: value => value > 0 ? value : NaN, fromBase: value => value },
+    { label: 'Miles per US gallon', symbol: 'mpg (US)', toBase: value => value > 0 ? 235.214583 / value : NaN, fromBase: value => 235.214583 / value },
+    { label: 'Miles per Imperial gallon', symbol: 'mpg (Imp)', toBase: value => value > 0 ? 282.480936 / value : NaN, fromBase: value => 282.480936 / value },
+    { label: 'Kilometers per liter', symbol: 'km/L', toBase: value => value > 0 ? 100 / value : NaN, fromBase: value => 100 / value },
+  ],
+  density: [
+    { label: 'Kilograms per cubic meter', symbol: 'kg/m³', toBase: value => value, fromBase: value => value },
+    { label: 'Grams per cubic centimeter', symbol: 'g/cm³', toBase: value => value * 1000, fromBase: value => value / 1000 },
+    { label: 'Pounds per cubic foot', symbol: 'lb/ft³', toBase: value => value * 16.01846337396, fromBase: value => value / 16.01846337396 },
+  ],
 };
 
 const CAT_ICONS: Record<Category, string> = {
-  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E', cooking: 'C',
+  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E', cooking: 'C', fuel: 'F', density: 'D',
 };
 
-const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy', 'cooking'];
+const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy', 'cooking', 'fuel', 'density'];
 const pairKey = ({ cat, from, to }: RecentConversion) => cat + ':' + from + ':' + to;
 const MAX_PINNED = 8;
 type Precision = { mode: 'decimals' | 'significant'; digits: number };
 const DEFAULT_PRECISION: Precision = { mode: 'decimals', digits: 8 };
 
-function readPairs(key: string): RecentConversion[] {
+interface CustomUnit { label: string; symbol: string; factor: number }
+type CustomUnits = Partial<Record<Category, CustomUnit[]>>;
+const CUSTOM_KEY = 'dex-unit-custom';
+const CUSTOM_LIMIT = 12;
+const CUSTOM_BASE: Record<Category, string> = {
+  length: 'm', weight: 'kg', temperature: '°C', volume: 'L', speed: 'km/h',
+  data: 'B', energy: 'J', cooking: 'mL', fuel: 'L/100 km', density: 'kg/m³',
+};
+const canCustomize = (category: Category) => category !== 'temperature';
+const validCustomUnit = (unit: CustomUnit) => typeof unit?.label === 'string' && !!unit.label.trim()
+  && unit.label.length <= 36 && typeof unit.symbol === 'string' && !!unit.symbol.trim()
+  && unit.symbol.length <= 12 && Number.isFinite(unit.factor) && unit.factor > 0;
+
+function readCustomUnits(): CustomUnits {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '{}');
+    return Object.fromEntries(CATEGORIES.filter(canCustomize).flatMap(category => {
+      const units = stored?.[category];
+      return Array.isArray(units) ? [[category, units.filter(validCustomUnit).slice(0, CUSTOM_LIMIT)]] : [];
+    }));
+  } catch { return {}; }
+}
+
+function unitCatalog(customUnits: CustomUnits): Record<Category, UnitDef[]> {
+  const catalog = { ...UNITS };
+  for (const category of CATEGORIES) {
+    catalog[category] = [...UNITS[category], ...(customUnits[category] ?? []).map(unit => ({
+      ...unit,
+      toBase: (value: number) => category === 'fuel' && value <= 0 ? NaN : value * unit.factor,
+      fromBase: (value: number) => value / unit.factor,
+    }))];
+  }
+  return catalog;
+}
+
+function readPairs(key: string, catalog: Record<Category, UnitDef[]>): RecentConversion[] {
   try {
     const items = JSON.parse(localStorage.getItem(key) || '[]');
     if (Array.isArray(items)) return items.filter(item =>
       item && CATEGORIES.includes(item.cat) && Number.isInteger(item.from) && Number.isInteger(item.to)
-      && UNITS[item.cat as Category][item.from] && UNITS[item.cat as Category][item.to] && item.from !== item.to);
+      && catalog[item.cat as Category][item.from] && catalog[item.cat as Category][item.to] && item.from !== item.to);
   } catch { /* Use defaults when storage is unavailable. */ }
   return [];
 }
@@ -103,15 +151,21 @@ const UnitConverter: React.FC = () => {
   const [fromIdx, setFromIdx] = useState(0);
   const [toIdx, setToIdx] = useState(1);
   const [inputValue, setInputValue] = useState('1');
+  useUtilityInput('unitconverter', value => setInputValue(value.trim()));
   const [unitQuery, setUnitQuery] = useState('');
-  const [recents, setRecents] = useState(() => readPairs('dex-unit-recents'));
-  const [pins, setPins] = useState(() => readPairs('dex-unit-pins').slice(0, MAX_PINNED));
+  const [customUnits, setCustomUnits] = useState(readCustomUnits);
+  const catalog = useMemo(() => unitCatalog(customUnits), [customUnits]);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customDraft, setCustomDraft] = useState({ label: '', symbol: '', factor: '' });
+  const categoryCustomUnits = customUnits[category] ?? [];
+  const [recents, setRecents] = useState(() => readPairs('dex-unit-recents', catalog));
+  const [pins, setPins] = useState(() => readPairs('dex-unit-pins', catalog).slice(0, MAX_PINNED));
   const [allTargets, setAllTargets] = useState(false);
   const [precisions, setPrecisions] = useState<Partial<Record<Category, Precision>>>(() => {
     try { return JSON.parse(localStorage.getItem('dex-unit-precision') || '{}') || {}; } catch { return {}; }
   });
 
-  const units = UNITS[category];
+  const units = catalog[category];
   const saved = precisions[category];
   const precision = saved && Number.isInteger(saved.digits) && saved.digits >= (saved.mode === 'decimals' ? 0 : 1) && saved.digits <= 12
     && (saved.mode === 'decimals' || saved.mode === 'significant') ? saved : DEFAULT_PRECISION;
@@ -124,6 +178,38 @@ const UnitConverter: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem('dex-unit-precision', JSON.stringify(precisions)); } catch { /* Session remains usable. */ }
   }, [precisions]);
+  useEffect(() => {
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customUnits)); } catch { /* Session remains usable. */ }
+  }, [customUnits]);
+  useEffect(() => {
+    try { localStorage.setItem('dex-unit-recents', JSON.stringify(recents)); } catch { /* Session remains usable. */ }
+  }, [recents]);
+
+  const newUnit = { label: customDraft.label.trim(), symbol: customDraft.symbol.trim(), factor: Number(customDraft.factor) };
+  const canAddUnit = canCustomize(category) && validCustomUnit(newUnit) && categoryCustomUnits.length < CUSTOM_LIMIT
+    && !units.some(unit => unit.symbol.toLowerCase() === newUnit.symbol.toLowerCase() || unit.label.toLowerCase() === newUnit.label.toLowerCase());
+  const addCustomUnit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canAddUnit) return;
+    setCustomUnits(previous => ({ ...previous, [category]: [...(previous[category] ?? []), newUnit] }));
+    setFromIdx(units.length);
+    setCustomDraft({ label: '', symbol: '', factor: '' });
+  };
+  const removeCustomUnit = (index: number) => {
+    const removed = UNITS[category].length + index;
+    const remap = (value: number, fallback: number) => value === removed ? fallback : value > removed ? value - 1 : value;
+    const updatePairs = (pairs: RecentConversion[]) => pairs.flatMap(pair => {
+      if (pair.cat !== category) return [pair];
+      if (pair.from === removed || pair.to === removed) return [];
+      return [{ ...pair, from: remap(pair.from, 0), to: remap(pair.to, 1) }];
+    });
+    setCustomUnits(previous => ({ ...previous, [category]: previous[category]?.filter((_, unitIndex) => unitIndex !== index) }));
+    setFromIdx(value => remap(value, 0));
+    setToIdx(value => remap(value, 1));
+    setPins(updatePairs);
+    setRecents(updatePairs);
+  };
+
   const setPrecision = (value: Precision) => setPrecisions(previous => ({ ...previous, [category]: value }));
   const togglePin = () => setPins(previous => pinned
     ? previous.filter(pair => pairKey(pair) !== pairKey(currentPair))
@@ -135,21 +221,20 @@ const UnitConverter: React.FC = () => {
     setRecents(prev => {
       const entry: RecentConversion = { cat: category, from: fromIdx, to: toIdx };
       const next = [entry, ...prev.filter(e => pairKey(e) !== pairKey(entry))].slice(0, 6);
-      try { localStorage.setItem('dex-unit-recents', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
   }, [category, fromIdx, toIdx]);
 
   // Jump to a unit typed into the search box (e.g. "km", "pounds", "MB").
   const runUnitSearch = useCallback(() => {
-    const match = resolveUnitQuery(UNITS, unitQuery);
+    const match = resolveUnitQuery(catalog, unitQuery);
     if (!match) return;
     const cat = match.category as Category;
     setCategory(cat);
     setFromIdx(match.index);
-    setToIdx(prev => prev === match.index || !UNITS[cat][prev] ? (match.index + 1) % UNITS[cat].length : prev);
+    setToIdx(prev => prev === match.index || !catalog[cat][prev] ? (match.index + 1) % catalog[cat].length : prev);
     setUnitQuery('');
-  }, [unitQuery]);
+  }, [catalog, unitQuery]);
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', precision.mode === 'significant'
     ? { maximumSignificantDigits: precision.digits }
@@ -161,6 +246,7 @@ const UnitConverter: React.FC = () => {
     return Number.isFinite(converted) ? formatter.format(converted) : '';
   });
   const result = targets[toIdx] ?? '';
+  const rawResult = base === undefined ? NaN : units[toIdx]?.fromBase(base);
 
   const swap = useCallback(() => {
     setFromIdx(toIdx);
@@ -181,6 +267,7 @@ const UnitConverter: React.FC = () => {
     setFromIdx(0);
     setToIdx(1);
     setInputValue('1');
+    setCustomDraft({ label: '', symbol: '', factor: '' });
   }, []);
 
   // UKI app-context: expose the active category, the from/to units, and the
@@ -246,7 +333,7 @@ const UnitConverter: React.FC = () => {
           semantics="tabs"
           size="md"
           aria-label="Conversion category"
-          options={CATEGORIES.map(cat => ({ value: cat, icon: <span aria-hidden="true" style={s.tabIcon}>{CAT_ICONS[cat]}</span>, label: cat.charAt(0).toUpperCase() + cat.slice(1) }))}
+          options={CATEGORIES.map(cat => ({ value: cat, icon: <span aria-hidden="true" style={s.tabIcon}>{CAT_ICONS[cat]}</span>, label: cat === 'fuel' ? 'Fuel economy' : cat.charAt(0).toUpperCase() + cat.slice(1) }))}
           value={category}
           onChange={(v) => handleCategoryChange(v as Category)}
         />
@@ -327,6 +414,14 @@ const UnitConverter: React.FC = () => {
           {pinned ? 'Unpin pair' : 'Pin pair'}
         </Button>
         <Button size="sm" variant="subtle" onClick={() => setAllTargets(current => !current)} aria-pressed={allTargets}>All units</Button>
+        <Button size="sm" variant="subtle" disabled={!result}
+          onClick={() => openUtilityInput('calculator', String(rawResult))}>Open in Calculator</Button>
+        <Button size="sm" variant="subtle" disabled={!result} onClick={() => void sendFlow('notes', {
+          kind: 'text', source: 'unitconverter', label: 'Conversion',
+          content: inputValue + ' ' + units[fromIdx].symbol + ' = ' + result + ' ' + units[toIdx].symbol,
+        })}>Send to Notes</Button>
+        {canCustomize(category) && <Button size="sm" variant="subtle" onClick={() => setShowCustom(value => !value)}
+          aria-expanded={showCustom}>Custom units</Button>}
         <select aria-label="Precision mode" value={precision.mode} style={s.select}
           onChange={event => {
             const mode = event.target.value as Precision['mode'];
@@ -341,6 +436,30 @@ const UnitConverter: React.FC = () => {
           {Array.from({ length: 12 }, (_, index) => <option key={index + 1}>{index + 1}</option>)}
         </select>
       </div>
+
+      {showCustom && canCustomize(category) && (
+        <section aria-label="Custom units" style={{ ...s.refGrid, display: 'grid', gap: 8 }}>
+          <form onSubmit={addCustomUnit} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            <input style={{ ...s.select, width: 140 }} aria-label="Custom unit name" placeholder="Unit name" maxLength={36}
+              value={customDraft.label} onChange={event => setCustomDraft(draft => ({ ...draft, label: event.target.value }))} required />
+            <input style={{ ...s.select, width: 86 }} aria-label="Custom unit symbol" placeholder="Symbol" maxLength={12}
+              value={customDraft.symbol} onChange={event => setCustomDraft(draft => ({ ...draft, symbol: event.target.value }))} required />
+            <label style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span>1 {customDraft.symbol || 'unit'} =</span>
+              <input style={{ ...s.select, width: 80 }} aria-label={'Custom unit factor in ' + CUSTOM_BASE[category]} type="number" step="any"
+                value={customDraft.factor} onChange={event => setCustomDraft(draft => ({ ...draft, factor: event.target.value }))} required />
+              {CUSTOM_BASE[category]}
+            </label>
+            <Button size="sm" type="submit" disabled={!canAddUnit}>Add unit</Button>
+          </form>
+          {categoryCustomUnits.map((unit, index) => (
+            <div key={unit.symbol} style={s.refRow}>
+              <span style={s.refFrom}>{unit.label} ({unit.symbol})</span>
+              <Button size="sm" variant="subtle" aria-label={'Remove ' + unit.label} onClick={() => removeCustomUnit(index)}>Remove</Button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Formula */}
       {inputValue && result && units[fromIdx] && units[toIdx] && (
@@ -362,7 +481,7 @@ const UnitConverter: React.FC = () => {
       {pins.length + recents.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 var(--space-5) var(--space-3)' }}>
           {[...pins, ...recents.filter(recent => !pins.some(pin => pairKey(pin) === pairKey(recent)))].map(r => {
-            const fu = UNITS[r.cat]?.[r.from], tu = UNITS[r.cat]?.[r.to];
+            const fu = catalog[r.cat]?.[r.from], tu = catalog[r.cat]?.[r.to];
             if (!fu || !tu) return null;
             return (
               <button

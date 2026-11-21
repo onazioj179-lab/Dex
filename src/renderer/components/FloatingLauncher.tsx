@@ -57,7 +57,7 @@ export function magnetBar(px: number, py: number, vw: number, vh: number, w: num
 }
 
 // --- calendar (reads the same store the Calendar app + Home widget write) ----
-interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string }
+interface CalEvent { id: string; title: string; date: string; time: string; color?: string; icon?: string; excludedDates?: string[] }
 
 function isoDay(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -75,7 +75,7 @@ function readTodayEvents(): CalEvent[] {
   for (const item of parsed) {
     if (!item || typeof item !== 'object') continue;
     const ev = item as CalEvent;
-    if (ev.date !== today || !ev.title) continue;
+    if (ev.date !== today || !ev.title || ev.excludedDates?.includes(today)) continue;
     const time = typeof ev.time === 'string' && /^\d{2}:\d{2}$/.test(ev.time) ? ev.time : '00:00';
     out.push({ ...ev, time });
   }

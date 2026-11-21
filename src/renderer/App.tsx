@@ -597,17 +597,6 @@ export const App: React.FC = () => {
         <ClipboardHistory
           isOpen={clipboardHistory.isOpen}
           onClose={clipboardHistory.close}
-          onSelect={(content: string) => {
-            // Paste selected clipboard content into active element
-          const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
-          if (el && ('value' in el)) {
-            const start = el.selectionStart ?? el.value.length;
-            const end = el.selectionEnd ?? el.value.length;
-            el.value = el.value.slice(0, start) + content + el.value.slice(end);
-            el.selectionStart = el.selectionEnd = start + content.length;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }}
       />
       </Suspense>
       </AppErrorBoundary>

@@ -10,6 +10,7 @@ import { createQrBatch, createQrMatrix, qrBatchToSVG, type QrErrorLevel } from '
 import { calendarQrPayload, mailtoPayload } from '../../../shared/format/qrPayloads';
 import { saveBlobAs } from '../../services/nativeSave';
 import { Button } from '../../ui/Button';
+import { useUtilityInput } from '../../services/utilityInput';
 
 type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo' | 'email' | 'event' | 'batch';
 type ECLevel = QrErrorLevel;
@@ -57,6 +58,7 @@ const QR_SCOPED_CSS = `
 const QRCodeGenerator: React.FC = () => {
   const [mode, setMode] = useState<QRMode>('text');
   const [text, setText] = useState('');
+  useUtilityInput('qrcode', value => { setMode('text'); setText(value); });
   const [url, setUrl] = useState('https://');
   const [wifiSSID, setWifiSSID] = useState('');
   const [wifiPass, setWifiPass] = useState('');

@@ -12,25 +12,23 @@ import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { useAppTracking } from '../../services/usePatternLearning';
 import DexIcon from '../../components/DexIcon';
 import { findEventConflicts } from '../../../shared/calendar/eventConflicts';
+import { occursOn, readExcludedDates, type RecurringDate } from '../../../shared/calendar/recurrence';
+import { calendarDayKey as formatDate, parseQuickCalendarEvent } from '../../../shared/time/naturalCalendar';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { keyEventForApp } from '../../shell/input/appKeyScope';
 import { persistOrWarn } from '../../utils/persistOrWarn';
 
-interface CalendarEvent {
+interface CalendarEvent extends RecurringDate {
   id: string;
   title: string;
-  date: string;
   time: string;
   endTime: string;
   color: string;
   description: string;
-  recurring?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   icon?: string;
   /** Category id (see CATEGORIES). Older stored events have none -> treated as 'general'. */
   category?: string;
-  /** Recurrence end: stop repeating after this date (inclusive, YYYY-MM-DD). Empty = forever. */
-  recurUntil?: string;
   /** Alert this many minutes before the start (services/calendarReminders). Absent = no alert. */
   alertMinutes?: number | null;
 }
@@ -58,21 +56,28 @@ const CATEGORIES: Category[] = [
   { id: 'travel', name: 'Travel', color: 'var(--color-warning)' },
 ];
 
+const eventClock = (date: Date) => [date.getHours(), date.getMinutes()].map(value => String(value).padStart(2, '0')).join(':');
+const dateLabel = new Intl.DateTimeFormat(undefined, { dateStyle: 'full' });
+
 const Calendar: React.FC = () => {
   // ===== PATTERN LEARNING =====
   useAppTracking('calendar');
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [eventDate, setEventDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>('month');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   // Id of the event currently being edited (inline editor reuses the modal). null = new.
   const [editingId, setEditingId] = useState<string | null>(null);
-  // Live search query matched against event titles.
+  const [editingOccurrence, setEditingOccurrence] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [quickEvent, setQuickEvent] = useState('');
+  const [quickError, setQuickError] = useState(false);
   // Set of category ids that are hidden from rendering (toggle visibility).
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
   // How many days the agenda view looks ahead.
@@ -112,14 +117,17 @@ const Calendar: React.FC = () => {
       try {
         if ((window as any).dex?.invoke) {
           const stored = await (window as any).dex.invoke('capability:storage:get', 'dex-calendar-events');
-          if (stored && Array.isArray(stored)) { setEvents(stored); return; }
+          if (Array.isArray(stored)) { setEvents(stored); setEventsLoaded(true); return; }
         }
       } catch (e) { console.warn('[DEX]', e); }
       try {
         const saved = localStorage.getItem('dex-calendar-events');
-        if (saved) setEvents(JSON.parse(saved));
+        const parsed: unknown = saved && JSON.parse(saved);
+        if (Array.isArray(parsed)) setEvents(parsed);
       } catch (e) {
         console.warn('[Calendar] Failed to load events:', e);
+      } finally {
+        setEventsLoaded(true);
       }
     })();
     // Restore the working-hours overlay preference.
@@ -134,6 +142,7 @@ const Calendar: React.FC = () => {
   }, [showWorkingHours]);
 
   useEffect(() => {
+    if (!eventsLoaded) return;
     try {
       persistOrWarn('dex-calendar-events', JSON.stringify(events), 'your calendar events');
     } catch (e) { console.warn('[DEX]', e); }
@@ -144,7 +153,7 @@ const Calendar: React.FC = () => {
         }
       } catch (e) { console.warn('[DEX]', e); }
     })();
-  }, [events]);
+  }, [events, eventsLoaded]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -167,38 +176,15 @@ const Calendar: React.FC = () => {
   // Americas) — that caused the "today" marker and event matching to be off by
   // one day. The grid cells are built with local-time `new Date(y, m, d)`, so
   // identity comparisons must be local too.
-  const formatDate = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-  
-  // Category of an event, defaulting legacy/undefined to 'general'.
   const eventCategory = (e: CalendarEvent): string => e.category || 'general';
   const isCategoryVisible = (e: CalendarEvent) => !hiddenCategories.has(eventCategory(e));
+  const query = search.trim().toLowerCase();
   const matchesSearch = (e: CalendarEvent) =>
-    !search.trim() || e.title.toLowerCase().includes(search.trim().toLowerCase());
-
-  // Does an event occur on `date`? Handles one-off dates and recurrence with an
-  // optional end boundary (recurUntil). Local-day comparisons throughout.
-  const eventOccursOn = (e: CalendarEvent, date: Date): boolean => {
-    const dateStr = formatDate(date);
-    if (e.date === dateStr) return true;
-    if (!e.recurring || e.recurring === 'none') return false;
-    const eventDate = new Date(e.date + 'T00:00:00');
-    if (eventDate > date) return false;
-    if (e.recurUntil && dateStr > e.recurUntil) return false;
-    if (e.recurring === 'daily') return true;
-    if (e.recurring === 'weekly') return eventDate.getDay() === date.getDay();
-    if (e.recurring === 'monthly') return eventDate.getDate() === date.getDate();
-    if (e.recurring === 'yearly') return eventDate.getMonth() === date.getMonth() && eventDate.getDate() === date.getDate();
-    return false;
-  };
+    !query || e.title.toLowerCase().includes(query) || e.description?.toLowerCase().includes(query);
 
   const getEventsForDate = (date: Date) =>
     events
-      .filter(e => isCategoryVisible(e) && matchesSearch(e) && eventOccursOn(e, date))
+      .filter(e => isCategoryVisible(e) && matchesSearch(e) && occursOn(e, date))
       .sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
 
   const isToday = (date: Date) => formatDate(date) === formatDate(new Date());
@@ -233,7 +219,7 @@ const Calendar: React.FC = () => {
   const getEventsForDateAndHour = (date: Date, hour: number): CalendarEvent[] => {
     return events.filter(e => {
       if (!isCategoryVisible(e) || !matchesSearch(e)) return false;
-      if (!eventOccursOn(e, date)) return false;
+      if (!occursOn(e, date)) return false;
       const eventHour = parseInt(e.time.split(':')[0], 10);
       return eventHour === hour;
     });
@@ -264,7 +250,9 @@ const Calendar: React.FC = () => {
   // Open the inline editor pre-filled for a brand new event on `date`.
   const openNewEvent = (date: Date, time?: string, endTime?: string) => {
     setEditingId(null);
+    setEditingOccurrence(null);
     setSelectedDate(date);
+    setEventDate(date);
     setNewEvent(prev => ({
       ...prev,
       title: '', description: '', icon: '',
@@ -279,12 +267,13 @@ const Calendar: React.FC = () => {
     const applyDraft = () => {
       const draft = takeCalendarDraft();
       if (!draft) return;
-      const clock = (date: Date) => [date.getHours(), date.getMinutes()].map(value => String(value).padStart(2, '0')).join(':');
       setEditingId(null);
+      setEditingOccurrence(null);
       setCurrentDate(draft.start);
       setSelectedDate(draft.start);
+      setEventDate(draft.start);
       setNewEvent({
-        title: draft.title, description: draft.description, time: clock(draft.start), endTime: clock(draft.end),
+        title: draft.title, description: draft.description, time: eventClock(draft.start), endTime: eventClock(draft.end),
         color: 'var(--color-accent)', icon: '', recurring: 'none', category: 'general', recurUntil: '', alertMinutes: null,
       });
       setShowEventModal(true);
@@ -295,9 +284,10 @@ const Calendar: React.FC = () => {
   }, [showEventModal]);
 
   // Open the inline editor pre-filled with an existing event for editing.
-  const openEditEvent = (e: CalendarEvent) => {
+  const openEditEvent = (e: CalendarEvent, occurrence: Date) => {
     setEditingId(e.id);
-    setSelectedDate(new Date(e.date + 'T00:00:00'));
+    setEditingOccurrence(formatDate(occurrence));
+    setEventDate(new Date(e.date + 'T00:00:00'));
     setNewEvent({
       title: e.title,
       time: e.time,
@@ -313,8 +303,24 @@ const Calendar: React.FC = () => {
     setShowEventModal(true);
   };
 
+  const openQuickEvent = (event: React.FormEvent) => {
+    event.preventDefault();
+    const draft = parseQuickCalendarEvent(quickEvent);
+    if (!draft) {
+      setQuickError(true);
+      return;
+    }
+    setQuickError(false);
+    setQuickEvent('');
+    setCurrentDate(draft.start);
+    if (view === 'agenda') setView('day');
+    openNewEvent(draft.start, eventClock(draft.start), eventClock(draft.end));
+    setNewEvent(previous => ({ ...previous, title: draft.title }));
+  };
+
   const handleSaveEvent = () => {
-    if (!newEvent.title.trim() || !selectedDate) {
+    if (!eventsLoaded) return;
+    if (!newEvent.title.trim()) {
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: 'Event needs a title' } }));
       return;
     }
@@ -325,7 +331,7 @@ const Calendar: React.FC = () => {
 
     const base = {
       title: newEvent.title.trim(),
-      date: formatDate(selectedDate),
+      date: formatDate(eventDate),
       time: newEvent.time,
       endTime: newEvent.endTime,
       color: newEvent.color,
@@ -338,7 +344,7 @@ const Calendar: React.FC = () => {
     };
 
     if (editingId) {
-      setEvents(prev => prev.map(e => (e.id === editingId ? { ...e, ...base } : e)));
+      setEvents(prev => prev.map(e => (e.id === editingId ? { ...e, ...base, excludedDates: base.recurring === 'none' ? undefined : e.excludedDates } : e)));
       window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: 'Event updated' } }));
     } else {
       const event: CalendarEvent = { id: Date.now().toString(), ...base };
@@ -355,7 +361,19 @@ const Calendar: React.FC = () => {
   const closeModal = () => {
     setShowEventModal(false);
     setEditingId(null);
+    setEditingOccurrence(null);
     resetNewEvent();
+  };
+
+  const setOccurrenceSkipped = (id: string, day: string, skip: boolean) => {
+    setEvents(previous => previous.map(event => {
+      if (event.id !== id) return event;
+      const dates = new Set(event.excludedDates);
+      if (skip) dates.add(day);
+      else dates.delete(day);
+      return { ...event, excludedDates: [...dates].sort() };
+    }));
+    if (skip) closeModal();
   };
 
   const deleteEvent = (id: string) => {
@@ -453,6 +471,13 @@ const Calendar: React.FC = () => {
     setCurrentDate(newDate);
   };
 
+  const pageMiniMonth = (dir: number) => {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + dir, 1);
+    setCurrentDate(date);
+    setSelectedDate(date);
+    if (view === 'agenda') setView('month');
+  };
+
   const goToToday = () => {
     setCurrentDate(new Date());
     setSelectedDate(new Date());
@@ -520,6 +545,7 @@ const Calendar: React.FC = () => {
       let rule = `RRULE:FREQ=${e.recurring.toUpperCase()}`;
       if (e.recurUntil) rule += `;UNTIL=${e.recurUntil.replace(/-/g, '')}T235959`;
       out.push(rule);
+      e.excludedDates?.forEach(day => out.push('EXDATE:' + day.replace(/-/g, '') + 'T' + timeClean));
     }
     out.push('END:VEVENT');
     return out;
@@ -585,7 +611,7 @@ const Calendar: React.FC = () => {
           if (seen.has(key)) return;
           seen.add(key);
           // Pin recurring occurrences to their concrete day; one-offs unchanged.
-          out.push({ ...e, date: occDate, recurring: 'none', recurUntil: undefined, id: `${e.id}-${occDate}` });
+          out.push({ ...e, date: occDate, recurring: 'none', recurUntil: undefined, excludedDates: undefined, id: `${e.id}-${occDate}` });
         });
         cursor.setDate(cursor.getDate() + 1);
       }
@@ -671,7 +697,10 @@ const Calendar: React.FC = () => {
         else if (rrule.includes('MONTHLY')) recurring = 'monthly';
         else if (rrule.includes('YEARLY')) recurring = 'yearly';
         const catColor = CATEGORIES.find(c => c.id === category)?.color || 'var(--color-accent)';
-        imported.push({ id: Date.now().toString() + i, title: summary, date, time, endTime, color: catColor, description: desc, recurring, category });
+        imported.push({ id: Date.now().toString() + i, title: summary, date, time, endTime, color: catColor, description: desc, recurring, category,
+          recurUntil: /(?:^|;)UNTIL=(\d{4})(\d{2})(\d{2})/.exec(rrule)?.slice(1).join('-'),
+          excludedDates: recurring === 'none' ? undefined : readExcludedDates(block),
+        });
       }
       if (imported.length > 0) {
         setEvents(prev => [...prev, ...imported]);
@@ -837,10 +866,10 @@ const Calendar: React.FC = () => {
             <input
               style={styles.searchInput}
               type="text"
-              placeholder="Search events"
+              placeholder="Search events and notes"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              aria-label="Search events"
+              aria-label="Search events and notes"
             />
             {search && (
               <button style={styles.searchClear} onClick={() => setSearch('')} aria-label="Clear search"><DexIcon name="close" size={11} /></button>
@@ -898,6 +927,15 @@ const Calendar: React.FC = () => {
         </div>
       </div>
 
+      <form style={styles.quickForm} onSubmit={openQuickEvent}>
+        <input className="cal-input" style={{ ...styles.searchInput, minWidth: 0, flex: '1 1 170px' }}
+          aria-label="Quick add event" placeholder="Lunch Fri 12" maxLength={200}
+          aria-invalid={quickError} aria-describedby={quickError ? 'calendar-quick-error' : undefined}
+          value={quickEvent} onChange={event => { setQuickEvent(event.target.value); setQuickError(false); }} />
+        <button className="cal-pill" type="submit" style={styles.todayBtn} disabled={!quickEvent.trim()}>Quick add</button>
+        {quickError && <span id="calendar-quick-error" role="alert">Use a title, day and time, such as Lunch Fri 12.</span>}
+      </form>
+
       <div style={styles.main}>
         {/* Sidebar */}
         <div className={sidebarCollapsed ? undefined : 'dex-liquid-glass'} style={{ ...styles.sidebar, width: sidebarCollapsed ? '0' : 'min(260px, 30vw)', padding: sidebarCollapsed ? '0' : '20px' }}>
@@ -906,27 +944,34 @@ const Calendar: React.FC = () => {
               {/* Mini Calendar */}
               <div style={styles.miniCal}>
                 <div style={styles.miniHeader}>
-                  <span style={styles.miniTitle}>{months[currentDate.getMonth()].slice(0, 3)} {currentDate.getFullYear()}</span>
+                  <button className="cal-icon-btn" style={styles.navBtn} onClick={() => pageMiniMonth(-1)} aria-label="Previous mini-calendar month"><DexIcon name="chevron-left" size={13} /></button>
+                  <span style={styles.miniTitle} aria-live="polite">{months[currentDate.getMonth()].slice(0, 3)} {currentDate.getFullYear()}</span>
+                  <button className="cal-icon-btn" style={styles.navBtn} onClick={() => pageMiniMonth(1)} aria-label="Next mini-calendar month"><DexIcon name="chevron-right" size={13} /></button>
                 </div>
+                <button className="cal-pill" style={{ ...styles.todayBtn, width: '100%', marginBottom: 6 }}
+                  onClick={goToToday} aria-label="Mini-calendar today">Today</button>
                 <div style={styles.miniDays}>
                   {days.map(d => <span key={d} style={styles.miniDayLabel}>{d[0]}</span>)}
                 </div>
                 <div style={styles.miniGrid}>
-                  {getDaysInMonth(currentDate).map((day, idx) => (
-                    <div
-                      key={idx}
-                      className={day && !isToday(day) && !isSelected(day) ? 'cal-mini-day' : undefined}
+                  {getDaysInMonth(currentDate).map((day, idx) => day ? (
+                    <button type="button"
+                      key={formatDate(day)}
+                      className="cal-mini-day"
                       style={{
                         ...styles.miniDay,
-                        ...(day && isWeekend(day) && !isToday(day) && !isSelected(day) ? { color: 'var(--color-text-muted)' } : {}),
-                        ...(day && isSelected(day) ? styles.miniDaySelected : {}),
-                        ...(day && isToday(day) ? styles.miniDayToday : {}),
+                        ...(isWeekend(day) && !isToday(day) && !isSelected(day) ? { color: 'var(--color-text-muted)' } : {}),
+                        ...(isSelected(day) ? styles.miniDaySelected : {}),
+                        ...(isToday(day) ? styles.miniDayToday : {}),
                       }}
-                      onClick={() => day && setSelectedDate(day)}
+                      aria-label={dateLabel.format(day)}
+                      aria-pressed={!!isSelected(day)}
+                      aria-current={isToday(day) ? 'date' : undefined}
+                      onClick={() => { jumpToDate(formatDate(day)); if (view === 'agenda') setView('day'); }}
                     >
-                      {day?.getDate()}
-                    </div>
-                  ))}
+                      {day.getDate()}
+                    </button>
+                  ) : <span key={'blank-' + idx} />)}
                 </div>
               </div>
 
@@ -957,6 +1002,18 @@ const Calendar: React.FC = () => {
                 </div>
               </div>
 
+              {events.some(event => event.excludedDates?.length) && (
+                <details style={{ paddingBottom: 'var(--space-3)' }}>
+                  <summary style={{ cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: 12 }}>Skipped occurrences</summary>
+                  <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+                    {events.flatMap(event => event.excludedDates?.map(day => (
+                      <button key={event.id + day} type="button" style={{ ...styles.cancelBtn, whiteSpace: 'normal' }}
+                        onClick={() => setOccurrenceSkipped(event.id, day, false)}>Restore {event.title} · {day}</button>
+                    )) ?? [])}
+                  </div>
+                </details>
+              )}
+
               {/* Selected Day Events */}
               {selectedDate && (
                 <div style={styles.dayEvents}>
@@ -979,11 +1036,12 @@ const Calendar: React.FC = () => {
                         <div
                           key={event.id}
                           className="cal-event-row"
+                          aria-label={'Edit ' + event.title + ', ' + event.time}
                           tabIndex={0}
                           role="button"
-                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event); } }}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event, selectedDate); } }}
                           style={{ ...styles.eventItem, borderLeftColor: event.color, cursor: 'pointer' }}
-                          onClick={() => openEditEvent(event)}
+                          onClick={() => openEditEvent(event, selectedDate)}
                           title="Click to edit"
                         >
                           <div style={styles.eventTime}>
@@ -1122,9 +1180,9 @@ const Calendar: React.FC = () => {
                           className="cal-agenda-row"
                           tabIndex={0}
                           role="button"
-                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event); } }}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditEvent(event, group.date); } }}
                           style={{ ...styles.agendaItem, borderLeftColor: event.color }}
-                          onClick={() => openEditEvent(event)}
+                          onClick={() => openEditEvent(event, group.date)}
                           title="Click to edit"
                         >
                           <span style={styles.agendaTime}>{event.time}</span>
@@ -1196,7 +1254,11 @@ const Calendar: React.FC = () => {
                               background: event.color,
                               ...(conflictIds.has(event.id) ? styles.weekViewEventConflict : {}),
                             }}
-                            onClick={e => { e.stopPropagation(); openEditEvent(event); }}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={'Edit ' + event.title + ', ' + event.time}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openEditEvent(event, currentDate); } }}
+                            onClick={e => { e.stopPropagation(); openEditEvent(event, currentDate); }}
                             title="Click to edit"
                           >
                             <span style={styles.weekViewEventTitle}>{event.title}</span>
@@ -1270,7 +1332,11 @@ const Calendar: React.FC = () => {
                                 background: event.color,
                                 ...(conflictIds.has(event.id) ? styles.weekViewEventConflict : {}),
                               }}
-                              onClick={e => { e.stopPropagation(); openEditEvent(event); }}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={'Edit ' + event.title + ', ' + event.time}
+                              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openEditEvent(event, date); } }}
+                              onClick={e => { e.stopPropagation(); openEditEvent(event, date); }}
                               title={conflictIds.has(event.id) ? 'Overlaps another event' : 'Click to edit'}
                             >
                               <span style={styles.weekViewEventTitle}>{event.title}</span>
@@ -1310,8 +1376,8 @@ const Calendar: React.FC = () => {
               <input
                 style={styles.timeInput}
                 type="date"
-                value={selectedDate ? formatDate(selectedDate) : formatDate(new Date())}
-                onChange={e => { if (e.target.value) setSelectedDate(new Date(e.target.value + 'T00:00:00')); }}
+                value={formatDate(eventDate)}
+                onChange={e => { if (e.target.value) setEventDate(new Date(e.target.value + 'T00:00:00')); }}
                 aria-label="Event date"
               />
               <div style={styles.timeRow}>
@@ -1460,6 +1526,12 @@ const Calendar: React.FC = () => {
                     </button>
                     {current && (
                       <>
+                        {current.recurring && current.recurring !== 'none' && editingOccurrence && (
+                          <button type="button" style={styles.cancelBtn}
+                            title={editingOccurrence} onClick={() => setOccurrenceSkipped(current.id, editingOccurrence, true)}>
+                            Skip this occurrence
+                          </button>
+                        )}
                         <button style={styles.cancelBtn} onClick={() => { duplicateEvent(current); closeModal(); }} aria-label="Duplicate event">Duplicate</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 1); closeModal(); }} aria-label="Move to tomorrow" title="Reschedule +1 day">+1 Day</button>
                         <button style={styles.cancelBtn} onClick={() => { rescheduleEvent(current, 7); closeModal(); }} aria-label="Move to next week" title="Reschedule +1 week">+1 Week</button>
@@ -1470,7 +1542,7 @@ const Calendar: React.FC = () => {
                 );
               })()}
               <button className="cal-cancel" style={styles.cancelBtn} onClick={closeModal} aria-label="Cancel">Cancel</button>
-              <button className="cal-save" style={styles.saveBtn} onClick={handleSaveEvent} aria-label="Save event">{editingId ? 'Save Changes' : 'Save Event'}</button>
+              <button className="cal-save" style={styles.saveBtn} onClick={handleSaveEvent} disabled={!eventsLoaded} aria-label="Save event">{editingId ? 'Save Changes' : 'Save Event'}</button>
             </div>
           </div>
         </div>
@@ -1636,7 +1708,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sidebar: {
     borderRadius: 0,
-    overflow: 'hidden',
+    overflowX: 'hidden',
+    overflowY: 'auto',
     transition: 'all 0.18s ease',
   },
   miniCal: {
@@ -1647,7 +1720,19 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border-subtle)',
   },
   miniHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 2,
     marginBottom: '10px',
+  },
+  quickForm: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-4)',
+    borderBottom: '1px solid var(--color-border-subtle)',
   },
   miniTitle: {
     fontSize: '12px',
@@ -1674,6 +1759,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   miniDay: {
+    background: 'transparent',
+    border: '1px solid transparent',
     textAlign: 'center',
     padding: '5px',
     fontSize: '10px',
