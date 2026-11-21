@@ -1,6 +1,7 @@
 // DEX Platform - Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 import React, { useEffect, useState } from 'react';
 import { Button } from '../../ui/Button';
+import { colorInputValue } from '../../utils/canvasTheme';
 import { saveBlobAs } from '../../services/nativeSave';
 import { contrastRatio, type HSL } from '../../../shared/creative/colorUtils';
 import {
@@ -108,7 +109,7 @@ export function ColorWorkbench({ hex, hsl, pick, copy }: {
     <details open>
       <summary>Contrast and color vision</summary>
       <div style={row}>
-        <label>Background <input type="color" aria-label="Contrast background" value={background} onChange={event => setBackground(event.target.value)} /></label>
+        <label>Background <input type="color" aria-label="Contrast background" value={colorInputValue(background)} onChange={event => setBackground(event.target.value)} /></label>
         <span style={{ background, color: hex, padding: '3px 8px', borderRadius: 4 }}>Sample text</span>
         <output aria-live="polite">{ratio.toFixed(2)}:1 · {ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : 'Below AA'} for normal text</output>
       </div>
@@ -138,7 +139,7 @@ export function ColorWorkbench({ hex, hsl, pick, copy }: {
     <details>
       <summary>Mix and gradient</summary>
       <div style={row}>
-        <label>Second color <input type="color" value={second} onChange={event => setSecond(event.target.value)} /></label>
+        <label>Second color <input type="color" value={colorInputValue(second)} onChange={event => setSecond(event.target.value)} /></label>
         <label>Mix {weight}% <input type="range" aria-label="Mix ratio" value={weight} onChange={event => setWeight(+event.target.value)} /></label>
         {swatches([mixed], 'Mixed color')}
         <Button size="sm" onClick={() => pick(mixed)}>Use mix</Button>
