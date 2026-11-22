@@ -188,26 +188,29 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (autoCollapse) collapse();
   };
 
-  const startPlacementDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const startPlacementDrag = (e: React.PointerEvent<HTMLElement>) => {
     if (!e.isPrimary || e.button !== 0) return;
+    const trigger = triggerRef.current;
+    const fromTrigger = trigger?.contains(e.target as Node);
+    if (!fromTrigger && (expanded || (e.target as Element).closest('button'))) return;
     clearTimeout(collapseTimer.current);
     suppressTriggerClick.current = false;
     placementDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    ((fromTrigger && trigger) || e.currentTarget).setPointerCapture(e.pointerId);
   };
-  const movePlacementDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const movePlacementDrag = (e: React.PointerEvent<HTMLElement>) => {
     const pointer = placementDrag.current;
     if (!pointer || pointer.id !== e.pointerId) return;
     if (!pointer.moved && Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) < DRAG_THRESHOLD) return;
     pointer.moved = true;
     setPlacementPreview(dockPositionAt(area, e.clientX, e.clientY));
   };
-  const endPlacementDrag = (e: React.PointerEvent<HTMLButtonElement>, commit: boolean) => {
+  const endPlacementDrag = (e: React.PointerEvent<HTMLElement>, commit: boolean) => {
     const pointer = placementDrag.current;
     if (!pointer || pointer.id !== e.pointerId) return;
     placementDrag.current = null;
     setPlacementPreview(null);
-    if (commit && pointer.moved) {
+    if (commit && (pointer.moved || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) >= DRAG_THRESHOLD)) {
       suppressTriggerClick.current = true;
       setPrefs(dockPositionAt(area, e.clientX, e.clientY));
     }
@@ -407,6 +410,11 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
         data-state={open ? 'expanded' : 'collapsed'}
         data-hidden={hidden || undefined}
         onKeyDown={onKeyDown}
+        onPointerDown={startPlacementDrag}
+        onPointerMove={movePlacementDrag}
+        onPointerUp={e => endPlacementDrag(e, true)}
+        onPointerCancel={e => endPlacementDrag(e, false)}
+        onLostPointerCapture={e => endPlacementDrag(e, false)}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
         onDragOver={onDragOver}
@@ -446,11 +454,6 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
             aria-label={open ? 'Search apps' : 'Open Dock'}
             aria-expanded={open}
             title={(open ? 'Search apps' : 'Open Dock') + ' · Drag to move'}
-            onPointerDown={startPlacementDrag}
-            onPointerMove={movePlacementDrag}
-            onPointerUp={e => endPlacementDrag(e, true)}
-            onPointerCancel={e => endPlacementDrag(e, false)}
-            onLostPointerCapture={e => endPlacementDrag(e, false)}
             onFocus={() => setFocusId('__trigger')}
             onClick={onTrigger}
             onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
@@ -478,7 +481,7 @@ function toast(message: string): void {
 
 const DOCK_CSS = `
 :where(.dex-mdock) {
-  position: fixed; z-index: 9000; overflow: hidden; box-sizing: border-box;
+  position: fixed; z-index: 9000; touch-action: none; overflow: hidden; box-sizing: border-box;
   /* DEX Blue Modern: a restrained blue tint in the glass, a hairline rim. */
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-elevated));
   border: 1px solid color-mix(in srgb, var(--color-accent) 14%, var(--color-border-subtle));

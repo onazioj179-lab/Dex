@@ -68,9 +68,7 @@ test.describe('Morphing Dock', () => {
       [18, 780, 'bottom', 'start'],
       [1260, 780, 'bottom', 'end'],
     ] as const) {
-      const start = await trigger.boundingBox();
-      expect(start).not.toBeNull();
-      await page.mouse.move(start!.x + start!.width / 2, start!.y + start!.height / 2);
+      await trigger.hover();
       await page.mouse.down();
       await page.mouse.move(x, y, { steps: 8 });
       await page.mouse.up();
