@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 //
-// macOS Blue Modern palette contract: the tokens match the owner's table, the
+// DEX palette contract: the tokens match the owner's table, the
 // boot mirror in index.html matches the runtime tokens (no launch flash), and
 // the contrast pairs that carry text pass WCAG AA.
 //
@@ -34,22 +34,22 @@ const ratio = (a: string, b: string) => {
   return (x + 0.05) / (y + 0.05);
 };
 
-describe('macOS Blue Modern palette', () => {
+describe('DEX palette', () => {
   it('dark tokens match the table', () => {
     expect(token(dark, '--color-accent')).toBe('#0A84FF');
     expect(token(dark, '--color-bg-base')).toBe('#111215');
     expect(token(dark, '--color-bg-surface')).toBe('#1C1C1E');
     expect(token(dark, '--color-bg-elevated')).toBe('#2C2C2E');
     expect(token(dark, '--color-text-primary')).toBe('#F5F5F7');
-    expect(token(dark, '--color-text-secondary')).toBe('#AEAEB2');
+    expect(token(dark, '--color-text-secondary')).toBe('#BBC0C9');
   });
 
   it('light tokens match the palette with accessible accent and secondary text', () => {
-    expect(token(light, '--color-bg-base')).toBe('#F5F5F7');
+    expect(token(light, '--color-bg-base')).toBe('#F5F6F8');
     expect(token(light, '--color-bg-surface')).toBe('#FFFFFF');
     expect(token(light, '--color-bg-secondary')).toBe('#F2F2F7');
     expect(token(light, '--color-text-primary')).toBe('#1D1D1F');
-    expect(token(light, '--color-text-secondary')).toBe('#545458');
+    expect(token(light, '--color-text-secondary')).toBe('#484C55');
     expect(ratio(token(light, '--color-text-secondary')!, '#DCDCE0')).toBeGreaterThanOrEqual(4.5);
     expect(token(light, '--color-border')).toBe('#D1D1D6');
     // Table says #007AFF; on white that is 4.02:1, so DEX uses #0066CC (5.57:1).
@@ -64,8 +64,8 @@ describe('macOS Blue Modern palette', () => {
   });
 
   it('text-bearing pairs pass AA', () => {
-    for (const [block, base, surface] of [[dark, '#111215', '#1C1C1E'], [light, '#F5F5F7', '#FFFFFF']] as const) {
-      for (const t of ['--color-text-primary', '--color-text-secondary']) {
+    for (const [block, base, surface] of [[dark, '#111215', '#1C1C1E'], [light, '#F5F6F8', '#FFFFFF']] as const) {
+      for (const t of ['--color-text-primary', '--color-text-secondary', '--color-text-tertiary']) {
         expect(ratio(token(block, t)!, base), t).toBeGreaterThanOrEqual(4.5);
         expect(ratio(token(block, t)!, surface), t).toBeGreaterThanOrEqual(4.5);
       }

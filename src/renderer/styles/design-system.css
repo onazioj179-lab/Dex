@@ -72,7 +72,7 @@
   /* Text -- warm off-white (17:1 on base) with visible secondary (9:1) */
   --color-text-primary: #F5F5F7;
   --color-text-secondary: #BBC0C9;
-  --color-text-tertiary: #A1A7B2; /* #8E8E93 was 4.3:1 on raised #2C2C2E surfaces; this is 4.9:1 */
+  --color-text-tertiary: #A1A7B2;
   --color-text-muted: #A0A0A5;
   --color-text-disabled: #58585D;
   --color-text-inverse: #000000;
@@ -654,8 +654,8 @@
   --color-text-inverse: #000000;
   --color-text-muted: #A0A0A5;
   --color-text-primary: #F5F5F7;
-  --color-text-secondary: #AEAEB2;
-  --color-text-tertiary: #98989D; /* #8E8E93 was 4.3:1 on raised #2C2C2E surfaces; this is 4.9:1 */
+  --color-text-secondary: #BBC0C9;
+  --color-text-tertiary: #A1A7B2;
   --color-warning: #FF9F0A;
   --color-warning-muted: rgba(255, 159, 10, 0.14);
   color: var(--color-text-primary);

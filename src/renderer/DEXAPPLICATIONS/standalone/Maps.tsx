@@ -800,7 +800,7 @@ const DexMaps: React.FC = () => {
       )}
 
       {/* Vertical control stack (custom, DEX-styled) */}
-      <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 8, overflow: 'hidden', zIndex: 5 }}>
+      <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-md)', overflow: 'hidden', zIndex: 5 }}>
         <button aria-label="Zoom in" title="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
           onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="plus" size={16} />
