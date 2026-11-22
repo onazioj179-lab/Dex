@@ -8,6 +8,8 @@
 // The trigger is the shared element: it is the whole collapsed Dock, and the
 // expanded Dock grows out of it, so it never moves while the Dock morphs.
 
+import type { DockAlign, DockEdge } from '../../../shared/shell/dockGeometry';
+import type { WorkArea } from '../../../shared/shell/workArea';
 import { DOCK_TILE, DOCK_PAD } from '../../store/dockStore';
 
 export const DOCK_GAP = 4;
@@ -60,3 +62,32 @@ export const DOCK_MOTION = {
   expandMs: 260,
   collapseMs: 190,
 };
+
+export type DockPosition = { edge: DockEdge; align: DockAlign };
+
+export const DOCK_POSITIONS: readonly (DockPosition & { label: string })[] = [
+  { edge: 'bottom', align: 'center', label: 'Bottom' },
+  { edge: 'top', align: 'center', label: 'Top' },
+  { edge: 'left', align: 'center', label: 'Left' },
+  { edge: 'right', align: 'center', label: 'Right' },
+  { edge: 'top', align: 'start', label: 'Top left' },
+  { edge: 'top', align: 'end', label: 'Top right' },
+  { edge: 'bottom', align: 'start', label: 'Bottom left' },
+  { edge: 'bottom', align: 'end', label: 'Bottom right' },
+];
+
+export function dockPositionAt(area: WorkArea, x: number, y: number): DockPosition {
+  const { desktop } = area;
+  const left = x - desktop.x;
+  const right = desktop.x + desktop.w - x;
+  const top = y - desktop.y;
+  const bottom = desktop.y + desktop.h - y;
+  const corner = Math.min(desktop.w, desktop.h) * 0.24;
+  if (Math.min(left, right) < corner && Math.min(top, bottom) < corner) {
+    return { edge: top < bottom ? 'top' : 'bottom', align: left < right ? 'start' : 'end' };
+  }
+
+  const nearest = Math.min(left, right, top, bottom);
+  const edge = nearest === top ? 'top' : nearest === bottom ? 'bottom' : nearest === left ? 'left' : 'right';
+  return { edge, align: 'center' };
+}

@@ -14,7 +14,10 @@
 // the window manager (drag, resize from every edge, maximize, snap, recovery
 // after a display change) and the Dock.
 
-export type DockEdge = 'bottom' | 'left' | 'right';
+import type { DockEdge } from './dockGeometry';
+export type { DockEdge } from './dockGeometry';
+
+export const isHorizontalDockEdge = (edge: DockEdge) => edge === 'top' || edge === 'bottom';
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -74,6 +77,9 @@ export function computeWorkArea(input: WorkAreaInput): WorkArea {
   if (input.dock.edge === 'bottom') {
     dockBand = { x: 0, y: H - reserve, w: W, h: reserve };
     h -= reserve;
+  } else if (input.dock.edge === 'top') {
+    dockBand = { x: 0, y: top, w: W, h: reserve };
+    y += reserve; h -= reserve;
   } else if (input.dock.edge === 'left') {
     dockBand = { x: 0, y: top, w: reserve, h: desktop.h };
     x += reserve; w -= reserve;
@@ -89,7 +95,7 @@ export function computeWorkArea(input: WorkAreaInput): WorkArea {
     w: snap(Math.max(minW, w), scale),
     h: snap(Math.max(minH, h), scale),
   };
-  const edgeLength = input.dock.edge === 'bottom' ? W : desktop.h;
+  const edgeLength = isHorizontalDockEdge(input.dock.edge) ? W : desktop.h;
   return {
     screen,
     desktop,
@@ -112,8 +118,8 @@ export function toLocal(r: Rect, origin: { x: number; y: number }): Rect {
  */
 export function placeDock(area: WorkArea, edge: DockEdge, length: number, anchor: number, margin = 8): { start: number; length: number } {
   const len = Math.min(length, area.dockMaxLength);
-  const lo = (edge === 'bottom' ? 0 : area.desktop.y) + margin;
-  const hi = (edge === 'bottom' ? area.screen.w : area.desktop.y + area.desktop.h) - margin;
+  const lo = (isHorizontalDockEdge(edge) ? 0 : area.desktop.y) + margin;
+  const hi = (isHorizontalDockEdge(edge) ? area.screen.w : area.desktop.y + area.desktop.h) - margin;
   const start = Math.min(Math.max(anchor - len / 2, lo), Math.max(lo, hi - len));
   return { start, length: len };
 }
@@ -139,8 +145,8 @@ export function recoverWindow(b: Rect, area: Rect, min: { w: number; h: number }
  */
 export function placeDockAroundTrigger(area: WorkArea, edge: DockEdge, length: number, triggerOffset: number, anchor: number, margin = 8): { start: number; length: number } {
   const len = Math.min(length, area.dockMaxLength);
-  const lo = (edge === 'bottom' ? 0 : area.desktop.y) + margin;
-  const hi = (edge === 'bottom' ? area.screen.w : area.desktop.y + area.desktop.h) - margin;
+  const lo = (isHorizontalDockEdge(edge) ? 0 : area.desktop.y) + margin;
+  const hi = (isHorizontalDockEdge(edge) ? area.screen.w : area.desktop.y + area.desktop.h) - margin;
   const ideal = anchor - triggerOffset;
   return { start: Math.min(Math.max(ideal, lo), Math.max(lo, hi - len)), length: len };
 }

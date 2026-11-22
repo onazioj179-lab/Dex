@@ -383,7 +383,7 @@ export const Files: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'column'>('list');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const listingRequest = useRef(0);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
@@ -470,6 +470,7 @@ export const Files: React.FC = () => {
   const recordRecentFolder = useCallback((path: string) => {
     if (!path) return;
     setRecentFolders(prev => {
+      if (prev[0] === path) return prev;
       const next = [path, ...prev.filter(p => p !== path)].slice(0, RECENT_FOLDERS_MAX);
       try { localStorage.setItem(RECENT_FOLDERS_KEY, JSON.stringify(next)); } catch { /* localStorage unavailable */ }
       return next;
@@ -1788,7 +1789,7 @@ export const Files: React.FC = () => {
 
       {/* Main Content */}
       <div style={styles.main}>
-        <div role="group" aria-label="Folder tabs" style={{ display: 'flex', gap: 4, alignItems: 'center', overflowX: 'auto', padding: '4px var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+        <div role="group" aria-label="Folder tabs" style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, minHeight: 36, overflowX: 'auto', scrollbarWidth: 'none', padding: '4px var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)' }}>
           {locationTabs.map(tab => {
             const path = tab.history[tab.index];
             const name = QUICK_ACCESS.find(item => item.path === path)?.name ?? (path.split(/[\\/]/).filter(Boolean).pop() || path);
@@ -2639,6 +2640,9 @@ const styles: Record<string, React.CSSProperties> = {
   // Sidebar
   sidebar: {
     width: 'var(--pg-sidebar-width)',
+    flexShrink: 0,
+    minHeight: 0,
+    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column' as const,
     background: 'var(--pg-sidebar)',
@@ -2680,6 +2684,8 @@ const styles: Record<string, React.CSSProperties> = {
   // Main
   main: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
     background: 'var(--color-bg-secondary)',
@@ -2794,7 +2800,9 @@ const styles: Record<string, React.CSSProperties> = {
   // Content
   content: {
     flex: 1,
+    minHeight: 0,
     overflow: 'auto',
+    overflowAnchor: 'none',
     background: 'var(--color-bg-secondary)',
   },
   loading: {
