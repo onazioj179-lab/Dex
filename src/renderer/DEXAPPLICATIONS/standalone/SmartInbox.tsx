@@ -25,6 +25,7 @@
  * resolves it against real app ids / display names (non-app sources no-op).
  * Mutations (mark-all-read / clear) hit the hub when present, else act locally.
  */
+import { DexSearchInput } from '../../styles/components';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ContextBus, { type ContextChannel, type ContextEventMap } from '../../services/ContextBus';
 import { readHubMeta, type NotificationIcon } from '../../services/notify';
@@ -501,7 +502,7 @@ const SmartInbox: React.FC = () => {
   // -------------------------------------------------------------------------
 
   return (
-    <div style={S.container}>
+    <div className="smart-inbox" style={S.container}>
       <style>{INBOX_CSS}</style>
       {/* Header */}
       <div style={S.header}>
@@ -527,34 +528,17 @@ const SmartInbox: React.FC = () => {
         </div>
       </div>
 
-      {/* Search */}
       <div style={S.searchBar}>
-        <div style={S.searchWrap}>
-          <svg style={S.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <input
-            className="inbox-search-input"
-            style={S.searchInput}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search inbox"
-            aria-label="Search inbox"
-            spellCheck={false}
-          />
-          {query && (
-            <button
-              className="inbox-tool-btn"
-              style={S.searchClear}
-              onClick={() => setQuery('')}
-              title="Clear search"
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          )}
-        </div>
+        <DexSearchInput
+          size="sm"
+          fullWidth
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onClear={() => setQuery('')}
+          placeholder="Search inbox"
+          aria-label="Search inbox"
+          spellCheck={false}
+        />
       </div>
 
       {/* Source filter */}
@@ -670,9 +654,7 @@ const SmartInbox: React.FC = () => {
                     }}
                     title={`Open ${item.source}`}
                   >
-                    {/* One compact line per item, like a mail list: unread dot,
-                        severity dot, title + body, source, time. (Each item was a
-                        90 px card repeating its source three times.) */}
+
                     <span style={{ ...S.unreadDot, visibility: item.read ? 'hidden' : 'visible' }} aria-label={item.read ? undefined : 'unread'} />
                     <span style={{ ...S.iconDot, background: ICON_COLOR[item.icon] }} aria-hidden="true" title={item.icon} />
                     <span style={S.rowMain}>
@@ -681,7 +663,7 @@ const SmartInbox: React.FC = () => {
                     </span>
                     <span style={S.rowSource}>{item.source}{item.kind === 'activity' ? ' · activity' : ''}</span>
                     <span style={S.rowTime}>{relativeTime(item.ts)}</span>
-                    {/* Hover/focus quick actions (Apple Mail swipe-action parity). */}
+
                     <span className="inbox-row-actions" style={S.rowActions}>
                       {!item.read && (
                         <button
@@ -727,15 +709,13 @@ const SmartInbox: React.FC = () => {
 // (Class-based pseudo-states can't be expressed via inline style objects.)
 const INBOX_CSS = `
 .inbox-tool-btn:hover:not(:disabled) { background: var(--color-bg-hover, var(--color-bg-surface)); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
-.inbox-tool-btn:active:not(:disabled) { transform: scale(0.97); }
 .inbox-tool-btn:disabled { opacity: 0.45; cursor: default; }
 .inbox-chip:hover { color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
 .inbox-row:hover { background: var(--color-bg-hover, rgba(255,255,255,0.04)); }
-.inbox-row.inbox-row-active { background: color-mix(in srgb, var(--color-accent) 16%, transparent); }
-.inbox-row-actions { opacity: 0; transform: translateX(4px); transition: opacity 0.12s ease, transform 0.12s ease; pointer-events: none; }
+.inbox-row.inbox-row-active { background: var(--color-accent-light); }
+.inbox-row-actions { opacity: 0; transition: opacity 0.12s ease; pointer-events: none; }
 .inbox-row:hover .inbox-row-actions, .inbox-row:focus-within .inbox-row-actions, .inbox-row.inbox-row-active .inbox-row-actions { opacity: 1; transform: none; pointer-events: auto; }
 .inbox-row-action:hover { background: var(--color-bg-base); color: var(--color-text-primary); border-color: var(--color-border-strong, var(--color-border)); }
-.inbox-row-action:active { transform: scale(0.92); }
 .inbox-shimmer { position: relative; overflow: hidden; }
 .inbox-shimmer::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-text-primary) 8%, transparent), transparent); animation: inbox-shimmer 1.3s ease-in-out infinite; }
 @keyframes inbox-shimmer { 100% { transform: translateX(100%); } }
@@ -768,7 +748,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   headerActions: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
   toolBtn: {
-    padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
+    minHeight: 'var(--dex-control-h-sm)', padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s ease',
@@ -778,13 +758,13 @@ const S: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) var(--space-5)', borderBottom: '1px solid var(--color-border)',
   },
   chip: {
-    padding: '4px 12px', borderRadius: 14, border: '1px solid var(--color-border)',
+    minHeight: 'var(--dex-control-h-sm)', padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)',
     background: 'transparent', color: 'var(--color-text-tertiary)',
     fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s ease', whiteSpace: 'nowrap',
   },
   chipActive: {
-    background: 'var(--color-accent-fill)', color: 'var(--color-accent-text, #fff)',
+    background: 'var(--color-accent-light)', color: 'var(--color-text-primary)',
     borderColor: 'var(--color-accent)',
   },
   degradeNote: {
@@ -797,26 +777,6 @@ const S: Record<string, React.CSSProperties> = {
   },
   searchBar: {
     flexShrink: 0, padding: 'var(--space-3) var(--space-5) 0',
-  },
-  searchWrap: {
-    position: 'relative', display: 'flex', alignItems: 'center',
-  },
-  searchIcon: {
-    position: 'absolute', left: 10, color: 'var(--color-text-muted)', pointerEvents: 'none',
-  },
-  searchInput: {
-    width: '100%', boxSizing: 'border-box',
-    padding: '7px 30px 7px 30px', borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'var(--font-family)',
-    outline: 'none', transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-  },
-  searchClear: {
-    position: 'absolute', right: 6, width: 22, height: 22,
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent',
-    color: 'var(--color-text-muted)', fontSize: 16, lineHeight: 1, cursor: 'pointer',
-    padding: 0, fontFamily: 'var(--font-family)',
   },
   body: { flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-4) var(--space-6)' },
   skeletonRow: {
@@ -845,7 +805,7 @@ const S: Record<string, React.CSSProperties> = {
   row: {
     position: 'relative',
     display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
-    height: 36, padding: '0 10px', borderRadius: 'var(--radius-sm)',
+    minHeight: 48, padding: '6px var(--space-2)', borderRadius: 'var(--radius-sm)', boxSizing: 'border-box',
     borderBottom: '1px solid color-mix(in srgb, var(--color-border-subtle) 60%, transparent)',
     color: 'var(--color-text-primary)',
     cursor: 'pointer', width: '100%', fontFamily: 'var(--font-family)',
@@ -853,9 +813,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   rowUnread: {},
   rowActions: {
-    position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)',
-    display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 8,
-    background: 'var(--color-bg-base)',
+    display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4,
+    width: 52, flexShrink: 0,
   },
   rowAction: {
     width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -865,24 +824,24 @@ const S: Record<string, React.CSSProperties> = {
     transition: 'all 0.12s ease',
   },
   iconDot: { flexShrink: 0, width: 6, height: 6, borderRadius: '50%', opacity: 0.85 },
-  rowMain: { display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, flex: 1, overflow: 'hidden' },
+  rowMain: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1 },
   rowTopLine: { display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' },
   rowTitle: {
-    fontSize: 13, color: 'var(--color-text-primary)', flexShrink: 0, maxWidth: '55%',
+    fontSize: 13, color: 'var(--color-text-primary)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   rowTime: {
-    fontSize: 11, color: 'var(--color-text-muted)', flexShrink: 0, minWidth: 56, textAlign: 'right',
+    fontSize: 11, color: 'var(--color-text-secondary)', flexShrink: 0, minWidth: 46, textAlign: 'right',
     fontVariantNumeric: 'tabular-nums',
   },
   rowBody: {
-    fontSize: 12, color: 'var(--color-text-tertiary)', minWidth: 0,
+    fontSize: 12, color: 'var(--color-text-secondary)', minWidth: 0,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   rowMeta: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
   rowSource: {
     fontSize: 11, color: 'var(--color-text-tertiary)', flexShrink: 0,
-    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'min(20%, 160px)',
   },
   rowKind: { fontSize: 10, color: 'var(--color-text-muted)' },
   unreadDot: {

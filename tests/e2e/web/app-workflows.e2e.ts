@@ -34,6 +34,54 @@ async function open(page: Page, id: string): Promise<void> {
 }
 
 test.describe('App workflows (web renderer)', () => {
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`Settings, Notes and Inbox share flat controls in ${theme} mode`, async ({ page }) => {
+      await page.addInitScript((dark) => {
+        localStorage.setItem('darkMode', String(dark));
+        localStorage.setItem('dex-theme-source', 'user');
+      }, theme === 'dark');
+      await boot(page);
+      await open(page, 'settings');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      const settings = page.locator('.settings-shell');
+      const nav = settings.getByRole('button', { name: 'Navigate to General settings' });
+      await expect(nav).toHaveCSS('box-shadow', 'none');
+      const field = settings.getByRole('searchbox', { name: 'Search all settings' });
+      await expect(field.locator('..')).toHaveCSS('border-radius', '6px');
+      const reopen = settings.locator('[data-setting-row="Reopen apps and windows"]');
+      const label = await reopen.getByText('Reopen apps and windows', { exact: true }).boundingBox();
+      const toggle = await reopen.getByRole('switch').boundingBox();
+      expect(toggle!.x).toBeGreaterThan(label!.x + label!.width);
+      await field.fill('contrast');
+      await expect(settings.getByRole('listbox', { name: 'Settings search results' })).toBeVisible();
+      await field.press('Escape');
+      await expect(field).toHaveValue('');
+
+      await open(page, 'notes');
+      const notes = page.locator('.dexnotes-app');
+      await notes.getByRole('button', { name: 'Create new note', exact: true }).first().click();
+      const title = notes.getByRole('textbox', { name: 'Note title' });
+      await title.fill('Project log');
+      await expect(title).toHaveCSS('outline-style', 'none');
+      const format = notes.getByRole('toolbar', { name: 'Formatting' });
+      await expect(format).toHaveCSS('box-shadow', 'none');
+      await expect(format).toHaveCSS('position', 'static');
+
+      await open(page, 'inbox');
+      const inbox = page.locator('.smart-inbox');
+      await expect(inbox.getByRole('searchbox', { name: 'Search inbox' }).locator('..')).toHaveCSS('border-radius', '6px');
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('dex-notification', {
+        detail: { title: 'Design review', body: 'Read the notes from this morning', source: 'Notes' },
+      })));
+      const row = inbox.getByRole('option', { name: /Design review/ });
+      await expect(row).toBeVisible();
+      const headline = await row.getByText('Design review').boundingBox();
+      const body = await row.getByText('Read the notes from this morning').boundingBox();
+      expect(body!.y).toBeGreaterThan(headline!.y);
+    });
+  }
+
   test('Calculator: 12 + 30 = 42 with the keypad, and with the keyboard', async ({ page }) => {
     await boot(page);
     await open(page, 'calculator');

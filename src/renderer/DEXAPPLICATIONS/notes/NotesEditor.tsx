@@ -170,27 +170,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     position: 'relative',
   },
-  // Floating formatting toolbar (DEX Floating Surface System): a frosted pill
-  // over the writing canvas; the note scrolls beneath it (content-under-glass,
-  // see .dex-under-glass on the scroller). One row; scrolls sideways if narrow.
   toolbar: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
-    right: 0,
-    margin: '0 auto',
-    width: 'fit-content',
-    maxWidth: 'calc(100% - 24px)',
-    zIndex: 5,
     display: 'flex',
+    flexShrink: 0,
     alignItems: 'center',
     gap: 2,
-    padding: '0 6px',
-    height: 40,
-    borderRadius: 9999,
-    flexWrap: 'nowrap',
+    padding: '0 var(--space-2)',
+    minHeight: 'var(--toolbar-height)',
+    margin: '0 var(--space-5)',
+    borderTop: '1px solid var(--color-border-subtle)',
+    borderBottom: '1px solid var(--color-border-subtle)',
+    background: 'var(--color-bg-surface)',
     overflowX: 'auto',
-    scrollbarWidth: 'none',
+    scrollbarWidth: 'thin',
   },
   toolbarGroup: {
     display: 'flex',
@@ -199,15 +191,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginRight: 6,
   },
   toolbarBtn: {
-    width: 28,
-    height: 28,
+    width: 'var(--dex-control-h-sm)',
+    height: 'var(--dex-control-h-sm)',
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
-    borderRadius: 9999,
+    borderRadius: 'var(--radius-sm)',
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
@@ -236,7 +229,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   editable: {
     minHeight: '100%',
-    padding: 'var(--space-4) var(--space-8)',
+    padding: 'var(--space-5)',
     outline: 'none',
     color: 'var(--color-text-primary, #e0e0e0)',
     fontSize: 15,
@@ -1176,7 +1169,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       )}
       {/* Toolbar */}
       {!readOnly && editorMode !== 'preview' && (
-        <div style={styles.toolbar} className="dex-mat-frosted" role="toolbar" aria-label="Formatting">
+        <div style={styles.toolbar} role="toolbar" aria-label="Formatting">
           {TOOLBAR_GROUPS.map((group, gi) => (
             <React.Fragment key={gi}>
               <div style={styles.toolbarGroup}>
@@ -1260,7 +1253,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         onDrop={handleDrop}
       >
         {showEditor && (
-          <div className={`dex-scroll-fade-y${!readOnly ? ' dex-under-glass' : ''}`} style={{ ...styles.editorArea, ['--dex-glass-top' as string]: '58px' } as React.CSSProperties}>
+          <div style={styles.editorArea}>
             <div style={{ position: 'relative' }}>
               {isEmpty && !readOnly && (
                 <div style={styles.placeholder}>{placeholder}</div>

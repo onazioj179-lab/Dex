@@ -78,20 +78,19 @@ Install over the previous release on a test profile and check that it starts,
 reports the new version in Settings › About, and uninstalls cleanly. Record the
 results in `DEX_X.Y.Z_VERIFICATION.md`.
 
-## 5. Local Windows previews
+## 5. GitHub releases and in-app updates
 
-DEX is in local preview. Run the installer produced in step 1 on the test PC
-when the owner approves an update. Use the same installer path each time so the
-new preview replaces the previous setup. Settings › Software Update shows the
-installed build. CI runs the renderer checks without packaging installers.
+GitHub Actions builds and publishes the official Windows x64 installer. After
+CI passes on the release commit, create and push the version tag and dispatch
+the Release workflow with that tag. The workflow publishes one installer,
+its signature and checksum, and the update manifest.
 
-The GitHub Release workflow is disabled during local preview. When the owner
-approves public distribution, enable it explicitly and dispatch it with the
-approved version tag. The stable workflow builds one x64 setup, a signature,
-a checksum and the GitHub update manifest. Stable builds verify the package and
-its version before offering to restart. Each update requires a higher published
-version. The signing key is stored outside the repository. The workflow reads
-the GitHub secret TAURI_SIGNING_PRIVATE_KEY and optionally its password.
+Install the GitHub release once, including when moving from a local preview.
+For later releases, open DEX Settings › Software Update and select Check for
+Updates. Stable builds verify the package and its version before offering to
+restart. Each update requires a higher published version. Keep the updater
+signing key outside the repository. GitHub Actions reads it from
+TAURI_SIGNING_PRIVATE_KEY and optionally TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
 
 ## 6. Old releases
 

@@ -184,12 +184,15 @@ html[data-thermal-state="critical"] [data-decorative="true"] { display: none !im
 :focus:not(:focus-visible) {
   outline: none !important;
 }
-/* DexSearchInput renders its OWN focus ring on the wrapper (accent hairline +
-   soft halo). The inner <input> therefore suppresses the global outline so the
-   field shows one clean ring instead of a doubled wrapper-border + inner-outline.
-   Component-scoped (class + :focus-visible) so it beats the bare rule above. */
-.dex-search-field:focus-visible {
-  outline: none !important;
+/* Draw keyboard focus on the complete search field. */
+@supports selector(:has(*)) {
+  .dex-search-control:has(> .dex-search-field:focus-visible) {
+    outline: 1px solid var(--dex-focus-color);
+    outline-offset: 1px;
+  }
+  .dex-search-control > .dex-search-field:focus-visible {
+    outline: none !important;
+  }
 }
 
 /* ── Narrow-window top bar ────────────────────────────────────────────────────
@@ -3398,13 +3401,6 @@ textarea,
 /* ═══════════════════════════════════════════════════════════════════════════
    DEX v2.0 — Bold & Slick Global Polish
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* All buttons: active press-in with shadow inversion */
-button:active:not(:disabled),
-[role="button"]:active:not(:disabled) {
-  transform: scale(0.97);
-  transition-duration: 40ms;
-}
 
 /* Nav dock items — stronger shadow on hover */
 .nav-items {

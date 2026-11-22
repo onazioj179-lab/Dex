@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: dex-stable-release
+
 jobs:
   release:
     name: Build & publish (Windows / Tauri)
@@ -123,6 +126,9 @@ jobs:
             Write-Host '::warning::The setup is unsigned (no WINDOWS_CERTIFICATE secret). SmartScreen will warn on first run.'
           }
 
+      - name: Verify Windows bundle
+        run: npm run verify:bundle
+
       - name: Collect release assets
         shell: bash
         run: |
@@ -183,14 +189,11 @@ jobs:
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
           REPO="${{ github.repository }}"
-          # Idempotent: a locally-created release (the normal path) already
-          # exists, so upload/clobber onto it; otherwise create it fresh.
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" --repo "$REPO" release-assets/* --clobber
-            gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --title "DEX OS ${TAG#v}"
-          else
-            gh release create "$TAG" --repo "$REPO" --verify-tag --latest --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
+            echo "::error::This version already has a release. Publish updates under a new version."
+            exit 1
           fi
+          gh release create "$TAG" --repo "$REPO" --verify-tag --latest --title "DEX OS ${TAG#v}" --notes-file release-notes.md release-assets/*
 
       - name: Mirror to dex-updates auto-update channel
         if: ${{ env.DEX_UPDATES_TOKEN != '' }}

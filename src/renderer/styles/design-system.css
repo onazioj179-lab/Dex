@@ -71,8 +71,8 @@
 
   /* Text -- warm off-white (17:1 on base) with visible secondary (9:1) */
   --color-text-primary: #F5F5F7;
-  --color-text-secondary: #AEAEB2;
-  --color-text-tertiary: #98989D; /* #8E8E93 was 4.3:1 on raised #2C2C2E surfaces; this is 4.9:1 */
+  --color-text-secondary: #BBC0C9;
+  --color-text-tertiary: #A1A7B2;
   --color-text-muted: #A0A0A5;
   --color-text-disabled: #58585D;
   --color-text-inverse: #000000;
@@ -654,8 +654,8 @@
   --color-text-inverse: #000000;
   --color-text-muted: #A0A0A5;
   --color-text-primary: #F5F5F7;
-  --color-text-secondary: #AEAEB2;
-  --color-text-tertiary: #98989D; /* #8E8E93 was 4.3:1 on raised #2C2C2E surfaces; this is 4.9:1 */
+  --color-text-secondary: #BBC0C9;
+  --color-text-tertiary: #A1A7B2;
   --color-warning: #FF9F0A;
   --color-warning-muted: rgba(255, 159, 10, 0.14);
   color: var(--color-text-primary);
@@ -968,55 +968,17 @@
   -webkit-backdrop-filter: var(--blur-lg) saturate(130%);
 }
 
-/* Liquid Glass (macOS Tahoe-grade) — the frosted base PLUS pronounced specular
-   lensing: a bright top rim that falls off down the sides, for the "lit glass"
-   look that flat frosted panels lack. Built only from existing tokens. The
-   universal low-tier rule (html[data-perf-tier="low"] *) strips the blur on weak
-   machines; reduced-transparency drops it for accessibility. */
-.dex-liquid-glass {
-  /* Apple Liquid Glass (CSS, inspired by liquid-glass-studio, MIT (c) Charles Yin
-     -- approximated in pure CSS, no WebGL dependency): genuinely SEE-THROUGH --
-     a light translucent gradient over a deep backdrop blur + saturation/brightness
-     boost (the "lensing" that makes wallpaper bloom behind it), finished with a
-     fresnel-style bright top rim and edge highlights. Far more transparent than a
-     frosted panel so the wallpaper/content reads through. */
-  /* Fill + blur come from Settings > Interface Transparency (applyGlassVars):
-     theme surface mixed with transparency, so it reads in light and dark. */
+/* Floating glass uses one soft shadow and one edge. */
+.dex-liquid-glass,
+.dex-liquid-glass-strong {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  /* Borderless: no hard outline. The lit fresnel rim (inset highlight below)
-     defines the edge, so the panel reads as one continuous piece of glass. */
-  border: 1px solid transparent;
-  border-radius: var(--radius-xl);
-  /* Spatial depth: a tight contact shadow + a wide soft ambient shadow so the
-     panel reads as a physical object floating above the desktop, not a flat
-     overlay. Fresnel rim + edge lensing complete the lit-glass material. */
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.20),             /* contact */
-    0 10px 30px rgba(0, 0, 0, 0.30),           /* mid float */
-    0 28px 60px -12px rgba(0, 0, 0, 0.36),     /* deep ambient -- spatial lift */
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),   /* bright fresnel top rim */
-    inset 1px 0 0 rgba(255, 255, 255, 0.08),   /* left edge lens */
-    inset -1px 0 0 rgba(255, 255, 255, 0.08),  /* right edge lens */
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04);  /* faint bottom */
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--dex-popup-shadow);
 }
-/* Stronger variant: more opaque for content-heavy surfaces that need text
-   contrast (panels over busy app content rather than the wallpaper). */
-.dex-liquid-glass-strong {
-  background: var(--color-bg-glass-strong);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xl);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.22),
-    0 10px 30px rgba(0, 0, 0, 0.32),
-    0 28px 60px -12px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05),
-    inset -1px 0 0 rgba(255, 255, 255, 0.05);
-}
+.dex-liquid-glass-strong { background: var(--color-bg-glass-strong); }
 /* Lite mode (weak GPUs, data-perf-tier="low") strips the EXPENSIVE backdrop blur
    via the universal rule -- but the glass STAYS translucent so it never goes
    solid black. We just bump the opacity a touch (it has no frost to lean on) so
@@ -1588,10 +1550,10 @@ html[data-darkroom="on"] {
 
 [data-theme="light"], .light-mode {
   /* Backgrounds -- Golden Modern warm paper */
-  --color-bg-base: #F5F5F7;
+  --color-bg-base: #F5F6F8;
   --color-bg-surface: #FFFFFF;
   --color-bg-surface-solid: #FFFFFF;
-  --color-bg-inset: #EDEDF0;
+  --color-bg-inset: #EFF1F4;
   --color-bg-hover: #E9E9ED;
   --color-bg-active: #DFDFE4;
   --color-bg-overlay: #FAFAFC;
@@ -1608,8 +1570,8 @@ html[data-darkroom="on"] {
   /* Secondary/tertiary are sized for the grey fills too (selected rows,
      chips, segmented controls #DCDCE0), not only white: the old #636366 /
      #6C6C70 fell to 3.0-4.4:1 there. Now >= 4.6:1 on every light fill. */
-  --color-text-secondary: #545458;
-  --color-text-tertiary: #5E5E63;
+  --color-text-secondary: #484C55;
+  --color-text-tertiary: #5A606A;
   --color-text-muted: #5E5E63;
   --color-text-disabled: #AEAEB2;
   --color-text-inverse: #FFFFFF;
@@ -1648,6 +1610,8 @@ html[data-darkroom="on"] {
   --color-border-strong: #AEAEB2;
   --color-border-glass: #D1D1D6;
   --color-border-highlight: #D0D0D3;
+  --pg-border: var(--color-border-subtle);
+  --pg-border-strong: var(--color-border-strong);
 
   /* Shadows (lighter for white backgrounds) */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -8430,36 +8394,19 @@ html:not([data-theme="light"]):not([data-darkroom="on"]):not([data-high-contrast
    spring motion. Accessibility first: reduce-transparency and glass-off fall
    back to solid fills; reduce-motion drops the springs. */
 
-/* Specular highlight: a soft reflection on the upper edge that falls off, so
-   the surface reads as curved glass. Painted under the content (::before). */
+/* A thin rim for the optional liquid material. */
 .dex-glass-specular { isolation: isolate; }
-.dex-glass-specular::before {
+html[data-glass-effective-mode="liquid"] .dex-glass-specular::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   z-index: -1;
-  background:
-    radial-gradient(120% 70% at 18% 0%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 38%, transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 42%, rgba(255, 255, 255, 0.02) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    inset 1px 0 0 rgba(255, 255, 255, 0.07),
-    inset -1px 0 0 rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
-html[data-theme="light"] .dex-glass-specular::before {
-  background:
-    radial-gradient(120% 70% at 18% 0%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 64%);
-}
-
-/* Refraction: the background bends slightly through the glass (an SVG
-   displacement filter, #dex-glass-refract, mounted once by GlassFilters) on top
-   of the normal frosted blur. Only on small floating chrome (dock, orb,
-   notifications, pills) so the GPU cost stays tiny. */
-html:not([data-perf-tier="low"]):not([data-glass-effective-mode="off"]) .dex-glass-refract {
-  backdrop-filter: url(#dex-glass-refract) var(--glass-blur, blur(28px) saturate(180%));
+html[data-glass-effective-mode="liquid"]:not([data-perf-tier="low"]) .dex-glass-refract {
+  backdrop-filter: url(#dex-glass-refract) var(--glass-blur);
 }
 @media (prefers-reduced-transparency: reduce) {
   html .dex-glass-refract { backdrop-filter: none; }
@@ -8473,32 +8420,24 @@ html:not([data-perf-tier="low"]):not([data-glass-effective-mode="off"]) .dex-gla
   gap: 6px;
   height: 28px;
   padding: 0 12px;
-  border-radius: 999px;
-  border: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
   font: 500 12px/1 var(--font-family);
   color: var(--color-text-primary);
-  background: rgba(255, 255, 255, 0.10);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-surface);
   cursor: pointer;
   transition: background 0.16s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.dex-pill:hover { background: rgba(255, 255, 255, 0.16); }
-.dex-pill:active { transform: scale(0.96); }
-html[data-theme="light"] .dex-pill { background: rgba(0, 0, 0, 0.06); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+.dex-pill:hover { background: var(--color-bg-hover); }
 
 /* Tinted Liquid Glass: DEX Blue keeps its colour while still reading as glass
    (translucent accent fill + specular top edge + soft accent elevation). */
 .dex-pill-tinted {
-  color: #fff;
-  background: color-mix(in srgb, var(--color-accent, #0A84FF) 82%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
-    0 2px 8px color-mix(in srgb, var(--color-accent, #0A84FF) 30%, transparent);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  color: var(--color-accent-text, #fff);
+  background: var(--color-accent-fill);
+  border-color: transparent;
 }
-.dex-pill-tinted:hover { background: color-mix(in srgb, var(--color-accent, #0A84FF) 92%, transparent); }
+.dex-pill-tinted:hover { background: var(--color-accent-dark); }
 
 /* Floating notification card: compact, soft elevation, spring in. */
 .dex-notif-card {
@@ -8535,37 +8474,25 @@ html[data-theme="light"] .dex-pill { background: rgba(0, 0, 0, 0.06); box-shadow
      .dex-mat-opaque   content-heavy panels and accessibility fallback
 */
 .dex-mat-clear, .dex-mat-frosted, .dex-mat-tinted, .dex-mat-opaque {
-  border: 1px solid var(--dex-mat-edge, rgba(255, 255, 255, 0.10));
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-subtle);
   color: var(--color-text-primary);
 }
 .dex-mat-clear {
-  background: color-mix(in srgb, var(--color-bg-base, #0c0c0e) 42%, transparent);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  background: color-mix(in srgb, var(--color-bg-surface) 86%, transparent);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
 }
 .dex-mat-frosted {
-  background: color-mix(in srgb, var(--color-bg-base, #0c0c0e) 72%, transparent);
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
 }
 .dex-mat-tinted {
-  background: color-mix(in srgb, var(--color-accent, #0A84FF) 82%, transparent);
-  color: #fff;
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  background: var(--color-accent-fill);
+  color: var(--color-accent-text, #fff);
   border-color: transparent;
 }
-.dex-mat-opaque { background: var(--color-bg-elevated, #1c1c1e); }
-html[data-theme="light"] .dex-mat-clear,
-html[data-theme="light"] .dex-mat-frosted,
-html[data-theme="light"] .dex-mat-opaque {
-  --dex-mat-edge: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-html[data-theme="light"] .dex-mat-clear { background: rgba(255, 255, 255, 0.55); }
-html[data-theme="light"] .dex-mat-frosted { background: rgba(255, 255, 255, 0.78); }
-html[data-theme="light"] .dex-mat-tinted { background: color-mix(in srgb, #007AFF 86%, transparent); }
+.dex-mat-opaque { background: var(--color-bg-surface); }
 @media (prefers-reduced-transparency: reduce) {
   .dex-mat-clear, .dex-mat-frosted, .dex-mat-tinted { backdrop-filter: none; -webkit-backdrop-filter: none; }
   .dex-mat-clear, .dex-mat-frosted { background: var(--color-bg-elevated, #1c1c1e); }
@@ -8604,18 +8531,6 @@ html[data-perf-tier="low"] :is(.dex-mat-clear, .dex-mat-frosted) {
 .dex-under-glass.dex-scroll-fade-y {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
-}
-/* Maps: the search field is a frosted pill floating on the map. */
-.dex-maps-search .dex-search-field { background: transparent; }
-.dex-maps-search > div:first-child {
-  border-radius: 9999px !important;
-  background: color-mix(in srgb, var(--color-bg-base, #0c0c0e) 72%, transparent) !important;
-  backdrop-filter: blur(24px) saturate(170%); -webkit-backdrop-filter: blur(24px) saturate(170%);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
-  height: 40px !important;
-}
-@media (prefers-reduced-transparency: reduce) {
-  .dex-maps-search > div:first-child { backdrop-filter: none; background: var(--color-bg-elevated, #1c1c1e) !important; }
 }
 /* Shared entrance for floating surfaces: short ease-out rise, no bounce. */
 @keyframes dexEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

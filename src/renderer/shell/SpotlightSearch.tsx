@@ -154,7 +154,7 @@ const ResultItem: React.FC<{
         display: 'flex', alignItems: 'center',
         width: '100%', height: 38, padding: '0 10px',
         background: isSelected ? 'color-mix(in srgb, var(--color-accent, #0A84FF) 18%, transparent)' : 'transparent',
-        border: 'none', borderRadius: 14, cursor: 'pointer',
+        border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
         transition: isReduceMotion() ? 'none' : 'background 0.12s ease',
         position: 'relative', gap: 10,
         textAlign: 'left',
@@ -162,7 +162,7 @@ const ResultItem: React.FC<{
     >
       {/* Icon */}
       <div style={{
-        width: 26, height: 26, borderRadius: 10,
+        width: 26, height: 26, borderRadius: 'var(--radius-sm)',
         background: result.color ? `${result.color}1f` : 'var(--color-bg-hover)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
@@ -318,14 +318,13 @@ const VoiceMicButton: React.FC<VoiceMicButtonProps> = memo(({ onTranscript }) =>
       aria-label={listening ? 'Stop voice search' : 'Start voice search'}
       title={listening ? 'Listening… click to stop' : 'Voice search'}
       style={{
-        width: 28, height: 28, borderRadius: 14,
-        background: listening ? 'var(--color-error, rgba(255,69,58,0.95))' : 'rgba(120,120,128,0.24)',
+        width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+        background: listening ? 'var(--color-error, rgba(255,69,58,0.95))' : 'var(--color-bg-hover)',
         border: 'none', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: listening ? '#fff' : 'rgba(235,235,245,0.85)',
+        color: listening ? '#fff' : 'var(--color-text-secondary)',
         transition: 'background 0.15s ease, transform 0.15s ease',
         flexShrink: 0,
-        boxShadow: listening ? '0 0 0 4px color-mix(in srgb, var(--color-error, #FF453A) 18%, transparent)' : 'none',
       }}
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -672,16 +671,10 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', left: popup.left, width: popup.width, ...dropStyle,
               height: popup.height, overflowY: 'auto', overflowX: 'hidden',
               scrollbarGutter: 'stable',
-              // Liquid glass (master overhaul) -- the strong variant: translucent
-              // enough to bloom the wallpaper/content behind it, opaque enough that
-              // result text stays readable. Falls back to solid on weak GPUs /
-              // reduced-transparency via the shared token + universal low-tier rule.
-              background: 'var(--color-bg-glass-strong, rgba(16,16,20,0.86))',
-              backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-              WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-              border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
-              borderRadius: 18,
-              boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-strong)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--dex-popup-shadow)',
               padding: 6,
               boxSizing: 'border-box',
             }}
@@ -750,21 +743,17 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           width: 'min(600px, 92vw)',
           maxHeight: 'min(540px, 72vh)',
           display: 'flex', flexDirection: 'column', gap: 4, padding: 6,
-          // Master overhaul: glass search overlay (Part 3.7).
-          background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-          backdropFilter: 'var(--glass-blur, blur(24px))',
-          WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
-          border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-          // Floating capsule: outer 24, inner input 18 (24 - 6 padding), rows 14.
-          borderRadius: 24,
-          boxShadow: 'var(--pg-shadow-modal)',
+          background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border-strong)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--dex-popup-shadow)',
           overflow: 'hidden',
         }}
       >
         {/* Input row */}
         <div data-testid="spotlight-capsule" style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          height: 48, padding: '0 8px 0 16px', borderRadius: 18,
+          height: 40, padding: '0 8px 0 12px', borderRadius: 'var(--radius-sm)',
           background: 'var(--color-bg-hover)',
           flexShrink: 0,
         }}>
@@ -800,7 +789,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               onClick={() => { setQuery(''); handleSearch(''); inputRef.current?.focus(); }}
               aria-label="Clear search"
               style={{
-                width: 28, height: 28, borderRadius: 14,
+                width: 28, height: 28, borderRadius: 'var(--radius-sm)',
                 background: 'var(--color-bg-active)',
                 border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',

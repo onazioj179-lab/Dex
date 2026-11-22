@@ -127,7 +127,7 @@ export const DexFloatingSearch: React.FC<DexFloatingSearchProps> = ({ value, onC
   return (
     <div data-dex-capsule="search" role="search" style={{
       position: 'relative', display: 'inline-flex', alignItems: 'center', width, height: h,
-      borderRadius: h / 2, background: 'color-mix(in srgb, var(--color-text-primary, #fff) 6%, transparent)',
+      borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-inset)',
       border: '1px solid var(--color-border-subtle)', boxSizing: 'border-box',
     }}>
       <span aria-hidden="true" style={{ position: 'absolute', left: CAPSULE_PAD_X[size], display: 'inline-flex', color: 'var(--color-text-tertiary)' }}>

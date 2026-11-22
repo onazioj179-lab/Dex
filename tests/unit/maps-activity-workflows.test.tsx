@@ -90,6 +90,29 @@ it('chooses a basemap and recalls a saved place after reopening Maps', async () 
   expect(screen.getByText('Lagos')).toBeVisible();
 });
 
+it('cancels an outdated place search and only shows results for the latest query', async () => {
+  const place = (name: string) => ({
+    ok: true, json: async () => ({ results: [{ name, latitude: 1, longitude: 2 }] }),
+  });
+  let finishOldSearch!: (response: ReturnType<typeof place>) => void;
+  const fetchPlaces = vi.fn((_url: string, _options: RequestInit) => Promise.resolve(place('Lisbon')))
+    .mockImplementationOnce(() => new Promise(resolve => { finishOldSearch = resolve; }));
+  vi.stubGlobal('fetch', fetchPlaces);
+  render(<Maps />);
+  const search = screen.getByRole('searchbox', { name: 'Search places' });
+
+  fireEvent.change(search, { target: { value: 'London' } });
+  await waitFor(() => expect(fetchPlaces).toHaveBeenCalledTimes(1));
+  fireEvent.change(search, { target: { value: 'Lisbon' } });
+  expect(screen.getByRole('status', { name: 'Searching' })).toBeVisible();
+  expect(fetchPlaces.mock.calls[0][1].signal?.aborted).toBe(true);
+
+  const results = await screen.findByRole('listbox', { name: 'Search results' });
+  await act(async () => finishOldSearch(place('London')));
+  expect(within(results).getByText('Lisbon')).toBeVisible();
+  expect(within(results).queryByText('London')).toBeNull();
+});
+
 it('counts new activity when the feed stays the same size and saves only the filtered rows', async () => {
   const entry = (id: number, title: string, app: string) => ({
     id, title, app, event_type: 'test', source: 'local', details: '', created_at: new Date().toISOString(),

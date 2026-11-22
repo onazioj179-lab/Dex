@@ -8,9 +8,9 @@
 // DEX Capsule geometry: one set of sizes for every capsule control, so buttons
 // in a group line up and a selected highlight always matches its container.
 //
-//   outer radius  = height / 2 (a true capsule)
+//   outer radius  = up to 8px
 //   inset         = the gap between the container edge and a segment
-//   inner radius  = outer radius - inset   (concentric: never a rectangle in a pill)
+//   inner radius  = outer radius - inset   (matching corners)
 
 export type CapsuleSize = 'sm' | 'md' | 'lg';
 
@@ -30,10 +30,10 @@ export function innerRadius(outerRadius: number, inset = CAPSULE_INSET): number 
 /** Outer and inner radius for a capsule group of a given size. Multi-row grids use a rounded rectangle. */
 export function capsuleRadii(size: CapsuleSize, rows = 1): { outer: number; inner: number } {
   const h = CAPSULE_HEIGHT[size];
-  const outer = rows > 1 ? 10 : h / 2;
+  const outer = rows > 1 ? 10 : Math.min(8, h / 2);
   return { outer, inner: innerRadius(outer) };
 }
 
 /** Selected highlight: the DEX accent tint, theme-aware. */
-export const CAPSULE_SELECTED_BG = 'color-mix(in srgb, var(--color-accent, #0A84FF) 22%, transparent)';
+export const CAPSULE_SELECTED_BG = 'color-mix(in srgb, var(--color-accent, #0A84FF) 12%, transparent)';
 export const CAPSULE_HOVER_BG = 'color-mix(in srgb, var(--color-text-primary, #fff) 8%, transparent)';
