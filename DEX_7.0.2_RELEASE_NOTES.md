@@ -19,6 +19,7 @@
 - **Pixel Art**: undo and redo. **Project Dashboard**: status report into Notes.
 
 ## Build serials
+- **002b** steadies the Files layout on open. Drag the Morphing Dock or choose a screen edge or corner in Settings.
 - **002a** adds Files tabs and folder scans, project-linked Env Manager profiles, Task Manager process details, and Windows power-plan verification.
 
 ## Updates

@@ -8,7 +8,7 @@
 // registry (services/appPinning); this store is only the Dock's own layout.
 
 import { create } from 'zustand';
-import type { DockEdge } from '../../shared/shell/workArea';
+import { normalizeDockAlign, normalizeDockEdge, type DockAlign, type DockEdge } from '../../shared/shell/dockGeometry';
 
 const KEY = 'dex-dock-prefs-v1';
 
@@ -26,6 +26,7 @@ export interface DockPrefs {
   /** 'morphing' = the Morphing Dock; 'classic' = the floating DEX Bar. */
   style: DockStyle;
   edge: DockEdge;
+  align: DockAlign;
   /** Collapse back to the search button after launching, on Escape, when the
    *  pointer leaves, or on a click elsewhere. Off = it stays open. */
   autoCollapse: boolean;
@@ -38,6 +39,7 @@ export interface DockPrefs {
 export const DEFAULT_DOCK_PREFS: DockPrefs = {
   style: 'morphing',
   edge: 'bottom',
+  align: 'center',
   // Owner (2026-11-17): the Dock folds to its search button when idle by
   // default, so it never sits on top of an app's own bottom controls.
   autoCollapse: true,
@@ -52,7 +54,8 @@ export function sanitizeDockPrefs(v: unknown): DockPrefs {
   const migrate = !o.acV2;
   return {
     style: o.style === 'classic' ? 'classic' : 'morphing',
-    edge: o.edge === 'left' || o.edge === 'right' ? o.edge : 'bottom',
+    edge: normalizeDockEdge(o.edge),
+    align: normalizeDockAlign(o.align),
     autoCollapse: migrate ? true : o.autoCollapse === true,
     expanded: migrate ? false : o.expanded !== false,
     workspacePadding: Math.max(0, Math.min(48, Math.round(Number(o.workspacePadding) || 0))),
@@ -72,15 +75,15 @@ interface DockState extends DockPrefs {
 }
 
 function persist(s: DockPrefs): void {
-  const { style, edge, autoCollapse, expanded, workspacePadding } = s;
-  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, autoCollapse, expanded, workspacePadding, acV2: true })); } catch { /* storage full */ }
+  const { style, edge, align, autoCollapse, expanded, workspacePadding } = s;
+  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, align, autoCollapse, expanded, workspacePadding, acV2: true })); } catch { /* storage full */ }
 }
 
 export const useDockStore = create<DockState>((set, get) => ({
   ...load(),
   hiddenForFullscreen: false,
   setPrefs: (patch) => {
-    set(sanitizeDockPrefs({ ...get(), ...patch }));
+    set(sanitizeDockPrefs({ ...get(), ...patch, acV2: true }));
     persist(get());
   },
   setExpanded: (expanded) => {

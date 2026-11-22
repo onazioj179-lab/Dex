@@ -17,7 +17,7 @@ async function boot(page: Page, prefs?: Record<string, unknown>): Promise<void> 
   // geometry tests start from an open Dock that stays open, marked as a
   // deliberate choice (acV2) so the one-time migration leaves it alone.
   const seeded = { expanded: true, autoCollapse: false, ...prefs, acV2: true };
-  await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(seeded)] as const);
+  await page.addInitScript(([k, v]) => { try { if (localStorage.getItem(k) === null) localStorage.setItem(k, v); } catch { /* */ } }, [PREFS, JSON.stringify(seeded)] as const);
   await page.goto('/');
   await page.waitForFunction(() => !!window.__dexRunningApps && !!document.querySelector('.dex-mdock'), null, { timeout: 120_000 });
   await page.waitForTimeout(500);
@@ -55,6 +55,51 @@ function inside(b: Box, v: { w: number; h: number }) {
 }
 
 test.describe('Morphing Dock', () => {
+
+  test('the collapsed Dock drags to all four corners and keeps its position', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await boot(page, { expanded: false, autoCollapse: false });
+    const trigger = page.locator('[data-dock-item="__trigger"]');
+    const dock = page.getByRole('navigation', { name: 'Dock', exact: true });
+    const top = (await topBar(page)) + 20;
+    for (const [x, y, edge, align] of [
+      [18, top, 'top', 'start'],
+      [1260, top, 'top', 'end'],
+      [18, 780, 'bottom', 'start'],
+      [1260, 780, 'bottom', 'end'],
+    ] as const) {
+      await trigger.hover();
+      await page.mouse.down();
+      await page.mouse.move(x, y, { steps: 8 });
+      await page.mouse.up();
+      await expect(dock).toHaveAttribute('data-edge', edge);
+      await expect(dock).toHaveAttribute('data-align', align);
+      await expect(dock).toHaveAttribute('data-state', 'collapsed');
+      inside((await box(page, '.dex-mdock'))!, { w: 1280, h: 800 });
+    }
+    await trigger.click();
+    await expect(dock).toHaveAttribute('data-state', 'expanded');
+    await trigger.press('Escape');
+    await expect(dock).toHaveAttribute('data-state', 'collapsed');
+    await page.reload();
+    await expect(dock).toHaveAttribute('data-align', 'end');
+    await expect(dock).toHaveAttribute('data-edge', 'bottom');
+    expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).autoCollapse, PREFS)).toBe(false);
+  });
+
+  test('Files keeps its tabs and scroll pane steady after opening', async ({ page }) => {
+    await page.setViewportSize({ width: 940, height: 640 });
+    await boot(page);
+    await open(page, 'files');
+    const tabs = page.getByRole('group', { name: 'Folder tabs' });
+    await expect(tabs).toBeVisible();
+    const offset = await tabs.boundingBox();
+    for (let i = 0; i < 5; i++) {
+      await page.waitForTimeout(90);
+      expect(await tabs.boundingBox()).toEqual(offset);
+    }
+  });
+
   test('Search keeps the panel and input in place from app grid through empty results', async ({ page }) => {
     await boot(page);
     await page.locator('[data-dock-item="__trigger"]').click();

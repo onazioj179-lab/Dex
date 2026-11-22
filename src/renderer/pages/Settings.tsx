@@ -30,6 +30,7 @@ import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import { InterfaceTransparencyControl } from '../components/InterfaceTransparencyControl';
 import { isSoundEnabled, setSoundEnabled, subscribeSoundEnabled, getSoundVolume, setSoundVolume, playToggle } from '../shell/SpatialAudio';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
+import { DOCK_POSITIONS } from '../components/dock/dockLayout';
 import { useDockStore } from '../store/dockStore';
 const DOCK_SELECT: React.CSSProperties = { minHeight: 28, padding: '0 8px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontSize: 13, fontFamily: 'inherit' };
 import { SETTINGS_SECTIONS } from '../shell/settingsSections';
@@ -2033,12 +2034,13 @@ export const Settings: React.FC = () => {
             <div style={styles.settingRow}>
               <div style={styles.settingInfo}>
                 <span style={styles.settingLabel}>Position</span>
-                <span style={styles.settingDesc}>Windows and full-size apps stay clear of the Dock on this edge.</span>
+                <span style={styles.settingDesc}>Choose an edge or corner, or drag the Dock’s search button.</span>
               </div>
-              <select value={dock.edge} onChange={(e) => dock.setPrefs({ edge: e.target.value as 'bottom' | 'left' | 'right' })} aria-label="Dock position" style={DOCK_SELECT}>
-                <option value="bottom">Bottom</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
+              <select value={dock.edge + ':' + dock.align} onChange={(e) => {
+                const position = DOCK_POSITIONS.find(p => p.edge + ':' + p.align === e.target.value);
+                if (position) dock.setPrefs({ edge: position.edge, align: position.align });
+              }} aria-label="Dock position" style={DOCK_SELECT}>
+                {DOCK_POSITIONS.map(p => <option key={p.edge + ':' + p.align} value={p.edge + ':' + p.align}>{p.label}</option>)}
               </select>
             </div>
             <div style={styles.settingRow}>

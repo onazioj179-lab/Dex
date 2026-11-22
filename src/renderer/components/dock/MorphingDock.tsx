@@ -21,9 +21,9 @@ import { appPinning, useDockAppIds } from '../../services/appPinning';
 import { openAppContextMenu, sendAppCommand } from '../AppContextMenu';
 import { DEX_APP_DRAG_TYPE } from '../AppMenuPanel';
 import { useDockStore, DOCK_TILE, DOCK_PAD, DOCK_THICKNESS, DOCK_MARGIN, dockReserve } from '../../store/dockStore';
-import { computeWorkArea, placeDockAroundTrigger, type DockEdge } from '../../../shared/shell/workArea';
+import { computeWorkArea, isHorizontalDockEdge, placeDock } from '../../../shared/shell/workArea';
 import { isReduceMotion, onReduceMotionChange } from '../../utils/MotionController';
-import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION } from './dockLayout';
+import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION, DOCK_POSITIONS, dockPositionAt, type DockPosition } from './dockLayout';
 
 const LONG_PRESS_MS = 500;
 const DRAG_THRESHOLD = 6;
@@ -75,7 +75,7 @@ export interface MorphingDockProps {
 }
 
 export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) => {
-  const { edge, autoCollapse, expanded, setExpanded } = useDockStore();
+  const { edge: savedEdge, align: savedAlign, autoCollapse, expanded, setExpanded, setPrefs } = useDockStore();
   const hidden = useDockStore(s => s.hiddenForFullscreen);
   const style = useDockStore(s => s.style);
   const pinnedIds = useDockAppIds();
@@ -83,7 +83,11 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const currentId = useRunningApps(s => s.currentAppId);
   const vp = useViewport();
   const reduced = useReducedMotion();
-  const vertical = edge !== 'bottom';
+  const [placementPreview, setPlacementPreview] = useState<DockPosition | null>(null);
+  const placementDrag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+  const suppressTriggerClick = useRef(false);
+  const { edge, align } = placementPreview ?? { edge: savedEdge, align: savedAlign };
+  const vertical = !isHorizontalDockEdge(edge);
 
   const [drag, setDrag] = useState<DragState | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -120,29 +124,25 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const expandedLen = fixed + pinnedVis + runningVis;
   const triggerCenter = DOCK_PAD + (layout.pinnedLen ? pinnedVis + DOCK_GROUP_GAP : 0) + DOCK_TILE / 2;
   const collapsedLen = layout.collapsedLen;
-  const anchor = edge === 'bottom' ? vp.w / 2 : area.desktop.y + area.desktop.h / 2;
+  const axisStart = vertical ? area.desktop.y : 0;
+  const axisLength = vertical ? area.desktop.h : area.desktop.w;
+  const anchor = axisStart + (align === 'start' ? 0 : align === 'end' ? axisLength : axisLength / 2);
   const open = expanded || !!drag?.active;
-  // Owner (2026-11-17): the Dock sits at the absolute centre of its edge in
-  // both states -- open, the whole strip is centred (not the search button);
-  // collapsed, the button is. Still clamped inside the screen.
-  const openLen = Math.min(expandedLen, area.dockMaxLength);
-  const placed = open
-    ? placeDockAroundTrigger(area, edge, expandedLen, openLen / 2, anchor, DOCK_MARGIN)
-    : { start: anchor - collapsedLen / 2, length: collapsedLen };
+  const placed = placeDock(area, edge, open ? expandedLen : collapsedLen, anchor, DOCK_MARGIN);
   // Collapsed, the track slides so its trigger sits in the middle of the button.
   const trackShift = open ? 0 : -(triggerCenter - collapsedLen / 2);
 
   // Collapse runs a little faster than expand; reduced motion = no movement.
   const ms = reduced ? 0 : (open ? DOCK_MOTION.expandMs : DOCK_MOTION.collapseMs);
   const ease = DOCK_MOTION.easing;
-  const geomTransition = drag?.active
+  const geomTransition = drag?.active || placementPreview
     ? 'none'
     : ['left', 'top', 'width', 'height', 'border-radius'].map(p => `${p} ${ms}ms ${ease}`).join(', ');
   const fadeMs = reduced ? 0 : open ? 160 : 90;
   const fadeDelay = reduced || !open ? 0 : Math.round(DOCK_MOTION.expandMs * 0.35);
 
-  const outer: React.CSSProperties = edge === 'bottom'
-    ? { left: placed.start, bottom: DOCK_MARGIN, width: placed.length, height: DOCK_THICKNESS }
+  const outer: React.CSSProperties = !vertical
+    ? { left: placed.start, [edge]: edge === 'top' ? area.desktop.y + DOCK_MARGIN : DOCK_MARGIN, width: placed.length, height: DOCK_THICKNESS }
     : { top: placed.start, [edge]: DOCK_MARGIN, width: DOCK_THICKNESS, height: placed.length } as React.CSSProperties;
 
   // --- collapse rules ---------------------------------------------------------
@@ -164,7 +164,7 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   useEffect(() => () => { clearTimeout(collapseTimer.current); clearTimeout(longPress.current); }, []);
 
   const onPointerLeave = () => {
-    if (!autoCollapse || !expanded || drag || menu) return;
+    if (!autoCollapse || !expanded || drag || menu || placementDrag.current) return;
     clearTimeout(collapseTimer.current);
     collapseTimer.current = setTimeout(() => collapse(), AUTO_COLLAPSE_MS);
   };
@@ -177,11 +177,43 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (autoCollapse) collapse();
   };
 
-  const onTrigger = () => {
+  const onTrigger = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (suppressTriggerClick.current) {
+      suppressTriggerClick.current = false;
+      if (event.detail > 0) return;
+    }
     if (suppressClick.current) { suppressClick.current = false; return; }
     if (!expanded) { setExpanded(true); return; }
     onOpenLauncher();
     if (autoCollapse) collapse();
+  };
+
+  const startPlacementDrag = (e: React.PointerEvent<HTMLElement>) => {
+    if (!e.isPrimary || e.button !== 0) return;
+    const trigger = triggerRef.current;
+    const fromTrigger = trigger?.contains(e.target as Node);
+    if (!fromTrigger && (expanded || (e.target as Element).closest('button'))) return;
+    clearTimeout(collapseTimer.current);
+    suppressTriggerClick.current = false;
+    placementDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    ((fromTrigger && trigger) || e.currentTarget).setPointerCapture(e.pointerId);
+  };
+  const movePlacementDrag = (e: React.PointerEvent<HTMLElement>) => {
+    const pointer = placementDrag.current;
+    if (!pointer || pointer.id !== e.pointerId) return;
+    if (!pointer.moved && Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) < DRAG_THRESHOLD) return;
+    pointer.moved = true;
+    setPlacementPreview(dockPositionAt(area, e.clientX, e.clientY));
+  };
+  const endPlacementDrag = (e: React.PointerEvent<HTMLElement>, commit: boolean) => {
+    const pointer = placementDrag.current;
+    if (!pointer || pointer.id !== e.pointerId) return;
+    placementDrag.current = null;
+    setPlacementPreview(null);
+    if (commit && (pointer.moved || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) >= DRAG_THRESHOLD)) {
+      suppressTriggerClick.current = true;
+      setPrefs(dockPositionAt(area, e.clientX, e.clientY));
+    }
   };
 
   // --- pointer drag (mouse, touch, pen) ---------------------------------------
@@ -357,9 +389,10 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const triggerMenu: ContextMenuItem[] = [
     { id: 'toggle', label: expanded ? 'Collapse Dock' : 'Expand Dock', onClick: () => (expanded ? collapse(true) : setExpanded(true)) },
     { id: 'launcher', label: 'Search apps', onClick: onOpenLauncher, dividerAfter: true },
-    ...(['bottom', 'left', 'right'] as DockEdge[]).map(p => ({
-      id: `edge-${p}`, label: `${edge === p ? '✓ ' : ''}Position: ${p[0].toUpperCase()}${p.slice(1)}`,
-      onClick: () => useDockStore.getState().setPrefs({ edge: p }),
+    ...DOCK_POSITIONS.map(position => ({
+      id: 'position-' + position.edge + '-' + position.align,
+      label: (savedEdge === position.edge && savedAlign === position.align ? '✓ ' : '') + 'Position: ' + position.label,
+      onClick: () => setPrefs({ edge: position.edge, align: position.align }),
     })),
     { id: 'auto', label: `${autoCollapse ? '✓ ' : ''}Collapse automatically`, onClick: () => useDockStore.getState().setPrefs({ autoCollapse: !autoCollapse }) },
   ];
@@ -372,9 +405,16 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
         className="dex-mdock"
         aria-label="Dock"
         data-edge={edge}
+        data-align={align}
+        data-axis={vertical ? 'vertical' : 'horizontal'}
         data-state={open ? 'expanded' : 'collapsed'}
         data-hidden={hidden || undefined}
         onKeyDown={onKeyDown}
+        onPointerDown={startPlacementDrag}
+        onPointerMove={movePlacementDrag}
+        onPointerUp={e => endPlacementDrag(e, true)}
+        onPointerCancel={e => endPlacementDrag(e, false)}
+        onLostPointerCapture={e => endPlacementDrag(e, false)}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
         onDragOver={onDragOver}
@@ -413,7 +453,7 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
             tabIndex={!open || focusId === '__trigger' ? 0 : -1}
             aria-label={open ? 'Search apps' : 'Open Dock'}
             aria-expanded={open}
-            title={open ? 'Search apps' : 'Open Dock'}
+            title={(open ? 'Search apps' : 'Open Dock') + ' · Drag to move'}
             onFocus={() => setFocusId('__trigger')}
             onClick={onTrigger}
             onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
@@ -441,7 +481,7 @@ function toast(message: string): void {
 
 const DOCK_CSS = `
 :where(.dex-mdock) {
-  position: fixed; z-index: 9000; overflow: hidden; box-sizing: border-box;
+  position: fixed; z-index: 9000; touch-action: none; overflow: hidden; box-sizing: border-box;
   /* DEX Blue Modern: a restrained blue tint in the glass, a hairline rim. */
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-elevated));
   border: 1px solid color-mix(in srgb, var(--color-accent) 14%, var(--color-border-subtle));
@@ -456,8 +496,8 @@ const DOCK_CSS = `
 }
 :where(.dex-mdock)[data-hidden] { opacity: 0; pointer-events: none; }
 :where(.dex-mdock) :where(.dex-mdock-track) { position: absolute; left: 0; top: 0; }
-:where(.dex-mdock[data-edge="bottom"]) :where(.dex-mdock-track) { height: 100%; }
-:where(.dex-mdock:not([data-edge="bottom"])) :where(.dex-mdock-track) { width: 100%; }
+:where(.dex-mdock[data-axis="horizontal"]) :where(.dex-mdock-track) { height: 100%; }
+:where(.dex-mdock[data-axis="vertical"]) :where(.dex-mdock-track) { width: 100%; }
 :where(.dex-mdock) :where(.dex-mdock-tile) {
   position: relative; flex-shrink: 0; width: ${DOCK_TILE}px; height: ${DOCK_TILE}px; padding: 0;
   display: flex; align-items: center; justify-content: center; border: none; border-radius: 10px;
@@ -470,12 +510,13 @@ const DOCK_CSS = `
 :where(.dex-mdock) :where(.dex-mdock-tile)[data-drop-before] { box-shadow: inset 2px 0 0 var(--color-accent); }
 :where(.dex-mdock) :where(.dex-mdock-trigger) { color: var(--color-accent); }
 :where(.dex-mdock) :where(.dex-mdock-sep) { flex-shrink: 0; background: var(--color-border-subtle); }
-:where(.dex-mdock[data-edge="bottom"]) :where(.dex-mdock-sep) { width: 1px; height: 22px; margin: 0 ${(DOCK_GROUP_GAP - 1) / 2}px; }
-:where(.dex-mdock:not([data-edge="bottom"])) :where(.dex-mdock-sep) { height: 1px; width: 22px; margin: ${(DOCK_GROUP_GAP - 1) / 2}px 0; }
+:where(.dex-mdock[data-axis="horizontal"]) :where(.dex-mdock-sep) { width: 1px; height: 22px; margin: 0 ${(DOCK_GROUP_GAP - 1) / 2}px; }
+:where(.dex-mdock[data-axis="vertical"]) :where(.dex-mdock-sep) { height: 1px; width: 22px; margin: ${(DOCK_GROUP_GAP - 1) / 2}px 0; }
 :where(.dex-mdock) :where(.dex-mdock-dot) { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--color-text-secondary); }
 :where(.dex-mdock) :where(.dex-mdock-tile)[data-current] :where(.dex-mdock-dot) { background: var(--color-accent); }
 :where(.dex-mdock) :where(.dex-mdock-dot)[data-minimized] { opacity: 0.5; }
 :where(.dex-mdock[data-edge="bottom"]) :where(.dex-mdock-dot) { bottom: 1px; left: calc(50% - 2px); }
+:where(.dex-mdock[data-edge="top"]) :where(.dex-mdock-dot) { top: 1px; left: calc(50% - 2px); }
 :where(.dex-mdock[data-edge="left"]) :where(.dex-mdock-dot) { left: 1px; top: calc(50% - 2px); }
 :where(.dex-mdock[data-edge="right"]) :where(.dex-mdock-dot) { right: 1px; top: calc(50% - 2px); }
 @media (prefers-reduced-motion: reduce) {
