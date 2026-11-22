@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * SETTINGS - macOS System Preferences Style
+ * DEX Settings
  * Clean settings panel with sections
  */
 
@@ -19,6 +19,7 @@ import { applyAccentFamily } from '../utils/accentFamily';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
 import { useToastHelpers } from '../components/Toast';
 import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
+import { DexSearchInput } from '../styles/components';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
 import { DexSwitch, CAPSULE_SELECTED_BG } from '../components/controls';
@@ -3922,7 +3923,6 @@ export const Settings: React.FC = () => {
     <div className="settings-shell" style={styles.container}>
       <style>{`
         .settings-nav:hover { background: var(--pg-row-hover) !important; color: var(--color-text-primary) !important; }
-        .settings-nav:active { transform: scale(0.98); }
         .settings-nav[data-active="true"]::before {
           content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
           width: 2px; background: var(--color-accent); border-radius: 2px;
@@ -3937,8 +3937,7 @@ export const Settings: React.FC = () => {
         .settings-shell input[type="range"] { accent-color: var(--color-accent); }
         .settings-shell input[type="checkbox"] { accent-color: var(--color-accent); }
         .settings-shell input[type="color"] { border-radius: 6px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
-        .settings-shell button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--color-border-subtle, rgba(255,255,255,0.14)), 0 6px 18px var(--color-accent-muted, rgba(10,132,255,0.18)); }
-        .settings-shell button, .settings-shell input, .settings-shell select { transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.12s ease; }
+        .settings-shell button, .settings-shell input, .settings-shell select { transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease; }
         .settings-content::-webkit-scrollbar { width: 6px; }
         .settings-content::-webkit-scrollbar-track { background: transparent; }
         .settings-content::-webkit-scrollbar-thumb { background: var(--pg-border-strong); border-radius: 3px; }
@@ -3954,58 +3953,20 @@ export const Settings: React.FC = () => {
         </div>
 
         <div style={{ padding: '0 var(--space-3) var(--space-2)' }}>
-          <div
-            style={{
-              position: 'relative', display: 'flex', alignItems: 'center',
-              background: 'var(--color-bg-hover)',
-              border: `1px solid ${settingsSearch ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
-              borderRadius: 9999, height: 28, boxSizing: 'border-box', transition: 'border-color 0.12s ease',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2"
-              style={{ position: 'absolute', left: 9, pointerEvents: 'none' }} aria-hidden>
-              <circle cx="11" cy="11" r="7" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              role="searchbox"
-              placeholder="Search"
-              aria-label="Search all settings"
-              aria-controls="settings-search-results"
-              autoComplete="off"
-              spellCheck={false}
-              value={settingsSearch}
-              onChange={e => setSettingsSearch(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              style={{
-                width: '100%', padding: '7px 26px 7px 27px', fontSize: 12,
-                background: 'transparent', border: 'none',
-                color: 'var(--color-text-primary)', outline: 'none',
-                fontFamily: 'var(--dex-font-ui, inherit)',
-                boxSizing: 'border-box' as const,
-              }}
-            />
-            {settingsSearch && (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onClick={() => { setSettingsSearch(''); searchInputRef.current?.focus(); }}
-                style={{
-                  position: 'absolute', right: 6, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', width: 16, height: 16, padding: 0,
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: 'var(--color-text-tertiary)',
-                }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            )}
-          </div>
+          <DexSearchInput
+            ref={searchInputRef}
+            size="sm"
+            fullWidth
+            placeholder="Search"
+            aria-label="Search all settings"
+            aria-controls={settingsSearch.trim() ? 'settings-search-results' : undefined}
+            autoComplete="off"
+            spellCheck={false}
+            value={settingsSearch}
+            onChange={e => setSettingsSearch(e.target.value)}
+            onClear={() => { setSettingsSearch(''); searchInputRef.current?.focus(); }}
+            onKeyDown={onSearchKeyDown}
+          />
         </div>
 
         {/* Search results — every matching control, tagged by section. */}
@@ -4306,6 +4267,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Sidebar — frosted glass via `.dex-liquid-glass` on the element; only the
   // right divider + layout live here (background is supplied by the class).
   sidebar: {
+    background: 'var(--color-bg-secondary)',
     width: 'var(--pg-sidebar-width)',
     minWidth: 'var(--pg-sidebar-width)',
     borderRight: '1px solid var(--pg-border)',
@@ -4340,8 +4302,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '7px var(--space-3)',
-    height: 'var(--pg-row-height)',
-    borderRadius: 'var(--pg-row-radius)',
+    minHeight: 'var(--dex-control-h-md)',
+    borderRadius: 'var(--radius-sm)',
+    flexShrink: 0,
     border: 'none',
     cursor: 'pointer',
     fontSize: '12.5px',
@@ -4373,6 +4336,7 @@ const styles: Record<string, React.CSSProperties> = {
   // contrast-heavy frosted surface that long settings lists sit on. No radius
   // (full-bleed pane); the class supplies the background.
   main: {
+    background: 'var(--color-bg-surface)',
     flex: 1,
     minWidth: 0,
     display: 'flex',
@@ -4428,10 +4392,12 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 'var(--space-2)',
-    padding: '13px 0',
+    padding: '12px 0',
     borderBottom: '1px solid var(--color-border-subtle)',
   },
   settingInfo: {
+    flex: '1 1 160px',
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
@@ -4443,7 +4409,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.01em',
   },
   settingDesc: {
-    fontSize: '11.5px',
+    fontSize: '12px',
     color: 'var(--color-text-secondary)',
     lineHeight: '1.4',
   },
@@ -4453,7 +4419,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   secondaryBtn: {
     marginTop: 'var(--space-3)',
-    padding: '10px 18px',
+    minHeight: 'var(--dex-control-h-md)',
+    padding: '0 var(--space-3)',
     borderRadius: '6px',
     border: '1px solid var(--color-border)',
     background: 'var(--color-bg-hover)',
@@ -4466,7 +4433,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   dangerBtn: {
     marginTop: 'var(--space-3)',
-    padding: '10px 18px',
+    minHeight: 'var(--dex-control-h-md)',
+    padding: '0 var(--space-3)',
     borderRadius: '6px',
     border: 'none',
     background: 'rgba(255,69,58,0.12)',

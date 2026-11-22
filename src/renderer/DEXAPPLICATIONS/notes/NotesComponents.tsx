@@ -1764,19 +1764,25 @@ interface TitleInputProps {
 export const TitleInput: React.FC<TitleInputProps> = memo(({ title, onChange, readOnly }) => {
   return (
     <input
+      className="dn-title-input"
+      aria-label="Note title"
       value={title}
       onChange={e => onChange(e.target.value)}
       readOnly={readOnly}
       placeholder="Untitled"
       style={{
-        width: '100%',
+        width: 'calc(100% - var(--space-5) * 2)',
+        marginInline: 'var(--space-5)',
+        boxSizing: 'border-box',
         background: 'transparent',
         border: 'none',
+        borderBottom: '1px solid transparent',
+        borderRadius: 0,
         outline: 'none',
         color: 'var(--color-text-primary)',
-        fontSize: 24,
-        fontWeight: 700,
-        padding: 'var(--space-4) var(--space-8) var(--space-2)',
+        fontSize: 22,
+        fontWeight: 650,
+        padding: 'var(--space-3) 0 var(--space-2)',
         fontFamily: 'var(--dex-font-ui)',
       }}
     />

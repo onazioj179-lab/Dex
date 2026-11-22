@@ -10,6 +10,13 @@ history (`git tag --list`) and on the GitHub Releases page.
 
 ---
 
+## v7.0.3 — Windows release
+
+- Refined light and dark themes across DEX, with flatter controls, clearer borders, and consistent spacing.
+- Refined Settings, Notes, Inbox, Maps, App Menu, and Spotlight.
+- Maps cancels outdated place searches and keeps results tied to the current query.
+- GitHub Actions builds the Windows x64 installer and publishes the signed update feed. Install the GitHub build once, then check for future updates in Settings › Software Update.
+
 ## v7.0.2 (001z) — unreleased
 
 Owner roadmap "we do not break userspace". Details in docs/ROADMAP.md (top) and

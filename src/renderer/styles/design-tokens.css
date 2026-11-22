@@ -100,6 +100,9 @@
   --dex-control-h-sm: 28px;
   --dex-control-h-md: 32px;
   --dex-control-h-lg: 40px;
+  --dex-window-shadow: 0 6px 20px rgba(0, 0, 0, 0.30);
+  --dex-window-shadow-inactive: 0 2px 8px rgba(0, 0, 0, 0.20);
+  --dex-popup-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
 }
 
 /* Light theme parity for the dex token layer. Values mirror the canonical
@@ -125,6 +128,9 @@
   --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
   /* Light-mode focus: near-black so the white-on-dark ring inverts and stays
      visible on light surfaces. */
+  --dex-window-shadow: 0 6px 20px rgba(25, 30, 42, 0.14);
+  --dex-window-shadow-inactive: 0 2px 8px rgba(25, 30, 42, 0.09);
+  --dex-popup-shadow: 0 3px 12px rgba(25, 30, 42, 0.13);
   --dex-focus-color: #1a1a1a;
   --dex-focus-glow: rgba(0, 0, 0, 0.16);
 }

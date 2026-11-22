@@ -101,6 +101,8 @@ const S: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   editorPane: {
+    background: 'var(--color-bg-surface)',
+    minWidth: 0,
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
@@ -906,6 +908,11 @@ const DexNotesInner: React.FC = () => {
         /* === DEXNOTES - UI HOVER === */
         .dexnotes-app button { font-family: inherit; transition: all 0.12s ease; }
         .dexnotes-app button:active { transform: scale(0.97); }
+        .dexnotes-app .dn-title-input:focus-visible {
+          outline: none !important;
+          border-bottom-color: var(--dex-focus-color) !important;
+        }
+        .dexnotes-app .dn-note-item[data-selected] { box-shadow: inset 2px 0 var(--color-accent); }
         .dexnotes-app .dn-footer button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; color: var(--color-text-primary) !important; }
         .dexnotes-app .dn-tree-acts:hover { opacity: 1 !important; }
         .dexnotes-app .dn-tree-acts button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; border-radius: 3px; }
@@ -1126,7 +1133,7 @@ const DexNotesInner: React.FC = () => {
                         minWidth: 150, padding: '4px 0', borderRadius: 6,
                         background: 'var(--color-bg-elevated, rgba(35,35,35,0.98))',
                         border: '1px solid var(--color-bg-hover)',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                        boxShadow: 'var(--dex-popup-shadow)',
                         zIndex: 'var(--z-max)',
                       }}>
                         <div className="dex-label-caps" style={{ padding: '4px var(--space-3) 6px' }}>New from template</div>

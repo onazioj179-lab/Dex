@@ -48,8 +48,8 @@ export const DexSwitch: React.FC<DexSwitchProps> = ({ checked, onChange, label, 
       style={{
         position: 'relative', flexShrink: 0, width: g.w, height: g.h, padding: 0, border: 'none',
         borderRadius: g.trackRadius,
-        background: checked ? 'var(--color-accent-fill, var(--color-accent, #0A84FF))' : 'color-mix(in srgb, var(--color-text-primary, #fff) 14%, transparent)',
-        boxShadow: checked ? 'none' : 'inset 0 0 0 1px var(--color-border-subtle)',
+        background: checked ? 'var(--color-accent-fill)' : 'var(--color-bg-active)',
+        boxShadow: checked ? 'none' : 'inset 0 0 0 1px var(--color-border-control, var(--color-border-strong))',
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1,
         transition: motion ?? 'background 0.15s ease',
       }}
@@ -58,8 +58,7 @@ export const DexSwitch: React.FC<DexSwitchProps> = ({ checked, onChange, label, 
         aria-hidden="true"
         style={{
           position: 'absolute', top: CAPSULE_INSET, left: CAPSULE_INSET, width: g.knob, height: g.knob, borderRadius: g.knobRadius,
-          background: checked ? 'var(--color-accent-text, #fff)' : '#fff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          background: checked ? 'var(--color-accent-text, #fff)' : 'var(--color-text-secondary)',
           transform: `translateX(${checked ? g.travel : 0}px)`,
           transition: motion ?? 'transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)',
         }}

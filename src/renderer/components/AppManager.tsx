@@ -27,7 +27,7 @@ import { AppContextMenuHost, openAppContextMenu, runAppAction, type AppCommandDe
 import { AppMenuPanel } from './AppMenuPanel';
 import { dispatchAppIntent } from '../services/appIntents';
 import { useUkiStore } from '../store/ukiStore';
-import { glassModal, adaptiveShadow } from '../styles/glassMenu';
+import { glassModal } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
 import { MorphingDock } from './dock/MorphingDock';
@@ -4103,13 +4103,8 @@ export const AppManager: React.FC = () => {
                 : 'var(--color-bg-base, #0C0C0E)',
               backdropFilter: useGlass ? 'var(--blur-xl) saturate(160%)' : undefined,
               WebkitBackdropFilter: useGlass ? 'var(--blur-xl) saturate(160%)' : undefined,
-              // Focus hierarchy (Apple-style depth): the active window LIFTS with a
-              // deeper shadow + a faint accent edge; inactive windows recede with a
-              // softer, lower shadow. Animates via the box-shadow transition below.
-              border: isMaximized ? 'none' : `1px solid ${isFocused ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`,
-              ...adaptiveShadow(isMaximized ? 'none' : isFocused
-                ? '0 28px 80px rgba(0,0,0,0.62), 0 8px 24px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(74,158,255,0.20), inset 0 0.5px 0 rgba(255,255,255,0.10)'
-                : '0 10px 28px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.05)'),
+              border: isMaximized ? 'none' : '1px solid var(--color-border)',
+              boxShadow: isMaximized ? 'none' : isFocused ? 'var(--dex-window-shadow)' : 'var(--dex-window-shadow-inactive)',
               contain: 'layout style paint',
               willChange: 'auto',
               transition: 'box-shadow 0.2s ease',
@@ -4128,11 +4123,8 @@ export const AppManager: React.FC = () => {
               style={{
                 height: spatialEnabled ? 30 : 36, display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                 padding: '0 var(--space-3)', cursor: 'grab', userSelect: 'none',
-                // Subtle top-lit gradient + hairline highlight gives the title bar real
-                // depth (Apple-like) instead of a dead-flat fill -- still fully opaque.
-                background: spatialEnabled ? 'var(--color-bg-surface)' : 'linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-surface) 100%)',
-                borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.10))', flexShrink: 0,
-                boxShadow: spatialEnabled ? undefined : 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
+                background: 'var(--color-bg-surface)',
+                borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0,
                 justifyContent: 'center',
                 touchAction: 'none',
                 WebkitAppRegion: 'no-drag',
@@ -5291,16 +5283,7 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region data-dex-chrome="topbar" style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      // Top chrome bar -- liquid glass (master overhaul): translucent --glass-bg
-      // over the adaptive backdrop blur so content scrolling beneath the chrome
-      // frosts through, matching the menus/dock/orbs. Degrades to solid on weak
-      // GPUs / reduced-transparency via the shared token.
-      background: 'var(--glass-bg, rgba(20,20,24,0.66))',
-      backdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-      WebkitBackdropFilter: 'var(--glass-blur, blur(28px) saturate(180%))',
-      // Seamless top chrome: tier 1 (this bar) and tier 2 (the tab strip) share
-      // one surface -- no divider, gloss, or shadow between them. The only
-      // hairline of the chrome lives at the bottom of the tab strip.
+      background: 'var(--color-bg-surface)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -5699,14 +5682,11 @@ export const AppManager: React.FC = () => {
               flexDirection: 'column',
               boxSizing: 'border-box',
               overflow: 'hidden',
-              // Master overhaul: glass app launcher panel (Part 3.7 / Part 4).
-              background: 'var(--glass-bg, rgba(12,12,12,0.85))',
-              backdropFilter: 'var(--glass-blur, blur(24px))',
-              WebkitBackdropFilter: 'var(--glass-blur, blur(24px))',
-              border: '1px solid var(--glass-border, rgba(255,255,255,0.07))',
-              borderRadius: 14,
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-strong)',
+              borderRadius: 'var(--radius-md)',
               padding: 'var(--space-4)',
-              boxShadow: 'var(--pg-shadow-modal)',
+              boxShadow: 'var(--dex-popup-shadow)',
               // Precision motion: pure opacity fade, no movement / scale / bounce.
               animation: 'appMenuFade 0.15s ease-out',
             } as React.CSSProperties}

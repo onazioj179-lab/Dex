@@ -1644,7 +1644,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
     // :focus-visible outline is suppressed via .dex-search-field, so the field
     // never shows a highlight box. One calm, consistent search field everywhere.
     border: `1px solid ${focused ? 'var(--color-border-strong, var(--color-border))' : 'var(--color-border)'}`,
-    borderRadius: 9999,
+    borderRadius: 'var(--radius-sm)',
     boxShadow: 'none',
     transition: `border-color ${transition.fast}`,
     width: fullWidth ? '100%' : 'auto',
@@ -1689,7 +1689,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
   };
 
   return (
-    <div style={containerStyle}>
+    <div className="dex-search-control" style={containerStyle}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={iconStyle}>
         <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

@@ -374,7 +374,7 @@ export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
 // Platform release stamped onto every built-in app so dock, Launchpad,
 // Settings -> About, and UKI all report the build version (package.json).
 const PLATFORM_VERSION = getBundledAppVersion();
-const PLATFORM_BUILD_DATE = '2026-11-01';
+const PLATFORM_BUILD_DATE = '2026-11-21';
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 const _O = platform.isMac ? '⌥' : 'Alt';
