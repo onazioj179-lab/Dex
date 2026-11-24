@@ -19,6 +19,7 @@ import {
 } from '../../uki/providers/connect';
 import { captureScreenImage, isScreenCaptureAvailable, captureCameraFrame, isCameraCaptureAvailable } from '../../uki/screenCapture';
 import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
+import { coreSystemPrompt, reasoningForTurn } from '../../uki/identity';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
@@ -42,10 +43,9 @@ interface Message {
   timestamp: number;
 }
 
-const SYSTEM_PROMPT =
-  'You are uki, the AI assistant inside DEX — a desktop productivity environment. ' +
-  'Be concise, helpful, and proactive. When the user asks you to do something across ' +
-  'their apps (notes, tasks, files, media), explain the steps clearly. Use markdown for code.';
+// The chat app shares UKI's one identity (uki/identity.ts) instead of keeping
+// its own differently-worded copy; it only adds the chat-specific format rule.
+const SYSTEM_PROMPT = `${coreSystemPrompt()}\nUse markdown for code.`;
 
 const OS_NAMES: Record<string, string> = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
 
@@ -64,7 +64,7 @@ function formatDevice(d: DeviceInfo): string {
  *  user is looking at (foreground/open/recent apps, local time, connectivity) and
  *  what machine it is running on (DEX 5.7 device awareness).
  *  Built per-send from the dependency-light snapshot in uki/context.ts. */
-function buildSystemPrompt(grounding?: string | null): string {
+function buildSystemPrompt(grounding?: string | null, userText = ''): string {
   const c = liveContext();
   const parts = [
     `Local time: ${c.localTime}.`,
@@ -76,7 +76,7 @@ function buildSystemPrompt(grounding?: string | null): string {
     c.recentFiles.length ? `Recent files: ${c.recentFiles.join(', ')}.` : '',
     `Network: ${c.online ? 'online' : 'offline'}.`,
   ].filter(Boolean);
-  let prompt = `${SYSTEM_PROMPT}\n\n[Live context] ${parts.join(' ')}`;
+  let prompt = `${SYSTEM_PROMPT}\n\n${reasoningForTurn(userText, { foregroundAppId: c.foregroundAppId })}\n\n[Live context] ${parts.join(' ')}`;
   // Domain skill packs relevant to the active Project Space and/or open apps
   // (DEX 5.6) — e.g. Git/Refactor/Debug for a development space. Compact and
   // token-bounded so the prompt stays lean; see uki/skillPacks.ts.
@@ -547,7 +547,7 @@ export default function Uki(): React.ReactElement {
     try {
       const result = await streamConfiguredLLM(
         text,
-        buildSystemPrompt(grounding),
+        buildSystemPrompt(grounding, text),
         (_token, running) => {
           full = running;
           setStreamingText(running);
@@ -744,7 +744,7 @@ export default function Uki(): React.ReactElement {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '0 10px', flexShrink: 0, cursor: 'pointer',
-                background: lookAtScreen ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
+                background: lookAtScreen ? 'var(--color-accent-light)' : 'transparent',
                 color: lookAtScreen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                 border: 'none', borderRadius: 9999,
               }}
@@ -764,7 +764,7 @@ export default function Uki(): React.ReactElement {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '0 10px', flexShrink: 0, cursor: 'pointer',
-                background: lookWithCamera ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
+                background: lookWithCamera ? 'var(--color-accent-light)' : 'transparent',
                 color: lookWithCamera ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                 border: 'none', borderRadius: 9999,
               }}

@@ -21,20 +21,24 @@
   /* Tabular numerals for any numeric / data display. */
   --dex-numeric: "tnum" 1, "lnum" 1;
 
-  /* ---- Color: neutral grays + ONE accent ------------------------------- */
-  --dex-accent: #4a9eff;
-  --dex-accent-hover: #6cb2ff;
-  --dex-accent-soft: rgba(74, 158, 255, 0.08);
+  /* ---- Color: aliases of the ONE canonical palette (design-system.css) ---
+     This layer used to carry its own literals (#4a9eff accent, #636366 light
+     tertiary at 3.0-4.4:1), a second palette that drifted from the real one.
+     Aliases resolve per element, so they follow light/dark/high-contrast and
+     scoped .dex-theme-dark subtrees automatically. */
+  --dex-accent: var(--color-accent);
+  --dex-accent-hover: var(--color-accent-hover);
+  --dex-accent-soft: var(--color-accent-soft);
 
-  --dex-bg: #0c0c0e;
-  --dex-bg-surface: #161618;
-  --dex-bg-hover: #1e1e22;
-  --dex-bg-active: #252528;
+  --dex-bg: var(--color-bg-base);
+  --dex-bg-surface: var(--color-bg-surface);
+  --dex-bg-hover: var(--color-bg-hover);
+  --dex-bg-active: var(--color-bg-active);
 
-  --dex-text: #ffffff;
-  --dex-text-secondary: #b8b8bd;
-  --dex-text-tertiary: #8e8e93;
-  --dex-text-disabled: #58585d;
+  --dex-text: var(--color-text-primary);
+  --dex-text-secondary: var(--color-text-secondary);
+  --dex-text-tertiary: var(--color-text-tertiary);
+  --dex-text-disabled: var(--color-text-disabled);
 
   /* ---- Borders: hairline at low opacity, no heavy shadows -------------- */
   --dex-hairline: 1px solid rgba(255, 255, 255, 0.08);
@@ -103,26 +107,20 @@
   --dex-window-shadow: 0 6px 20px rgba(0, 0, 0, 0.30);
   --dex-window-shadow-inactive: 0 2px 8px rgba(0, 0, 0, 0.20);
   --dex-popup-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+
+  /* ---- Glass material (fill + blur come from applyGlassVars) ------------
+     Edge: a translucent hairline, not an opaque grey line, so the rim takes
+     the colour of what is behind it. Rim: a 0.5px lit top edge. Depth: a
+     tight contact shadow plus one soft ambient shadow (no wide blooms). */
+  --glass-edge: rgba(255, 255, 255, 0.10);
+  --glass-rim: inset 0 0.5px 0 rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 /* Light theme parity for the dex token layer. Values mirror the canonical
    light palette in design-system.css ([data-theme="light"]). Without these,
    .dex-titlebar / .dex-panel / focus rings stay dark in light mode. */
 [data-theme="light"], .light-mode {
-  --dex-accent: #0066cc;
-  --dex-accent-hover: #0055b3;
-  --dex-accent-soft: rgba(0, 102, 204, 0.08);
-
-  --dex-bg: #fafafa;
-  --dex-bg-surface: #f2f2f4;
-  --dex-bg-hover: #e2e2e5;
-  --dex-bg-active: #d8d8dc;
-
-  --dex-text: #000000;
-  --dex-text-secondary: #3c3c43;
-  --dex-text-tertiary: #636366;
-  --dex-text-disabled: #aeaeb2;
-
   --dex-hairline: 1px solid rgba(0, 0, 0, 0.1);
   --dex-hairline-strong: 1px solid rgba(0, 0, 0, 0.16);
   --dex-elevation: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
@@ -131,6 +129,9 @@
   --dex-window-shadow: 0 6px 20px rgba(25, 30, 42, 0.14);
   --dex-window-shadow-inactive: 0 2px 8px rgba(25, 30, 42, 0.09);
   --dex-popup-shadow: 0 3px 12px rgba(25, 30, 42, 0.13);
+  --glass-edge: rgba(0, 0, 0, 0.08);
+  --glass-rim: inset 0 0.5px 0 rgba(255, 255, 255, 0.70);
+  --glass-shadow: 0 1px 2px rgba(25, 30, 42, 0.08), 0 8px 24px rgba(25, 30, 42, 0.12);
   --dex-focus-color: #1a1a1a;
   --dex-focus-glow: rgba(0, 0, 0, 0.16);
 }

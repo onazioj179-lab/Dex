@@ -53,6 +53,10 @@ describe('Dock layout', () => {
     expect(dockPositionAt(area, 10, 788)).toEqual({ edge: 'bottom', align: 'start' });
     expect(dockPositionAt(area, 1270, 788)).toEqual({ edge: 'bottom', align: 'end' });
     expect(dockPositionAt(area, 10, 430)).toEqual({ edge: 'left', align: 'center' });
+    // Along a side edge inside a corner zone, away from the top/bottom edge:
+    // a vertical Dock at that end of the side.
+    expect(dockPositionAt(area, 8, 200)).toEqual({ edge: 'left', align: 'start' });
+    expect(dockPositionAt(area, 1272, 700)).toEqual({ edge: 'right', align: 'end' });
   });
   it('maps a pointer to a slot and moves ids', () => {
     expect(dropIndex(0, 5)).toBe(0);

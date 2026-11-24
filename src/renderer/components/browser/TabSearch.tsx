@@ -77,7 +77,7 @@ export const TabSearch: React.FC<{ tabs: TabSearchItem[]; onPick: (id: string) =
             onClick={() => { onPick(t.id); onClose(); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, cursor: 'pointer',
-              background: i === sel ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent',
+              background: i === sel ? 'var(--color-accent-light)' : 'transparent',
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>

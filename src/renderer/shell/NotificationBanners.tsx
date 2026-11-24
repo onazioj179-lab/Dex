@@ -76,11 +76,14 @@ const UNDO_DURATION = 8000;
 /**
  * How long a capsule stays. Errors, urgent items and anything asking for a
  * decision (action buttons) stay until handled; Undo gets a little longer.
+ * A success notice's buttons are a shortcut ("View"), not a decision: it gets
+ * the longer Undo time to reach the button and then goes (a "Challenge
+ * complete" capsule used to sit on screen until clicked away).
  */
 export function capsuleDuration(n: Pick<BannerNotification, 'duration' | 'icon' | 'priority' | 'actions' | 'undoAction'>): number {
   if (typeof n.duration === 'number') return n.duration;
   if (n.icon === 'error' || n.priority === 'urgent') return 0;
-  if (n.actions && n.actions.length > 0) return 0;
+  if (n.actions && n.actions.length > 0) return n.icon === 'success' ? UNDO_DURATION : 0;
   if (n.undoAction) return UNDO_DURATION;
   return DEFAULT_DURATION;
 }
@@ -676,7 +679,7 @@ const CenterCard: React.FC<{
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     padding: '4px 10px', borderRadius: 6, border: 'none',
-                    background: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    background: 'var(--color-accent-light)',
                     color: 'var(--color-accent)', fontSize: 11, fontWeight: 600,
                     cursor: 'pointer',
                     transition: isReduceMotion() ? 'none' : 'background 0.12s ease',
@@ -885,7 +888,7 @@ export const NotificationCenter: React.FC<{
                     {group.unreadCount > 0 && (
                       <span style={{
                         fontSize: 9, fontWeight: 600, color: 'var(--color-accent)',
-                        background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
+                        background: 'var(--color-accent-light)',
                         padding: '1px 5px', borderRadius: 6, flexShrink: 0,
                       }}>
                         {group.unreadCount} new

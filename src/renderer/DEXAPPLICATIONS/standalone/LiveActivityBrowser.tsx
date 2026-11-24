@@ -388,7 +388,7 @@ const LiveActivityBrowser: React.FC = () => {
           style={{
             height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: paused ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+            background: paused ? 'var(--color-accent-light)' : 'transparent',
             border: `1px solid ${paused ? 'var(--color-accent)' : 'var(--color-border)'}`,
             color: paused ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
           }}
@@ -442,7 +442,7 @@ const LiveActivityBrowser: React.FC = () => {
                 style={{
                   height: 24, padding: '0 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600, textTransform: 'capitalize',
-                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  background: active ? 'var(--color-accent-light)' : 'transparent',
                   border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
@@ -472,7 +472,7 @@ const LiveActivityBrowser: React.FC = () => {
                 style={{
                   height: 22, padding: '0 9px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  background: active ? 'var(--color-accent-light)' : 'transparent',
                   border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
@@ -495,7 +495,7 @@ const LiveActivityBrowser: React.FC = () => {
                 style={{
                   height: 22, padding: '0 9px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  background: active ? 'var(--color-accent-light)' : 'transparent',
                   border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}
@@ -520,7 +520,7 @@ const LiveActivityBrowser: React.FC = () => {
                 style={{
                   height: 24, padding: '0 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+                  background: active ? 'var(--color-accent-light)' : 'transparent',
                   border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border-subtle)'}`,
                   color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 }}

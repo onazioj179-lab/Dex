@@ -30,16 +30,6 @@ export const T = {
   borderSub:'var(--color-border-subtle)',
 } as const;
 
-export function toggleTheme(): void {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const next = isDark ? 'light' : 'dark';
-  // An explicit flip cross-fades (one compositor fade, see viewTransition.ts).
-  withViewTransition(() => applyTheme(next));
-  // User explicitly toggled — pin and stop following OS
-  localStorage.setItem('darkMode', (!isDark).toString());
-  localStorage.setItem('dex-theme-source', 'user');
-}
-
 /**
  * Run a theme change with CSS transitions switched off for that one style
  * pass. Without this, flipping light/dark started a colour transition on every
@@ -70,49 +60,122 @@ export function setThemeAttribute(theme: string): void {
   withoutTransitions(() => root.setAttribute('data-theme', theme));
 }
 
-/** Apply a theme (dark|light) to root + body without persisting. */
-export function applyTheme(theme: 'dark' | 'light'): void {
-  const isDark = theme === 'dark';
-  withoutTransitions(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    document.body.classList.toggle('dark-mode', isDark);
-    document.body.classList.toggle('light-mode', !isDark);
-    document.documentElement.classList.toggle('dark-mode', isDark);
-    document.documentElement.classList.toggle('light-mode', !isDark);
-  });
+// ---------------------------------------------------------------------------
+// The one theme controller.
+//
+// Every surface that reads or changes light/dark goes through here: the
+// pre-paint script in index.html mirrors `resolveThemePreference`, Settings and
+// the Setup Assistant call `setThemePreference`, the command palette and the
+// shell call `toggleTheme`, the theme schedule calls `applyTheme`. Before this,
+// six writers disagreed at boot (App.tsx forced dark on mount after the OS
+// follow had chosen light, an unused store forced dark at import, a preset
+// writer applied a third key) and Settings' "Auto" only snapshotted the OS.
+//
+// Persisted preference (keys kept for existing installs):
+//   dex-theme-source = 'system'          -> follow the OS live
+//   darkMode = 'true' | 'false'          -> explicit choice (source 'user' or
+//                                           legacy installs with no source)
+//   nothing stored                       -> dark (DEX's default)
+// ---------------------------------------------------------------------------
+
+export type ThemeName = 'dark' | 'light';
+export type ThemePreference = ThemeName | 'system';
+
+const DARK_KEY = 'darkMode';
+const SOURCE_KEY = 'dex-theme-source';
+/** Fired on window after the applied theme changes. detail: { theme }. */
+export const THEME_CHANGED_EVENT = 'dex-theme-changed';
+
+export function getThemePreference(): ThemePreference {
+  try {
+    if (localStorage.getItem(SOURCE_KEY) === 'system') return 'system';
+    const stored = localStorage.getItem(DARK_KEY);
+    if (stored !== null) return stored === 'false' ? 'light' : 'dark';
+  } catch { /* storage unavailable */ }
+  return 'dark';
 }
 
-/**
- * Initialize theme on boot: if user has explicitly chosen one, honor it.
- * Otherwise follow OS prefers-color-scheme and update live as it changes.
- */
-export function initTheme(): void {
+function systemTheme(): ThemeName {
   try {
-    const source = localStorage.getItem('dex-theme-source');
-    const stored = localStorage.getItem('darkMode');
-    if (source === 'user' && stored !== null) {
-      applyTheme(stored === 'true' ? 'dark' : 'light');
-      return;
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    applyTheme(mq.matches ? 'dark' : 'light');
-    mq.addEventListener('change', e => {
-      // Only follow OS if the user hasn't pinned a choice
-      if (localStorage.getItem('dex-theme-source') !== 'user') {
-        applyTheme(e.matches ? 'dark' : 'light');
-      }
-    });
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   } catch {
-    applyTheme('dark');
+    return 'dark';
   }
+}
+
+export function resolveThemePreference(pref: ThemePreference = getThemePreference()): ThemeName {
+  return pref === 'system' ? systemTheme() : pref;
+}
+
+/** The theme currently applied to the document. */
+export function currentTheme(): ThemeName {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+/** Apply a theme (dark|light) to root + body without persisting. */
+export function applyTheme(theme: ThemeName): void {
+  const isDark = theme === 'dark';
+  const root = document.documentElement;
+  const changed = root.getAttribute('data-theme') !== theme;
+  const classesRight = root.classList.contains(isDark ? 'dark-mode' : 'light-mode')
+    && !root.classList.contains(isDark ? 'light-mode' : 'dark-mode')
+    && document.body.classList.contains(isDark ? 'dark-mode' : 'light-mode');
+  if (!changed && classesRight) return;
+  withoutTransitions(() => {
+    root.setAttribute('data-theme', theme);
+    document.body.classList.toggle('dark-mode', isDark);
+    document.body.classList.toggle('light-mode', !isDark);
+    root.classList.toggle('dark-mode', isDark);
+    root.classList.toggle('light-mode', !isDark);
+  });
+  if (changed) {
+    try { window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } })); } catch { /* noop */ }
+  }
+}
+
+/** Persist a preference and apply it (an actual flip cross-fades). */
+export function setThemePreference(pref: ThemePreference, opts: { animate?: boolean } = {}): void {
+  try {
+    if (pref === 'system') {
+      localStorage.setItem(SOURCE_KEY, 'system');
+      localStorage.removeItem(DARK_KEY);
+    } else {
+      localStorage.setItem(DARK_KEY, String(pref === 'dark'));
+      localStorage.setItem(SOURCE_KEY, 'user');
+    }
+  } catch { /* storage unavailable: still apply for this session */ }
+  const next = resolveThemePreference(pref);
+  if (opts.animate !== false && next !== currentTheme()) withViewTransition(() => applyTheme(next));
+  else applyTheme(next);
+}
+
+export function toggleTheme(): void {
+  setThemePreference(currentTheme() === 'dark' ? 'light' : 'dark');
 }
 
 /** Reset theme to follow OS again. */
 export function followSystemTheme(): void {
+  setThemePreference('system');
+}
+
+let themeListenersInstalled = false;
+
+/**
+ * Apply the persisted preference and keep it live: OS scheme changes while
+ * following the system, and preference changes made in another DEX window
+ * (same-origin webviews share localStorage and receive `storage` events).
+ * Idempotent.
+ */
+export function initTheme(): void {
+  applyTheme(resolveThemePreference());
+  if (themeListenersInstalled || typeof window === 'undefined') return;
+  themeListenersInstalled = true;
   try {
-    localStorage.removeItem('dex-theme-source');
-    localStorage.removeItem('darkMode');
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    applyTheme(mq.matches ? 'dark' : 'light');
-  } catch { /* ignore */ }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (getThemePreference() === 'system') applyTheme(systemTheme());
+    });
+  } catch { /* matchMedia unavailable */ }
+  window.addEventListener('storage', (e) => {
+    if (e.key === null || e.key === DARK_KEY || e.key === SOURCE_KEY) applyTheme(resolveThemePreference());
+  });
 }

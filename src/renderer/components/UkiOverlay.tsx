@@ -1683,6 +1683,7 @@ const UkiOverlay: React.FC = () => {
         online: isOnline,
         localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         activeWorkspace: ws ? { name: ws.name, kind: ws.kind } : undefined,
+        userText: text,
       });
       // Fold in live app context (what the user is looking at across Notes/Tasks/
       // Files, etc.) so the overlay's answers are grounded in the current state,

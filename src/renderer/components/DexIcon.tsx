@@ -698,6 +698,9 @@ export const ICON_NAME_MAP: Record<string, string> = {
   'pomodoro': 'clock',
   'qrcode': 'grid',
   'colorpicker': 'palette',
+  // These two app ids had no glyph and rendered the letter fallback.
+  'dashboard': 'layout-dashboard',
+  'powerrename': 'type',
   
   // Text aliases for common use
   'star': 'emoji-star', 'sparkle': 'emoji-sparkle',

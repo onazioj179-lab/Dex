@@ -16,6 +16,13 @@ history (`git tag --list`) and on the GitHub Releases page.
 - Refined Settings, Notes, Inbox, Maps, App Menu, and Spotlight.
 - Maps cancels outdated place searches and keeps results tied to the current query.
 - GitHub Actions builds the Windows x64 installer and publishes the signed update feed. Install the GitHub build once, then check for future updates in Settings › Software Update.
+- Light mode: one theme setting for the whole system (Dark, Light, or Auto, which now really follows Windows), no dark flash at startup, and readable text in every app, checked automatically on each change.
+- Glass is back on the top bar, App Menu, Spotlight and menus, in light and dark, and it follows Interface Transparency and Reduce Transparency.
+- Calmer motion: springs no longer bounce and menus open without overshoot.
+- UKI picks its approach to suit each request, says so when it disagrees, and corrects itself if a step it relied on did not complete.
+- The Dock can snap to the top or bottom of the left and right edges; Esc cancels a move.
+- Software Update explains failures in plain words, and Try again resumes the step that failed.
+- Security: updated the map engine and the HTML sanitiser to fix known vulnerabilities.
 
 ## v7.0.2 (001z) — unreleased
 

@@ -127,12 +127,21 @@
       }
     </style>
     <script>
-      // Apply theme immediately to prevent flash
+      // Apply theme before first paint. Mirrors resolveThemePreference() in
+      // utils/theme.ts (the one controller): 'system' follows the OS, a stored
+      // darkMode is an explicit choice, nothing stored means dark.
       (function() {
-        var savedDarkMode = localStorage.getItem('darkMode');
-        var isDark = savedDarkMode === null ? true : savedDarkMode === 'true';
-        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        if (document.body && isDark) document.body.classList.add('dark-mode');
+        var isDark = true;
+        try {
+          if (localStorage.getItem('dex-theme-source') === 'system') {
+            isDark = !window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches;
+          } else {
+            isDark = localStorage.getItem('darkMode') !== 'false';
+          }
+        } catch (e) { /* storage unavailable: dark */ }
+        var root = document.documentElement;
+        root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        root.classList.add(isDark ? 'dark-mode' : 'light-mode');
       })();
     </script>
   </head>

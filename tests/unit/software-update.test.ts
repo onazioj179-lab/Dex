@@ -1,6 +1,6 @@
 // DEX Platform — Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 import { afterEach, expect, it, vi } from 'vitest';
-import { useSoftwareUpdate } from '../../src/renderer/services/softwareUpdate';
+import { describeUpdateError, useSoftwareUpdate } from '../../src/renderer/services/softwareUpdate';
 
 const api = vi.hoisted(() => ({ check: vi.fn() }));
 vi.mock('@tauri-apps/plugin-updater', () => api);
@@ -44,7 +44,49 @@ it('counts downloaded bytes and waits for verification before enabling install',
 it('shows an unsuccessful update check as an error and can retry', async () => {
   api.check.mockRejectedValueOnce(new Error('Update feed unavailable')).mockResolvedValueOnce(null);
   await useSoftwareUpdate.getState().check();
-  expect(useSoftwareUpdate.getState()).toMatchObject({ phase: 'error', error: 'Update feed unavailable' });
+  expect(useSoftwareUpdate.getState()).toMatchObject({ phase: 'error', failedStep: 'check', errorDetail: 'Update feed unavailable' });
   await useSoftwareUpdate.getState().check();
   expect(useSoftwareUpdate.getState()).toMatchObject({ phase: 'current', error: '' });
+});
+
+const update = (download: ReturnType<typeof vi.fn>, install = vi.fn(async () => undefined)) => ({
+  version: '7.0.4', body: '', close: vi.fn(async () => undefined), download, install,
+});
+
+it('a failed download retries the same update without a new check', async () => {
+  const download = vi.fn()
+    .mockRejectedValueOnce(new Error('error sending request: connection reset'))
+    .mockImplementationOnce(async (emit: (event: unknown) => void) => { emit({ event: 'Finished' }); });
+  api.check.mockResolvedValue(update(download));
+  await useSoftwareUpdate.getState().check();
+  await useSoftwareUpdate.getState().download();
+  expect(useSoftwareUpdate.getState()).toMatchObject({ phase: 'error', failedStep: 'download' });
+  expect(useSoftwareUpdate.getState().error).toMatch(/interrupted\. Nothing was installed/);
+  await useSoftwareUpdate.getState().retry();
+  expect(api.check).toHaveBeenCalledTimes(1);
+  expect(download).toHaveBeenCalledTimes(2);
+  expect(useSoftwareUpdate.getState().phase).toBe('ready');
+});
+
+it('an invalid signature is reported as not installed and never reaches install', async () => {
+  const install = vi.fn(async () => undefined);
+  api.check.mockResolvedValue(update(vi.fn().mockRejectedValue(new Error('minisign: signature verification failed')), install));
+  await useSoftwareUpdate.getState().check();
+  await useSoftwareUpdate.getState().download();
+  expect(useSoftwareUpdate.getState().error).toMatch(/signature check, so it was not installed/);
+  await useSoftwareUpdate.getState().install();
+  expect(install).not.toHaveBeenCalled();
+});
+
+it('offline fails fast without calling the server', async () => {
+  const spy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  await useSoftwareUpdate.getState().check();
+  spy.mockRestore();
+  expect(api.check).not.toHaveBeenCalled();
+  expect(useSoftwareUpdate.getState().error).toMatch(/could not reach the update server/);
+});
+
+it('maps disk-space and installer failures to plain language', () => {
+  expect(describeUpdateError('download', new Error('os error 112: ENOSPC'))).toMatch(/not enough free disk space/);
+  expect(describeUpdateError('install', new Error('failed to run installer'))).toMatch(/current version is unchanged/);
 });

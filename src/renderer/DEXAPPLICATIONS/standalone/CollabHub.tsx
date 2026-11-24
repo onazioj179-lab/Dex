@@ -1703,7 +1703,7 @@ const CollabHub: React.FC = () => {
                           gap: 6,
                           padding: 'var(--space-3) var(--space-4)',
                           background: selected
-                            ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)'
+                            ? 'var(--color-accent-light)'
                             : 'var(--color-bg-hover, rgba(255,255,255,0.04))',
                           border: selected
                             ? '1px solid var(--color-accent)'

@@ -263,7 +263,7 @@ const PowerRename: React.FC = () => {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <input style={{ ...inputStyle, width: 220 }} placeholder="C:\\path\\to\\folder" value={folderPath} onChange={e => setFolderPath(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') loadFolder(folderPath); }} />
-                <button onClick={() => loadFolder(folderPath)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer', borderColor: 'var(--color-accent, #0A84FF)', color: 'var(--color-accent, #4A9EFF)' }}>Load folder</button>
+                <button onClick={() => loadFolder(folderPath)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer', borderColor: 'var(--color-accent-fill)', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)' }}>Load folder</button>
                 <button onClick={() => setPasteMode(p => !p)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }}>Paste names</button>
               </div>
               {pasteMode && (

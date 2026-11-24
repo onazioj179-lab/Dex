@@ -1,5 +1,39 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-24) — Owner directive "system-wide design, architecture, maintenance and production reliability" (P0 light mode).**
+> - **Theme architecture: DONE (this branch).** `utils/theme.ts` is the one controller (preference dark | light | system,
+>   resolve, apply, OS-follow, cross-window `storage` sync, `dex-theme-changed` event); the `index.html` pre-paint script
+>   mirrors it (tested). Removed: App.tsx forcing dark on mount, the unused `useThemeStore` forcing dark at import, the
+>   preset observer, and ThemeManager's inline palette (it overrode light secondary text and both high-contrast palettes).
+>   Settings Appearance Auto now really follows the OS and shows as selected. Guard tests: one `data-theme` writer, no
+>   inline palette writes.
+> - **Light-mode contrast sweep: DONE for all 62 apps** (runtime WCAG check on composited colours in the preview). Fixed:
+>   accent text on accent tints (opaque `color-mix` tints, 4.3 -> 4.8:1), DexCode light syntax palette (1.6/2.2 -> >= 4.5),
+>   Store counts, VINX track toggles, PowerRename, DexCode labels. Imosion/AXL stay dark-scoped on purpose.
+> - **Glass + motion (follow-up brief): DONE.** One material (`--glass-edge/-rim/-shadow`, theme-aware) on the top bar,
+>   App Menu, Spotlight, menus and `.dex-liquid-glass`; fill/blur still only from `applyGlassVars`. #170 had flattened
+>   these to solid. Concentric radii (24 = 18 + 6). `--ease-spring` overshoot 1.56 -> 1.2, menus enter ease-out. 80
+>   inline accent tints -> `--color-accent-light`. Duplicate `--dex-*` palette now aliases the canonical one. Success
+>   capsules with a View button auto-dismiss (8 s). CI: read-only token, cancel superseded PR runs, Rust `core/` tests.
+> - **CI/CD + updater (third pass): DONE.** CI: every action pinned to a commit SHA; `security` job (npm audit prod
+>   high+, gitleaks, dependency-review on PRs); `version:check` (4 files + tag); Rust core tests; Playwright
+>   `theme-contrast.e2e.ts` = the light-mode release gate (62 apps, light AND dark at 0 findings; only the
+>   owner-accepted dark accent is exempt). Release: a `verify`
+>   job (lint, unit, Rust, version==tag) must pass before build/publish; write permission only on the publish job.
+>   Deps: maplibre-gl 5.24 -> 6.19 (critical XSS), dompurify 3.3.1 -> 3.5.0 (21 advisories); `npm audit` prod = 0.
+>   Updater: plain-language errors (signature / network / disk / installer), Try again resumes the failed step,
+>   offline fails fast; tests cover interrupted download, bad signature, offline. Low perf-tier rule painted inline-blur
+>   surfaces #141416 in light mode (caught by the gate) -> theme surface.
+> - **UKI foundations + dock + perf (fourth pass): DONE.** `uki/foundations.ts`: five task-selected lenses (engineering,
+>   computation, research, invention, reliability) + a shared reasoning core (incl. no agreeing to please), max 3
+>   lenses per turn, never named in answers; Umari leans on research, Xack on reliability. One identity:
+>   `coreSystemPrompt()` replaces the chat app's private prompt copy. Agent loop cross-checks the final answer
+>   against real tool outcomes and appends a correction when a failed step is claimed as done. Dock: 4 vertical
+>   corner snaps (12 positions), Esc cancels a placement drag. Launch metrics now see windowed apps (they polled
+>   every frame for 10 s and were never recorded). Idle with 8 apps: 15 rAF / 6 s, 0 long tasks (preview).
+> - **Decided (owner, 2026-11-24): keep #0A84FF.** As text on accent tints it is 3.3-4.4:1 in dark mode; accepted, no
+>   text-only accent.
+
 > **GOAL (2026-11-17) — Owner mandate "Performance, multi-window, Browser, system-wide UI/UX, UKI" (7.0.2, 16 batches).**
 > Rule: measure in the release exe on an isolated profile before and after (`scripts/perf/packaged-probe.mjs`; results in
 > `docs/reports/perf/`). Nothing estimated. Status:

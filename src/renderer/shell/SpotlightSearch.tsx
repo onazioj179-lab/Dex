@@ -671,11 +671,14 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               position: 'absolute', left: popup.left, width: popup.width, ...dropStyle,
               height: popup.height, overflowY: 'auto', overflowX: 'hidden',
               scrollbarGutter: 'stable',
-              background: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border-strong)',
+              // Floating glass; 10 = the 6px rows + 4px padding (concentric).
+              background: 'var(--color-bg-glass-strong)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-edge)',
               borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--dex-popup-shadow)',
-              padding: 6,
+              boxShadow: 'var(--glass-shadow), var(--glass-rim)',
+              padding: 4,
               boxSizing: 'border-box',
             }}
           >
@@ -743,17 +746,20 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           width: 'min(600px, 92vw)',
           maxHeight: 'min(540px, 72vh)',
           display: 'flex', flexDirection: 'column', gap: 4, padding: 6,
-          background: 'var(--color-bg-surface)',
-          border: '1px solid var(--color-border-strong)',
-          borderRadius: 'var(--radius-md)',
-          boxShadow: 'var(--dex-popup-shadow)',
+          // Floating glass capsule: outer 24 = the 18px field + 6px padding.
+          background: 'var(--color-bg-glass-strong)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          border: '1px solid var(--glass-edge)',
+          borderRadius: 'var(--radius-2xl)',
+          boxShadow: 'var(--glass-shadow), var(--glass-rim)',
           overflow: 'hidden',
         }}
       >
         {/* Input row */}
         <div data-testid="spotlight-capsule" style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          height: 40, padding: '0 8px 0 12px', borderRadius: 'var(--radius-sm)',
+          height: 40, padding: '0 8px 0 14px', borderRadius: 'var(--radius-xl)',
           background: 'var(--color-bg-hover)',
           flexShrink: 0,
         }}>

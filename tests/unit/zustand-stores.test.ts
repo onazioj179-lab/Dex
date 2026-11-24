@@ -223,31 +223,3 @@ describe('useDockPins', () => {
 // ========================================================================
 // Theme Store Tests
 // ========================================================================
-describe('useThemeStore', () => {
-  let store: any;
-
-  beforeEach(async () => {
-    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
-    vi.resetModules();
-    const mod = await import('../../src/renderer/store/useStore');
-    store = mod.useThemeStore;
-  });
-
-  it('defaults to dark theme', () => {
-    expect(store.getState().theme).toBe('dark');
-  });
-
-  it('setTheme updates theme and persists', () => {
-    store.getState().setTheme('light');
-    expect(store.getState().theme).toBe('light');
-    expect(mockStorage['dex-theme']).toBe('light');
-  });
-
-  it('toggleTheme switches between dark and light', () => {
-    store.getState().setTheme('dark');
-    store.getState().toggleTheme();
-    expect(store.getState().theme).toBe('light');
-    store.getState().toggleTheme();
-    expect(store.getState().theme).toBe('dark');
-  });
-});

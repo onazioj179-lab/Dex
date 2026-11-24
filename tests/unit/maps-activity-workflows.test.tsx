@@ -13,8 +13,8 @@ const map = vi.hoisted(() => ({
   setStyle: vi.fn(), line: vi.fn(),
 }));
 
-vi.mock('maplibre-gl', () => ({
-  default: {
+vi.mock('maplibre-gl', () => {
+  const lib = {
     Map: class {
       on(event: string, cb: (event: unknown) => void) { map.handlers.set(event, cb); }
       off(event: string) { map.handlers.delete(event); }
@@ -33,8 +33,9 @@ vi.mock('maplibre-gl', () => ({
       addTo() { return this; }
       remove() {}
     },
-  },
-}));
+  };
+  return { default: lib, ...lib };
+});
 vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().mockResolvedValue(null) }));
 
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); map.handlers.clear(); });

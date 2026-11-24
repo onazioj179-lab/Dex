@@ -2592,7 +2592,7 @@ const Flux: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
-    logo: { fontSize: '12px', fontWeight: 700, color: FLUX_ACCENT, letterSpacing: '-0.2px' },
+    logo: { fontSize: '12px', fontWeight: 700, color: `color-mix(in srgb, ${FLUX_ACCENT} 70%, var(--color-text-primary))`, letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
     btnPrimary: { background: FLUX_ACCENT, color: 'var(--flux-on-accent, #fff)', border: `1px solid ${FLUX_ACCENT}`, borderRadius: '9999px' },
@@ -3534,7 +3534,7 @@ const Flux: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Animate By</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['character', 'word', 'line'] as const).map(m => (
-                <button key={m} onClick={() => setTextAnimMode(m)} aria-label={`Animate by ${m}`} aria-pressed={textAnimMode === m} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: textAnimMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: textAnimMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
+                <button key={m} onClick={() => setTextAnimMode(m)} aria-label={`Animate by ${m}`} aria-pressed={textAnimMode === m} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: textAnimMode === m ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: textAnimMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Cascade Delay</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{textAnimCascade}ms</span></div>
@@ -3783,7 +3783,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['grid', 'radial', 'spiral'] as const).map(t => (
-                <button key={t} onClick={() => setRepeaterType(t)} aria-label={`${t} repeater type`} aria-pressed={repeaterType === t} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: repeaterType === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: repeaterType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                <button key={t} onClick={() => setRepeaterType(t)} aria-label={`${t} repeater type`} aria-pressed={repeaterType === t} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: repeaterType === t ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: repeaterType === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             <div style={{ height: 100, background: 'var(--color-border-subtle)', borderRadius: 6, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3852,7 +3852,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: 14 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {([['vp9', 'WebM VP9'], ['vp8', 'WebM VP8']] as const).map(([codec, f]) => (
-                <button key={f} aria-label={`${f} export format`} aria-pressed={gifCodec === codec} onClick={() => setGifCodec(codec)} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: gifCodec === codec ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: gifCodec === codec ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
+                <button key={f} aria-label={`${f} export format`} aria-pressed={gifCodec === codec} onClick={() => setGifCodec(codec)} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: gifCodec === codec ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: gifCodec === codec ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{f}</button>
               ))}
             </div>
             <div style={{ marginBottom: 10 }}>
@@ -4006,7 +4006,7 @@ const Flux: React.FC = () => {
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             <div style={{ width: 130, borderRight: '1px solid var(--color-bg-hover)', padding: 'var(--space-2)' }}>
               {(['lower-thirds', 'intros', 'social', 'titles'] as const).map(cat => (
-                <button key={cat} onClick={() => setCompTemplateCategory(cat)} aria-label={`${cat.replace('-', ' ')} templates`} aria-pressed={compTemplateCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: compTemplateCategory === cat ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent', color: compTemplateCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat.replace('-', ' ')}</button>
+                <button key={cat} onClick={() => setCompTemplateCategory(cat)} aria-label={`${cat.replace('-', ' ')} templates`} aria-pressed={compTemplateCategory === cat} style={{ display: 'block', width: '100%', padding: '6px var(--space-2)', borderRadius: 4, border: 'none', background: compTemplateCategory === cat ? 'var(--color-accent-light)' : 'transparent', color: compTemplateCategory === cat ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', marginBottom: 2, textTransform: 'capitalize' }}>{cat.replace('-', ' ')}</button>
               ))}
             </div>
             <div style={{ flex: 1, padding: 'var(--space-3)', overflowY: 'auto' }}>
@@ -4057,7 +4057,7 @@ const Flux: React.FC = () => {
                 }
                 return l;
               }));
-            }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
+            }} style={{ width: '100%', padding: '6px', borderRadius: 9999, border: '1px dashed color-mix(in srgb, var(--color-accent) 30%, transparent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginBottom: 'var(--space-2)' }}>+ Create Null Object</button>
             <div style={{ marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 4 }}>Control layer (optional)</span>
               <select value={nullParentId} onChange={e => setNullParentId(e.target.value)} style={{ width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-bg-inset, rgba(0,0,0,0.3))', color: 'var(--color-text-secondary)', fontSize: 11 }}>
@@ -4077,7 +4077,7 @@ const Flux: React.FC = () => {
               {layers.filter(l => (l.type as any) === 'null').length === 0 ? (
                 <div style={{ padding: 14, textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 11 }}>No null objects created yet</div>
               ) : layers.filter(l => (l.type as any) === 'null').map(n => (
-                <button key={n.id} onClick={() => setSelectedLayerId(n.id)} aria-label={`Select ${n.name}`} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid ' + (selectedLayerId === n.id ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'), background: selectedLayerId === n.id ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent', color: selectedLayerId === n.id ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 2 }}>{n.name}</button>
+                <button key={n.id} onClick={() => setSelectedLayerId(n.id)} aria-label={`Select ${n.name}`} style={{ display: 'block', width: '100%', padding: '5px var(--space-2)', borderRadius: 4, border: '1px solid ' + (selectedLayerId === n.id ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-bg-hover)'), background: selectedLayerId === n.id ? 'var(--color-accent-light)' : 'transparent', color: selectedLayerId === n.id ? 'var(--color-accent)' : 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', textAlign: 'left', marginBottom: 2 }}>{n.name}</button>
               ))}
             </div>
           </div>
@@ -4141,7 +4141,7 @@ const Flux: React.FC = () => {
           <div style={{ padding: 10 }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {['Add', 'Subtract', 'Intersect'].map(op => (
-                <button key={op} onClick={() => setMaskType(op.toLowerCase() as 'add' | 'subtract' | 'intersect')} aria-label={`${op} mask mode`} aria-pressed={maskType === op.toLowerCase()} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: maskType === op.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: maskType === op.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{op}</button>
+                <button key={op} onClick={() => setMaskType(op.toLowerCase() as 'add' | 'subtract' | 'intersect')} aria-label={`${op} mask mode`} aria-pressed={maskType === op.toLowerCase()} style={{ flex: 1, padding: '4px 0', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: maskType === op.toLowerCase() ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: maskType === op.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{op}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>

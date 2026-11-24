@@ -7,66 +7,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { performanceManager } from '../utils/PerformanceManager';
-import { setThemeAttribute } from '../utils/theme';
 import type { DexAction, DexMode, DexRule, LogEntry, SystemStatus, DexPermissions } from '../../shared/types';
-
-// ===========================================================================
-// THEME STORE - Light/Dark mode management
-// ===========================================================================
-
-type Theme = 'dark' | 'light';
-
-interface ThemeState {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
-}
-
-export const useThemeStore = create<ThemeState>((set, get) => {
-  // Async load from IPC backend on startup
-  (window as any).dex?.invoke?.('capability:storage:get', 'dex-theme').then((saved: string | null) => {
-    if (saved === 'light' || saved === 'dark') {
-      setThemeAttribute(saved);
-      set({ theme: saved });
-    }
-  }).catch((e: unknown) => { console.warn('[DEX]', e); });
-
-  return {
-  theme: (localStorage.getItem('dex-theme') as Theme) || 'dark',
-  
-  setTheme: (theme) => {
-    localStorage.setItem('dex-theme', theme);
-    (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', theme).catch((e: unknown) => { console.warn('[DEX]', e); });
-    setThemeAttribute(theme);
-    set({ theme });
-  },
-  
-  toggleTheme: () => {
-    const newTheme = get().theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('dex-theme', newTheme);
-    (window as any).dex?.invoke?.('capability:storage:set', 'dex-theme', newTheme).catch((e: unknown) => { console.warn('[DEX]', e); });
-    setThemeAttribute(newTheme);
-    set({ theme: newTheme });
-  },
-  };
-});
-
-// Initialize theme on load - always default to dark if no saved theme
-const initTheme = () => {
-  try {
-    const savedTheme = localStorage.getItem('dex-theme') as Theme;
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setThemeAttribute(savedTheme);
-    } else {
-      // Default to dark theme
-      setThemeAttribute('dark');
-    }
-  } catch (e) {
-    // Fallback to dark theme if localStorage fails
-    setThemeAttribute('dark');
-  }
-};
-initTheme();
 
 // ===========================================================================
 // MAIN DEX STORE

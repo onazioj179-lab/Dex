@@ -20,6 +20,7 @@
 
 import * as cache from './cache';
 import { recordTurn } from './memory';
+import { getThemePreference, resolveThemePreference } from '../utils/theme';
 import {
   listArchives,
   getCompressionStats,
@@ -293,20 +294,15 @@ function collectClipboardPinned(): SourceFact[] {
 
 function collectThemePrefs(): SourceFact[] {
   try {
-    const out: SourceFact[] = [];
-    const preset = localStorage.getItem('dex-theme-preset');
-    const dark = localStorage.getItem('dex-dark-mode');
+    const pref = getThemePreference();
     const accent = localStorage.getItem('dex-accent-color');
-    if (preset || dark || accent) {
-      out.push({
-        source: 'theme-prefs',
-        user: 'What theme does the user prefer?',
-        response: clip(`Theme preset: ${preset ?? 'default'}; dark mode: ${dark ?? 'auto'}; accent: ${accent ?? 'system'}.`),
-        ts: Date.now(),
-        appId: 'settings',
-      });
-    }
-    return out;
+    return [{
+      source: 'theme-prefs',
+      user: 'What theme does the user prefer?',
+      response: clip(`Appearance: ${pref === 'system' ? `follows the system (now ${resolveThemePreference(pref)})` : pref}; accent: ${accent ?? 'system blue'}.`),
+      ts: Date.now(),
+      appId: 'settings',
+    }];
   } catch { return []; }
 }
 
