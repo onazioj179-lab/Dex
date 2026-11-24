@@ -3417,3 +3417,17 @@ fn main() {
     }
 }
 
+
+#[cfg(test)]
+mod updater_http_tests {
+    /// Regression: the updater's HTTP client must speak HTTP/2. GitHub serves the
+    /// update feed over HTTP/2 (negotiated by native-tls ALPN); without reqwest's
+    /// `http2` feature hyper panicked mid-check and Software Update hung on
+    /// "Checking for updates". `http2_prior_knowledge` only exists when the
+    /// feature is compiled in, so this test fails to build if it is dropped.
+    #[test]
+    fn updater_http_client_supports_http2() {
+        let client = reqwest::Client::builder().http2_prior_knowledge().build();
+        assert!(client.is_ok());
+    }
+}

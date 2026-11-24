@@ -51,6 +51,11 @@ windows-core = "0.62"
 # the WebView2 interop above.
 windows = { version = "0.61", features = ["Media_SpeechRecognition", "Foundation", "Foundation_Collections", "Globalization"] }
 tauri-plugin-updater = { version = "2.14.1", default-features = false, features = ["native-tls", "system-proxy"] }
+# The updater's reqwest negotiates TLS ALPN (native-tls-alpn), so GitHub answers
+# over HTTP/2; without reqwest's http2 feature hyper panics ("http2 feature is not
+# enabled") inside the check and Software Update hangs on "Checking". Cargo
+# feature unification enables it for the plugin's reqwest too.
+reqwest = { version = "0.13", default-features = false, features = ["http2"] }
 
 # Release builds: full optimisation, cross-crate LTO, one codegen unit for the
 # best code, and no debug info in the shipped exe. On MSVC symbols never live in
