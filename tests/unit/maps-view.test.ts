@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { describe, it, expect, vi } from 'vitest';
-vi.mock('maplibre-gl', () => ({ default: {} }));
+vi.mock('maplibre-gl', () => ({ default: {}, setWorkerUrl: () => {} }));
 import { parseMapView } from '../../src/renderer/DEXAPPLICATIONS/standalone/Maps';
 
 describe('Maps remembers the last view', () => {

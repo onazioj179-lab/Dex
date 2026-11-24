@@ -34,7 +34,7 @@ vi.mock('maplibre-gl', () => {
       remove() {}
     },
   };
-  return { default: lib, ...lib };
+  return { default: lib, ...lib, setWorkerUrl: () => {} };
 });
 vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().mockResolvedValue(null) }));
 

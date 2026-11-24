@@ -5,7 +5,7 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 import { describe, it, expect, vi } from 'vitest';
-vi.mock('maplibre-gl', () => ({ default: {}, Map: class {}, Marker: class {} }));
+vi.mock('maplibre-gl', () => ({ default: {}, Map: class {}, Marker: class {}, setWorkerUrl: () => {} }));
 import { geocode, locationErrorMessage } from '../../src/renderer/DEXAPPLICATIONS/standalone/Maps';
 
 const res = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as unknown as Response;

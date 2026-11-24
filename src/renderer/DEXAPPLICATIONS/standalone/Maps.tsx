@@ -31,6 +31,11 @@ import { isReduceMotion } from '../../utils/MotionController';
 // maplibre-gl 6 ships ESM named exports only (no default).
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// maplibre 6 loads its tile worker from a separate module next to its own file,
+// which does not exist once Vite bundles it ("Worker failed to load", blank
+// map). Point it at the worker Vite emits as an asset (same origin: CSP-safe).
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+maplibregl.setWorkerUrl?.(maplibreWorkerUrl);
 import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
 import { DexSearchInput } from '../../styles/components';
