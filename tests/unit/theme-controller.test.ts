@@ -173,3 +173,18 @@ describe('the pre-paint script mirrors the controller', () => {
     expect(resolveThemePreference()).toBe(expected);
   });
 });
+
+describe('native window background sync', () => {
+  it('tells the native shell the applied theme on every change', () => {
+    const invoke = vi.fn(() => Promise.resolve({ success: true }));
+    (window as unknown as { dex?: unknown }).dex = { invoke };
+    applyTheme('light');
+    applyTheme('light');
+    applyTheme('dark');
+    delete (window as unknown as { dex?: unknown }).dex;
+    expect(invoke.mock.calls).toEqual([
+      ['capability:storage:set', 'dex-window-theme', 'light'],
+      ['capability:storage:set', 'dex-window-theme', 'dark'],
+    ]);
+  });
+});

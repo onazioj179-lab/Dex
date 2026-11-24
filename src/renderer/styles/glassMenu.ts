@@ -264,7 +264,7 @@ export function glassIconBox(size = 20, radius = 6, tint = 'var(--color-bg-hover
   return {
     width: size, height: size, borderRadius: radius,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: tier === 'low' ? 'rgba(40,40,42,0.9)' : tint,
+    background: tier === 'low' ? 'var(--color-bg-elevated)' : tint, // low tier: solid theme surface (was a dark literal in light mode)
     border: '0.5px solid var(--color-border-subtle)',
     boxShadow: 'inset 0 0.5px 0 var(--color-border)',
   };

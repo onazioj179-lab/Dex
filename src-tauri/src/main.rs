@@ -1111,7 +1111,33 @@ fn kv_load(app: &tauri::AppHandle) -> serde_json::Map<String, Value> {
 pub(crate) fn kv_get(app: &tauri::AppHandle, key: &str) -> Value {
     kv_load(app).get(key).cloned().unwrap_or(Value::Null)
 }
+/// KV key the renderer writes with the applied theme ("dark" | "light").
+pub(crate) const WINDOW_THEME_KEY: &str = "dex-window-theme";
+
+/// The native window background for a theme: the colour WebView2 shows before
+/// the page paints and in the gap while a window is resized. Matches the
+/// pre-paint colours in index.html (#111215 dark, #F5F5F7 light), so there is
+/// no white flash at launch in dark mode and no dark flash in light mode.
+pub(crate) fn window_background(theme: &Value) -> tauri::window::Color {
+    if theme.as_str() == Some("light") {
+        tauri::window::Color(0xF5, 0xF5, 0xF7, 0xFF)
+    } else {
+        tauri::window::Color(0x11, 0x12, 0x15, 0xFF)
+    }
+}
+
+/// Paint every open DEX window's native background for `theme`.
+pub(crate) fn apply_window_background(app: &tauri::AppHandle, theme: &Value) {
+    let color = window_background(theme);
+    for w in app.webview_windows().values() {
+        let _ = w.set_background_color(Some(color));
+    }
+}
+
 pub(crate) fn kv_set(app: &tauri::AppHandle, key: &str, value: Value) -> Value {
+    if key == WINDOW_THEME_KEY {
+        apply_window_background(app, &value);
+    }
     let mut map = kv_load(app);
     map.insert(key.to_string(), value);
     let data = serde_json::to_string(&Value::Object(map)).unwrap_or_default();
@@ -3362,6 +3388,8 @@ fn main() {
             // Answer DEX's own clipboard/MIDI/camera permission requests from the
             // saved policy instead of a WebView2 prompt every time.
             webview_permissions::install(app.handle());
+            // Native background in the saved theme before the first paint.
+            apply_window_background(app.handle(), &kv_get(app.handle(), WINDOW_THEME_KEY));
             // Maximized DEX fills the whole monitor, over the Windows taskbar.
             if let Some(w) = app.get_webview_window("main") {
                 let ok = cover_taskbar::install(&w);
