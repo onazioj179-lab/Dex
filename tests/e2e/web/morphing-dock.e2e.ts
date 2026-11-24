@@ -87,6 +87,41 @@ test.describe('Morphing Dock', () => {
     expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).autoCollapse, PREFS)).toBe(false);
   });
 
+  test('the folded Dock can be placed anywhere, follows the pointer, persists, and snaps back near an edge', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await boot(page, { expanded: false, autoCollapse: false });
+    const trigger = page.locator('[data-dock-item="__trigger"]');
+    const dock = page.getByRole('navigation', { name: 'Dock', exact: true });
+    // Mid-screen: no edge nearby, so it stays exactly where it is dropped.
+    await trigger.hover();
+    await page.mouse.down();
+    await page.mouse.move(700, 420, { steps: 10 });
+    const during = (await box(page, '[data-dock-item="__trigger"]'))!;
+    expect(Math.abs(during.x + during.w / 2 - 700)).toBeLessThanOrEqual(2);
+    await page.mouse.up();
+    await expect(dock).toHaveAttribute('data-free', 'true');
+    const placed = (await box(page, '[data-dock-item="__trigger"]'))!;
+    expect(Math.abs(placed.x + placed.w / 2 - 700)).toBeLessThanOrEqual(2);
+    expect(Math.abs(placed.y + placed.h / 2 - 420)).toBeLessThanOrEqual(2);
+    // Opening grows from the button and stays on screen.
+    await trigger.click();
+    await expect(dock).toHaveAttribute('data-state', 'expanded');
+    await settled(page);
+    inside((await box(page, '.dex-mdock'))!, { w: 1280, h: 800 });
+    await trigger.press('Escape');
+    await page.reload();
+    await expect(dock).toHaveAttribute('data-free', 'true');
+    const after = (await box(page, '[data-dock-item="__trigger"]'))!;
+    expect(Math.abs(after.x + after.w / 2 - 700)).toBeLessThanOrEqual(2);
+    // Dropped near the bottom edge it docks there again.
+    await trigger.hover();
+    await page.mouse.down();
+    await page.mouse.move(640, 790, { steps: 10 });
+    await page.mouse.up();
+    await expect(dock).not.toHaveAttribute('data-free', 'true');
+    await expect(dock).toHaveAttribute('data-edge', 'bottom');
+  });
+
   test('Files keeps its tabs and scroll pane steady after opening', async ({ page }) => {
     await page.setViewportSize({ width: 940, height: 640 });
     await boot(page);

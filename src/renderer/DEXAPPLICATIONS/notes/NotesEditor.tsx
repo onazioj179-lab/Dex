@@ -182,7 +182,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--color-border-subtle)',
     background: 'var(--color-bg-surface)',
     overflowX: 'auto',
-    scrollbarWidth: 'thin',
+    // Still scrolls sideways in a narrow window, without a scrollbar strip
+    // sitting under the formatting buttons.
+    scrollbarWidth: 'none',
   },
   toolbarGroup: {
     display: 'flex',

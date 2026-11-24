@@ -47,3 +47,13 @@ describe('mid-tier motion', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('low tier keeps features working', () => {
+  it('does not freeze every animation, force containment or strip filters on all elements', () => {
+    const offenders = tierRules()
+      .filter((r) => /data-perf-tier="low"/.test(r.selector) && /(^|[\s,])\*(::?(before|after))?\s*(,|$)/m.test(r.selector))
+      .filter((r) => /animation\s*:\s*none|transition\s*:\s*none|animation-duration|contain\s*:|(^|[^-])filter\s*:\s*none/.test(r.body))
+      .map((r) => `${r.file}: ${r.selector.replace(/\s+/g, ' ')}`);
+    expect(offenders).toEqual([]);
+  });
+});

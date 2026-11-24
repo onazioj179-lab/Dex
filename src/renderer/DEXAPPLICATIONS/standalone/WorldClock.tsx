@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from '
 import { useReducedMotion } from '../../utils/useReducedMotion';
 import { MeetingPlanner } from './MeetingPlanner';
 import { Button } from '../../ui/Button';
+import { SegmentedControl } from '../../components/controls';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 interface ClockZone {
@@ -401,9 +402,9 @@ const WorldClock: React.FC = () => {
     const rad = (deg: number) => (deg * Math.PI) / 180;
     // The dial face and hands invert their contrast for night zones so the
     // little clocks read like a real day/night world map at a glance.
-    const faceFill = day ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.35)';
-    const handColor = 'var(--color-text-primary)';
-    const tickColor = day ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)';
+    const faceFill = day ? '#FFFFFF' : '#1C1C1E';
+    const handColor = day ? '#1D1D1F' : '#F5F5F7';
+    const tickColor = day ? '#8A8A8E' : '#98989D';
 
     // Hand rendered as vertical line from center going up, rotated by transform
     const Hand: React.FC<{ angle: number; len: number; w: number; color: string; smooth?: boolean }> =
@@ -422,7 +423,7 @@ const WorldClock: React.FC = () => {
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img"
         aria-label={`Analog clock showing ${formatTime(time)}`}>
-        <circle cx={cx} cy={cy} r={cx - 2} fill={faceFill} stroke="var(--color-border)" strokeWidth="1.5" />
+        <circle cx={cx} cy={cy} r={cx - 2} fill={faceFill} stroke={day ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)'} strokeWidth="1" />
         {[...Array(12)].map((_, i) => {
           const a = rad((i / 12) * 360 - 90);
           // Quarter ticks (12/3/6/9) are longer and bolder, like a real dial.
@@ -454,6 +455,7 @@ const WorldClock: React.FC = () => {
         .wc-card .wc-icon-btn { opacity: 0; transition: opacity 0.15s ease; }
         .wc-card:hover .wc-icon-btn,
         .wc-card:focus-within .wc-icon-btn { opacity: 1; }
+        .wc-card .wc-icon-btn:disabled { opacity: 0 !important; pointer-events: none; }
         .wc-icon-btn { border-radius: 6px; }
         .wc-icon-btn:hover { color: var(--color-text-primary); background: var(--color-bg-hover, rgba(255,255,255,0.08)); }
         .wc-result-row { transition: background 0.12s ease; }
@@ -463,23 +465,24 @@ const WorldClock: React.FC = () => {
         }
       `}</style>
       {/* Toolbar */}
-      <div className="dex-liquid-glass" style={s.toolbar}>
-        <span style={s.title}>World Clock</span>
+      <div style={s.toolbar}>
+        <div style={s.toolbarRight}>
+          <SegmentedControl
+            aria-label="Clock style"
+            value={showAnalog ? 'analog' : 'digital'}
+            onChange={(v) => setShowAnalog(v === 'analog')}
+            options={[{ value: 'analog', label: 'Analog' }, { value: 'digital', label: 'Digital' }]}
+          />
+          <SegmentedControl
+            aria-label="Time format"
+            value={is24h ? '24h' : '12h'}
+            onChange={(v) => setIs24h(v === '24h')}
+            options={[{ value: '12h', label: '12h' }, { value: '24h', label: '24h' }]}
+          />
+        </div>
         <div style={s.toolbarRight}>
           <Button size="sm" variant="subtle" aria-pressed={showPlanner} onClick={() => setShowPlanner(value => !value)}>Plan meeting</Button>
-          <button className="dex-liquid-glass" style={{ ...s.toggleBtn, fontWeight: is24h ? 700 : 400 }} onClick={() => setIs24h(!is24h)} aria-label="Toggle 12/24 hour">
-            {is24h ? '24h' : '12h'}
-          </button>
-          <button
-            style={{ ...s.toggleBtn, background: showAnalog ? 'var(--color-accent-light, rgba(10,132,255,0.2))' : 'transparent', color: showAnalog ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
-            onClick={() => setShowAnalog(!showAnalog)}
-            aria-label="Toggle analog clocks"
-          >CLK</button>
-          <button
-            style={{ ...s.addBtn, background: showAdd ? 'var(--color-text-secondary)' : 'var(--color-accent-fill)' }}
-            onClick={() => setShowAdd(!showAdd)}
-            aria-label="Add city"
-          >+</button>
+          <Button size="sm" aria-pressed={showAdd} onClick={() => setShowAdd(!showAdd)} aria-label="Add city">Add city</Button>
         </div>
       </div>
 
@@ -582,11 +585,7 @@ const WorldClock: React.FC = () => {
               style={{
                 ...s.clockCard,
                 background: cardBg,
-                border: isHome
-                  ? '1px solid var(--color-accent)'
-                  : working
-                    ? '1px solid var(--color-accent)'
-                    : '1px solid var(--color-border, var(--color-bg-hover))',
+                border: isHome ? '1px solid var(--color-accent)' : '1px solid var(--color-border-subtle)',
                 opacity: dragId === zone.id ? 0.5 : 1,
                 cursor: 'grab',
               }}
@@ -602,26 +601,23 @@ const WorldClock: React.FC = () => {
                 >{isHome ? '★' : '☆'}</button>
                 <button
                   className="wc-icon-btn"
-                  style={{ ...s.iconBtn, opacity: idx === 0 ? 0.3 : 1 }}
+                  style={s.iconBtn}
                   onClick={() => moveZone(zone.id, -1)}
                   disabled={idx === 0}
                   aria-label={`Move ${zone.label} left`}
-                  title="Move left"
                 >{'‹'}</button>
                 <button
                   className="wc-icon-btn"
-                  style={{ ...s.iconBtn, opacity: idx === activeZones.length - 1 ? 0.3 : 1 }}
+                  style={s.iconBtn}
                   onClick={() => moveZone(zone.id, 1)}
                   disabled={idx === activeZones.length - 1}
                   aria-label={`Move ${zone.label} right`}
-                  title="Move right"
                 >{'›'}</button>
                 <button
                   className="wc-icon-btn"
                   style={s.iconBtn}
                   onClick={() => removeZone(zone.id)}
                   aria-label={`Remove ${zone.label}`}
-                  title="Remove"
                 >{'×'}</button>
               </div>
 
@@ -649,9 +645,8 @@ const WorldClock: React.FC = () => {
                       <path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z" fill="var(--color-text-secondary)" />
                     </svg>
                   )}
-                  {isDay ? 'Day' : 'Night'}
+                  {isDay ? 'Day' : 'Night'}{working ? ' · Working hours' : ''}
                 </span>
-                {working && <span style={s.workBadge}>Working hours</span>}
               </div>
             </div>
           );

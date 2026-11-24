@@ -486,9 +486,10 @@ html[data-perf-tier="low"] *, html[data-perf-tier="low"] *::before, html[data-pe
   scroll-behavior: auto !important;
 }
 html[data-perf-tier="low"] * {
-  filter: none !important;
+  /* Only drop compositor layer hints. (filter:none broke icon/image treatments
+     and contain:layout on every element turned each one into a containing
+     block, so popovers and menus landed in the wrong place on weak PCs.) */
   will-change: auto !important;
-  contain: layout style !important;
 }
 html[data-perf-tier="low"] [style*="backdrop"],
 html[data-perf-tier="low"] [style*="blur"] {

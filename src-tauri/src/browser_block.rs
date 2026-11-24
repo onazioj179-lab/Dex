@@ -70,6 +70,27 @@ fn url_host(url: &str) -> Option<String> {
     }
 }
 
+/// Blocking is on and has a list: only then do tabs intercept requests at all.
+pub fn active() -> bool {
+    config().read().map(|c| c.enabled && !c.hosts.is_empty()).unwrap_or(false)
+}
+
+/// Cheap first check, before any page lookup: is this request's host (or a
+/// parent domain) on the list? Most requests are not, and return here.
+pub fn listed(request_url: &str) -> bool {
+    config().read().map(|cfg| listed_in(&cfg, request_url)).unwrap_or(false)
+}
+
+fn listed_in(cfg: &BlockConfig, request_url: &str) -> bool {
+    if !cfg.enabled || cfg.hosts.is_empty() {
+        return false;
+    }
+    match url_host(request_url) {
+        Some(req) => host_and_parents(&req).any(|h| h.contains('.') && cfg.hosts.contains(h)),
+        None => false,
+    }
+}
+
 /// Decide one request against a config. `is_document` = the top-level page load.
 pub fn decide(cfg: &BlockConfig, request_url: &str, page_url: &str, is_document: bool) -> bool {
     if !cfg.enabled || is_document || cfg.hosts.is_empty() {
@@ -123,6 +144,17 @@ pub fn set_blocking(arg: Option<&Value>) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fast_path_lists_only_blocked_hosts_and_follows_the_switch() {
+        let mut c = cfg(&["ads.example.net"], &[]);
+        assert!(listed_in(&c, "https://ads.example.net/pixel.gif"));
+        assert!(listed_in(&c, "https://cdn.ads.example.net/a.js"));
+        assert!(!listed_in(&c, "https://example.net/app.js"));
+        assert!(!listed_in(&c, "https://video.example.org/chunk-1.m4s"));
+        c.enabled = false;
+        assert!(!listed_in(&c, "https://ads.example.net/pixel.gif"));
+    }
 
     fn cfg(hosts: &[&str], off: &[&str]) -> BlockConfig {
         BlockConfig {

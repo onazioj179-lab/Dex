@@ -5091,6 +5091,18 @@ export const AppManager: React.FC = () => {
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  // Width available to the tab row: with many apps open the tabs fold to
+  // icons (the active one keeps its name) instead of an endless strip.
+  const [tabBarWidth, setTabBarWidth] = useState(0);
+  useEffect(() => {
+    const el = tabContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setTabBarWidth(el.clientWidth));
+    ro.observe(el);
+    setTabBarWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [showAppTabBar, runningApps.length > 1]);
+
   // Keep the active tab visible (scroll it into view when switching apps).
   useEffect(() => {
     const container = tabContainerRef.current;
@@ -5176,6 +5188,13 @@ export const AppManager: React.FC = () => {
     // The open-app tabs live INSIDE the top bar (one row of chrome, macOS
     // style). The container is itself a drag region, so empty space between
     // tabs still moves the window; the tabs are not.
+    // Many apps: tabs fold to icons (active keeps its name); past what fits,
+    // the row scrolls (wheel), its edges fade, and a count opens Stage Manager
+    // with search, so 500 open apps stay navigable.
+    const FULL_TAB = 104, ICON_TAB = 34;
+    const compact = tabBarWidth > 0 && sortedTabs.length * FULL_TAB > tabBarWidth;
+    const overflowing = tabBarWidth > 0 && sortedTabs.length * (compact ? ICON_TAB : FULL_TAB) > tabBarWidth;
+    const fade = 'linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%)';
     return (
       <>
       <div
@@ -5183,9 +5202,13 @@ export const AppManager: React.FC = () => {
         data-tauri-drag-region
         role="tablist"
         aria-label="Open apps"
+        data-compact={compact || undefined}
         style={{
           flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', margin: '0 12px', gap: 2,
+          // 'safe': when the row overflows it starts at the left edge instead of
+          // centring and pushing the first tabs out of reach.
+          justifyContent: 'safe center', margin: '0 12px', gap: 2,
+          maskImage: overflowing ? fade : undefined, WebkitMaskImage: overflowing ? fade : undefined,
           overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none',
         } as React.CSSProperties}
       >
@@ -5204,6 +5227,8 @@ export const AppManager: React.FC = () => {
               // below, so the close button sits BESIDE the tab, not inside it
               // (a button nested in role="tab" is unreachable to screen readers).
               role="presentation"
+              className="dex-topbar-tab"
+              data-active={isActive || undefined}
               onPointerDown={e => handleTabDragStart(e, app.id)}
               onPointerMove={handleTabDragMove}
               onPointerUp={handleTabDragEnd}
@@ -5218,9 +5243,11 @@ export const AppManager: React.FC = () => {
               onDoubleClick={() => { if (!draggingTab) tileWindow(app.id as AppId, 'maximize'); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 10px', height: 24, borderRadius: 6, /* pill-shaped tabs (owner request) */
-                background: isActive ? 'color-mix(in srgb, var(--dex-focus-color, #fff) 14%, transparent)' : isDragging ? 'var(--color-bg-elevated, #1C1C20)' : 'transparent',
-                border: isDragging ? '1px solid var(--color-border)' : isActive ? '1px solid var(--color-border-subtle)' : '1px solid transparent',
+                // One clean pill: a soft fill for the active app, nothing for
+                // the rest (hover tints), no borders.
+                padding: compact && !isActive ? '0 6px' : '0 4px 0 10px', height: 26, borderRadius: 9999,
+                background: isActive ? 'color-mix(in srgb, var(--color-text-primary) 10%, transparent)' : isDragging ? 'var(--color-bg-elevated)' : 'transparent',
+                border: 'none',
                 cursor: isDragging ? 'grabbing' : 'grab', flexShrink: 0,
                 // The dragged tab itself lifts (scale + shadow) and reorders live into
                 // its drop slot -- no floating ghost copy. Stays fully opaque.
@@ -5239,6 +5266,7 @@ export const AppManager: React.FC = () => {
               <span
                 role="tab"
                 aria-selected={isActive}
+                aria-label={compact && !isActive ? (def?.name || app.id) : undefined}
                 tabIndex={isActive ? 0 : -1}
                 aria-keyshortcuts="Delete"
                 onKeyDown={e => {
@@ -5252,13 +5280,15 @@ export const AppManager: React.FC = () => {
                   bringToFront(app.id as AppId);
                   setCurrentApp(app.id as AppId);
                 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, borderRadius: 4, outlineOffset: 2 }}
+                className="dex-topbar-tabname"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, borderRadius: 9999, outlineOffset: 2, background: 'transparent' }}
               >
               <span style={{ display: 'flex', color, alignItems: 'center', justifyContent: 'center', flexShrink: 0, pointerEvents: 'none' }}>
                 {AppIconPngs[app.id]
                   ? <AppIconImg appId={app.id} size={14} />
                   : (icon || <DexIcon name={APP_DEFINITIONS[app.id]?.icon || app.id} size={14} color={color} />)}
               </span>
+              {(!compact || isActive) && (
               <span style={{
                 fontSize: 11, fontWeight: isActive ? 600 : 500,
                 color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -5267,30 +5297,39 @@ export const AppManager: React.FC = () => {
               }}>
                 {def?.name || app.id}
               </span>
+              )}
               </span>
-              <button
+              {(!compact || isActive) && <button
                 aria-hidden="true"
                 tabIndex={-1}
                 onClick={e => { e.stopPropagation(); e.preventDefault(); handleCloseApp(app.id); }}
                 onPointerDown={e => e.stopPropagation()}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 18, height: 18, borderRadius: 4,
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: 'var(--color-text-tertiary)', padding: 0, marginLeft: 4, flexShrink: 0,
-                  transition: 'color 0.08s ease, background 0.08s ease, transform 0.08s ease',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--color-error)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,69,58,0.12)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-tertiary)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.9)'; }}
-                onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+                className="dex-topbar-tabclose"
               >
                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+              </button>}
             </div>
           );
         })}
       </div>
+      <style>{TOPBAR_TAB_CSS}</style>
+      {overflowing && (
+        <button
+          type="button"
+          aria-label={`Show all ${sortedTabs.length} open apps`}
+          onClick={() => { setCurrentRunningApp('home' as AppId); setShowOverview(true); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px', marginRight: 8,
+            borderRadius: 9999, border: 'none', flexShrink: 0, cursor: 'pointer',
+            background: 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
+            color: 'var(--color-text-primary)', fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+            WebkitAppRegion: 'no-drag',
+          } as React.CSSProperties}
+        >
+          <DexIcon name="grid" size={12} color="currentColor" />
+          {sortedTabs.length}
+        </button>
+      )}
 
       </>
     );
@@ -5875,3 +5914,17 @@ const winBtnStyle: React.CSSProperties = {
 };
 
 export default AppManager;
+
+// Top-bar app tabs: the close button sits in the pill, round, visible on hover
+// and on the active tab only (Safari), neutral rather than alarm-red.
+const TOPBAR_TAB_CSS = `
+.dex-topbar-tabclose {
+  display: grid; place-items: center; width: 18px; height: 18px; padding: 0; margin-left: 2px; flex-shrink: 0;
+  border: 0; border-radius: 9999px; background: transparent; color: var(--color-text-secondary);
+  opacity: 0; cursor: pointer; transition: opacity 120ms ease, background-color 120ms ease;
+}
+.dex-topbar-tab:hover .dex-topbar-tabclose, .dex-topbar-tab[data-active] .dex-topbar-tabclose { opacity: 1; }
+.dex-topbar-tabclose:hover { background: color-mix(in srgb, var(--color-text-primary) 14%, transparent); color: var(--color-text-primary); }
+.dex-topbar-tabclose:active { transform: scale(0.94); }
+.dex-topbar-tabname[role="tab"] { background: transparent; }
+`;

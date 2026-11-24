@@ -34,8 +34,11 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // maplibre 6 loads its tile worker from a separate module next to its own file,
 // which does not exist once Vite bundles it ("Worker failed to load", blank
 // map). Point it at the worker Vite emits as an asset (same origin: CSP-safe).
+// Production only: the dev server rewrites that file for the window (it injects
+// its client and a 4.5 MB inline source map), so the worker never answered and
+// the map hung on "Loading map"; in dev maplibre's own resolution works.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-maplibregl.setWorkerUrl?.(maplibreWorkerUrl);
+if (import.meta.env.PROD) maplibregl.setWorkerUrl?.(maplibreWorkerUrl);
 import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
 import { DexSearchInput } from '../../styles/components';
@@ -192,6 +195,14 @@ export function locationErrorMessage(code: number): string {
 
 // Map controls sit on the shared frosted material (.dex-mat-frosted on their
 // group), so the buttons themselves are transparent.
+/** Floating glass pill for controls over the map (one material across DEX). */
+const glassPill: React.CSSProperties = {
+  height: 34, padding: '0 14px', gap: 6, borderRadius: 9999, display: 'flex', alignItems: 'center',
+  background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+  border: '1px solid var(--glass-edge)', boxShadow: 'var(--glass-shadow), var(--glass-rim)',
+  color: 'var(--color-text-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+};
+
 const ctrlBtn: React.CSSProperties = {
   width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'transparent', border: '1px solid transparent',
@@ -562,7 +573,7 @@ const DexMaps: React.FC = () => {
   const showRecentPanel = focused && !query.trim() && recent.length > 0;
 
   if (failed) {
-    return <AppErrorState title="Maps unavailable" description="The map engine could not start on this device." icon="map-pin" />;
+    return <AppErrorState description="The map engine could not start on this device." icon="map-pin" />;
   }
 
   return (
@@ -578,7 +589,7 @@ const DexMaps: React.FC = () => {
         </div>
       )}
       {tilesFailing && (
-        <div role="status" className="dex-mat-opaque" style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
+        <div role="status" className="dex-mat-opaque" style={{ position: 'absolute', left: '50%', top: 58, transform: 'translateX(-50%)', borderRadius: 9999, zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
           <DexIcon name="alert-triangle" size={14} color="var(--color-text-tertiary)" />
           Some map tiles could not load. Check your connection.
         </div>
@@ -602,7 +613,7 @@ const DexMaps: React.FC = () => {
           onChange={(e) => changeSearch(e.target.value)}
           onClear={() => changeSearch('')}
           loading={searching}
-          style={{ background: 'var(--color-bg-surface)' }}
+          style={{ background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderRadius: 9999, border: '1px solid var(--glass-edge)', boxShadow: 'var(--glass-shadow), var(--glass-rim)' }}
           placeholder="Search places"
           aria-label="Search places"
         />
@@ -620,7 +631,7 @@ const DexMaps: React.FC = () => {
                     {r.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.detail}</span>}
                   </span>
                 </button>
-                <button aria-label={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'} title={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'}
+                <button aria-label={isSaved(r.lat, r.lon) ? 'Remove from saved' : 'Save place'}
                   className="dex-maps-iconbtn"
                   onClick={() => toggleSaved(r)}
                   style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: isSaved(r.lat, r.lon) ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
@@ -672,14 +683,13 @@ const DexMaps: React.FC = () => {
 
       {/* Top-right action cluster: saved places + measure toggles */}
       <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, zIndex: 6 }}>
-        <button aria-label="Saved places" title="Saved places"
+        <button aria-label="Saved places" aria-pressed={drawer === 'saved'}
           onClick={() => setDrawer((d) => (d === 'saved' ? null : 'saved'))}
-          style={{ ...ctrlBtn, width: 'auto', padding: '0 12px', gap: 6, borderRadius: 6, background: drawer === 'saved' ? 'var(--color-bg-hover)' : 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-hover)'} onMouseLeave={e => e.currentTarget.style.background = drawer === 'saved' ? 'var(--color-bg-hover)' : 'var(--color-bg-elevated)'}>
+          style={{ ...glassPill, ...(drawer === 'saved' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
           <DexIcon name="star" size={14} color="#FFD60A" />
           Saved{saved.length ? ` (${saved.length})` : ''}
         </button>
-        <button aria-label="Measure distance" title="Measure distance along a path"
+        <button aria-label="Measure distance" aria-pressed={measuring}
           onClick={() => {
             setMeasuring((m) => {
               const next = !m;
@@ -687,8 +697,8 @@ const DexMaps: React.FC = () => {
               return next;
             });
           }}
-          style={{ ...ctrlBtn, width: 'auto', padding: '0 12px', gap: 6, borderRadius: 6, background: measuring ? 'var(--color-accent-primary)' : 'var(--color-bg-elevated)', color: measuring ? '#fff' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}
-          onMouseEnter={e => { if (!measuring) e.currentTarget.style.background = 'var(--color-bg-hover)'; }} onMouseLeave={e => { if (!measuring) e.currentTarget.style.background = 'var(--color-bg-elevated)'; }}>
+          // (Active used --color-accent-primary, which does not exist: no fill at all.)
+          style={{ ...glassPill, ...(measuring ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
           <DexIcon name="crosshair" size={14} />
           Measure
         </button>
@@ -720,11 +730,11 @@ const DexMaps: React.FC = () => {
                     {s.detail && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{s.detail}</span>}
                   </span>
                 </button>
-                <button aria-label="Use in distance measurement" title="Use in distance measurement" className="dex-maps-iconbtn" onClick={() => measureFromSaved(s)}
+                <button aria-label="Use in distance measurement" className="dex-maps-iconbtn" onClick={() => measureFromSaved(s)}
                   style={{ width: 30, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
                   <DexIcon name="crosshair" size={14} />
                 </button>
-                <button aria-label="Remove saved place" title="Remove" className="dex-maps-iconbtn" onClick={() => toggleSaved(s)}
+                <button aria-label="Remove saved place" className="dex-maps-iconbtn" onClick={() => toggleSaved(s)}
                   style={{ width: 32, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}>
                   <DexIcon name="trash" size={14} />
                 </button>
@@ -789,13 +799,13 @@ const DexMaps: React.FC = () => {
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              <button onClick={copyPin} title="Copy coordinates" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={copyPin} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="copy" size={13} /> Copy
               </button>
-              <button onClick={() => toggleSaved(pin)} title={isSaved(pin.lat, pin.lon) ? 'Remove from saved' : 'Save place'} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: isSaved(pin.lat, pin.lon) ? '#FFD60A' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => toggleSaved(pin)} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: isSaved(pin.lat, pin.lon) ? '#FFD60A' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name={isSaved(pin.lat, pin.lon) ? 'star' : 'star-outline'} size={13} /> {isSaved(pin.lat, pin.lon) ? 'Saved' : 'Save'}
               </button>
-              <button onClick={sendPinToNotes} title="Send location to Notes" style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={sendPinToNotes} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="send" size={13} /> Notes
               </button>
               <button type="button" style={cardBtn} onClick={sendPinToCalendar}>Calendar</button>
@@ -807,15 +817,15 @@ const DexMaps: React.FC = () => {
 
       {/* Vertical control stack (custom, DEX-styled) */}
       <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-md)', overflow: 'hidden', zIndex: 5 }}>
-        <button aria-label="Zoom in" title="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
+        <button aria-label="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
           onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="plus" size={16} />
         </button>
-        <button aria-label="Zoom out" title="Zoom out" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
+        <button aria-label="Zoom out" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
           onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="minus" size={16} />
         </button>
-        <button aria-label="My location" title="My location" style={{ ...ctrlBtn, borderWidth: 0 }}
+        <button aria-label="My location" style={{ ...ctrlBtn, borderWidth: 0 }}
           onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <DexIcon name="navigation" size={15} />
         </button>
@@ -823,10 +833,10 @@ const DexMaps: React.FC = () => {
 
       {/* Compass (shows rotation; click = north up, flat) and 3D tilt. */}
       <div style={{ position: 'absolute', right: 12, bottom: 146, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 5 }}>
-        <button aria-label={pitch > 1 ? 'Flat view' : '3D view'} title={pitch > 1 ? 'Flat view' : 'Tilt to 3D'} aria-pressed={pitch > 1}
+        <button aria-label={pitch > 1 ? 'Flat view' : '3D view'} aria-pressed={pitch > 1}
           onClick={() => mapRef.current?.easeTo({ pitch: pitch > 1 ? 0 : 60, duration: isReduceMotion() ? 0 : 400 })}
           className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, color: pitch > 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>3D</button>
-        <button aria-label="Reset to north" title="North up" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
+        <button aria-label="Reset to north" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
           onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: isReduceMotion() ? 0 : 400 })}
           className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 'var(--radius-sm)', opacity: Math.abs(bearing) < 0.5 && pitch < 1 ? 0.55 : 1 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)`, transition: 'transform 0.1s linear' }}>

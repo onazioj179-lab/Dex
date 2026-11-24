@@ -3206,26 +3206,13 @@ html[data-perf-tier="low"] * {
      stays on every tier. */
   text-shadow: none !important;
 }
-html[data-perf-tier="low"] *,
-html[data-perf-tier="low"] *::before,
-html[data-perf-tier="low"] *::after {
-  animation: none !important;
-  transition: none !important;
-}
+/* (Low tier used to force animation:none / transition:none on every element,
+   which froze loading spinners and status rings so the UI looked stuck.
+   Transitions are already zeroed through the motion tokens on this tier --
+   TierManager animationDurationScale 0 -- and functional animations keep
+   running.) */
 
 /* Low-end: replace all backdrop-filter with solid backgrounds */
-html[data-perf-tier="low"] * {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-/* Low-end: disable non-essential animations */
-html[data-perf-tier="low"] *,
-html[data-perf-tier="low"] *::before,
-html[data-perf-tier="low"] *::after {
-  animation-duration: 0.01ms !important;
-  transition-duration: 50ms !important;
-}
 
 /* Low-end: cards/list-items/buttons keep their depth too (cheap static shadows).
    The old rule stripped them, which read as flat/cheap on low-end hardware. */

@@ -13,6 +13,8 @@
 // arrows along the Dock, Home/End, Alt+arrow to reorder, Shift+F10 / Menu key
 // for the app menu, Escape to collapse.
 
+import { useUkiStore } from '../../store/ukiStore';
+import { useUkiTasks } from '../../store/ukiTasksStore';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../DexIcon';
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
@@ -21,7 +23,7 @@ import { appPinning, useDockAppIds } from '../../services/appPinning';
 import { openAppContextMenu, sendAppCommand } from '../AppContextMenu';
 import { DEX_APP_DRAG_TYPE } from '../AppMenuPanel';
 import { useDockStore, DOCK_TILE, DOCK_PAD, DOCK_THICKNESS, DOCK_MARGIN, dockReserve } from '../../store/dockStore';
-import { computeWorkArea, isHorizontalDockEdge, placeDock } from '../../../shared/shell/workArea';
+import { computeWorkArea, isHorizontalDockEdge, placeDock, type WorkArea, type DockEdge } from '../../../shared/shell/workArea';
 import { isReduceMotion, onReduceMotionChange } from '../../utils/MotionController';
 import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION, DOCK_POSITIONS, dockPositionAt, type DockPosition } from './dockLayout';
 
@@ -74,19 +76,43 @@ export interface MorphingDockProps {
   onOpenLauncher: () => void;
 }
 
+/** Within this distance of a screen edge a dragged Dock snaps to that edge. */
+const EDGE_SNAP_PX = 56;
+const clampTo = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+/** The edge position to snap to, or null to place the Dock freely here. */
+function edgeSnapAt(area: WorkArea, x: number, y: number): DockPosition | null {
+  const d = area.desktop;
+  const near = Math.min(x - d.x, d.x + d.w - x, y - d.y, d.y + d.h - y);
+  return near <= EDGE_SNAP_PX ? dockPositionAt(area, x, y) : null;
+}
+
 export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) => {
-  const { edge: savedEdge, align: savedAlign, autoCollapse, expanded, setExpanded, setPrefs } = useDockStore();
+  const { edge: savedEdge, align: savedAlign, autoCollapse, expanded, setExpanded, setPrefs, free: savedFree } = useDockStore();
   const hidden = useDockStore(s => s.hiddenForFullscreen);
   const style = useDockStore(s => s.style);
   const pinnedIds = useDockAppIds();
+  // UKI presence on the folded button: working (thinking, speaking, or a
+  // background task running) / listening / awake / asleep (no ring).
+  const ukiState = useUkiStore(st => st.state);
+  const ukiTaskRunning = useUkiTasks(st => st.tasks.some(t => t.status === 'running'));
+  const ukiRing: 'working' | 'listening' | 'awake' | null =
+    ukiTaskRunning || ukiState === 'processing' || ukiState === 'thinking' || ukiState === 'speaking' ? 'working'
+      : ukiState === 'listening' ? 'listening'
+        : ukiState === 'idle' ? 'awake' : null;
   const runningApps = useRunningApps(s => s.runningApps);
   const currentId = useRunningApps(s => s.currentAppId);
   const vp = useViewport();
   const reduced = useReducedMotion();
   const [placementPreview, setPlacementPreview] = useState<DockPosition | null>(null);
+  // Free placement: while dragging the Dock follows the pointer exactly (direct
+  // manipulation, no easing); near a screen edge it snaps to that edge instead.
+  const [freePreview, setFreePreview] = useState<{ x: number; y: number } | null>(null);
   const placementDrag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const suppressTriggerClick = useRef(false);
-  const { edge, align } = placementPreview ?? { edge: savedEdge, align: savedAlign };
+  const freePx = placementPreview ? null
+    : freePreview ?? (savedFree ? { x: savedFree.x * vp.w, y: savedFree.y * vp.h } : null);
+  const { edge, align } = placementPreview
+    ?? (freePx ? { edge: (freePx.y < vp.h / 2 ? 'top' : 'bottom') as DockEdge, align: 'center' as const } : { edge: savedEdge, align: savedAlign });
   const vertical = !isHorizontalDockEdge(edge);
 
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -108,8 +134,8 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   // --- geometry -------------------------------------------------------------
   const area = useMemo(() => computeWorkArea({
     viewport: { width: vp.w, height: vp.h }, topBar: vp.top, scale: vp.scale,
-    dock: { edge, reserve: dockReserve({ style: 'morphing', hiddenForFullscreen: hidden }), margin: DOCK_MARGIN },
-  }), [vp, edge, hidden]);
+    dock: { edge, reserve: freePx ? 0 : dockReserve({ style: 'morphing', hiddenForFullscreen: hidden }), margin: DOCK_MARGIN },
+  }), [vp, edge, hidden, freePx]);
 
   const layout = dockLayout(shownPinned.length, runningIds.length);
   // On a short edge the two groups share what is left; each scrolls.
@@ -135,15 +161,23 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   // Collapse runs a little faster than expand; reduced motion = no movement.
   const ms = reduced ? 0 : (open ? DOCK_MOTION.expandMs : DOCK_MOTION.collapseMs);
   const ease = DOCK_MOTION.easing;
-  const geomTransition = drag?.active || placementPreview
+  const geomTransition = drag?.active || placementPreview || freePreview
     ? 'none'
     : ['left', 'top', 'width', 'height', 'border-radius'].map(p => `${p} ${ms}ms ${ease}`).join(', ');
   const fadeMs = reduced ? 0 : open ? 160 : 90;
   const fadeDelay = reduced || !open ? 0 : Math.round(DOCK_MOTION.expandMs * 0.35);
 
-  const outer: React.CSSProperties = !vertical
+  // Free: the folded button sits where it was dropped; opening grows sideways
+  // from it (the button stays under the pointer), always kept fully on screen.
+  const freeLen = open ? expandedLen : collapsedLen;
+  const freeOuter: React.CSSProperties | null = freePx ? {
+    left: Math.round(clampTo(freePx.x - (open ? triggerCenter : collapsedLen / 2), DOCK_MARGIN, vp.w - freeLen - DOCK_MARGIN)),
+    top: Math.round(clampTo(freePx.y - DOCK_THICKNESS / 2, area.desktop.y + DOCK_MARGIN, vp.h - DOCK_THICKNESS - DOCK_MARGIN)),
+    width: freeLen, height: DOCK_THICKNESS,
+  } : null;
+  const outer: React.CSSProperties = freeOuter ?? (!vertical
     ? { left: placed.start, [edge]: edge === 'top' ? area.desktop.y + DOCK_MARGIN : DOCK_MARGIN, width: placed.length, height: DOCK_THICKNESS }
-    : { top: placed.start, [edge]: DOCK_MARGIN, width: DOCK_THICKNESS, height: placed.length } as React.CSSProperties;
+    : { top: placed.start, [edge]: DOCK_MARGIN, width: DOCK_THICKNESS, height: placed.length } as React.CSSProperties);
 
   // --- collapse rules ---------------------------------------------------------
   const collapse = useCallback((focusTrigger = false) => {
@@ -203,11 +237,14 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (!pointer || pointer.id !== e.pointerId) return;
     if (!pointer.moved && Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) < DRAG_THRESHOLD) return;
     pointer.moved = true;
-    setPlacementPreview(dockPositionAt(area, e.clientX, e.clientY));
+    const snap = edgeSnapAt(area, e.clientX, e.clientY);
+    setPlacementPreview(snap);
+    setFreePreview(snap ? null : { x: e.clientX, y: e.clientY });
   };
   // Esc abandons a placement drag: the Dock returns to where it was.
+  const placing = !!placementPreview || !!freePreview;
   useEffect(() => {
-    if (!placementPreview) return;
+    if (!placing) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || !placementDrag.current) return;
       e.preventDefault();
@@ -215,18 +252,22 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
       placementDrag.current = null;
       suppressTriggerClick.current = true;
       setPlacementPreview(null);
+      setFreePreview(null);
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [placementPreview]);
+  }, [placing]);
   const endPlacementDrag = (e: React.PointerEvent<HTMLElement>, commit: boolean) => {
     const pointer = placementDrag.current;
     if (!pointer || pointer.id !== e.pointerId) return;
     placementDrag.current = null;
     setPlacementPreview(null);
+    setFreePreview(null);
     if (commit && (pointer.moved || Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) >= DRAG_THRESHOLD)) {
       suppressTriggerClick.current = true;
-      setPrefs(dockPositionAt(area, e.clientX, e.clientY));
+      const snap = edgeSnapAt(area, e.clientX, e.clientY);
+      if (snap) setPrefs({ ...snap, free: null });
+      else setPrefs({ free: { x: e.clientX / Math.max(1, vp.w), y: e.clientY / Math.max(1, vp.h) } });
     }
   };
 
@@ -420,6 +461,7 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
         aria-label="Dock"
         data-edge={edge}
         data-align={align}
+        data-free={freePx ? 'true' : undefined}
         data-axis={vertical ? 'vertical' : 'horizontal'}
         data-state={open ? 'expanded' : 'collapsed'}
         data-hidden={hidden || undefined}
@@ -465,14 +507,15 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
             className="dex-mdock-tile dex-mdock-trigger"
             data-dock-item="__trigger"
             tabIndex={!open || focusId === '__trigger' ? 0 : -1}
-            aria-label={open ? 'Search apps' : 'Open Dock'}
+            aria-label={(open ? 'Search apps' : 'Open Dock') + (ukiRing === 'working' ? ', UKI is working' : ukiRing === 'listening' ? ', UKI is listening' : '')}
             aria-expanded={open}
-            title={(open ? 'Search apps' : 'Open Dock') + ' · Drag to move'}
+            data-uki={ukiRing ?? undefined}
             onFocus={() => setFocusId('__trigger')}
             onClick={onTrigger}
             onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
           >
             <DexIcon name="search" size={20} color="currentColor" />
+            {ukiRing && <span className="dex-mdock-uki" aria-hidden="true" data-state={ukiRing} />}
           </button>
           {layout.runningLen > 0 && (
             <>
@@ -522,7 +565,24 @@ const DOCK_CSS = `
 :where(.dex-mdock) :where(.dex-mdock-tile)[data-current] { background: var(--color-bg-active, var(--color-bg-hover)); color: var(--color-text-primary); }
 :where(.dex-mdock) :where(.dex-mdock-tile)[data-dragging] { opacity: 0.55; }
 :where(.dex-mdock) :where(.dex-mdock-tile)[data-drop-before] { box-shadow: inset 2px 0 0 var(--color-accent); }
-:where(.dex-mdock) :where(.dex-mdock-trigger) { color: var(--color-accent); }
+:where(.dex-mdock) :where(.dex-mdock-trigger) { color: var(--color-accent); position: relative; }
+/* UKI ring around the search button: a turning accent arc while UKI works,
+   a solid ring while it listens, a faint ring while it is awake. */
+:where(.dex-mdock) .dex-mdock-uki {
+  position: absolute; inset: -3px; border-radius: 9999px; pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+}
+:where(.dex-mdock) .dex-mdock-uki[data-state="awake"] { background: color-mix(in srgb, var(--color-accent) 35%, transparent); }
+:where(.dex-mdock) .dex-mdock-uki[data-state="listening"] { background: var(--color-accent); }
+:where(.dex-mdock) .dex-mdock-uki[data-state="working"] {
+  background: conic-gradient(from 0deg, transparent 0 35%, var(--color-accent) 75%, transparent 100%);
+  animation: dex-mdock-uki-turn 1.1s linear infinite;
+}
+@keyframes dex-mdock-uki-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  :where(.dex-mdock) .dex-mdock-uki[data-state="working"] { animation: none; background: var(--color-accent); }
+}
 :where(.dex-mdock) :where(.dex-mdock-sep) { flex-shrink: 0; background: var(--color-border-subtle); }
 :where(.dex-mdock[data-axis="horizontal"]) :where(.dex-mdock-sep) { width: 1px; height: 22px; margin: 0 ${(DOCK_GROUP_GAP - 1) / 2}px; }
 :where(.dex-mdock[data-axis="vertical"]) :where(.dex-mdock-sep) { height: 1px; width: 22px; margin: ${(DOCK_GROUP_GAP - 1) / 2}px 0; }
