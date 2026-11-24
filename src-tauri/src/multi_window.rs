@@ -96,6 +96,8 @@ fn detach(app: &tauri::AppHandle, app_id: &str) -> Value {
     let mut builder = WebviewWindowBuilder::new(app, &label, url)
         .title(format!("DEX — {}", app_id))
         .min_inner_size(360.0, 280.0)
+        // Same native background as the main window's theme (no flash on open).
+        .background_color(crate::window_background(&crate::kv_get(app, crate::WINDOW_THEME_KEY)))
         // Tauri's own file-drop handler swallows HTML5 drag and drop on Windows
         // (files dropped on apps, in-page drags). DEX uses only HTML5 drops.
         .disable_drag_drop_handler();

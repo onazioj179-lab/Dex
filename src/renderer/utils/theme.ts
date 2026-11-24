@@ -130,7 +130,31 @@ export function applyTheme(theme: ThemeName): void {
   });
   if (changed) {
     try { window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } })); } catch { /* noop */ }
+    syncNativeWindowTheme(theme);
   }
+}
+
+/**
+ * Tell the native shell which theme is applied: it paints every DEX window's
+ * background to match now, and the main window's before the first paint on
+ * the next launch (src-tauri kv key `dex-window-theme`). No-op in the web
+ * preview. The bridge is read at call time (never at module scope).
+ */
+function syncNativeWindowTheme(theme: ThemeName, retry = true): void {
+  try {
+    const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    if (!dex?.invoke) {
+      // At boot the bridge can arrive after this module runs: try once more
+      // after load, with whatever theme is applied by then.
+      if (retry && typeof window !== 'undefined') {
+        const again = () => syncNativeWindowTheme(currentTheme(), false);
+        if (document.readyState === 'complete') setTimeout(again, 500);
+        else window.addEventListener('load', again, { once: true });
+      }
+      return;
+    }
+    void dex.invoke('capability:storage:set', 'dex-window-theme', theme)?.catch?.(() => undefined);
+  } catch { /* bridge unavailable */ }
 }
 
 /** Persist a preference and apply it (an actual flip cross-fades). */
@@ -168,6 +192,9 @@ let themeListenersInstalled = false;
  */
 export function initTheme(): void {
   applyTheme(resolveThemePreference());
+  // The pre-paint script already set data-theme, so applyTheme saw no change;
+  // still tell the native shell (its stored theme may be from another choice).
+  syncNativeWindowTheme(currentTheme());
   if (themeListenersInstalled || typeof window === 'undefined') return;
   themeListenersInstalled = true;
   try {
