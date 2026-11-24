@@ -5240,7 +5240,12 @@ export const AppManager: React.FC = () => {
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}
+                aria-keyshortcuts="Delete"
                 onKeyDown={e => {
+                  // Delete closes the tab: the visible close button is
+                  // mouse-only (hidden from assistive tech), since a tablist may
+                  // only own tabs and a button may not sit inside a tab.
+                  if (e.key === 'Delete') { e.preventDefault(); handleCloseApp(app.id); return; }
                   if (e.key !== 'Enter' && e.key !== ' ') return;
                   e.preventDefault();
                   if (minimizedApps.has(app.id)) restoreFloatingApp(app.id);
@@ -5264,7 +5269,8 @@ export const AppManager: React.FC = () => {
               </span>
               </span>
               <button
-                aria-label={`Close ${def?.name || app.id}`}
+                aria-hidden="true"
+                tabIndex={-1}
                 onClick={e => { e.stopPropagation(); e.preventDefault(); handleCloseApp(app.id); }}
                 onPointerDown={e => e.stopPropagation()}
                 style={{
@@ -5696,20 +5702,20 @@ export const AppManager: React.FC = () => {
               // edge anchoring, no dock-relative math, nothing that moves.
               position: 'relative',
               pointerEvents: 'auto',
-              width: 'min(520px, 92vw)',
-              height: 'min(620px, calc(100dvh - 32px))',
+              width: 'min(640px, 94vw)',
+              height: 'min(640px, calc(100dvh - 48px))',
               display: 'flex',
               flexDirection: 'column',
               boxSizing: 'border-box',
               overflow: 'hidden',
-              // Floating glass (strong fill: dense content). Outer radius 24 =
-              // the 10px tiles + 16px padding, so the corners stay concentric.
+              // Floating glass (strong fill: dense content); 24 is the scale's
+              // largest radius and reads as one shape with the search pill.
               background: 'var(--color-bg-glass-strong)',
               backdropFilter: 'var(--glass-blur)',
               WebkitBackdropFilter: 'var(--glass-blur)',
               border: '1px solid var(--glass-edge)',
               borderRadius: 'var(--radius-2xl)',
-              padding: 'var(--space-4)',
+              padding: '20px 20px 12px',
               boxShadow: 'var(--glass-shadow), var(--glass-rim)',
               // Precision motion: pure opacity fade, no movement / scale / bounce.
               animation: 'appMenuFade 0.15s ease-out',
