@@ -28,7 +28,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { SegmentedControl } from '../../components/controls';
 import { isReduceMotion } from '../../utils/MotionController';
-import maplibregl from 'maplibre-gl';
+// maplibre-gl 6 ships ESM named exports only (no default).
+import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
@@ -361,7 +362,7 @@ const DexMaps: React.FC = () => {
         } catch { /* storage blocked */ }
       }, 400);
     });
-    map.on('error', (e) => {
+    map.on('error', (e: maplibregl.ErrorEvent) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
       if ((e as { tile?: unknown; sourceId?: string }).tile || (e as { sourceId?: string }).sourceId || /fetch|network|load/i.test(String(e?.error?.message ?? ''))) {
         lastTileError = Date.now();
@@ -371,7 +372,7 @@ const DexMaps: React.FC = () => {
     // Clear once tiles load again well after the last failure (not on 'idle',
     // which also fires when every pending tile has simply failed).
     let lastTileError = 0;
-    map.on('data', (e) => {
+    map.on('data', (e: maplibregl.MapSourceDataEvent | maplibregl.MapStyleDataEvent) => {
       if ((e as { tile?: unknown }).tile && lastTileError && Date.now() - lastTileError > 3000) { lastTileError = 0; setTilesFailing(false); }
     });
     return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; };

@@ -230,7 +230,7 @@ export function useAppTransition(currentApp: string, containerRef: React.RefObje
         child.style.opacity = '0';
         child.style.transform = 'scale(1.02)';
         requestAnimationFrame(() => {
-          child.style.transition = 'opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)';
+          child.style.transition = 'opacity 0.15s ease, transform 0.15s var(--ease-spring)';
           child.style.opacity = '1';
           child.style.transform = 'scale(1)';
           setTimeout(() => {

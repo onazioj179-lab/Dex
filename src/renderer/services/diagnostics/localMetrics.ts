@@ -99,7 +99,11 @@ function watchLaunch(appId: string, t0: number): void {
   const deadline = t0 + 10_000;
   const check = () => {
     if (hiddenEpoch !== epoch) return; // window was hidden meanwhile
-    const el = document.querySelector(`[data-app-id="${CSS.escape(appId)}"]`);
+    // Inline apps mount in [data-app-id]; windowed apps in [data-floating-window].
+    // Watching only the first made every windowed launch poll each frame for
+    // the full 10 s and never be recorded.
+    const id = CSS.escape(appId);
+    const el = document.querySelector(`[data-app-id="${id}"], [data-floating-window="${id}"]`);
     if (el && el.childElementCount > 0) {
       // The frame after the one that inserted the content is the first painted one.
       requestAnimationFrame(() => { if (hiddenEpoch === epoch) recordLaunch(appId, performance.now() - t0); });

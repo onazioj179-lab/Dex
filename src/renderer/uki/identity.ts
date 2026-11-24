@@ -14,6 +14,8 @@
  * Edit this file to evolve UKI's behavior across the entire OS.
  */
 
+import { buildReasoningBlock, selectFoundations } from './foundations';
+
 export const UKI_IDENTITY = {
   name: 'UKI',
   fullName: 'UKI — Universal Knowledge Interface',
@@ -91,16 +93,30 @@ export interface UkiContextSnapshot {
 }
 
 /**
+ * The identity lines every UKI surface starts from (chat app, overlay, agent
+ * runs, scheduled tasks). One copy, so UKI is the same intelligence everywhere.
+ */
+export function coreSystemPrompt(): string {
+  return [
+    `You are ${UKI_IDENTITY.name}, the ${UKI_IDENTITY.role}.`,
+    `Voice: ${UKI_VOICE.tone}. ${UKI_VOICE.lengthPolicy}. ${UKI_VOICE.emojiPolicy}.`,
+    'Principles: local-first, private, transparent, non-intrusive, fast.',
+    'You know about DEX apps, workspaces, files, sessions, terminals, and the user\'s active workflow.',
+  ].join('\n');
+}
+
+/** The reasoning block for one turn: shared core + the lenses the task calls for. */
+export function reasoningForTurn(userText: string, opts: { foregroundAppId?: string | null; actionable?: boolean } = {}): string {
+  return buildReasoningBlock(selectFoundations(userText, { agent: 'uki', ...opts }), 'uki');
+}
+
+/**
  * Build the UKI system prompt. This is what gets sent to any LLM (local
  * or remote) as the system role. It is short and dense by design — long
  * prompts cost latency.
  */
-export function buildSystemPrompt(ctx: UkiContextSnapshot = {}): string {
-  const lines: string[] = [];
-  lines.push(`You are ${UKI_IDENTITY.name}, the ${UKI_IDENTITY.role}.`);
-  lines.push(`Voice: ${UKI_VOICE.tone}. ${UKI_VOICE.lengthPolicy}. ${UKI_VOICE.emojiPolicy}.`);
-  lines.push('Principles: local-first, private, transparent, non-intrusive, fast.');
-  lines.push('You know about DEX apps, workspaces, files, sessions, terminals, and the user\'s active workflow.');
+export function buildSystemPrompt(ctx: UkiContextSnapshot & { userText?: string; actionable?: boolean } = {}): string {
+  const lines: string[] = [coreSystemPrompt()];
 
   // Live context block — kept tight.
   const ctxBits: string[] = [];
@@ -123,6 +139,7 @@ export function buildSystemPrompt(ctx: UkiContextSnapshot = {}): string {
   }
 
   lines.push('If you do not know, say so briefly and suggest the next best step.');
+  lines.push(reasoningForTurn(ctx.userText ?? '', { foregroundAppId: ctx.foregroundAppId, actionable: ctx.actionable }));
   return lines.join('\n');
 }
 

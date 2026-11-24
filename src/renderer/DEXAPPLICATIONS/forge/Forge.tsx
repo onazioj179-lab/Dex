@@ -1321,7 +1321,7 @@ const Forge: React.FC = () => {
     logo: { fontSize: '12px', fontWeight: 800, color: 'var(--color-accent)', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-    btnPrimary: { background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '9999px' },
+    btnPrimary: { background: 'var(--color-accent-light)', color: 'var(--color-accent)', border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)', borderRadius: '9999px' },
     btnDanger: { background: '#3a1818', color: '#ff6961', border: '1px solid #4a2020', borderRadius: '9999px' },
     workspace: { flex: 1, display: 'flex', overflow: 'hidden' },
     sidebar: { width: '220px', flexShrink: 0, borderRadius: 0, borderRight: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
@@ -1335,8 +1335,8 @@ const Forge: React.FC = () => {
     stat: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' },
     queueList: { flex: 1, minHeight: 0, overflow: 'auto', padding: '10px' },
     jobItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: 'var(--space-2) 10px', background: 'var(--color-border-subtle)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid transparent' },
-    jobItemSelected: { border: '1px solid var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
-    jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', borderRadius: '6px', color: 'var(--color-accent)' },
+    jobItemSelected: { border: '1px solid var(--color-accent)', background: 'var(--color-accent-light)' },
+    jobIcon: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-accent-light)', borderRadius: '6px', color: 'var(--color-accent)' },
     jobInfo: { flex: 1, minWidth: 0 },
     jobName: { fontWeight: 600, marginBottom: '2px', fontSize: '11px', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     jobMeta: { display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--color-text-muted)' },
@@ -1354,7 +1354,7 @@ const Forge: React.FC = () => {
     infoLabel: { color: 'var(--color-text-muted)' },
     infoValue: { color: 'var(--color-text-primary)', fontWeight: 600 },
     presetItem: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2)', background: 'var(--color-bg-hover)', borderRadius: 'var(--radius-lg)', marginBottom: '4px', cursor: 'pointer', border: '1px solid var(--color-border-subtle)' },
-    presetItemSelected: { border: '1px solid var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' },
+    presetItemSelected: { border: '1px solid var(--color-accent)', background: 'var(--color-accent-light)' },
     presetInfo: { flex: 1 },
     presetName: { fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.2px' },
     presetDesc: { fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' },
@@ -1696,7 +1696,7 @@ const Forge: React.FC = () => {
           {dragOverMain && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 'var(--z-modal)',
-              background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', border: '1px dashed color-mix(in srgb, var(--color-accent) 50%, transparent)',
+              background: 'var(--color-accent-light)', border: '1px dashed color-mix(in srgb, var(--color-accent) 50%, transparent)',
               borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#5ac8fa' }}>Drop media files to add to queue</div>
@@ -2190,7 +2190,7 @@ const Forge: React.FC = () => {
                 })}
               </svg>
               {/* Selected region overlay */}
-              <div style={{ position: 'absolute', left: `${trimIn}%`, width: `${trimOut - trimIn}%`, top: 0, bottom: 0, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', left: `${trimIn}%`, width: `${trimOut - trimIn}%`, top: 0, bottom: 0, background: 'var(--color-accent-light)', pointerEvents: 'none' }} />
               {/* Draggable IN handle */}
               <div onPointerDown={e => startTrimHandleDrag('in', e)} onPointerMove={onTrimHandleMove} onPointerUp={endTrimHandleDrag} title="Drag in point" style={{ position: 'absolute', left: `${trimIn}%`, top: 0, bottom: 0, width: 10, marginLeft: -5, cursor: 'ew-resize', display: 'flex', alignItems: 'stretch', zIndex: 3 }}>
                 <div style={{ width: 2, margin: '0 auto', background: 'var(--color-accent-fill)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent)' }} />
@@ -2222,7 +2222,7 @@ const Forge: React.FC = () => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 setJobs(prev => prev.map(j => j.id === selectedJob.id ? { ...j, trimIn: trimIn / 100, trimOut: trimOut / 100 } as any : j));
                 setShowTrimSplit(false);
-              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Trim</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Trim</button>
               <button aria-label="Split video at intervals" onClick={() => {
                 if (!selectedJob) { toast.warning('Select a job first'); return; }
                 const segments = 3;
@@ -2251,7 +2251,7 @@ const Forge: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '9:16'] as const).map(a => (
-                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+                <button key={a} onClick={() => setCropAspect(a)} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid var(--color-bg-hover)', background: cropAspect === a ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: cropAspect === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
             <div style={{ height: 80, background: 'var(--color-border-subtle)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2554,7 +2554,7 @@ const Forge: React.FC = () => {
                 } finally {
                   setMediaBusy(false);
                 }
-              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>Merge Audio → WAV (instant)</button>
+              }} style={{ flex: 1, padding: '7px', borderRadius: 9999, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: (concatOrder.length < 2 || mediaBusy) ? 'not-allowed' : 'pointer', opacity: (concatOrder.length < 2 || mediaBusy) ? 0.4 : 1 }}>Merge Audio → WAV (instant)</button>
               <button disabled={mediaBusy} onClick={async () => {
                 if (mediaBusy) return;
                 if (concatOrder.length < 2) return;

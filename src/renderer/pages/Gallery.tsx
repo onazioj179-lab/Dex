@@ -1512,7 +1512,7 @@ export const Gallery: React.FC = () => {
               key={album.id}
               style={{
                 ...styles.albumItem,
-                background: selectedAlbum === album.id ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent',
+                background: selectedAlbum === album.id ? 'var(--color-accent-light)' : 'transparent',
                 color: selectedAlbum === album.id ? 'var(--color-accent)' : 'var(--color-text-primary)',
               }}
               aria-label={album.name}
@@ -1530,7 +1530,7 @@ export const Gallery: React.FC = () => {
               key={album.id}
               style={{
                 ...styles.albumItem,
-                background: selectedAlbum === album.id ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent',
+                background: selectedAlbum === album.id ? 'var(--color-accent-light)' : 'transparent',
                 color: selectedAlbum === album.id ? 'var(--color-accent)' : 'var(--color-text-primary)',
               }}
               aria-label={album.name}
@@ -1547,7 +1547,7 @@ export const Gallery: React.FC = () => {
               <button
                 style={{
                   ...styles.albumItem, flex: 1,
-                  background: selectedAlbum === USER_ALBUM_PREFIX + album.id ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent',
+                  background: selectedAlbum === USER_ALBUM_PREFIX + album.id ? 'var(--color-accent-light)' : 'transparent',
                   color: selectedAlbum === USER_ALBUM_PREFIX + album.id ? 'var(--color-accent)' : 'var(--color-text-primary)',
                 }}
                 aria-label={`Album ${album.name}`}
@@ -1588,7 +1588,7 @@ export const Gallery: React.FC = () => {
                 aria-label={album.name}
                 style={{
                   width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: selectedAlbum === album.id ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent',
+                  background: selectedAlbum === album.id ? 'var(--color-accent-light)' : 'transparent',
                   color: selectedAlbum === album.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   border: 'none', borderRadius: 4, cursor: 'pointer', flexShrink: 0,
                 }}
@@ -1660,7 +1660,7 @@ export const Gallery: React.FC = () => {
               )}
             </span>
             <div style={styles.viewToggle}>
-              <button style={{...styles.viewBtn, background: selectionMode ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent', color: selectionMode ? 'var(--color-accent)' : undefined}} aria-label="Toggle selection mode" aria-pressed={selectionMode} onClick={() => { setSelectionMode(v => !v); if (selectionMode) setSelectedItems(new Set()); }}>
+              <button style={{...styles.viewBtn, background: selectionMode ? 'var(--color-accent-light)' : 'transparent', color: selectionMode ? 'var(--color-accent)' : undefined}} aria-label="Toggle selection mode" aria-pressed={selectionMode} onClick={() => { setSelectionMode(v => !v); if (selectionMode) setSelectedItems(new Set()); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </button>
               {selectionMode && selectedItems.size > 0 && (
@@ -1712,7 +1712,7 @@ export const Gallery: React.FC = () => {
             </div>
           ) : sortedMedia.length === 0 ? (
             <div style={styles.emptyState}>
-              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-5)', color: 'var(--color-accent)' }}>
+              <div style={{ width: 80, height: 80, borderRadius: 14, background: 'var(--color-accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--space-5)', color: 'var(--color-accent)' }}>
                 {selectedAlbum === 'videos' ? (
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -1923,7 +1923,7 @@ export const Gallery: React.FC = () => {
             { label: 'Compare', fn: () => setShowCompareMode(v => !v), active: showCompareMode },
             { label: 'Slideshow', fn: () => setShowSlideshow(v => !v), active: showSlideshow },
           ].map(b => (
-            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
+            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
           ))}
         </div>
       </div>
@@ -2008,12 +2008,12 @@ export const Gallery: React.FC = () => {
           <div style={{ padding: 'var(--space-3)' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--space-2)' }}>
               <input value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="Add tag..." onKeyDown={e => { if (e.key === 'Enter' && selectedMedia) addMediaTag([selectedMedia.id], tagInput); }} maxLength={40} aria-label="Media tag"  style={{ flex: 1, padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11 }} />
-              <button aria-label="Add tag" onClick={() => { if (selectedMedia) addMediaTag([selectedMedia.id], tagInput); }} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
+              <button aria-label="Add tag" onClick={() => { if (selectedMedia) addMediaTag([selectedMedia.id], tagInput); }} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, cursor: 'pointer' }}>+</button>
             </div>
             {selectedMedia && (mediaTags[selectedMedia.id] || []).length > 0 ? (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {(mediaTags[selectedMedia.id] || []).map((tag, i) => (
-                  <span key={i} style={{ padding: '2px var(--space-2)', borderRadius: 10, background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)', color: 'var(--color-accent)', fontSize: 11 }}>
+                  <span key={i} style={{ padding: '2px var(--space-2)', borderRadius: 10, background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11 }}>
                     {tag} <span style={{ cursor: 'pointer', marginLeft: 2, display: 'inline-flex', verticalAlign: 'middle' }} onClick={() => { if (selectedMedia) setMediaTags(t => ({ ...t, [selectedMedia.id]: (t[selectedMedia.id] || []).filter((_, j) => j !== i) })); }}><DexIcon name="close" size={9} /></span>
                   </span>
                 ))}
@@ -2070,7 +2070,7 @@ export const Gallery: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Aspect Ratio</div>
             <div style={{ display: 'flex', gap: 3, marginBottom: 10, flexWrap: 'wrap' }}>
               {(['free', '16:9', '4:3', '1:1', '3:2'] as const).map(a => (
-                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={cropRatio === a} onClick={() => setCropRatio(a)} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropRatio === a ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: cropRatio === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
+                <button key={a} aria-label={`Set crop ratio ${a}`} aria-pressed={cropRatio === a} onClick={() => setCropRatio(a)} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: cropRatio === a ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: cropRatio === a ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{a}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Straighten</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{straightenAngle}°</span></div>
@@ -2081,7 +2081,7 @@ export const Gallery: React.FC = () => {
               <button aria-label="Flip vertical" aria-pressed={flipV} onClick={() => setFlipV(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-vertical" size={10} /> Flip</button>
               <button aria-label="Flip horizontal" aria-pressed={flipH} onClick={() => setFlipH(v => !v)} style={{ flex: 1, padding: '5px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}><DexIcon name="flip-horizontal" size={10} /> Flip</button>
             </div>
-            <button aria-label="Save edited image as copy" disabled={savingEdit} onClick={() => { void saveEditedCopy(true); }} style={{ width: '100%', padding: '6px', borderRadius: 10, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'color-mix(in srgb, var(--color-accent) 10%, transparent)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>{savingEdit ? 'Saving…' : 'Save Edited Copy'}</button>
+            <button aria-label="Save edited image as copy" disabled={savingEdit} onClick={() => { void saveEditedCopy(true); }} style={{ width: '100%', padding: '6px', borderRadius: 10, border: '1px solid color-mix(in srgb, var(--color-accent) 20%, transparent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 6 }}>{savingEdit ? 'Saving…' : 'Save Edited Copy'}</button>
           </div>
         </div>
         </div>
@@ -2143,7 +2143,7 @@ export const Gallery: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Transition</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
               {(['fade', 'slide', 'zoom'] as const).map(t => (
-                <button key={t} aria-label={`${t} transition`} aria-pressed={slideshowTransition === t} onClick={() => setSlideshowTransition(t)} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: slideshowTransition === t ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: slideshowTransition === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                <button key={t} aria-label={`${t} transition`} aria-pressed={slideshowTransition === t} onClick={() => setSlideshowTransition(t)} style={{ flex: 1, padding: '6px', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: slideshowTransition === t ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: slideshowTransition === t ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}><span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Interval</span><span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{slideshowInterval}s</span></div>

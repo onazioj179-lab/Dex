@@ -5283,7 +5283,13 @@ export const AppManager: React.FC = () => {
     <div data-tauri-drag-region data-dex-chrome="topbar" style={{
       height: 34, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: `0 ${12 + nativeOverlayWidth}px 0 12px`,
-      background: 'var(--color-bg-surface)',
+      // Glass over the fixed wallpaper layer: fill + blur from applyGlassVars,
+      // so Interface Transparency, Reduce Transparency and low-end mode turn it
+      // solid together with every other glass surface.
+      background: 'var(--glass-bg)',
+      backdropFilter: 'var(--glass-blur)',
+      WebkitBackdropFilter: 'var(--glass-blur)',
+      boxShadow: 'inset 0 -0.5px 0 var(--glass-edge)',
       WebkitAppRegion: 'drag', flexShrink: 0,
       position: 'relative', zIndex: 100,
     } as React.CSSProperties}>
@@ -5682,11 +5688,15 @@ export const AppManager: React.FC = () => {
               flexDirection: 'column',
               boxSizing: 'border-box',
               overflow: 'hidden',
-              background: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: 'var(--radius-md)',
+              // Floating glass (strong fill: dense content). Outer radius 24 =
+              // the 10px tiles + 16px padding, so the corners stay concentric.
+              background: 'var(--color-bg-glass-strong)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid var(--glass-edge)',
+              borderRadius: 'var(--radius-2xl)',
               padding: 'var(--space-4)',
-              boxShadow: 'var(--dex-popup-shadow)',
+              boxShadow: 'var(--glass-shadow), var(--glass-rim)',
               // Precision motion: pure opacity fade, no movement / scale / bounce.
               animation: 'appMenuFade 0.15s ease-out',
             } as React.CSSProperties}

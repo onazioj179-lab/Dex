@@ -18,6 +18,15 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+# Read-only token: CI only checks out and tests. Publishing lives in release.yml.
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR supersedes the running checks.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   NODE_VERSION: '20.x'
 
@@ -30,10 +39,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -56,6 +65,9 @@ jobs:
       - name: IPC ABI check
         run: npm run abi:check
 
+      - name: Version consistency
+        run: npm run version:check
+
   # ---------------------------------------------------------------------------
   # Unit tests (Vitest)
   # ---------------------------------------------------------------------------
@@ -65,10 +77,10 @@ jobs:
     needs: lint
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -88,10 +100,10 @@ jobs:
     needs: lint
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -101,6 +113,61 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Supply chain: known-vulnerable production dependencies, committed secrets,
+  # and (on PRs) newly added dependencies with advisories or bad licences.
+  # ---------------------------------------------------------------------------
+  security:
+    name: Dependency & secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+
+  # ---------------------------------------------------------------------------
+  # Native core (Rust): the core/ workspace (search, audio DSP, ledger, DTP,
+  # vault...) had no CI at all. Windows/MSVC, the platform DEX ships on.
+  # ---------------------------------------------------------------------------
+  rust-core:
+    name: Rust core tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Cache cargo build
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core
+
+      - name: Test
+        working-directory: core
+        run: cargo test --workspace --locked
 
   # ---------------------------------------------------------------------------
   # Web smoke run (Playwright): the real renderer in Chromium, served by Vite.
@@ -114,10 +181,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -133,7 +200,7 @@ jobs:
 
       - name: Upload report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-report
           path: test-results/

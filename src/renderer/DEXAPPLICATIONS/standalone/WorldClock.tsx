@@ -566,7 +566,9 @@ const WorldClock: React.FC = () => {
 
           const cardBg = isHome
             ? 'var(--color-accent-light, rgba(10,132,255,0.14))'
-            : isDay ? 'var(--color-border-subtle)' : 'rgba(0,0,0,0.2)';
+            // Theme surfaces: day raised, night recessed. A black 20% overlay put
+            // tertiary text at 3.7:1 on night cards in light mode.
+            : isDay ? 'var(--color-bg-surface)' : 'var(--color-bg-inset)';
 
           return (
             <div

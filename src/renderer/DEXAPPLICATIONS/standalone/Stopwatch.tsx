@@ -234,7 +234,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   btnStart: {
-    background: 'color-mix(in srgb, var(--color-accent) 18%, transparent)', color: 'var(--color-accent)',
+    background: 'var(--color-accent-light)', color: 'var(--color-accent)',
     boxShadow: 'inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent)',
   },
   btnStop: {

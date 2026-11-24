@@ -61,7 +61,7 @@ export const CommandPalette: React.FC<{ commands: PaletteCommand[]; onClose: () 
               onClick={() => run(c)}
               style={{
                 display: 'flex', alignItems: 'center', height: 30, padding: '0 10px', borderRadius: 10, cursor: c.disabled ? 'default' : 'pointer',
-                background: i === sel ? 'color-mix(in srgb, var(--color-accent) 18%, transparent)' : 'transparent',
+                background: i === sel ? 'var(--color-accent-light)' : 'transparent',
                 color: c.disabled ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)', fontSize: 13,
               }}
             >

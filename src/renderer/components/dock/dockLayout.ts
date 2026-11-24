@@ -74,6 +74,10 @@ export const DOCK_POSITIONS: readonly (DockPosition & { label: string })[] = [
   { edge: 'top', align: 'end', label: 'Top right' },
   { edge: 'bottom', align: 'start', label: 'Bottom left' },
   { edge: 'bottom', align: 'end', label: 'Bottom right' },
+  { edge: 'left', align: 'start', label: 'Left top' },
+  { edge: 'left', align: 'end', label: 'Left bottom' },
+  { edge: 'right', align: 'start', label: 'Right top' },
+  { edge: 'right', align: 'end', label: 'Right bottom' },
 ];
 
 export function dockPositionAt(area: WorkArea, x: number, y: number): DockPosition {
@@ -84,6 +88,11 @@ export function dockPositionAt(area: WorkArea, x: number, y: number): DockPositi
   const bottom = desktop.y + desktop.h - y;
   const corner = Math.min(desktop.w, desktop.h) * 0.24;
   if (Math.min(left, right) < corner && Math.min(top, bottom) < corner) {
+    const side = Math.min(left, right);
+    const end = Math.min(top, bottom);
+    // Hugging a side edge, clearly away from the top/bottom edge: a vertical
+    // Dock at that end of the side. Otherwise the horizontal corner.
+    if (side * 2 < end) return { edge: left < right ? 'left' : 'right', align: top < bottom ? 'start' : 'end' };
     return { edge: top < bottom ? 'top' : 'bottom', align: left < right ? 'start' : 'end' };
   }
 

@@ -144,9 +144,11 @@ describe('Theme presets', () => {
     localStorage.setItem('dex-accent-color', '#10b981');
     localStorage.setItem('dex-dark-mode', 'true');
     initializeTheme();
-    expect(localStorage.getItem('dex-theme-preset')).toBe('dark-default');
-    expect(localStorage.getItem('dex-accent-color')).toBe('');
-    expect(document.documentElement.style.getPropertyValue('--color-text-primary')).toBe('#F5F5F7');
+    // The preset key is retired (utils/theme owns the scheme) and the palette
+    // comes from the stylesheet, never inline.
+    expect(localStorage.getItem('dex-theme-preset')).toBeNull();
+    expect(localStorage.getItem('dex-accent-color')).toBeNull();
+    expect(document.documentElement.style.getPropertyValue('--color-text-primary')).toBe('');
   });
 
   it('keeps an accent the user chose after picking a retired preset', () => {
@@ -154,7 +156,7 @@ describe('Theme presets', () => {
     localStorage.setItem('dex-accent-color', '#0a84ff');
     localStorage.setItem('dex-dark-mode', 'false');
     initializeTheme();
-    expect(localStorage.getItem('dex-theme-preset')).toBe('light-default');
+    expect(localStorage.getItem('dex-theme-preset')).toBeNull();
     expect(localStorage.getItem('dex-accent-color')).toBe('#0a84ff');
   });
 });

@@ -50,7 +50,7 @@ describe('theme switch without transitions', () => {
       }
     };
     walk(root);
-    // theme.ts is the helper; ThemeManager wraps its writes; App.tsx sets it once at boot before any app exists.
-    expect(offenders.sort()).toEqual(['App.tsx', 'components/ThemeManager.tsx', 'utils/theme.ts']);
+    // utils/theme.ts is the one theme controller; nothing else writes the attribute.
+    expect(offenders.sort()).toEqual(['utils/theme.ts']);
   });
 });

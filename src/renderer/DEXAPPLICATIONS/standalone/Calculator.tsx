@@ -589,7 +589,7 @@ const CALC_CSS = `
   color: var(--color-text-primary); font-size: 15px;
 }
 .dex-calc-key--op {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent);
+  background: var(--color-accent-light); color: var(--color-accent);
   font-size: 20px;
 }
 .dex-calc-key--op.is-pressed { background: var(--color-accent-fill); color: var(--color-accent-text, #fff); }

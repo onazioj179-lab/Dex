@@ -776,7 +776,7 @@ const Calendar: React.FC = () => {
         date,
         time: time || '09:00',
         endTime: '',
-        color: '#4A9EFF',
+        color: '#0A84FF',
         description: '',
       };
       setEvents((prev) => [...prev, newEvent]);

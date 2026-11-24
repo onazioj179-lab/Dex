@@ -65,8 +65,7 @@ import { SETTINGS_INDEX, type SettingIndexEntry } from './settingsPanels/setting
 import { DATA_CATEGORIES, POLICY_CONTACT_EMAIL, POLICY_METADATA, POLICY_REPOSITORY_URL, type PolicySlug } from '../../shared/policies';
 import { applyMotionDurations } from '../styles/motionDurations';
 import { applyGlassVars } from '../store/shellPreferencesStore';
-import { applyTheme } from '../utils/theme';
-import { withViewTransition } from '../utils/viewTransition';
+import { currentTheme, getThemePreference, setThemePreference, THEME_CHANGED_EVENT, type ThemePreference } from '../utils/theme';
 import { setReduceMotionOverride } from '../utils/MotionController';
 import { createTapCounter, discoverEasterEgg } from '../services/easterEggs';
 import { colorInputValue } from '../utils/canvasTheme';
@@ -501,20 +500,12 @@ const applySettings = (settings: Record<string, unknown>) => {
     const root = document.documentElement;
     const body = document.body;
     
-    // Apply selected theme (dark or light)
+    // Theme: `darkMode` mirrors the applied theme (the page keeps it in step
+    // with THEME_CHANGED_EVENT), so it only differs from what is on screen when
+    // something set it directly, e.g. an imported settings file. Only then is
+    // it a choice to persist; otherwise following the system stays intact.
     const theme = settings.darkMode !== false ? 'dark' : 'light';
-    // One style pass with transitions off (see utils/theme withoutTransitions).
-    // A real light/dark change cross-fades as one view transition.
-    if (root.getAttribute('data-theme') !== theme) withViewTransition(() => applyTheme(theme));
-    else applyTheme(theme);
-    // When the user actually changes Dark Mode, pin it: utils/theme's boot code
-    // otherwise ignores `darkMode` and follows the OS scheme, so a Light choice
-    // was undone on restart.
-    const nextDark = String(settings.darkMode !== false);
-    if (nextDark !== (localStorage.getItem('darkMode') ?? 'true')) {
-      localStorage.setItem('dex-theme-source', 'user');
-    }
-    localStorage.setItem('darkMode', nextDark);
+    if (theme !== currentTheme()) setThemePreference(theme);
 
     // Apply locale to document.lang and dir (RTL for Arabic/Hebrew/Persian/Urdu)
     try {
@@ -1297,14 +1288,33 @@ export const Settings: React.FC = () => {
   // When a search result jumps to a section, remember which control to scroll
   // to + flash once the new section has rendered.
   const pendingScrollRef = React.useRef<string | null>(null);
-  const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => ({
+    ...(loadSettings() || DEFAULT_SETTINGS),
+    // The stored copy can be stale (the OS flipped while following the system,
+    // or a schedule applied); the applied theme is the truth.
+    darkMode: currentTheme() === 'dark',
+  }));
+  const [themePref, setThemePref] = useState<ThemePreference>(() => getThemePreference());
+  useEffect(() => {
+    const onTheme = () => {
+      const dark = currentTheme() === 'dark';
+      setThemePref(getThemePreference());
+      setSettings((prev) => (prev.darkMode === dark ? prev : { ...prev, darkMode: dark }));
+    };
+    window.addEventListener(THEME_CHANGED_EVENT, onTheme);
+    window.addEventListener('storage', onTheme);
+    return () => {
+      window.removeEventListener(THEME_CHANGED_EVENT, onTheme);
+      window.removeEventListener('storage', onTheme);
+    };
+  }, []);
   // Other surfaces (e.g. the Browser's privacy panel) write single keys through
   // writeDexSetting; pick those up so this page never saves a stale copy over them.
   useEffect(() => {
     const onExternal = (e: Event) => {
       if ((e as CustomEvent).detail?.source === 'settings') return;
       const latest = loadSettings();
-      if (latest) setSettings((prev) => ({ ...prev, ...latest }));
+      if (latest) setSettings((prev) => ({ ...prev, ...latest, darkMode: currentTheme() === 'dark' }));
     };
     window.addEventListener('dex-settings-changed', onExternal);
     return () => window.removeEventListener('dex-settings-changed', onExternal);
@@ -2252,31 +2262,28 @@ export const Settings: React.FC = () => {
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Appearance</span>
-          <span style={styles.settingDesc}>Switch between dark and light mode</span>
+          <span style={styles.settingDesc}>Dark, light, or follow the system appearance</span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['dark', 'light', 'auto'] as const).map(mode => (
-            <button
-              key={mode}
-              aria-label={`${mode} mode`}
-              onClick={() => {
-                if (mode === 'auto') {
-                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  setSettings(prev => ({ ...prev, darkMode: prefersDark }));
-                } else {
-                  setSettings(prev => ({ ...prev, darkMode: mode === 'dark' }));
-                }
-              }}
-              style={{
-                padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                border: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
-                background: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-bg-active, #252528)' : 'transparent',
-                color: (mode === 'dark' && settings.darkMode !== false) || (mode === 'light' && settings.darkMode === false) ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              }}
-            >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
-            </button>
-          ))}
+        <div role="radiogroup" aria-label="Appearance" style={{ display: 'flex', gap: 6 }}>
+          {([['dark', 'Dark'], ['light', 'Light'], ['system', 'Auto']] as const).map(([mode, label]) => {
+            const on = themePref === mode;
+            return (
+              <button
+                key={mode}
+                role="radio"
+                aria-checked={on}
+                onClick={() => setThemePreference(mode)}
+                style={{
+                  padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: on ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+                  background: on ? 'var(--color-bg-active)' : 'transparent',
+                  color: on ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -4437,8 +4444,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 var(--space-3)',
     borderRadius: '6px',
     border: 'none',
-    background: 'rgba(255,69,58,0.12)',
-    color: 'var(--color-error)',
+    background: 'color-mix(in srgb, var(--color-error) 12%, transparent)',
+    // Toward the text colour: lighter in dark, darker in light. Plain error red
+    // on its own tint was 3.95:1 in dark mode.
+    color: 'color-mix(in srgb, var(--color-error) 75%, var(--color-text-primary))',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',

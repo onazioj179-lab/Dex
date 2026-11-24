@@ -247,7 +247,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
               onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                background: i === selected ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                background: i === selected ? 'var(--color-accent-light)' : 'transparent',
               }}
             >
               <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
@@ -275,7 +275,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
                 aria-selected={i === selected}
                 onMouseMove={() => setActive(i)}
                 onClick={() => runAt(i)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: i === selected ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: i === selected ? 'var(--color-accent-light)' : 'transparent' }}
               >
                 <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)' }}>
                   <DexIcon name={m.icon || 'search'} size={14} color="currentColor" />

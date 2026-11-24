@@ -205,6 +205,20 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     pointer.moved = true;
     setPlacementPreview(dockPositionAt(area, e.clientX, e.clientY));
   };
+  // Esc abandons a placement drag: the Dock returns to where it was.
+  useEffect(() => {
+    if (!placementPreview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !placementDrag.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      placementDrag.current = null;
+      suppressTriggerClick.current = true;
+      setPlacementPreview(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [placementPreview]);
   const endPlacementDrag = (e: React.PointerEvent<HTMLElement>, commit: boolean) => {
     const pointer = placementDrag.current;
     if (!pointer || pointer.id !== e.pointerId) return;

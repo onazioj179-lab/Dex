@@ -22,7 +22,7 @@ const progressLabels: Record<UpdatePhase, string> = {
 
 export function SoftwareUpdatePanel() {
   const state = useSoftwareUpdate();
-  const { phase, version, notes, received, total, error } = state;
+  const { phase, version, notes, received, total, error, errorDetail } = state;
   const desktop = isTauri();
   const remoteUpdates = getBuildInfo().channel === 'stable';
   const hasUpdater = desktop && remoteUpdates;
@@ -52,6 +52,9 @@ export function SoftwareUpdatePanel() {
           ) : null}
           {phase === 'ready' && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Save your work before restarting DEX.</p>}
           {phase === 'error' && <p role="alert" style={{ margin: 0, maxWidth: 420, fontSize: 13, color: 'var(--color-error)', overflowWrap: 'anywhere' }}>{error}</p>}
+          {phase === 'error' && errorDetail && errorDetail !== 'offline' && (
+            <p style={{ margin: 0, maxWidth: 420, fontSize: 12, color: 'var(--color-text-tertiary)', overflowWrap: 'anywhere' }}>Details: {errorDetail}</p>
+          )}
           {!remoteUpdates && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Updates are installed on this computer when you approve a new build.</p>}
           {remoteUpdates && !desktop && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>Install the Windows desktop app to enable in-app updates.</p>}
           {hasUpdater && (
@@ -59,7 +62,7 @@ export function SoftwareUpdatePanel() {
               {phase === 'available' ? <Button onClick={() => void state.download()}>Download update</Button>
                 : phase === 'ready' ? <Button onClick={() => void state.install()}>Install and restart</Button>
                   : busy ? <Button loading disabled>{progressLabels[phase]}</Button>
-                    : <Button onClick={() => void state.check()}>{phase === 'error' ? 'Try again' : 'Check for updates'}</Button>}
+                    : <Button onClick={() => void (phase === 'error' ? state.retry() : state.check())}>{phase === 'error' ? 'Try again' : 'Check for updates'}</Button>}
             </div>
           )}
         </div>

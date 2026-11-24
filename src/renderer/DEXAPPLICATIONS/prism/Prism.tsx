@@ -2980,7 +2980,7 @@ const Prism: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
     container: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-family)', fontSize: '11px', overflow: 'hidden', position: 'relative' as const, transition: 'background-color var(--duration-theme) ease, color var(--duration-theme) ease', contain: 'layout style' } as React.CSSProperties,
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)', background: 'var(--color-bg-elevated)', borderBottom: '1px solid var(--color-border)', height: '32px', minHeight: '32px', flexShrink: 0, position: 'relative' as const, zIndex: 100, overflow: 'visible' },
-    logo: { fontSize: '12px', fontWeight: 600, color: 'var(--prism-accent)', letterSpacing: '-0.2px' },
+    logo: { fontSize: '12px', fontWeight: 600, color: 'color-mix(in srgb, var(--prism-accent) 70%, var(--color-text-primary))', letterSpacing: '-0.2px' },
     headerCenter: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'visible', flexWrap: 'nowrap', maxHeight: 38, justifyContent: 'flex-start', scrollbarWidth: 'thin' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
     btn: { padding: '4px var(--space-2)', background: 'none', border: 'none', borderRadius: '9999px', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s ease', whiteSpace: 'nowrap', flexShrink: 0 },
@@ -3002,7 +3002,7 @@ const Prism: React.FC = () => {
     layerThumb: { width: '28px', height: '28px', background: 'color-mix(in srgb, var(--prism-accent) 16%, var(--color-bg-elevated))', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     layerInfo: { flex: 1 },
     layerName: { fontSize: '11px', fontWeight: 600, color: 'var(--color-text-primary)' },
-    layerType: { fontSize: '11px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', fontWeight: 600 },
+    layerType: { fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', fontWeight: 600 },
     layerActions: { display: 'flex', gap: '6px' },
     iconBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '9999px', transition: 'all 0.12s ease' },
     sliderRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' },

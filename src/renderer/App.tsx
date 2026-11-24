@@ -117,15 +117,9 @@ import { initializeBuiltinShortcuts } from './utils/shortcutConflictDetector';
 // ===========================================================================
 
 const initializeTheme = () => {
-  // Respect saved preference, default to dark
-  const savedDarkMode = localStorage.getItem('darkMode');
-  const isDark = savedDarkMode === null ? true : savedDarkMode !== 'false';
-  const theme = isDark ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', theme);
-  document.body.classList.toggle('dark-mode', isDark);
-  document.body.classList.toggle('light-mode', !isDark);
-  document.documentElement.classList.toggle('dark-mode', isDark);
-  document.documentElement.classList.toggle('light-mode', !isDark);
+  // Light/dark is owned by utils/theme (applied in main.tsx before render and
+  // kept live there); re-resolving it here used to force dark on mount after
+  // the OS-follow had chosen light. Only the saved accent is restored here.
   try {
     const savedSettings = localStorage.getItem('dex-settings');
     if (savedSettings) {

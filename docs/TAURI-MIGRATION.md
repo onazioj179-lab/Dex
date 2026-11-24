@@ -84,7 +84,7 @@
 
 ## PART 2 — idle CPU, privacy honesty, storage, tiers (2026-11-01)
 
-Full write-up: `reports/PART2_IMPROVEMENT_REPORT.md`. Resume facts:
+Full write-up: `docs/reports/PART2_IMPROVEMENT_REPORT.md` (retired; in git history). Resume facts:
 - **Idle CPU 50-100% of a core -> ~1-2%:** tantivy was rebuilt every launch (snapshot only in
   memory) and fragmented by per-file commits. Now: snapshot persisted in
   `search-index/dex-snapshot.json`, ONE shared `IndexReader` (manual reload), batch
@@ -101,7 +101,7 @@ Full write-up: `reports/PART2_IMPROVEMENT_REPORT.md`. Resume facts:
 
 ## STARTUP REPAIR — "WebView2 not found" root-caused + fixed (2026-11-01)
 
-Full write-up: `reports/PART1_SYSTEM_AUDIT_REPORT.md` (repo root). Key facts for resuming:
+Full write-up: `docs/reports/PART1_SYSTEM_AUDIT_REPORT.md` (retired; in git history). Key facts for resuming:
 - **Root cause:** v6.0.x was built with the GNU toolchain -> exe imports
   `WebView2Loader.dll` (static loader is MSVC-only) -> bundler doesn't ship it ->
   installed app dies `0xC0000135` before any DEX code. `build.rs` now refuses GNU

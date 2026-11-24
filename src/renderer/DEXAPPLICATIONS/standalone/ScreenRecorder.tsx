@@ -544,7 +544,10 @@ const ScreenRecorder: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div style={{ flex: 1, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', overflow: 'hidden' }}>
           <div style={{
-            ...premiumGlassPanel, flex: 1, position: 'relative', overflow: 'hidden',
+            // A solid black video well: no backdrop blur (nothing shows through
+            // it, and an inline blur made the low-tier rule repaint it white).
+            border: premiumGlassPanel.border, borderRadius: premiumGlassPanel.borderRadius,
+            flex: 1, position: 'relative', overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: '#0a0a0c',
           }}>

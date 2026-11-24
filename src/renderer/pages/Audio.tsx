@@ -1249,7 +1249,7 @@ export const Audio: React.FC = () => {
                 if (libraryView === 'recent') {
                   const sorted = [...tracks].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 50);
                   return sorted.map((track, i) => (
-                    <div key={track.id} style={{ ...styles.trackItem, background: currentTrack?.id === track.id ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent' }} onClick={() => playTrack(track)}>
+                    <div key={track.id} style={{ ...styles.trackItem, background: currentTrack?.id === track.id ? 'var(--color-accent-light)' : 'transparent' }} onClick={() => playTrack(track)}>
                       <span style={styles.trackNumber}>{i + 1}</span>
                       <div style={{ ...styles.trackArtwork, background: getArtworkColor(track.id) }} />
                       <div style={styles.trackInfo}>
@@ -1272,7 +1272,7 @@ export const Audio: React.FC = () => {
                     <div style={{ padding: 'var(--space-3) var(--space-4) 6px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-bg-hover)' }}>{group}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', padding: '2px var(--space-4) var(--space-2)' }}>{groupTracks.length} {groupTracks.length === 1 ? 'song' : 'songs'}</div>
                     {groupTracks.map((track, i) => (
-                      <div key={track.id} style={{ ...styles.trackItem, background: currentTrack?.id === track.id ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent' }} onClick={() => playTrack(track)}>
+                      <div key={track.id} style={{ ...styles.trackItem, background: currentTrack?.id === track.id ? 'var(--color-accent-light)' : 'transparent' }} onClick={() => playTrack(track)}>
                         <span style={styles.trackNumber}>{i + 1}</span>
                         <div style={{ ...styles.trackArtwork, background: getArtworkColor(track.id) }} />
                         <div style={styles.trackInfo}>
@@ -1338,7 +1338,7 @@ export const Audio: React.FC = () => {
                 key={track.id}
                 style={{
                   ...styles.trackItem,
-                  background: currentTrack?.id === track.id ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent',
+                  background: currentTrack?.id === track.id ? 'var(--color-accent-light)' : 'transparent',
                 }}
                 onClick={() => playTrack(track)}
                 onDoubleClick={(e) => { e.stopPropagation(); openMetadataEditor(track); }}
@@ -1401,14 +1401,14 @@ export const Audio: React.FC = () => {
             { label: 'Visualizer', fn: () => setShowVisualizer(v => !v), active: showVisualizer },
             { label: 'Crossfade', fn: () => setShowCrossfadeSettings(v => !v), active: showCrossfadeSettings },
           ].map(b => (
-            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
+            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
           ))}
           {/* Sleep Timer */}
           <select
             value={sleepTimer}
             onChange={e => startSleepTimer(Number(e.target.value))}
             aria-label="Sleep timer"
-            style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'var(--color-border-subtle)', color: sleepTimer > 0 ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (sleepTimer > 0 ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: sleepTimer > 0 ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: sleepTimer > 0 ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
           >
             <option value={0}>{sleepRemaining > 0 ? `${Math.ceil(sleepRemaining / 60)}m left` : 'Sleep Timer'}</option>
             <option value={15}>15 min</option>
@@ -1431,7 +1431,7 @@ export const Audio: React.FC = () => {
             <div style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
                 {[{ name: 'Flat', vals: [0,0,0,0,0,0,0,0,0,0] }, { name: 'Bass Boost', vals: [6,5,4,2,0,0,0,0,0,0] }, { name: 'Treble', vals: [0,0,0,0,0,1,3,4,5,6] }, { name: 'Rock', vals: [4,3,0,-2,0,2,4,5,5,4] }, { name: 'Pop', vals: [-1,0,2,4,5,4,2,0,-1,-2] }, { name: 'Jazz', vals: [3,2,0,1,2,2,3,4,4,3] }].map(p => (
-                  <button key={p.name} onClick={() => { setEqBands(p.vals); setEqPreset(p.name.toLowerCase()); }} aria-label={`Select ${p.name} preset`} aria-pressed={eqPreset === p.name.toLowerCase()} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: eqPreset === p.name.toLowerCase() ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: eqPreset === p.name.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p.name}</button>
+                  <button key={p.name} onClick={() => { setEqBands(p.vals); setEqPreset(p.name.toLowerCase()); }} aria-label={`Select ${p.name} preset`} aria-pressed={eqPreset === p.name.toLowerCase()} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: eqPreset === p.name.toLowerCase() ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: eqPreset === p.name.toLowerCase() ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{p.name}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, padding: '0 4px' }}>
@@ -1464,7 +1464,7 @@ export const Audio: React.FC = () => {
                   <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Songs will appear here</div>
                 </div>
               ) : queue.map((t, i) => (
-                <div key={t.id + i} draggable onDragStart={() => setQueueDragIdx(i)} onDragOver={(e) => { e.preventDefault(); setQueueOverIdx(i); }} onDragEnd={() => { if (queueDragIdx !== null && queueOverIdx !== null && queueDragIdx !== queueOverIdx) { setQueue(prev => { const next = [...prev]; const [moved] = next.splice(queueDragIdx, 1); next.splice(queueOverIdx, 0, moved); return next; }); } setQueueDragIdx(null); setQueueOverIdx(null); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 6px', borderRadius: 4, marginBottom: 1, cursor: 'grab', background: queueOverIdx === i ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent', opacity: queueDragIdx === i ? 0.4 : 1, transition: 'background 0.15s, opacity 0.15s' }}>
+                <div key={t.id + i} draggable onDragStart={() => setQueueDragIdx(i)} onDragOver={(e) => { e.preventDefault(); setQueueOverIdx(i); }} onDragEnd={() => { if (queueDragIdx !== null && queueOverIdx !== null && queueDragIdx !== queueOverIdx) { setQueue(prev => { const next = [...prev]; const [moved] = next.splice(queueDragIdx, 1); next.splice(queueOverIdx, 0, moved); return next; }); } setQueueDragIdx(null); setQueueOverIdx(null); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 6px', borderRadius: 4, marginBottom: 1, cursor: 'grab', background: queueOverIdx === i ? 'var(--color-accent-light)' : 'transparent', opacity: queueDragIdx === i ? 0.4 : 1, transition: 'background 0.15s, opacity 0.15s' }}>
                   <span style={{ fontSize: 9, color: 'var(--color-text-tertiary)', width: 14, textAlign: 'center' }}>{i + 1}</span>
                   <div style={{ width: 24, height: 24, borderRadius: 4, background: 'var(--color-bg-hover)' }} />
                   <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { playTrack(t); setQueue(q => q.filter((_, j) => j !== i)); }} title="Play now">
@@ -1523,7 +1523,7 @@ export const Audio: React.FC = () => {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>Visualizer</span>
                 {(['bars', 'wave', 'spectrum'] as const).map(m => (
-                  <button key={m} onClick={() => setVizMode(m)} aria-label={`Visualizer mode: ${m}`} aria-pressed={vizMode === m} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: vizMode === m ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'var(--color-border-subtle)', color: vizMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
+                  <button key={m} onClick={() => setVizMode(m)} aria-label={`Visualizer mode: ${m}`} aria-pressed={vizMode === m} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid var(--color-bg-hover)', background: vizMode === m ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: vizMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{m}</button>
                 ))}
               </div>
               <button style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: 14 }} onClick={() => setShowVisualizer(false)} aria-label="Close" title="Close"><DexIcon name="close" size={14} /></button>
@@ -1719,7 +1719,7 @@ export const Audio: React.FC = () => {
                     style={{
                       padding: '2px 5px', borderRadius: 4, cursor: 'pointer',
                       border: '1px solid ' + (speed === s ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'transparent'),
-                      background: speed === s ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                      background: speed === s ? 'var(--color-accent-light)' : 'transparent',
                       color: speed === s ? 'var(--color-accent)' : 'var(--color-text-muted)',
                       fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
                     }}
@@ -1739,7 +1739,7 @@ export const Audio: React.FC = () => {
                   style={{
                     padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
                     border: '1px solid ' + (abA !== null ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-border-subtle)'),
-                    background: abA !== null ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                    background: abA !== null ? 'var(--color-accent-light)' : 'transparent',
                     color: abA !== null ? 'var(--color-accent)' : 'var(--color-text-muted)',
                     fontSize: 10, fontWeight: 600,
                   }}
@@ -1756,7 +1756,7 @@ export const Audio: React.FC = () => {
                   style={{
                     padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
                     border: '1px solid ' + (abB !== null ? 'color-mix(in srgb, var(--color-accent) 40%, transparent)' : 'var(--color-border-subtle)'),
-                    background: abB !== null ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)' : 'transparent',
+                    background: abB !== null ? 'var(--color-accent-light)' : 'transparent',
                     color: abB !== null ? 'var(--color-accent)' : 'var(--color-text-muted)',
                     fontSize: 10, fontWeight: 600,
                   }}
@@ -1958,7 +1958,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 48,
     borderRadius: 10,
     border: '2px dashed color-mix(in srgb, var(--color-accent) 60%, transparent)',
-    background: 'color-mix(in srgb, var(--color-accent) 8%, transparent)',
+    background: 'var(--color-accent-light)',
   },
   // Large drop zone (empty state replacement)
   dropZone: {

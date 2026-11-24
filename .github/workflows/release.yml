@@ -7,16 +7,60 @@ on:
         description: 'Owner-approved stable tag to publish (for example, v7.0.2)'
         required: true
 
+# Read-only by default; only the publishing job can write releases.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: dex-stable-release
 
 jobs:
+  # Quality gate: nothing is built or published unless the tagged commit passes
+  # type-check, lint, the IPC ABI guard, version consistency, unit tests and
+  # the Rust core tests.
+  verify:
+    name: Verify release candidate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Cache cargo build
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: core
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Version matches the tag
+        run: node scripts/check-version.mjs ${{ github.event.inputs.tag }}
+
+      - name: Type-check, watermark and IPC ABI
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Rust core tests
+        working-directory: core
+        run: cargo test --workspace --locked
+
   release:
     name: Build & publish (Windows / Tauri)
+    needs: verify
     runs-on: windows-latest
+    permissions:
+      contents: write
     # Lift the optional dex-updates token to job env so it can be referenced in a
     # step-level `if:` — GitHub does NOT allow the `secrets` context in `if:`
     # conditions (it fails the whole workflow at startup). `env` IS allowed.
@@ -29,7 +73,7 @@ jobs:
       WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
       WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Full history: the build number is the commit count (scripts/build-info.mjs).
           fetch-depth: 0
@@ -49,7 +93,7 @@ jobs:
           node -e 'if ("v" + require("./package.json").version !== process.argv[1]) process.exit(1)' "$TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -59,10 +103,10 @@ jobs:
       # file / .cargo config in the repo forces GNU, so MSVC (Tauri's default,
       # recommended path) is used.
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
       - name: Cache cargo build
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri
 

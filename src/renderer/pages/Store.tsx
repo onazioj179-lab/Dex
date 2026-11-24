@@ -682,7 +682,7 @@ function CategoryButton(
       aria-pressed={active}
     >
       {label}
-      <span style={{ ...styles.catBtnCount, opacity: active ? 0.9 : 0.6 }}>{count}</span>
+      <span style={{ ...styles.catBtnCount, color: active ? 'inherit' : 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
     </button>
   );
 }

@@ -444,7 +444,8 @@
   --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
   --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0.0, 1, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Restrained overshoot (~6%): settles, does not bounce. Was 1.56 (~20%). */
+  --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
   --ease-tahoe: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-color: cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -456,7 +457,7 @@
   --pg-curve-emphasized: cubic-bezier(0.2, 0.0, 0, 1);
   --pg-curve-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
   --pg-curve-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
-  --pg-curve-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --pg-curve-spring: var(--ease-spring);
 
   /* ─────────────────────────────────────────────────────────────────────────
      DEX Motion Framework (v4.61) — one motion contract, organised by category.
@@ -595,7 +596,7 @@
   --focus-ring-success: 0 0 0 2px rgba(52, 199, 89, 0.4), 0 0 0 4px rgba(52, 199, 89, 0.2);
   
   /* 904. Spring physics transitions */
-  --transition-spring: 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-spring: 200ms var(--ease-spring);
   --transition-bounce: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-snap: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -968,15 +969,17 @@
   -webkit-backdrop-filter: var(--blur-lg) saturate(130%);
 }
 
-/* Floating glass uses one soft shadow and one edge. */
+/* The one floating-glass material: fill + blur from applyGlassVars (so the
+   Interface Transparency slider, reduced transparency and low-end mode all
+   flow through), a translucent edge, a lit rim and one soft shadow. */
 .dex-liquid-glass,
 .dex-liquid-glass-strong {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius-md);
-  box-shadow: var(--dex-popup-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-rim);
 }
 .dex-liquid-glass-strong { background: var(--color-bg-glass-strong); }
 /* Lite mode (weak GPUs, data-perf-tier="low") strips the EXPENSIVE backdrop blur
@@ -1582,9 +1585,13 @@ html[data-darkroom="on"] {
   --color-accent: #0066CC;
   --color-accent-hover: #0058B0;
   --color-accent-dark: #004A94;         /* pressed/active in light mode */
-  --color-accent-light: rgba(0, 102, 204, 0.12);
-  --color-accent-soft: rgba(0, 102, 204, 0.08);
-  --color-accent-muted: rgba(0, 102, 204, 0.10);
+  /* Tints are mixed toward white (opaque), not alpha: accent text sits on
+     them (selected tabs, filter pills), and an alpha tint over the grey base
+     composited to rgb(215,228,242) = 4.34:1 for #0066CC. Opaque 10% stays
+     4.8:1 on every surface it lands on. */
+  --color-accent-light: color-mix(in srgb, var(--color-accent) 10%, #FFFFFF);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 6%, #FFFFFF);
+  --color-accent-muted: color-mix(in srgb, var(--color-accent) 8%, #FFFFFF);
   --color-accent-text: #FFFFFF;
   --color-accent-fill: #0066CC;
 
@@ -4698,7 +4705,7 @@ svg, img.icon, [data-icon] {
   --transition-fast: 40ms cubic-bezier(0.25, 0.1, 0.25, 1);
   --transition-normal: 80ms cubic-bezier(0.25, 0.1, 0.25, 1);
   --transition-slow: 120ms cubic-bezier(0.25, 0.1, 0.25, 1);
-  --transition-spring: 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-spring: 150ms var(--ease-spring);
   --transition-tahoe: 200ms cubic-bezier(0.23, 1, 0.32, 1);
 
   /* 20. Overlay tokens */
@@ -5624,6 +5631,25 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.05); }
   --code-gutter-bg: transparent;
   --code-scrollbar: var(--color-border);
 }
+
+/* Light editor palette: every token >= 4.5:1 on the light editor surface
+   (#F5F6F8). The dark palette's gold numbers and teal builtins were 1.6:1
+   and 2.2:1 there. */
+[data-theme="light"] {
+  --code-text: var(--color-text-primary);
+  --code-comment: #5D6C79;
+  --code-string: #C41A16;
+  --code-number: #1C00CF;
+  --code-keyword: #9B2393;
+  --code-builtin: #326D74;
+  --code-function: #0F5F96;
+  --code-operator: #3A3D44;
+  --code-type: #0B4F79;
+  --code-constant: #6C36A9;
+  --code-error: #C4281B;
+}
+[data-theme="light"] .dex-syn-number,
+[data-theme="light"] .dex-syn-operator { opacity: 1; }
 
 /* DexCode syntax highlighting classes */
 .dex-syn-comment  { color: var(--code-comment); font-style: italic; }
@@ -8426,7 +8452,7 @@ html[data-glass-effective-mode="liquid"]:not([data-perf-tier="low"]) .dex-glass-
   color: var(--color-text-primary);
   background: var(--color-bg-surface);
   cursor: pointer;
-  transition: background 0.16s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: background 0.16s ease, transform 0.22s var(--ease-spring);
 }
 .dex-pill:hover { background: var(--color-bg-hover); }
 

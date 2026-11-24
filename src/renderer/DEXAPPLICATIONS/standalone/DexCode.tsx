@@ -641,7 +641,7 @@ const DexCode: React.FC = () => {
         setDuration(result.duration);
       } else {
         const steps: string[] = [];
-        const answer = await runUkiAgent({ userText: intent, systemPrompt: buildSystemPrompt(), pushStep: (s) => steps.push(s) });
+        const answer = await runUkiAgent({ userText: intent, systemPrompt: buildSystemPrompt({ userText: intent, foregroundAppId: 'dexcode', actionable: true }), pushStep: (s) => steps.push(s) });
         setOutput([
           ...(steps.length ? [...steps.map(s => `· ${s}`), ''] : []),
           answer || '(UKI returned no response — is a provider key set?)',
@@ -1486,7 +1486,7 @@ const DexCode: React.FC = () => {
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, width: 22, flexShrink: 0, textTransform: 'none' }}>{SYMBOL_TAG[s.kind]}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-text-tertiary)', width: 22, flexShrink: 0, textTransform: 'none' }}>{SYMBOL_TAG[s.kind]}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                         <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 10 }}>{s.line}</span>
                       </button>
@@ -1950,7 +1950,7 @@ const DexCode: React.FC = () => {
             <div ref={outputRef} className="dex-scroll" style={S.outputContent}>
               {output.length === 0 && !error && (
                 <div style={{ color: 'var(--color-text-tertiary)', fontStyle: 'italic', fontSize: 12 }}>
-                  <span style={{opacity:0.5}}>$ </span>Run your code to see output here
+                  <span aria-hidden="true">$ </span>Run your code to see output here
                 </div>
               )}
               {output.map((line, i) => (
@@ -2651,7 +2651,7 @@ const S: Record<string, React.CSSProperties> = {
   quickOpenPath: {
     marginLeft: 'auto',
     fontSize: 10,
-    opacity: 0.5,
+    color: 'var(--color-text-tertiary)',
     fontFamily: 'var(--font-mono)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',

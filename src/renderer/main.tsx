@@ -100,9 +100,7 @@ initCompositorHealth();
 
 // Theme: respect user choice or follow OS prefers-color-scheme live
 import { initTheme } from './utils/theme';
-import { installSchemePresetSync } from './components/ThemeManager';
 initTheme();
-installSchemePresetSync();
 
 // AI provider keys: load from the native DPAPI store and migrate legacy
 // localStorage copies (no-op in the web preview).

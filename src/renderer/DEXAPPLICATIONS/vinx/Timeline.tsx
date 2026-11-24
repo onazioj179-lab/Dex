@@ -250,12 +250,12 @@ const TrackHeader: React.FC<{
         <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</span>
       </div>
       <div style={{ display: 'flex', gap: 2, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'thin' }}>
-        <HeaderBtn label="M" active={track.muted} onClick={() => toggleMute(track.id)} activeColor="#FF6B6B" />
-        <HeaderBtn label="S" active={track.solo} onClick={() => toggleSolo(track.id)} activeColor="#FFD93D" />
+        <HeaderBtn label="M" active={track.muted} onClick={() => toggleMute(track.id)} activeColor="var(--color-error)" />
+        <HeaderBtn label="S" active={track.solo} onClick={() => toggleSolo(track.id)} activeColor="var(--color-warning)" />
         {track.type === 'video' && (
-          <HeaderBtn label="V" active={track.visible} onClick={() => toggleVisible(track.id)} activeColor="#4A9EFF" />
+          <HeaderBtn label="V" active={track.visible} onClick={() => toggleVisible(track.id)} activeColor="var(--color-accent)" />
         )}
-        <HeaderBtn label="L" active={track.locked} onClick={() => toggleLock(track.id)} activeColor="#D4853A" />
+        <HeaderBtn label="L" active={track.locked} onClick={() => toggleLock(track.id)} activeColor="var(--color-text-secondary)" />
       </div>
     </div>
   );
@@ -270,7 +270,9 @@ const HeaderBtn: React.FC<{ label: string; active: boolean; onClick: () => void;
     style={{
       width: 18, height: 14, fontSize: 8, fontWeight: 600,
       border: '1px solid var(--color-border)', borderRadius: 9999,
-      background: active ? `${activeColor}20` : 'transparent',
+      // Opaque mix against the surface: an alpha tint over the grey track header
+      // left accent text at 4.3:1 in light mode.
+      background: active ? `color-mix(in srgb, ${activeColor} 10%, var(--color-bg-surface))` : 'transparent',
       color: active ? activeColor : 'var(--color-text-tertiary)',
       cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}

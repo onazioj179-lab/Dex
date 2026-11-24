@@ -100,7 +100,7 @@ class ScheduledTaskRunner {
           userText: `${prompt}
 
 (This is a scheduled task "${task.title}" running in the background; the user is not watching. Answer briefly.)`,
-          systemPrompt: buildSystemPrompt(),
+          systemPrompt: buildSystemPrompt({ userText: prompt, actionable: true }),
           pushStep: (st) => ledger.logTaskStep(ledgerId, st.slice(0, 140)),
         });
         if (!answer) {

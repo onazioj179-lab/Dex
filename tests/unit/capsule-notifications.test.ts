@@ -17,6 +17,8 @@ describe('DEX Capsule notification timing', () => {
     expect(capsuleDuration({ icon: 'error' })).toBe(0);
     expect(capsuleDuration({ priority: 'urgent' })).toBe(0);
     expect(capsuleDuration({ actions: [{ label: 'Allow', onClick: () => {} }] })).toBe(0);
+    // A success notice's button is a shortcut, not a decision: it still leaves.
+    expect(capsuleDuration({ icon: 'success', actions: [{ label: 'View', onClick: () => {} }] })).toBe(8000);
   });
   it('undo gets longer; an explicit duration wins', () => {
     expect(capsuleDuration({ undoAction: () => {} })).toBe(8000);

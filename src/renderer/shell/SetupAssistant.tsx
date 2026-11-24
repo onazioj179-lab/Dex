@@ -14,7 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { writeDexSetting, readDexSetting } from '../hooks/useDexSetting';
-import { applyTheme } from '../utils/theme';
+import { applyTheme, resolveThemePreference, setThemePreference } from '../utils/theme';
 import { useInstalledAppsStore, RECOMMENDED_APP_IDS } from '../store/installedAppsStore';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { isReduceMotion } from '../utils/MotionController';
@@ -126,11 +126,13 @@ export const SetupAssistant: React.FC<{ onDone?: () => void }> = ({ onDone }) =>
   const finish = useCallback((applyChoices: boolean) => {
     if (applyChoices) {
       writeDexSetting('darkMode', dark);
-      try { localStorage.setItem('darkMode', String(dark)); localStorage.setItem('dex-theme-source', 'user'); } catch { /* storage blocked */ }
+      setThemePreference(dark ? 'dark' : 'light', { animate: false });
       if (apps === 'essentials') useInstalledAppsStore.getState().applyEssentials(allIds);
       writeDexSetting('ukiEnabled', uki);
       writeDexSetting('enableNotifications', notify);
     }
+    // Skipping drops the live preview and returns to the saved preference.
+    else applyTheme(resolveThemePreference());
     try { localStorage.setItem(SETUP_DONE_KEY, applyChoices ? 'done' : 'skipped'); } catch { /* storage blocked */ }
     if (native) void onboardingCall(native.requiredDone ? 'onboarding:complete' : 'onboarding:preferencesDone');
     setOpen(false);
