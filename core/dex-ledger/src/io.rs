@@ -32,7 +32,15 @@ impl Mapping {
     }
     fn from_json(v: &Value) -> Mapping {
         let f = |k: &str| v.get(k).and_then(|x| x.as_u64()).map(|x| x as usize);
-        Mapping { date: f("date"), payee: f("payee"), amount: f("amount"), debit: f("debit"), credit: f("credit"), memo: f("memo"), category: f("category") }
+        Mapping {
+            date: f("date"),
+            payee: f("payee"),
+            amount: f("amount"),
+            debit: f("debit"),
+            credit: f("credit"),
+            memo: f("memo"),
+            category: f("category"),
+        }
     }
 }
 
@@ -52,20 +60,64 @@ fn detect_mapping(headers: &[String]) -> Mapping {
         None
     };
     let date = pick(&["date", "datum", "fecha", "posted", "booking"], &[]);
-    let debit = pick(&["debit", "withdrawal", "paid out", "money out", "outflow", "spent"], &[]);
-    let credit = pick(&["credit", "deposit", "paid in", "money in", "inflow", "received"], &[]);
-    let amount = pick(&["amount", "betrag", "importe", "value", "sum"], &["balance"]);
+    let debit = pick(
+        &[
+            "debit",
+            "withdrawal",
+            "paid out",
+            "money out",
+            "outflow",
+            "spent",
+        ],
+        &[],
+    );
+    let credit = pick(
+        &[
+            "credit", "deposit", "paid in", "money in", "inflow", "received",
+        ],
+        &[],
+    );
+    let amount = pick(
+        &["amount", "betrag", "importe", "value", "sum"],
+        &["balance"],
+    );
     let category = pick(&["category"], &[]);
-    let payee = pick(&["payee", "description", "merchant", "name", "details", "narrative", "beschreibung", "counterparty", "transaction"], &[]);
+    let payee = pick(
+        &[
+            "payee",
+            "description",
+            "merchant",
+            "name",
+            "details",
+            "narrative",
+            "beschreibung",
+            "counterparty",
+            "transaction",
+        ],
+        &[],
+    );
     let memo = pick(&["memo", "note", "reference", "ref"], &[]);
-    Mapping { date, payee, amount, debit, credit, memo, category }
+    Mapping {
+        date,
+        payee,
+        amount,
+        debit,
+        credit,
+        memo,
+        category,
+    }
 }
 
-const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTHS: [&str; 12] = [
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+];
 
 fn month_name(s: &str) -> Option<u32> {
     let l = s.to_lowercase();
-    MONTHS.iter().position(|m| l.starts_with(m)).map(|i| i as u32 + 1)
+    MONTHS
+        .iter()
+        .position(|m| l.starts_with(m))
+        .map(|i| i as u32 + 1)
 }
 
 fn date_parts(s: &str) -> Option<Vec<String>> {
@@ -80,7 +132,13 @@ fn date_parts(s: &str) -> Option<Vec<String>> {
         return None;
     }
     // Drop a trailing time (e.g. "02/01/2026 14:05").
-    Some(parts.into_iter().filter(|p| !p.contains(':')).take(3).collect())
+    Some(
+        parts
+            .into_iter()
+            .filter(|p| !p.contains(':'))
+            .take(3)
+            .collect(),
+    )
 }
 
 /// Convert one bank date into `YYYY-MM-DD` using the given field order.
@@ -92,7 +150,11 @@ fn parse_date_fmt(s: &str, fmt: &str) -> Option<String> {
     let num = |x: &str| x.parse::<i64>().ok();
     let year = |x: &str| num(x).map(|y| if x.len() <= 2 { 2000 + y } else { y });
     let (y, m, d) = if p[0].len() == 4 && num(&p[0]).is_some() {
-        (year(&p[0])?, month_name(&p[1]).or_else(|| num(&p[1]).map(|x| x as u32))?, num(&p[2])? as u32)
+        (
+            year(&p[0])?,
+            month_name(&p[1]).or_else(|| num(&p[1]).map(|x| x as u32))?,
+            num(&p[2])? as u32,
+        )
     } else if let Some(mn) = month_name(&p[1]) {
         (year(&p[2])?, mn, num(&p[0])? as u32) // 02 Jan 2026
     } else if let Some(mn) = month_name(&p[0]) {
@@ -105,7 +167,11 @@ fn parse_date_fmt(s: &str, fmt: &str) -> Option<String> {
         }
     };
     let out = dates::fmt(y, m, d);
-    if dates::is_valid(&out) { Some(out) } else { None }
+    if dates::is_valid(&out) {
+        Some(out)
+    } else {
+        None
+    }
 }
 
 /// Decide between day-first and month-first from the data itself.
@@ -115,10 +181,16 @@ fn detect_date_order(samples: &[String], fallback: &str) -> (String, bool) {
     let mut numeric = false;
     for s in samples {
         let Some(p) = date_parts(s) else { continue };
-        if p.len() != 3 || p[0].len() == 4 || month_name(&p[0]).is_some() || month_name(&p[1]).is_some() {
+        if p.len() != 3
+            || p[0].len() == 4
+            || month_name(&p[0]).is_some()
+            || month_name(&p[1]).is_some()
+        {
             continue;
         }
-        let (Ok(a), Ok(b)) = (p[0].parse::<i64>(), p[1].parse::<i64>()) else { continue };
+        let (Ok(a), Ok(b)) = (p[0].parse::<i64>(), p[1].parse::<i64>()) else {
+            continue;
+        };
         numeric = true;
         if a > 12 {
             day_first = true;
@@ -130,7 +202,14 @@ fn detect_date_order(samples: &[String], fallback: &str) -> (String, bool) {
     match (day_first, month_first) {
         (true, false) => ("dmy".into(), false),
         (false, true) => ("mdy".into(), false),
-        _ => (if fallback == "mdy" { "mdy".into() } else { "dmy".into() }, numeric),
+        _ => (
+            if fallback == "mdy" {
+                "mdy".into()
+            } else {
+                "dmy".into()
+            },
+            numeric,
+        ),
     }
 }
 
@@ -159,11 +238,20 @@ fn parse_statement(p: &Value, digits: u32) -> R<Parsed> {
         return Err("The file has no rows".into());
     }
     if rows.len() > MAX_IMPORT_ROWS + 1 {
-        return Err(format!("The file has more than {MAX_IMPORT_ROWS} rows; split it into smaller files"));
+        return Err(format!(
+            "The file has more than {MAX_IMPORT_ROWS} rows; split it into smaller files"
+        ));
     }
-    let first_is_date = rows[0].first().map(|c| parse_date_fmt(c, "dmy").is_some() || parse_date_fmt(c, "mdy").is_some()).unwrap_or(false);
+    let first_is_date = rows[0]
+        .first()
+        .map(|c| parse_date_fmt(c, "dmy").is_some() || parse_date_fmt(c, "mdy").is_some())
+        .unwrap_or(false);
     let has_header = gb(p, "hasHeader").unwrap_or(!first_is_date);
-    let headers: Vec<String> = if has_header { rows[0].clone() } else { (1..=rows[0].len()).map(|i| format!("Column {i}")).collect() };
+    let headers: Vec<String> = if has_header {
+        rows[0].clone()
+    } else {
+        (1..=rows[0].len()).map(|i| format!("Column {i}")).collect()
+    };
     let body = if has_header { &rows[1..] } else { &rows[..] };
     let mut mapping = match p.get("mapping").filter(|m| m.is_object()) {
         Some(m) => Mapping::from_json(m),
@@ -174,20 +262,41 @@ fn parse_statement(p: &Value, digits: u32) -> R<Parsed> {
         // Headerless: date in column 1, first amount-looking column, first text column.
         mapping.date = Some(0);
         if let Some(r) = body.first() {
-            mapping.amount = (1..r.len()).find(|&i| money::parse_amount(&r[i], '.', digits).is_ok());
-            mapping.payee = (1..r.len()).find(|&i| Some(i) != mapping.amount && money::parse_amount(&r[i], '.', digits).is_err());
+            mapping.amount =
+                (1..r.len()).find(|&i| money::parse_amount(&r[i], '.', digits).is_ok());
+            mapping.payee = (1..r.len()).find(|&i| {
+                Some(i) != mapping.amount && money::parse_amount(&r[i], '.', digits).is_err()
+            });
         }
     }
-    let decimal = gs(p, "decimal").and_then(|d| d.chars().next()).filter(|c| *c == '.' || *c == ',').unwrap_or('.');
+    let decimal = gs(p, "decimal")
+        .and_then(|d| d.chars().next())
+        .filter(|c| *c == '.' || *c == ',')
+        .unwrap_or('.');
     let invert = gb(p, "invert").unwrap_or(false);
     let requested = gs(p, "dateFormat").unwrap_or_else(|| "auto".into());
-    let samples: Vec<String> = mapping.date.map(|di| body.iter().filter_map(|r| r.get(di).cloned()).take(500).collect()).unwrap_or_default();
+    let samples: Vec<String> = mapping
+        .date
+        .map(|di| {
+            body.iter()
+                .filter_map(|r| r.get(di).cloned())
+                .take(500)
+                .collect()
+        })
+        .unwrap_or_default();
     let (date_format, date_ambiguous) = if requested == "mdy" || requested == "dmy" {
         (requested, false)
     } else {
-        detect_date_order(&samples, &gs(p, "dateOrder").unwrap_or_else(|| "dmy".into()))
+        detect_date_order(
+            &samples,
+            &gs(p, "dateOrder").unwrap_or_else(|| "dmy".into()),
+        )
     };
-    let cell = |r: &Vec<String>, i: Option<usize>| i.and_then(|i| r.get(i)).map(|s| s.trim().to_string()).unwrap_or_default();
+    let cell = |r: &Vec<String>, i: Option<usize>| {
+        i.and_then(|i| r.get(i))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default()
+    };
     let mut lines = Vec::new();
     for (i, r) in body.iter().enumerate() {
         let line = i + 1 + has_header as usize;
@@ -205,7 +314,11 @@ fn parse_statement(p: &Value, digits: u32) -> R<Parsed> {
         } else if mapping.debit.is_some() || mapping.credit.is_some() {
             let read = |idx: Option<usize>| -> Result<i64, String> {
                 let v = cell(r, idx);
-                if v.is_empty() { Ok(0) } else { money::parse_amount(&v, decimal, digits).map(|x| x.abs()) }
+                if v.is_empty() {
+                    Ok(0)
+                } else {
+                    money::parse_amount(&v, decimal, digits).map(|x| x.abs())
+                }
             };
             match (read(mapping.credit), read(mapping.debit)) {
                 (Ok(c), Ok(d)) => Ok(c - d),
@@ -225,13 +338,30 @@ fn parse_statement(p: &Value, digits: u32) -> R<Parsed> {
                 None
             }
         };
-        lines.push(Line { line, date, payee: cell(r, mapping.payee), memo: cell(r, mapping.memo), amount, category: cell(r, mapping.category), error });
+        lines.push(Line {
+            line,
+            date,
+            payee: cell(r, mapping.payee),
+            memo: cell(r, mapping.memo),
+            amount,
+            category: cell(r, mapping.category),
+            error,
+        });
     }
-    Ok(Parsed { headers, mapping, date_format, date_ambiguous, lines })
+    Ok(Parsed {
+        headers,
+        mapping,
+        date_format,
+        date_ambiguous,
+        lines,
+    })
 }
 
 fn norm_payee(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 /// Stable id for an imported row: account + date + amount + payee + the
@@ -239,7 +369,12 @@ fn norm_payee(s: &str) -> String {
 /// identical coffees on one day both import, but re-importing the file doesn't.
 fn import_id(account: i64, date: &str, amount: i64, payee: &str, occurrence: usize) -> String {
     let mut h: u64 = 0xcbf29ce484222325;
-    for b in format!("{account}|{date}|{amount}|{}|{occurrence}", norm_payee(payee)).bytes() {
+    for b in format!(
+        "{account}|{date}|{amount}|{}|{occurrence}",
+        norm_payee(payee)
+    )
+    .bytes()
+    {
         h ^= b as u64;
         h = h.wrapping_mul(0x100000001b3);
     }
@@ -249,9 +384,22 @@ fn import_id(account: i64, date: &str, amount: i64, payee: &str, occurrence: usi
 /// A row is a duplicate when its import id is already stored, or when the
 /// ledger already held (before this import began, i.e. id <= `before_id`) at
 /// least `occurrence` transactions with the same date, amount and payee.
-fn is_duplicate(c: &Connection, account: i64, date: &str, amount: i64, payee: &str, iid: &str, occurrence: usize, before_id: i64) -> R<bool> {
+fn is_duplicate(
+    c: &Connection,
+    account: i64,
+    date: &str,
+    amount: i64,
+    payee: &str,
+    iid: &str,
+    occurrence: usize,
+    before_id: i64,
+) -> R<bool> {
     let by_id: i64 = c
-        .query_row("SELECT COUNT(*) FROM transactions WHERE account_id = ?1 AND import_id = ?2", params![account, iid], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM transactions WHERE account_id = ?1 AND import_id = ?2",
+            params![account, iid],
+            |r| r.get(0),
+        )
         .map_err(err)?;
     if by_id > 0 {
         return Ok(true);
@@ -267,9 +415,14 @@ fn is_duplicate(c: &Connection, account: i64, date: &str, amount: i64, payee: &s
 }
 
 fn category_lookup(c: &Connection) -> R<HashMap<String, i64>> {
-    let mut st = c.prepare("SELECT id, name FROM categories WHERE archived = 0").map_err(err)?;
+    let mut st = c
+        .prepare("SELECT id, name FROM categories WHERE archived = 0")
+        .map_err(err)?;
     let mut m = HashMap::new();
-    for row in st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))).map_err(err)? {
+    for row in st
+        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+        .map_err(err)?
+    {
         let (id, name) = row.map_err(err)?;
         m.entry(name.to_lowercase()).or_insert(id);
     }
@@ -281,7 +434,13 @@ fn utc_stamp() -> String {
     let secs = ms.div_euclid(1000);
     let (y, mo, d) = dates::civil_from_days(secs.div_euclid(86400));
     let sod = secs.rem_euclid(86400);
-    format!("{y:04}{mo:02}{d:02}-{:02}{:02}{:02}-{:03}", sod / 3600, (sod / 60) % 60, sod % 60, ms.rem_euclid(1000))
+    format!(
+        "{y:04}{mo:02}{d:02}-{:02}{:02}{:02}-{:03}",
+        sod / 3600,
+        (sod / 60) % 60,
+        sod % 60,
+        ms.rem_euclid(1000)
+    )
 }
 
 impl Ledger {
@@ -302,7 +461,10 @@ impl Ledger {
                     let occ = seen.entry(key).or_insert(0);
                     *occ += 1;
                     let iid = import_id(account, d, a, &l.payee, *occ);
-                    (is_duplicate(&self.conn, account, d, a, &l.payee, &iid, *occ, i64::MAX)?, cats.get(&l.category.to_lowercase()).copied())
+                    (
+                        is_duplicate(&self.conn, account, d, a, &l.payee, &iid, *occ, i64::MAX)?,
+                        cats.get(&l.category.to_lowercase()).copied(),
+                    )
                 }
                 _ => (false, None),
             };
@@ -331,7 +493,11 @@ impl Ledger {
     pub(crate) fn csv_import(&mut self, p: &Value) -> R<Value> {
         let account = req_i(p, "accountId")?;
         Ledger::account_active(&self.conn, account)?;
-        let rows = p.get("rows").and_then(|r| r.as_array()).cloned().unwrap_or_default();
+        let rows = p
+            .get("rows")
+            .and_then(|r| r.as_array())
+            .cloned()
+            .unwrap_or_default();
         if rows.is_empty() {
             return Err("Nothing selected to import".into());
         }
@@ -339,11 +505,17 @@ impl Ledger {
             return Err(format!("Import at most {MAX_IMPORT_ROWS} rows at a time"));
         }
         let skip_dups = gb(p, "skipDuplicates").unwrap_or(true);
-        let status = gs(p, "status").filter(|s| s == "cleared").unwrap_or_else(|| "uncleared".into());
+        let status = gs(p, "status")
+            .filter(|s| s == "cleared")
+            .unwrap_or_else(|| "uncleared".into());
         // Safety copy before a bulk change, so an import can always be undone by restore.
         let backup = self.backup_create("before-import")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let before_id: i64 = tx.query_row("SELECT COALESCE(MAX(id), 0) FROM transactions", [], |r| r.get(0)).map_err(err)?;
+        let before_id: i64 = tx
+            .query_row("SELECT COALESCE(MAX(id), 0) FROM transactions", [], |r| {
+                r.get(0)
+            })
+            .map_err(err)?;
         let mut seen: HashMap<String, usize> = HashMap::new();
         let (mut imported, mut skipped) = (0, 0);
         for (i, r) in rows.iter().enumerate() {
@@ -354,11 +526,20 @@ impl Ledger {
             let occ = seen.entry(key).or_insert(0);
             *occ += 1;
             let iid = import_id(account, &date, amount, &payee, *occ);
-            if skip_dups && is_duplicate(&tx, account, &date, amount, &payee, &iid, *occ, before_id)? {
+            if skip_dups
+                && is_duplicate(&tx, account, &date, amount, &payee, &iid, *occ, before_id)?
+            {
                 skipped += 1;
                 continue;
             }
-            let exists: Option<i64> = tx.query_row("SELECT id FROM transactions WHERE account_id = ?1 AND import_id = ?2", params![account, iid], |r| r.get(0)).optional().map_err(err)?;
+            let exists: Option<i64> = tx
+                .query_row(
+                    "SELECT id FROM transactions WHERE account_id = ?1 AND import_id = ?2",
+                    params![account, iid],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(err)?;
             let import_key = if exists.is_some() { None } else { Some(iid) };
             insert_plain(
                 &tx,
@@ -376,7 +557,13 @@ impl Ledger {
             .map_err(|e| format!("row {}: {e}", i + 1))?;
             imported += 1;
         }
-        audit(&tx, "import", "account", Some(account), json!({ "imported": imported, "skipped": skipped, "backup": backup["file"] }))?;
+        audit(
+            &tx,
+            "import",
+            "account",
+            Some(account),
+            json!({ "imported": imported, "skipped": skipped, "backup": backup["file"] }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "imported": imported, "skipped": skipped, "backup": backup["file"] }))
     }
@@ -387,30 +574,72 @@ impl Ledger {
         let (where_sql, binds) = txn_filters(p);
         let sql = format!("{TXN_SELECT} {where_sql} ORDER BY t.date, t.id LIMIT 200000");
         let mut st = self.conn.prepare(&sql).map_err(err)?;
-        let rows = st.query_map(params_from_iter(binds.iter()), txn_row).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
+        let rows = st
+            .query_map(params_from_iter(binds.iter()), txn_row)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
         let mut sst = self
             .conn
             .prepare("SELECT c.name, s.amount, s.memo FROM splits s LEFT JOIN categories c ON c.id = s.category_id WHERE s.txn_id = ?1 ORDER BY s.id")
             .map_err(err)?;
-        let mut out = csv::write_row(&["Date", "Account", "Payee", "Category", "Notes", "Amount", "Status", "Currency"].map(String::from));
+        let mut out = csv::write_row(
+            &[
+                "Date", "Account", "Payee", "Category", "Notes", "Amount", "Status", "Currency",
+            ]
+            .map(String::from),
+        );
         let s = |v: &Value| v.as_str().unwrap_or("").to_string();
         let mut count = 0;
         for r in &rows {
             let payee = if r["isTransfer"] == true {
-                format!("Transfer {} {}", if r["amount"].as_i64().unwrap_or(0) < 0 { "to" } else { "from" }, s(&r["transferAccountName"]))
+                format!(
+                    "Transfer {} {}",
+                    if r["amount"].as_i64().unwrap_or(0) < 0 {
+                        "to"
+                    } else {
+                        "from"
+                    },
+                    s(&r["transferAccountName"])
+                )
             } else {
                 s(&r["payee"])
             };
             if r["isSplit"] == true {
                 let id = r["id"].as_i64().unwrap_or(0);
-                let parts: Vec<(Option<String>, i64, String)> =
-                    sst.query_map([id], |x| Ok((x.get(0)?, x.get(1)?, x.get(2)?))).map_err(err)?.collect::<Result<_, _>>().map_err(err)?;
+                let parts: Vec<(Option<String>, i64, String)> = sst
+                    .query_map([id], |x| Ok((x.get(0)?, x.get(1)?, x.get(2)?)))
+                    .map_err(err)?
+                    .collect::<Result<_, _>>()
+                    .map_err(err)?;
                 for (cat, amt, memo) in parts {
-                    out += &csv::write_row(&[s(&r["date"]), s(&r["accountName"]), payee.clone(), cat.unwrap_or_default(), if memo.is_empty() { s(&r["memo"]) } else { memo }, money::format_minor(amt, d), s(&r["status"]), cur.clone()]);
+                    out += &csv::write_row(&[
+                        s(&r["date"]),
+                        s(&r["accountName"]),
+                        payee.clone(),
+                        cat.unwrap_or_default(),
+                        if memo.is_empty() { s(&r["memo"]) } else { memo },
+                        money::format_minor(amt, d),
+                        s(&r["status"]),
+                        cur.clone(),
+                    ]);
                 }
             } else {
-                let cat = if r["isTransfer"] == true { "Transfer".to_string() } else { s(&r["categoryName"]) };
-                out += &csv::write_row(&[s(&r["date"]), s(&r["accountName"]), payee, cat, s(&r["memo"]), money::format_minor(r["amount"].as_i64().unwrap_or(0), d), s(&r["status"]), cur.clone()]);
+                let cat = if r["isTransfer"] == true {
+                    "Transfer".to_string()
+                } else {
+                    s(&r["categoryName"])
+                };
+                out += &csv::write_row(&[
+                    s(&r["date"]),
+                    s(&r["accountName"]),
+                    payee,
+                    cat,
+                    s(&r["memo"]),
+                    money::format_minor(r["amount"].as_i64().unwrap_or(0), d),
+                    s(&r["status"]),
+                    cur.clone(),
+                ]);
             }
             count += 1;
         }
@@ -435,9 +664,15 @@ impl Ledger {
         let cleared = Self::cleared_balance(&self.conn, account)?;
         let balance = Self::account_balance(&self.conn, account)?;
         let mut st = self.conn.prepare(&format!("{TXN_SELECT} WHERE t.account_id = ?1 AND t.status <> 'reconciled' ORDER BY t.date, t.id")).map_err(err)?;
-        let open = st.query_map([account], txn_row).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
+        let open = st
+            .query_map([account], txn_row)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
         let last = self.reconcile_history(&json!({ "accountId": account, "limit": 1 }))?;
-        Ok(json!({ "accountId": account, "clearedBalance": cleared, "balance": balance, "open": open, "last": last.as_array().and_then(|a| a.first().cloned()) }))
+        Ok(
+            json!({ "accountId": account, "clearedBalance": cleared, "balance": balance, "open": open, "last": last.as_array().and_then(|a| a.first().cloned()) }),
+        )
     }
 
     /// Match statement lines to ledger transactions: same amount, date within
@@ -447,7 +682,11 @@ impl Ledger {
         let account = req_i(p, "accountId")?;
         let parsed = parse_statement(p, digits(&self.conn))?;
         let mut st = self.conn.prepare(&format!("{TXN_SELECT} WHERE t.account_id = ?1 AND t.status <> 'reconciled' ORDER BY t.date, t.id")).map_err(err)?;
-        let open = st.query_map([account], txn_row).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
+        let open = st
+            .query_map([account], txn_row)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
         let mut used: HashSet<i64> = HashSet::new();
         let mut lines = Vec::new();
         let mut statement_total: i64 = 0;
@@ -461,7 +700,11 @@ impl Ledger {
                     if used.contains(&id) || t["amount"].as_i64() != Some(a) {
                         continue;
                     }
-                    let Some(gap) = dates::diff_days(d, t["date"].as_str().unwrap_or("")).map(|g| g.abs()) else { continue };
+                    let Some(gap) =
+                        dates::diff_days(d, t["date"].as_str().unwrap_or("")).map(|g| g.abs())
+                    else {
+                        continue;
+                    };
                     if gap <= 5 && best.map(|(g, _)| gap < g).unwrap_or(true) {
                         best = Some((gap, t));
                     }
@@ -478,7 +721,10 @@ impl Ledger {
                 "matchPayee": matched.map(|t| t["payee"].clone()),
             }));
         }
-        let unmatched: Vec<Value> = open.into_iter().filter(|t| !used.contains(&t["id"].as_i64().unwrap_or(0))).collect();
+        let unmatched: Vec<Value> = open
+            .into_iter()
+            .filter(|t| !used.contains(&t["id"].as_i64().unwrap_or(0)))
+            .collect();
         Ok(json!({
             "lines": lines, "unmatchedTransactions": unmatched, "statementTotal": statement_total,
             "dateFormat": parsed.date_format, "dateAmbiguous": parsed.date_ambiguous, "mapping": parsed.mapping.to_json(), "headers": parsed.headers,
@@ -504,11 +750,26 @@ impl Ledger {
             }
             let id = insert_plain(
                 &tx,
-                &NewTxn { account_id: account, date: date.clone(), payee: "Reconciliation adjustment".into(), memo: format!("Created when reconciling to the statement of {date}"), amount: diff, category_id: None, status: "cleared".into(), import_id: None },
+                &NewTxn {
+                    account_id: account,
+                    date: date.clone(),
+                    payee: "Reconciliation adjustment".into(),
+                    memo: format!("Created when reconciling to the statement of {date}"),
+                    amount: diff,
+                    category_id: None,
+                    status: "cleared".into(),
+                    import_id: None,
+                },
             )?;
             adjustment = Some(id);
         }
-        let count: i64 = tx.query_row("SELECT COUNT(*) FROM transactions WHERE account_id = ?1 AND status = 'cleared'", [account], |r| r.get(0)).map_err(err)?;
+        let count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM transactions WHERE account_id = ?1 AND status = 'cleared'",
+                [account],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
         tx.execute(
             "INSERT INTO reconciliations (account_id, statement_date, statement_balance, cleared_balance, txn_count, adjustment_txn, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![account, date, statement, cleared, count, adjustment, now_ms()],
@@ -517,15 +778,30 @@ impl Ledger {
         let rid = tx.last_insert_rowid();
         tx.execute("UPDATE transactions SET status = 'reconciled', reconciliation_id = ?1, updated_at = ?2 WHERE account_id = ?3 AND status = 'cleared'", params![rid, now_ms(), account])
             .map_err(err)?;
-        audit(&tx, "reconcile", "account", Some(account), json!({ "reconciliationId": rid, "statementDate": date, "statementBalance": statement, "clearedBalance": cleared, "transactions": count, "adjustment": adjustment, "adjustmentAmount": diff }))?;
+        audit(
+            &tx,
+            "reconcile",
+            "account",
+            Some(account),
+            json!({ "reconciliationId": rid, "statementDate": date, "statementBalance": statement, "clearedBalance": cleared, "transactions": count, "adjustment": adjustment, "adjustmentAmount": diff }),
+        )?;
         tx.commit().map_err(err)?;
-        Ok(json!({ "id": rid, "transactions": count, "adjustmentId": adjustment, "difference": diff }))
+        Ok(
+            json!({ "id": rid, "transactions": count, "adjustmentId": adjustment, "difference": diff }),
+        )
     }
 
     pub(crate) fn reconcile_undo(&mut self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let row: Option<(i64, i64)> = tx.query_row("SELECT account_id, undone FROM reconciliations WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(err)?;
+        let row: Option<(i64, i64)> = tx
+            .query_row(
+                "SELECT account_id, undone FROM reconciliations WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
         let (account, undone) = row.ok_or_else(|| format!("reconciliation {id} does not exist"))?;
         if undone == 1 {
             return Err("That reconciliation was already undone".into());
@@ -535,8 +811,15 @@ impl Ledger {
             return Err("Undo the more recent reconciliations of this account first".into());
         }
         let n = tx.execute("UPDATE transactions SET status = 'cleared', reconciliation_id = NULL WHERE reconciliation_id = ?1", [id]).map_err(err)?;
-        tx.execute("UPDATE reconciliations SET undone = 1 WHERE id = ?1", [id]).map_err(err)?;
-        audit(&tx, "unreconcile", "account", Some(account), json!({ "reconciliationId": id, "transactions": n }))?;
+        tx.execute("UPDATE reconciliations SET undone = 1 WHERE id = ?1", [id])
+            .map_err(err)?;
+        audit(
+            &tx,
+            "unreconcile",
+            "account",
+            Some(account),
+            json!({ "reconciliationId": id, "transactions": n }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "transactions": n }))
     }
@@ -572,7 +855,13 @@ impl Ledger {
     pub fn clear_matched(&mut self, ids: &[i64]) -> R<usize> {
         let tx = self.conn.transaction().map_err(err)?;
         let n = set_status_inner(&tx, ids, "cleared", false)?;
-        audit(&tx, "status", "transaction", None, json!({ "ids": ids, "status": "cleared", "via": "statement match" }))?;
+        audit(
+            &tx,
+            "status",
+            "transaction",
+            None,
+            json!({ "ids": ids, "status": "cleared", "via": "statement match" }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(n)
     }
@@ -581,10 +870,15 @@ impl Ledger {
 
     pub fn backup_create(&self, label: &str) -> R<Value> {
         std::fs::create_dir_all(&self.backup_dir).map_err(err)?;
-        let label: String = label.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
+        let label: String = label
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .collect();
         let file = format!("ledger-{}-{label}.db", utc_stamp());
         let path = self.backup_dir.join(&file);
-        self.conn.execute("VACUUM INTO ?1", [path.to_string_lossy().to_string()]).map_err(err)?;
+        self.conn
+            .execute("VACUUM INTO ?1", [path.to_string_lossy().to_string()])
+            .map_err(err)?;
         let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         if label != "manual" {
             self.prune_auto_backups();
@@ -616,7 +910,12 @@ impl Ledger {
                     continue;
                 }
                 let meta = e.metadata().ok();
-                let label = name.trim_end_matches(".db").splitn(5, '-').nth(4).unwrap_or("manual").to_string();
+                let label = name
+                    .trim_end_matches(".db")
+                    .splitn(5, '-')
+                    .nth(4)
+                    .unwrap_or("manual")
+                    .to_string();
                 let modified = meta
                     .as_ref()
                     .and_then(|m| m.modified().ok())
@@ -632,7 +931,11 @@ impl Ledger {
 
     pub(crate) fn backup_restore_named(&mut self, p: &Value) -> R<Value> {
         let file = req_s(p, "file")?;
-        if file.contains(['/', '\\']) || file.contains("..") || !file.starts_with("ledger-") || !file.ends_with(".db") {
+        if file.contains(['/', '\\'])
+            || file.contains("..")
+            || !file.starts_with("ledger-")
+            || !file.ends_with(".db")
+        {
             return Err("not a ledger backup name".into());
         }
         let path = self.backup_dir.join(&file);
@@ -641,14 +944,19 @@ impl Ledger {
 
     /// Check that a file is a healthy DEX ledger this build can open.
     pub fn validate_backup(path: &Path) -> R<i64> {
-        let c = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| format!("can't open that file: {e}"))?;
-        let check: String = c.query_row("PRAGMA quick_check", [], |r| r.get(0)).map_err(|_| "that file is not a SQLite database".to_string())?;
+        let c = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| format!("can't open that file: {e}"))?;
+        let check: String = c
+            .query_row("PRAGMA quick_check", [], |r| r.get(0))
+            .map_err(|_| "that file is not a SQLite database".to_string())?;
         if check != "ok" {
             return Err(format!("that backup is damaged ({check})"));
         }
         let v = schema::user_version(&c).map_err(err)?;
         if v < 1 || v > schema::CURRENT_VERSION {
-            return Err(format!("that file is not a ledger this DEX can open (schema {v})"));
+            return Err(format!(
+                "that file is not a ledger this DEX can open (schema {v})"
+            ));
         }
         let tables: i64 = c
             .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('accounts','transactions','categories','allocations')", [], |r| r.get(0))
@@ -664,18 +972,35 @@ impl Ledger {
     pub fn restore_from_path(&mut self, path: &Path) -> R<Value> {
         Self::validate_backup(path)?;
         let safety = self.backup_create("before-restore")?;
-        self.conn.restore(rusqlite::DatabaseName::Main, path, None::<fn(rusqlite::backup::Progress)>).map_err(err)?;
+        self.conn
+            .restore(
+                rusqlite::DatabaseName::Main,
+                path,
+                None::<fn(rusqlite::backup::Progress)>,
+            )
+            .map_err(err)?;
         schema::migrate(&mut self.conn)?;
-        audit(&self.conn, "restore", "ledger", None, json!({ "from": path.file_name().map(|f| f.to_string_lossy().to_string()), "safetyBackup": safety["file"] }))?;
+        audit(
+            &self.conn,
+            "restore",
+            "ledger",
+            None,
+            json!({ "from": path.file_name().map(|f| f.to_string_lossy().to_string()), "safetyBackup": safety["file"] }),
+        )?;
         Ok(json!({ "restored": true, "safetyBackup": safety["file"] }))
     }
 
     /// Write a standalone copy of the ledger to a user-chosen path.
     pub fn export_backup(&self, dest: &Path) -> R<Value> {
         if dest.exists() {
-            std::fs::remove_file(dest).map_err(|e| format!("can't replace the existing file: {e}"))?;
+            std::fs::remove_file(dest)
+                .map_err(|e| format!("can't replace the existing file: {e}"))?;
         }
-        self.conn.execute("VACUUM INTO ?1", [dest.to_string_lossy().to_string()]).map_err(err)?;
-        Ok(json!({ "path": dest.to_string_lossy(), "size": std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0) }))
+        self.conn
+            .execute("VACUUM INTO ?1", [dest.to_string_lossy().to_string()])
+            .map_err(err)?;
+        Ok(
+            json!({ "path": dest.to_string_lossy(), "size": std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0) }),
+        )
     }
 }

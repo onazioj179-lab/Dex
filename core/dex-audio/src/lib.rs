@@ -38,11 +38,19 @@ fn open_format(path: &str) -> Result<Box<dyn FormatReader>, String> {
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(path).extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
         hint.with_extension(ext);
     }
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| e.to_string())?;
     Ok(probed.format)
 }
@@ -80,7 +88,14 @@ pub fn metadata(path: &str) -> Result<AudioMeta, String> {
         }
     }
 
-    Ok(AudioMeta { duration_ms, sample_rate, channels, title, artist, album })
+    Ok(AudioMeta {
+        duration_ms,
+        sample_rate,
+        channels,
+        title,
+        artist,
+        album,
+    })
 }
 
 const CAP: usize = 12_000_000; // bound memory/time on very long files
@@ -94,7 +109,12 @@ fn decode_mono<F: FnMut(f32)>(path: &str, mut sink: F) -> Result<usize, String> 
 
     let (track_id, codec_params, channels) = {
         let track = format.default_track().ok_or("no audio track")?;
-        let ch = track.codec_params.channels.map(|c| c.count()).unwrap_or(1).max(1);
+        let ch = track
+            .codec_params
+            .channels
+            .map(|c| c.count())
+            .unwrap_or(1)
+            .max(1);
         (track.id, track.codec_params.clone(), ch)
     };
     let mut decoder = symphonia::default::get_codecs()
@@ -219,7 +239,12 @@ pub struct BeatOptions {
 
 impl Default for BeatOptions {
     fn default() -> Self {
-        Self { hop: 512, min_bpm: 60.0, max_bpm: 200.0, sensitivity: 1.0 }
+        Self {
+            hop: 512,
+            min_bpm: 60.0,
+            max_bpm: 200.0,
+            sensitivity: 1.0,
+        }
     }
 }
 
@@ -339,7 +364,11 @@ pub fn tempo_from_envelope(env: &[f32], hop_time: f32, min_bpm: f32, max_bpm: f3
     }
 
     let bpm = 60.0 / (fundamental as f32 * hop_time);
-    let confidence = if r0 > 0.0 { (best_val / r0).clamp(0.0, 1.0) } else { 0.0 };
+    let confidence = if r0 > 0.0 {
+        (best_val / r0).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     (round1(bpm), round2(confidence))
 }
 
@@ -383,7 +412,13 @@ pub fn analyze_pcm(samples: &[f32], sample_rate: u32, opts: BeatOptions) -> Beat
     }
     let (bpm, confidence) = tempo_from_envelope(&env, hop_time, opts.min_bpm, opts.max_bpm);
     let onsets = onsets_from_envelope(&env, hop_time, opts.sensitivity);
-    BeatAnalysis { bpm, confidence, onsets, hop: hop as u32, sample_rate }
+    BeatAnalysis {
+        bpm,
+        confidence,
+        onsets,
+        hop: hop as u32,
+        sample_rate,
+    }
 }
 
 /// Decode `path` to mono PCM and run the beat analysis natively. The one heavy
@@ -400,7 +435,10 @@ pub fn analyze_beats(path: &str, opts: BeatOptions) -> Result<BeatAnalysis, Stri
 fn track_sample_rate(path: &str) -> Result<u32, String> {
     let format = open_format(path)?;
     let track = format.default_track().ok_or("no audio track")?;
-    track.codec_params.sample_rate.ok_or_else(|| "unknown sample rate".to_string())
+    track
+        .codec_params
+        .sample_rate
+        .ok_or_else(|| "unknown sample rate".to_string())
 }
 
 fn round1(x: f32) -> f32 {
@@ -423,14 +461,17 @@ fn round3(x: f32) -> f32 {
 // testable; `detect_key` adds the decode.
 // ===========================================================================
 
-const PITCH_NAMES: [&str; 12] =
-    ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const PITCH_NAMES: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
 
 // Krumhansl-Schmuckler key profiles (index 0 = tonic pitch class).
-const KS_MAJOR: [f32; 12] =
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const KS_MINOR: [f32; 12] =
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const KS_MAJOR: [f32; 12] = [
+    6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
+];
+const KS_MINOR: [f32; 12] = [
+    6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
+];
 
 const CHROMA_FRAME: usize = 4096;
 const KEY_FRAME_CAP: usize = 700; // ~65 s at 44.1 kHz — long enough, stays fast
@@ -591,7 +632,12 @@ pub struct SilenceOptions {
 
 impl Default for SilenceOptions {
     fn default() -> Self {
-        Self { threshold_db: -40.0, min_silence_sec: 0.35, window_sec: 0.02, padding_sec: 0.05 }
+        Self {
+            threshold_db: -40.0,
+            min_silence_sec: 0.35,
+            window_sec: 0.02,
+            padding_sec: 0.05,
+        }
     }
 }
 
@@ -672,12 +718,18 @@ fn complement(remove: &[Region], total_sec: f32) -> Vec<Region> {
     let mut cursor = 0.0f32;
     for r in remove {
         if r.start_sec > cursor {
-            keep.push(Region { start_sec: cursor, end_sec: r.start_sec });
+            keep.push(Region {
+                start_sec: cursor,
+                end_sec: r.start_sec,
+            });
         }
         cursor = cursor.max(r.end_sec);
     }
     if cursor < total_sec {
-        keep.push(Region { start_sec: cursor, end_sec: total_sec });
+        keep.push(Region {
+            start_sec: cursor,
+            end_sec: total_sec,
+        });
     }
     keep
 }
@@ -795,9 +847,17 @@ const LUFS_SILENCE_FLOOR: f32 = -70.0;
 /// Integrated LUFS of mono PCM per BS.1770 (K-weighting + two-stage gating).
 pub fn analyze_loudness_pcm(samples: &[f32], sample_rate: u32) -> LoudnessResult {
     let peak = samples.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
-    let peak_dbfs = if peak > 1e-12 { round2(20.0 * peak.log10()) } else { -120.0 };
+    let peak_dbfs = if peak > 1e-12 {
+        round2(20.0 * peak.log10())
+    } else {
+        -120.0
+    };
     if samples.is_empty() || sample_rate == 0 {
-        return LoudnessResult { lufs: LUFS_SILENCE_FLOOR, peak_dbfs, sample_rate };
+        return LoudnessResult {
+            lufs: LUFS_SILENCE_FLOOR,
+            peak_dbfs,
+            sample_rate,
+        };
     }
 
     // K-weight a working copy.
@@ -811,7 +871,11 @@ pub fn analyze_loudness_pcm(samples: &[f32], sample_rate: u32) -> LoudnessResult
     let block = ((0.400 * sample_rate as f32) as usize).max(1);
     let step = ((0.100 * sample_rate as f32) as usize).max(1);
     if z.len() < block {
-        return LoudnessResult { lufs: LUFS_SILENCE_FLOOR, peak_dbfs, sample_rate };
+        return LoudnessResult {
+            lufs: LUFS_SILENCE_FLOOR,
+            peak_dbfs,
+            sample_rate,
+        };
     }
     let mut blocks: Vec<f32> = Vec::new(); // mean square per block
     let mut start = 0usize;
@@ -823,19 +887,38 @@ pub fn analyze_loudness_pcm(samples: &[f32], sample_rate: u32) -> LoudnessResult
     let loudness = |ms: f32| -0.691 + 10.0 * (ms.max(1e-12)).log10();
 
     // Absolute gate at -70 LUFS.
-    let abs_kept: Vec<f32> = blocks.iter().copied().filter(|&ms| loudness(ms) >= -70.0).collect();
+    let abs_kept: Vec<f32> = blocks
+        .iter()
+        .copied()
+        .filter(|&ms| loudness(ms) >= -70.0)
+        .collect();
     if abs_kept.is_empty() {
-        return LoudnessResult { lufs: LUFS_SILENCE_FLOOR, peak_dbfs, sample_rate };
+        return LoudnessResult {
+            lufs: LUFS_SILENCE_FLOOR,
+            peak_dbfs,
+            sample_rate,
+        };
     }
     // Relative gate at -10 LU below the abs-gated mean.
     let abs_mean = abs_kept.iter().sum::<f32>() / abs_kept.len() as f32;
     let rel_thresh = loudness(abs_mean) - 10.0;
-    let rel_kept: Vec<f32> =
-        abs_kept.iter().copied().filter(|&ms| loudness(ms) >= rel_thresh).collect();
-    let final_blocks = if rel_kept.is_empty() { abs_kept } else { rel_kept };
+    let rel_kept: Vec<f32> = abs_kept
+        .iter()
+        .copied()
+        .filter(|&ms| loudness(ms) >= rel_thresh)
+        .collect();
+    let final_blocks = if rel_kept.is_empty() {
+        abs_kept
+    } else {
+        rel_kept
+    };
     let mean_ms = final_blocks.iter().sum::<f32>() / final_blocks.len() as f32;
     let lufs = loudness(mean_ms).max(LUFS_SILENCE_FLOOR);
-    LoudnessResult { lufs: round2(lufs), peak_dbfs, sample_rate }
+    LoudnessResult {
+        lufs: round2(lufs),
+        peak_dbfs,
+        sample_rate,
+    }
 }
 
 /// Decode `path` and measure its integrated loudness natively.
@@ -855,7 +938,9 @@ fn downsample_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
     let mut out = Vec::with_capacity(buckets);
     for b in 0..buckets {
         let start = (b as f64 * win) as usize;
-        let end = (((b + 1) as f64 * win) as usize).min(samples.len()).max(start);
+        let end = (((b + 1) as f64 * win) as usize)
+            .min(samples.len())
+            .max(start);
         let mut peak = 0.0f32;
         for &s in &samples[start..end] {
             let a = s.abs();
@@ -902,25 +987,36 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tone.wav");
         // 8000 Hz mono, 8000 samples == 1.0s.
-        let samples: Vec<i16> = (0..8000).map(|i| ((i as f32 * 0.1).sin() * 10000.0) as i16).collect();
+        let samples: Vec<i16> = (0..8000)
+            .map(|i| ((i as f32 * 0.1).sin() * 10000.0) as i16)
+            .collect();
         write_wav(&path, 8000, &samples);
 
         let meta = metadata(path.to_str().unwrap()).unwrap();
         assert_eq!(meta.sample_rate, 8000);
         assert_eq!(meta.channels, 1);
-        assert!((meta.duration_ms as i64 - 1000).abs() <= 5, "duration ~1s, got {}", meta.duration_ms);
+        assert!(
+            (meta.duration_ms as i64 - 1000).abs() <= 5,
+            "duration ~1s, got {}",
+            meta.duration_ms
+        );
     }
 
     #[test]
     fn extracts_waveform_peaks() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tone.wav");
-        let samples: Vec<i16> = (0..8000).map(|i| ((i as f32 * 0.1).sin() * 16000.0) as i16).collect();
+        let samples: Vec<i16> = (0..8000)
+            .map(|i| ((i as f32 * 0.1).sin() * 16000.0) as i16)
+            .collect();
         write_wav(&path, 8000, &samples);
 
         let wf = waveform(path.to_str().unwrap(), 32).unwrap();
         assert_eq!(wf.len(), 32);
-        assert!(wf.iter().any(|&p| p > 0.1), "a tone should produce non-trivial peaks");
+        assert!(
+            wf.iter().any(|&p| p > 0.1),
+            "a tone should produce non-trivial peaks"
+        );
         assert!(wf.iter().all(|&p| (0.0..=1.0).contains(&p)));
     }
 
@@ -962,7 +1058,11 @@ mod tests {
         for &b in &[1usize, 7, 32, 256, 1000, full.len() - 1, full.len()] {
             let streamed = waveform(p, b).unwrap();
             let reference = downsample_peaks(&full, b.max(1));
-            assert_eq!(streamed.len(), reference.len(), "len mismatch at buckets={b}");
+            assert_eq!(
+                streamed.len(),
+                reference.len(),
+                "len mismatch at buckets={b}"
+            );
             assert_eq!(streamed, reference, "peak mismatch at buckets={b}");
         }
 
@@ -971,7 +1071,10 @@ mod tests {
         let more = waveform(p, full.len() + 50).unwrap();
         assert_eq!(more.len(), full.len() + 50);
         assert!(more.iter().all(|&q| (0.0..=1.0).contains(&q)));
-        assert!(more.iter().rev().take(50).all(|&q| q == 0.0), "tail buckets are silent");
+        assert!(
+            more.iter().rev().take(50).all(|&q| q == 0.0),
+            "tail buckets are silent"
+        );
     }
 
     /// Synthesise a click track: a sharp decaying burst every `period` samples.
@@ -1006,16 +1109,30 @@ mod tests {
         let pcm = click_track(sr, 120.0, 5.0);
         let a = analyze_pcm(&pcm, sr, BeatOptions::default());
 
-        assert!((a.bpm - 120.0).abs() <= 6.0, "expected ~120 BPM, got {}", a.bpm);
-        assert!(a.confidence > 0.0, "a periodic click track should be confident");
+        assert!(
+            (a.bpm - 120.0).abs() <= 6.0,
+            "expected ~120 BPM, got {}",
+            a.bpm
+        );
+        assert!(
+            a.confidence > 0.0,
+            "a periodic click track should be confident"
+        );
 
         // ~2 beats/sec over 5 s → ~10 onsets; allow slack for edge frames.
-        assert!(a.onsets.len() >= 7, "expected ~10 onsets, got {}", a.onsets.len());
+        assert!(
+            a.onsets.len() >= 7,
+            "expected ~10 onsets, got {}",
+            a.onsets.len()
+        );
         // Consecutive onsets sit ~0.5 s apart (median inter-onset interval).
         let mut gaps: Vec<f32> = a.onsets.windows(2).map(|w| w[1] - w[0]).collect();
         gaps.sort_by(|x, y| x.partial_cmp(y).unwrap());
         let median = gaps[gaps.len() / 2];
-        assert!((median - 0.5).abs() <= 0.06, "median beat gap ~0.5s, got {median}");
+        assert!(
+            (median - 0.5).abs() <= 0.06,
+            "median beat gap ~0.5s, got {median}"
+        );
     }
 
     #[test]
@@ -1043,7 +1160,11 @@ mod tests {
         for &truth in &[90.0f32, 160.0f32] {
             let pcm = click_track(sr, truth, 5.0);
             let a = analyze_pcm(&pcm, sr, BeatOptions::default());
-            assert!((a.bpm - truth).abs() <= 8.0, "expected ~{truth} BPM, got {}", a.bpm);
+            assert!(
+                (a.bpm - truth).abs() <= 8.0,
+                "expected ~{truth} BPM, got {}",
+                a.bpm
+            );
         }
     }
 
@@ -1059,7 +1180,11 @@ mod tests {
 
         let a = analyze_beats(path.to_str().unwrap(), BeatOptions::default()).unwrap();
         assert_eq!(a.sample_rate, sr);
-        assert!((a.bpm - 128.0).abs() <= 8.0, "expected ~128 BPM, got {}", a.bpm);
+        assert!(
+            (a.bpm - 128.0).abs() <= 8.0,
+            "expected ~128 BPM, got {}",
+            a.bpm
+        );
         assert!(!a.onsets.is_empty(), "click track should yield onsets");
     }
 
@@ -1082,11 +1207,18 @@ mod tests {
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap();
-        assert_eq!(max_pc, 9, "A4 should peak pitch class A; chroma = {chroma:?}");
+        assert_eq!(
+            max_pc, 9,
+            "A4 should peak pitch class A; chroma = {chroma:?}"
+        );
 
         // C4 = ~261.63 Hz → pitch class 0 (C).
         let c = chroma_from_pcm(&sine(sr, 261.63, 3.0), sr);
-        let (c_pc, _) = c.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap();
+        let (c_pc, _) = c
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap();
         assert_eq!(c_pc, 0, "C4 should peak pitch class C; chroma = {c:?}");
     }
 
@@ -1137,7 +1269,10 @@ mod tests {
         idx.sort_by(|&a, &b| chroma[b].partial_cmp(&chroma[a]).unwrap());
         let top3: std::collections::HashSet<usize> = idx.into_iter().take(3).collect();
         for pc in [0usize, 4, 7] {
-            assert!(top3.contains(&pc), "chord tone {pc} should be in the top-3 chroma");
+            assert!(
+                top3.contains(&pc),
+                "chord tone {pc} should be in the top-3 chroma"
+            );
         }
     }
 
@@ -1153,9 +1288,21 @@ mod tests {
         assert_eq!(plan.remove.len(), 1, "exactly one silent gap");
         let gap = &plan.remove[0];
         // The gap sits around [0.5, 1.5] s, shrunk by 0.05 s padding each side.
-        assert!((gap.start_sec - 0.55).abs() < 0.06, "gap start ~0.55s, got {}", gap.start_sec);
-        assert!((gap.end_sec - 1.45).abs() < 0.06, "gap end ~1.45s, got {}", gap.end_sec);
-        assert!(plan.removed_sec > 0.8 && plan.removed_sec < 1.0, "removed ~0.9s, got {}", plan.removed_sec);
+        assert!(
+            (gap.start_sec - 0.55).abs() < 0.06,
+            "gap start ~0.55s, got {}",
+            gap.start_sec
+        );
+        assert!(
+            (gap.end_sec - 1.45).abs() < 0.06,
+            "gap end ~1.45s, got {}",
+            gap.end_sec
+        );
+        assert!(
+            plan.removed_sec > 0.8 && plan.removed_sec < 1.0,
+            "removed ~0.9s, got {}",
+            plan.removed_sec
+        );
         assert!(plan.keep.len() >= 2, "audio either side of the gap is kept");
     }
 
@@ -1163,7 +1310,10 @@ mod tests {
     fn no_silence_in_a_continuous_tone() {
         let sr = 8_000u32;
         let plan = plan_silence_removal(&sine(sr, 440.0, 2.0), sr, SilenceOptions::default());
-        assert!(plan.remove.is_empty(), "a continuous tone has no silence to cut");
+        assert!(
+            plan.remove.is_empty(),
+            "a continuous tone has no silence to cut"
+        );
         assert_eq!(plan.removed_sec, 0.0);
     }
 
@@ -1178,12 +1328,25 @@ mod tests {
         let tone = analyze_loudness_pcm(&loud, sr);
         let quiet = analyze_loudness_pcm(&vec![0.0f32; (sr * 3) as usize], sr);
 
-        assert!(tone.lufs > quiet.lufs + 30.0, "tone {} ≫ silence {}", tone.lufs, quiet.lufs);
+        assert!(
+            tone.lufs > quiet.lufs + 30.0,
+            "tone {} ≫ silence {}",
+            tone.lufs,
+            quiet.lufs
+        );
         assert_eq!(quiet.lufs, LUFS_SILENCE_FLOOR, "silence floors at -70 LUFS");
         assert_eq!(quiet.peak_dbfs, -120.0, "silence peak floors at -120 dBFS");
         // A ~0 dBFS sine measures near 0 dBFS peak and in a sane LUFS range.
-        assert!(tone.peak_dbfs > -1.0, "full-scale peak ~0 dBFS, got {}", tone.peak_dbfs);
-        assert!(tone.lufs > -10.0 && tone.lufs < 3.0, "1kHz full-scale ~-3 LUFS, got {}", tone.lufs);
+        assert!(
+            tone.peak_dbfs > -1.0,
+            "full-scale peak ~0 dBFS, got {}",
+            tone.peak_dbfs
+        );
+        assert!(
+            tone.lufs > -10.0 && tone.lufs < 3.0,
+            "1kHz full-scale ~-3 LUFS, got {}",
+            tone.lufs
+        );
     }
 
     #[test]
@@ -1196,6 +1359,10 @@ mod tests {
         write_wav(&path, sr, &samples);
         let r = analyze_loudness(path.to_str().unwrap()).unwrap();
         assert_eq!(r.sample_rate, sr);
-        assert!(r.lufs > -30.0, "a 1kHz tone should not read as near-silent, got {}", r.lufs);
+        assert!(
+            r.lufs > -30.0,
+            "a 1kHz tone should not read as near-silent, got {}",
+            r.lufs
+        );
     }
 }

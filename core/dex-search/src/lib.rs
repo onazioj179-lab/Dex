@@ -18,7 +18,9 @@ use rayon::prelude::*;
 fn io_pool() -> &'static rayon::ThreadPool {
     static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
-        let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let n = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         rayon::ThreadPoolBuilder::new()
             .num_threads((n / 2).max(2))
             .thread_name(|i| format!("dex-search-io-{i}"))
@@ -87,9 +89,9 @@ pub struct SearchIndex {
 
 /// Text-ish extensions whose contents we full-text index (bounded size).
 const TEXT_EXTS: &[&str] = &[
-    "txt", "md", "markdown", "json", "csv", "tsv", "log", "rs", "ts", "tsx", "js", "jsx",
-    "py", "html", "htm", "css", "xml", "yml", "yaml", "toml", "ini", "cfg", "sh", "c", "h",
-    "cpp", "java", "go", "rb", "php", "sql",
+    "txt", "md", "markdown", "json", "csv", "tsv", "log", "rs", "ts", "tsx", "js", "jsx", "py",
+    "html", "htm", "css", "xml", "yml", "yaml", "toml", "ini", "cfg", "sh", "c", "h", "cpp",
+    "java", "go", "rb", "php", "sql",
 ];
 const MAX_CONTENT_BYTES: u64 = 262_144; // 256 KB per file
 
@@ -98,35 +100,83 @@ const MAX_CONTENT_BYTES: u64 = 262_144; // 256 KB per file
 /// hold tens of thousands of generated files). Dot-dirs (.git, .next, ...) are
 /// already skipped separately.
 const SKIP_DIRS: &[&str] = &[
-    "node_modules", "$recycle.bin", "target", "dist", "build", "out",
-    "coverage", "vendor", "__pycache__",
+    "node_modules",
+    "$recycle.bin",
+    "target",
+    "dist",
+    "build",
+    "out",
+    "coverage",
+    "vendor",
+    "__pycache__",
 ];
 
 /// Files whose CONTENTS are never indexed (their name still is, so the user can
 /// find them): credentials, keys, keystores and environment files. Content that
 /// looks like a private key is dropped too, whatever the file is called.
 pub fn is_sensitive_file(path: &Path) -> bool {
-    let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
     if name.is_empty() {
         return false;
     }
     const EXACT: &[&str] = &[
-        ".env", ".npmrc", ".pypirc", ".netrc", "_netrc", ".git-credentials", ".htpasswd", "id_rsa", "id_dsa",
-        "id_ecdsa", "id_ed25519", "known_hosts", "authorized_keys", "credentials", "credentials.json",
-        "secrets.json", "secrets.yaml", "secrets.yml", "secrets.toml", "service-account.json", "wallet.dat",
-        "keystore.json", "local.settings.json", "appsettings.secrets.json", ".dockercfg",
+        ".env",
+        ".npmrc",
+        ".pypirc",
+        ".netrc",
+        "_netrc",
+        ".git-credentials",
+        ".htpasswd",
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "known_hosts",
+        "authorized_keys",
+        "credentials",
+        "credentials.json",
+        "secrets.json",
+        "secrets.yaml",
+        "secrets.yml",
+        "secrets.toml",
+        "service-account.json",
+        "wallet.dat",
+        "keystore.json",
+        "local.settings.json",
+        "appsettings.secrets.json",
+        ".dockercfg",
     ];
     if EXACT.contains(&name.as_str()) || name.starts_with(".env.") || name.ends_with(".env") {
         return true;
     }
-    const EXTS: &[&str] = &["pem", "key", "pfx", "p12", "jks", "keystore", "kdbx", "ppk", "asc", "gpg", "ovpn", "der", "crt", "cer"];
-    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    const EXTS: &[&str] = &[
+        "pem", "key", "pfx", "p12", "jks", "keystore", "kdbx", "ppk", "asc", "gpg", "ovpn", "der",
+        "crt", "cer",
+    ];
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
     if EXTS.contains(&ext.as_str()) {
         return true;
     }
-    ["secret", "password", "passwd", "credential", "private_key", "privatekey", "api_key", "apikey", "access_token", "auth_token"]
-        .iter()
-        .any(|w| name.contains(w))
+    [
+        "secret",
+        "password",
+        "passwd",
+        "credential",
+        "private_key",
+        "privatekey",
+        "api_key",
+        "apikey",
+        "access_token",
+        "auth_token",
+    ]
+    .iter()
+    .any(|w| name.contains(w))
 }
 
 /// True when text carries a private key or a well-known access-token prefix.
@@ -134,10 +184,26 @@ pub fn looks_like_secret(text: &str) -> bool {
     text.contains("PRIVATE KEY-----")
         || text.contains("-----BEGIN OPENSSH")
         || text.contains("-----BEGIN PGP PRIVATE")
-        || ["ghp_", "github_pat_", "xoxb-", "xoxp-", "sk-ant-", "AKIA", "AIza", "glpat-"].iter().any(|p| {
+        || [
+            "ghp_",
+            "github_pat_",
+            "xoxb-",
+            "xoxp-",
+            "sk-ant-",
+            "AKIA",
+            "AIza",
+            "glpat-",
+        ]
+        .iter()
+        .any(|p| {
             text.match_indices(p).any(|(i, _)| {
                 // A token prefix followed by a long run of token characters.
-                text[i + p.len()..].chars().take(16).filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').count() >= 16
+                text[i + p.len()..]
+                    .chars()
+                    .take(16)
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+                    .count()
+                    >= 16
             })
         })
 }
@@ -186,7 +252,14 @@ fn file_record(path: &Path) -> Option<(String, String, String, u64, u64, String)
         .map(|x| x.to_string_lossy().to_string())
         .unwrap_or_default();
     let content = read_text_content(path, size);
-    Some((path.to_string_lossy().to_string(), name, ext, modified, size, content))
+    Some((
+        path.to_string_lossy().to_string(),
+        name,
+        ext,
+        modified,
+        size,
+        content,
+    ))
 }
 
 impl SearchIndex {
@@ -226,11 +299,10 @@ impl SearchIndex {
             }
         };
         // Register the edge-ngram (prefix-only) tokenizer + lowercase folding.
-        let tokenizer = TextAnalyzer::builder(
-            NgramTokenizer::new(2, 12, true).map_err(|e| e.to_string())?,
-        )
-        .filter(LowerCaser)
-        .build();
+        let tokenizer =
+            TextAnalyzer::builder(NgramTokenizer::new(2, 12, true).map_err(|e| e.to_string())?)
+                .filter(LowerCaser)
+                .build();
         index.tokenizers().register("dex_prefix", tokenizer);
         let reader = index
             .reader_builder()
@@ -306,21 +378,30 @@ impl SearchIndex {
         // single IndexWriter sequentially (the writer isn't Sync for concurrent
         // adds). Preserves the same documents, just overlaps the per-file reads.
         let files = walk(root, max);
-        let prepared: Vec<(String, String, String, u64, u64, String)> = io_pool().install(|| files
-            .into_par_iter()
-            .map(|(path, modified, size)| {
-                let name = path
-                    .file_name()
-                    .map(|x| x.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let ext = path
-                    .extension()
-                    .map(|x| x.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let content = read_text_content(&path, size);
-                (path.to_string_lossy().to_string(), name, ext, modified, size, content)
-            })
-            .collect());
+        let prepared: Vec<(String, String, String, u64, u64, String)> = io_pool().install(|| {
+            files
+                .into_par_iter()
+                .map(|(path, modified, size)| {
+                    let name = path
+                        .file_name()
+                        .map(|x| x.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let ext = path
+                        .extension()
+                        .map(|x| x.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let content = read_text_content(&path, size);
+                    (
+                        path.to_string_lossy().to_string(),
+                        name,
+                        ext,
+                        modified,
+                        size,
+                        content,
+                    )
+                })
+                .collect()
+        });
 
         let n = prepared.len();
         for (path, name, ext, modified, size, content) in prepared {
@@ -349,7 +430,11 @@ impl SearchIndex {
     /// `upserts`, delete every path in `removals`. One commit per burst instead of
     /// one per file keeps the segment count (and merge work) down. Returns the
     /// number of files (re)indexed.
-    pub fn apply_file_changes(&self, upserts: &[PathBuf], removals: &[PathBuf]) -> Result<usize, String> {
+    pub fn apply_file_changes(
+        &self,
+        upserts: &[PathBuf],
+        removals: &[PathBuf],
+    ) -> Result<usize, String> {
         if upserts.is_empty() && removals.is_empty() {
             return Ok(0);
         }
@@ -486,7 +571,8 @@ impl SearchIndex {
             }
         }
         let searcher = self.reader.searcher();
-        let parser = QueryParser::for_index(&self.index, vec![self.f_name, self.f_content, self.f_path]);
+        let parser =
+            QueryParser::for_index(&self.index, vec![self.f_name, self.f_content, self.f_path]);
         // The edge-ngram tokenizer on `name` handles prefix matching, so the raw
         // query is enough — "budg" tokenizes to prefixes that match "budget".
         let parsed = parser.parse_query(&q);
@@ -511,12 +597,20 @@ impl SearchIndex {
                 let ext = s(self.f_ext);
                 let source = {
                     let v = s(self.f_source);
-                    if v.is_empty() { "file".to_string() } else { v }
+                    if v.is_empty() {
+                        "file".to_string()
+                    } else {
+                        v
+                    }
                 };
                 let path = s(self.f_path);
                 let id = {
                     let v = s(self.f_id);
-                    if v.is_empty() { path.clone() } else { v }
+                    if v.is_empty() {
+                        path.clone()
+                    } else {
+                        v
+                    }
                 };
                 hits.push(FileHit {
                     path,
@@ -598,16 +692,30 @@ mod tests {
         let normal = data.path().join("plan.md");
         std::fs::write(&env, b"OPENAI=quokkasecret").unwrap();
         std::fs::write(&creds, b"{\"password\":\"quokkasecret\"}").unwrap();
-        std::fs::write(&key_in_txt, b"-----BEGIN RSA PRIVATE KEY-----
+        std::fs::write(
+            &key_in_txt,
+            b"-----BEGIN RSA PRIVATE KEY-----
 quokkasecret
------END RSA PRIVATE KEY-----").unwrap();
-        std::fs::write(&token_md, b"token ghp_abcdefghijklmnopqrstuvwxyz0123 quokkasecret").unwrap();
+-----END RSA PRIVATE KEY-----",
+        )
+        .unwrap();
+        std::fs::write(
+            &token_md,
+            b"token ghp_abcdefghijklmnopqrstuvwxyz0123 quokkasecret",
+        )
+        .unwrap();
         std::fs::write(&normal, b"quokka roadmap").unwrap();
         let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
         assert_eq!(idx.index_path(data.path(), 100).unwrap(), 5);
-        assert!(idx.search("quokkasecret", 10).is_empty(), "secret content leaked into the index");
+        assert!(
+            idx.search("quokkasecret", 10).is_empty(),
+            "secret content leaked into the index"
+        );
         assert!(idx.search("quokka", 10).iter().any(|h| h.name == "plan.md"));
-        assert!(idx.search("credentials", 10).iter().any(|h| h.name == "credentials.json"));
+        assert!(idx
+            .search("credentials", 10)
+            .iter()
+            .any(|h| h.name == "credentials.json"));
         assert!(is_sensitive_file(Path::new("C:/x/id_ed25519")));
         assert!(is_sensitive_file(Path::new("C:/x/server.pem")));
         assert!(!is_sensitive_file(Path::new("C:/x/token_budget_notes.txt")));
@@ -625,16 +733,29 @@ quokkasecret
         std::fs::write(&b, b"meeting notes").unwrap();
         let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
 
-        assert_eq!(idx.apply_file_changes(&[a.clone(), b.clone()], &[]).unwrap(), 2);
+        assert_eq!(
+            idx.apply_file_changes(&[a.clone(), b.clone()], &[])
+                .unwrap(),
+            2
+        );
         // The shared reader sees the commit immediately (reloaded after write).
         assert_eq!(idx.count(), 2);
-        assert!(idx.search("zebra", 10).iter().any(|h| h.name == "alpha_plan.txt"));
+        assert!(idx
+            .search("zebra", 10)
+            .iter()
+            .any(|h| h.name == "alpha_plan.txt"));
 
         // Re-upserting a changed file doesn't duplicate it; removal drops it.
         std::fs::write(&a, b"quarterly giraffe roadmap").unwrap();
-        assert_eq!(idx.apply_file_changes(&[a.clone()], &[b.clone()]).unwrap(), 1);
+        assert_eq!(
+            idx.apply_file_changes(&[a.clone()], &[b.clone()]).unwrap(),
+            1
+        );
         assert_eq!(idx.count(), 1);
-        assert!(idx.search("giraffe", 10).iter().any(|h| h.name == "alpha_plan.txt"));
+        assert!(idx
+            .search("giraffe", 10)
+            .iter()
+            .any(|h| h.name == "alpha_plan.txt"));
         assert!(idx.search("zebra", 10).is_empty());
 
         // A path that vanished before the batch ran is treated as a removal.
@@ -684,15 +805,26 @@ quokkasecret
     fn searches_inside_file_contents() {
         let index_dir = tempfile::tempdir().unwrap();
         let data_dir = tempfile::tempdir().unwrap();
-        std::fs::write(data_dir.path().join("notes.txt"), b"the quick brown fox jumps").unwrap();
-        std::fs::write(data_dir.path().join("other.txt"), b"nothing relevant in here").unwrap();
+        std::fs::write(
+            data_dir.path().join("notes.txt"),
+            b"the quick brown fox jumps",
+        )
+        .unwrap();
+        std::fs::write(
+            data_dir.path().join("other.txt"),
+            b"nothing relevant in here",
+        )
+        .unwrap();
 
         let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
         idx.index_path(data_dir.path(), 1000).unwrap();
 
         // "brown" appears only in the file CONTENT, not in any filename.
         let hits = idx.search("brown", 10);
-        assert!(hits.iter().any(|h| h.name == "notes.txt"), "content search should find notes.txt");
+        assert!(
+            hits.iter().any(|h| h.name == "notes.txt"),
+            "content search should find notes.txt"
+        );
         assert!(!hits.iter().any(|h| h.name == "other.txt"));
     }
 
@@ -714,7 +846,10 @@ quokkasecret
         assert!(idx.upsert_file(&f).unwrap());
         assert_eq!(idx.count(), 1, "upsert must replace, not duplicate");
         assert!(idx.search("beta", 10).iter().any(|h| h.name == "live.txt"));
-        assert!(idx.search("alpha", 10).is_empty(), "stale content should be gone");
+        assert!(
+            idx.search("alpha", 10).is_empty(),
+            "stale content should be gone"
+        );
 
         // A directory (or missing path) is not an indexable file.
         assert!(!idx.upsert_file(data_dir.path()).unwrap());
@@ -732,8 +867,14 @@ quokkasecret
 
         idx.remove_path(&data_dir.path().join("alpha.txt")).unwrap();
         assert_eq!(idx.count(), 1);
-        assert!(idx.search("alpha", 10).is_empty(), "removed file should not match");
-        assert!(idx.search("bravo", 10).iter().any(|h| h.name == "bravo.txt"));
+        assert!(
+            idx.search("alpha", 10).is_empty(),
+            "removed file should not match"
+        );
+        assert!(idx
+            .search("bravo", 10)
+            .iter()
+            .any(|h| h.name == "bravo.txt"));
 
         // Removing an absent path is a no-op (still Ok), leaving the index intact.
         idx.remove_path(&data_dir.path().join("ghost.txt")).unwrap();
@@ -791,25 +932,51 @@ quokkasecret
 
         let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
         idx.index_path(data_dir.path(), 100).unwrap();
-        idx.upsert_doc("note:1", "note", "Meeting notes", "discuss the roadmap and hiring", 100)
-            .unwrap();
-        idx.upsert_doc("clip:9", "clipboard", "", "https://example.com/roadmap", 200).unwrap();
-        assert_eq!(idx.count(), 3, "one index holds the file, the note and the clip");
+        idx.upsert_doc(
+            "note:1",
+            "note",
+            "Meeting notes",
+            "discuss the roadmap and hiring",
+            100,
+        )
+        .unwrap();
+        idx.upsert_doc(
+            "clip:9",
+            "clipboard",
+            "",
+            "https://example.com/roadmap",
+            200,
+        )
+        .unwrap();
+        assert_eq!(
+            idx.count(),
+            3,
+            "one index holds the file, the note and the clip"
+        );
 
         // A file hit carries source "file"; content search still works.
         let files = idx.search("quarterly", 10);
-        assert!(files.iter().any(|h| h.name == "report.txt" && h.source == "file"));
+        assert!(files
+            .iter()
+            .any(|h| h.name == "report.txt" && h.source == "file"));
 
         // The note is found by its title (prefix) AND its body, tagged "note".
         let by_title = idx.search("meet", 10);
-        assert!(by_title.iter().any(|h| h.id == "note:1" && h.source == "note"));
+        assert!(by_title
+            .iter()
+            .any(|h| h.id == "note:1" && h.source == "note"));
         let by_body = idx.search("hiring", 10);
         assert!(by_body.iter().any(|h| h.id == "note:1"));
 
         // The clipboard entry is found by its body and tagged "clipboard".
         let clip = idx.search("roadmap", 10);
-        assert!(clip.iter().any(|h| h.id == "clip:9" && h.source == "clipboard"));
-        assert!(clip.iter().any(|h| h.id == "note:1"), "note also mentions roadmap");
+        assert!(clip
+            .iter()
+            .any(|h| h.id == "clip:9" && h.source == "clipboard"));
+        assert!(
+            clip.iter().any(|h| h.id == "note:1"),
+            "note also mentions roadmap"
+        );
     }
 
     #[test]
@@ -817,14 +984,19 @@ quokkasecret
         let index_dir = tempfile::tempdir().unwrap();
         let idx = SearchIndex::open_or_create(index_dir.path()).unwrap();
 
-        idx.upsert_doc("note:7", "note", "Draft", "alpha body text", 1).unwrap();
+        idx.upsert_doc("note:7", "note", "Draft", "alpha body text", 1)
+            .unwrap();
         assert!(idx.search("alpha", 10).iter().any(|h| h.id == "note:7"));
 
         // Re-upserting the same id replaces content, never duplicates.
-        idx.upsert_doc("note:7", "note", "Draft", "beta body text", 2).unwrap();
+        idx.upsert_doc("note:7", "note", "Draft", "beta body text", 2)
+            .unwrap();
         assert_eq!(idx.count(), 1, "upsert_doc must replace, not duplicate");
         assert!(idx.search("beta", 10).iter().any(|h| h.id == "note:7"));
-        assert!(idx.search("alpha", 10).is_empty(), "stale note body is gone");
+        assert!(
+            idx.search("alpha", 10).is_empty(),
+            "stale note body is gone"
+        );
 
         // remove_doc deletes it; removing an absent id is a no-op.
         idx.remove_doc("note:7").unwrap();
@@ -847,15 +1019,28 @@ mod io_pool_tests {
         // Occupy every index worker until released.
         let workers = super::io_pool().current_num_threads();
         let pool = super::io_pool();
-        let busy = std::thread::spawn(move || pool.install(|| (0..workers).into_par_iter().for_each(|_| {
-            let _ = rx.lock().unwrap().recv_timeout(std::time::Duration::from_secs(5));
-        })));
+        let busy = std::thread::spawn(move || {
+            pool.install(|| {
+                (0..workers).into_par_iter().for_each(|_| {
+                    let _ = rx
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(std::time::Duration::from_secs(5));
+                })
+            })
+        });
         std::thread::sleep(std::time::Duration::from_millis(50));
         let t = std::time::Instant::now();
         let sum: u64 = (0..10_000u64).into_par_iter().sum();
         assert_eq!(sum, 49_995_000);
-        assert!(t.elapsed() < std::time::Duration::from_secs(2), "global pool waited {:?}", t.elapsed());
-        for _ in 0..workers { let _ = tx.send(()); }
+        assert!(
+            t.elapsed() < std::time::Duration::from_secs(2),
+            "global pool waited {:?}",
+            t.elapsed()
+        );
+        for _ in 0..workers {
+            let _ = tx.send(());
+        }
         busy.join().unwrap();
     }
 }

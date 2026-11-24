@@ -37,7 +37,11 @@ pub struct StreamParser<F: FnMut(&str) -> String> {
 
 impl<F: FnMut(&str) -> String> StreamParser<F> {
     pub fn new(format: StreamFormat, parse_chunk: F) -> Self {
-        Self { format, parse_chunk, buffer: String::new() }
+        Self {
+            format,
+            parse_chunk,
+            buffer: String::new(),
+        }
     }
 
     /// Interpret one complete line. `None` for blanks, SSE non-`data:`/`[DONE]`
@@ -57,11 +61,19 @@ impl<F: FnMut(&str) -> String> StreamParser<F> {
                     return None;
                 }
                 let t = (self.parse_chunk)(data);
-                if t.is_empty() { None } else { Some(t) }
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t)
+                }
             }
             StreamFormat::Ndjson => {
                 let t = (self.parse_chunk)(line);
-                if t.is_empty() { None } else { Some(t) }
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t)
+                }
             }
         }
     }
@@ -144,8 +156,14 @@ pub struct HttpRequest {
 const OPENAI_DEFAULT_BASE: &str = "https://api.openai.com/v1";
 
 /// Build the OpenAI (and OpenAI-compatible, via `base_url`) chat request. Pure.
-pub fn build_openai_request(req: &ChatRequest, base_url: Option<&str>, api_key: &str) -> HttpRequest {
-    let base = base_url.unwrap_or(OPENAI_DEFAULT_BASE).trim_end_matches('/');
+pub fn build_openai_request(
+    req: &ChatRequest,
+    base_url: Option<&str>,
+    api_key: &str,
+) -> HttpRequest {
+    let base = base_url
+        .unwrap_or(OPENAI_DEFAULT_BASE)
+        .trim_end_matches('/');
     let mut headers = BTreeMap::new();
     headers.insert("Content-Type".to_string(), "application/json".to_string());
     headers.insert("Authorization".to_string(), format!("Bearer {}", api_key));
@@ -185,7 +203,10 @@ pub struct ChatResponse {
 
 /// Parse an OpenAI chat-completion JSON response into a normalized `ChatResponse`.
 pub fn parse_openai_response(json: &Value) -> ChatResponse {
-    let choice = json.get("choices").and_then(|c| c.as_array()).and_then(|a| a.first());
+    let choice = json
+        .get("choices")
+        .and_then(|c| c.as_array())
+        .and_then(|a| a.first());
     ChatResponse {
         content: choice
             .and_then(|c| c.get("message"))
@@ -193,7 +214,11 @@ pub fn parse_openai_response(json: &Value) -> ChatResponse {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
-        model: json.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        model: json
+            .get("model")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
         finish_reason: choice
             .and_then(|c| c.get("finish_reason"))
             .and_then(|v| v.as_str())
@@ -342,8 +367,14 @@ mod tests {
         let req = ChatRequest {
             model: "gpt-4o-mini".into(),
             messages: vec![
-                ChatMessage { role: "system".into(), content: "be brief".into() },
-                ChatMessage { role: "user".into(), content: "hi".into() },
+                ChatMessage {
+                    role: "system".into(),
+                    content: "be brief".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: "hi".into(),
+                },
             ],
             temperature: Some(0.5),
             max_tokens: Some(100),
@@ -352,8 +383,14 @@ mod tests {
         let r = build_openai_request(&req, None, "sk-test");
         assert_eq!(r.url, "https://api.openai.com/v1/chat/completions");
         assert_eq!(r.method, "POST");
-        assert_eq!(r.headers.get("Authorization").map(String::as_str), Some("Bearer sk-test"));
-        assert_eq!(r.headers.get("Content-Type").map(String::as_str), Some("application/json"));
+        assert_eq!(
+            r.headers.get("Authorization").map(String::as_str),
+            Some("Bearer sk-test")
+        );
+        assert_eq!(
+            r.headers.get("Content-Type").map(String::as_str),
+            Some("application/json")
+        );
         // Parse the body back — JSON key order is irrelevant.
         let body: Value = serde_json::from_str(r.body.as_deref().unwrap()).unwrap();
         assert_eq!(body["model"], "gpt-4o-mini");
@@ -365,7 +402,10 @@ mod tests {
 
     #[test]
     fn openai_base_url_override_and_omitted_optionals() {
-        let req = ChatRequest { model: "x".into(), ..Default::default() };
+        let req = ChatRequest {
+            model: "x".into(),
+            ..Default::default()
+        };
         let r = build_openai_request(&req, Some("https://router.example/v1/"), "k");
         assert_eq!(r.url, "https://router.example/v1/chat/completions"); // trailing slash trimmed
         let body: Value = serde_json::from_str(r.body.as_deref().unwrap()).unwrap();

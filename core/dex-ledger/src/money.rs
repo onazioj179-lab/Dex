@@ -31,7 +31,13 @@ pub fn format_minor(minor: i64, digits: u32) -> String {
     let scale = 10u64.pow(digits);
     let whole = abs / scale;
     let frac = abs % scale;
-    format!("{}{}.{:0width$}", if neg { "-" } else { "" }, whole, frac, width = digits as usize)
+    format!(
+        "{}{}.{:0width$}",
+        if neg { "-" } else { "" },
+        whole,
+        frac,
+        width = digits as usize
+    )
 }
 
 /// Parse human/bank amount text into minor units.
@@ -71,7 +77,8 @@ pub fn parse_amount(text: &str, decimal: char, digits: u32) -> Result<i64, Strin
             '+' => {}
             c if c == decimal => body.push('.'),
             ',' | '.' | '\'' | ' ' | '\u{a0}' | '\u{202f}' | '_' => {} // grouping
-            c if c.is_alphabetic() || "$€£¥₦₹₩₽₺₪₫₱₴₲₵₡₸฿¤".contains(c) => {} // symbols / codes
+            c if c.is_alphabetic() || "$€£¥₦₹₩₽₺₪₫₱₴₲₵₡₸฿¤".contains(c) =>
+                {} // symbols / codes
             _ => return Err(format!("unrecognised character '{ch}' in \"{raw}\"")),
         }
     }
@@ -94,8 +101,20 @@ pub fn parse_amount(text: &str, decimal: char, digits: u32) -> Result<i64, Strin
         format!("{frac:0<width$}", width = digits as usize)
     };
     let scale = 10i64.checked_pow(digits).ok_or("bad currency exponent")?;
-    let whole_v: i64 = if whole.is_empty() { 0 } else { whole.parse().map_err(|_| format!("amount too large: \"{raw}\""))? };
-    let frac_v: i64 = if frac_trimmed.is_empty() { 0 } else { frac_trimmed.parse().map_err(|_| "bad fraction".to_string())? };
+    let whole_v: i64 = if whole.is_empty() {
+        0
+    } else {
+        whole
+            .parse()
+            .map_err(|_| format!("amount too large: \"{raw}\""))?
+    };
+    let frac_v: i64 = if frac_trimmed.is_empty() {
+        0
+    } else {
+        frac_trimmed
+            .parse()
+            .map_err(|_| "bad fraction".to_string())?
+    };
     let v = whole_v
         .checked_mul(scale)
         .and_then(|w| w.checked_add(frac_v))

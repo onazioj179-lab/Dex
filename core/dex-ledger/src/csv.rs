@@ -8,7 +8,11 @@
 
 /// Pick the delimiter that splits the first line into the most fields.
 pub fn detect_delimiter(text: &str) -> char {
-    let first = text.trim_start_matches('\u{feff}').lines().next().unwrap_or("");
+    let first = text
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .next()
+        .unwrap_or("");
     let mut best = (',', 0usize);
     for d in [',', ';', '\t', '|'] {
         let n = parse_with(first, d).first().map(|r| r.len()).unwrap_or(0);
@@ -81,7 +85,12 @@ pub fn parse_with(text: &str, delim: char) -> Vec<Vec<String>> {
 pub fn escape(field: &str) -> String {
     let guarded = match field.chars().next() {
         Some('=') | Some('+') | Some('@') | Some('\t') => format!("'{field}"),
-        Some('-') if field.len() > 1 && !field[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') => format!("'{field}"),
+        Some('-')
+            if field.len() > 1
+                && !field[1..].starts_with(|c: char| c.is_ascii_digit() || c == '.') =>
+        {
+            format!("'{field}")
+        }
         _ => field.to_string(),
     };
     if guarded.contains([',', '"', '\n', '\r']) {
@@ -92,7 +101,11 @@ pub fn escape(field: &str) -> String {
 }
 
 pub fn write_row(fields: &[String]) -> String {
-    let mut s = fields.iter().map(|f| escape(f)).collect::<Vec<_>>().join(",");
+    let mut s = fields
+        .iter()
+        .map(|f| escape(f))
+        .collect::<Vec<_>>()
+        .join(",");
     s.push_str("\r\n");
     s
 }

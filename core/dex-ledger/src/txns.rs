@@ -97,7 +97,9 @@ pub(crate) struct SplitLine {
 }
 
 fn parse_splits(c: &Connection, v: &Value, total: i64) -> R<Option<Vec<SplitLine>>> {
-    let Some(arr) = v.get("splits").and_then(|x| x.as_array()) else { return Ok(None) };
+    let Some(arr) = v.get("splits").and_then(|x| x.as_array()) else {
+        return Ok(None);
+    };
     if arr.is_empty() {
         return Ok(Some(Vec::new()));
     }
@@ -107,7 +109,8 @@ fn parse_splits(c: &Connection, v: &Value, total: i64) -> R<Option<Vec<SplitLine
     let mut out = Vec::new();
     let mut sum: i64 = 0;
     for (i, s) in arr.iter().enumerate() {
-        let amount = gi(s, "amount").ok_or_else(|| format!("split line {} has no amount", i + 1))?;
+        let amount =
+            gi(s, "amount").ok_or_else(|| format!("split line {} has no amount", i + 1))?;
         if amount == 0 {
             return Err(format!("split line {} is zero", i + 1));
         }
@@ -115,7 +118,11 @@ fn parse_splits(c: &Connection, v: &Value, total: i64) -> R<Option<Vec<SplitLine
         check_category(c, cat)?;
         let memo = clean_text(&gs(s, "memo").unwrap_or_default(), 500, "Split memo")?;
         sum = sum.checked_add(amount).ok_or("split total overflow")?;
-        out.push(SplitLine { category_id: cat, amount, memo });
+        out.push(SplitLine {
+            category_id: cat,
+            amount,
+            memo,
+        });
     }
     if sum != total {
         return Err(format!("Split lines add up to {sum} but the transaction is {total} (minor units). They must match exactly."));
@@ -124,7 +131,8 @@ fn parse_splits(c: &Connection, v: &Value, total: i64) -> R<Option<Vec<SplitLine
 }
 
 fn write_splits(c: &Connection, txn: i64, lines: &[SplitLine]) -> R<()> {
-    c.execute("DELETE FROM splits WHERE txn_id = ?1", [txn]).map_err(err)?;
+    c.execute("DELETE FROM splits WHERE txn_id = ?1", [txn])
+        .map_err(err)?;
     for l in lines {
         c.execute(
             "INSERT INTO splits (txn_id, category_id, amount, memo) VALUES (?1, ?2, ?3, ?4)",
@@ -169,7 +177,15 @@ pub(crate) fn insert_plain(c: &Connection, t: &NewTxn) -> R<i64> {
     Ok(c.last_insert_rowid())
 }
 
-pub(crate) fn insert_transfer(c: &Connection, from: i64, to: i64, date: &str, amount: i64, memo: &str, status: &str) -> R<(i64, i64)> {
+pub(crate) fn insert_transfer(
+    c: &Connection,
+    from: i64,
+    to: i64,
+    date: &str,
+    amount: i64,
+    memo: &str,
+    status: &str,
+) -> R<(i64, i64)> {
     if from == to {
         return Err("Choose two different accounts for a transfer".into());
     }
@@ -194,7 +210,11 @@ pub(crate) fn insert_transfer(c: &Connection, from: i64, to: i64, date: &str, am
     )
     .map_err(err)?;
     let b = c.last_insert_rowid();
-    c.execute("UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2", params![b, a]).map_err(err)?;
+    c.execute(
+        "UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2",
+        params![b, a],
+    )
+    .map_err(err)?;
     Ok((a, b))
 }
 
@@ -209,17 +229,29 @@ impl Ledger {
             Some("status") => "t.status",
             _ => "t.date",
         };
-        let dir = if gs(p, "dir").as_deref() == Some("asc") { "ASC" } else { "DESC" };
+        let dir = if gs(p, "dir").as_deref() == Some("asc") {
+            "ASC"
+        } else {
+            "DESC"
+        };
         let limit = gi(p, "limit").unwrap_or(500).clamp(1, 5000);
         let offset = gi(p, "offset").unwrap_or(0).max(0);
         let sql = format!("{TXN_SELECT} {where_sql} ORDER BY {sort_col} {dir}, t.id {dir} LIMIT {limit} OFFSET {offset}");
         let mut st = self.conn.prepare(&sql).map_err(err)?;
-        let rows = st.query_map(params_from_iter(binds.iter()), txn_row).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
+        let rows = st
+            .query_map(params_from_iter(binds.iter()), txn_row)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
         let agg_sql = format!(
             "SELECT COUNT(*), COALESCE(SUM(t.amount), 0) FROM transactions t JOIN accounts a ON a.id = t.account_id LEFT JOIN categories c ON c.id = t.category_id {where_sql}"
         );
-        let (total, sum): (i64, i64) =
-            self.conn.query_row(&agg_sql, params_from_iter(binds.iter()), |r| Ok((r.get(0)?, r.get(1)?))).map_err(err)?;
+        let (total, sum): (i64, i64) = self
+            .conn
+            .query_row(&agg_sql, params_from_iter(binds.iter()), |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .map_err(err)?;
         Ok(json!({ "rows": rows, "total": total, "sum": sum }))
     }
 
@@ -262,10 +294,18 @@ impl Ledger {
         let tx = self.conn.transaction().map_err(err)?;
         let splits = parse_splits(&tx, p, amount)?;
         let split_lines = splits.filter(|s| !s.is_empty());
-        let t = NewTxn { category_id: if split_lines.is_some() { None } else { t.category_id }, ..t };
+        let t = NewTxn {
+            category_id: if split_lines.is_some() {
+                None
+            } else {
+                t.category_id
+            },
+            ..t
+        };
         let id = insert_plain(&tx, &t)?;
         if let Some(lines) = &split_lines {
-            tx.execute("UPDATE transactions SET is_split = 1 WHERE id = ?1", [id]).map_err(err)?;
+            tx.execute("UPDATE transactions SET is_split = 1 WHERE id = ?1", [id])
+                .map_err(err)?;
             write_splits(&tx, id, lines)?;
         }
         audit(
@@ -291,7 +331,13 @@ impl Ledger {
         }
         let tx = self.conn.transaction().map_err(err)?;
         let (a, b) = insert_transfer(&tx, from, to, &date, amount, &memo, &status)?;
-        audit(&tx, "create", "transfer", Some(a), json!({ "from": from, "to": to, "amount": amount, "date": date, "peer": b }))?;
+        audit(
+            &tx,
+            "create",
+            "transfer",
+            Some(a),
+            json!({ "from": from, "to": to, "amount": amount, "date": date, "peer": b }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": a, "peerId": b }))
     }
@@ -301,7 +347,9 @@ impl Ledger {
         let confirm = gb(p, "confirmReconciled") == Some(true);
         let tx = self.conn.transaction().map_err(err)?;
         let ex = load(&tx, id)?;
-        let money_fields = ["amount", "date", "accountId", "categoryId", "splits"].iter().any(|k| p.get(*k).is_some());
+        let money_fields = ["amount", "date", "accountId", "categoryId", "splits"]
+            .iter()
+            .any(|k| p.get(*k).is_some());
         if ex.status == "reconciled" && money_fields && !confirm {
             return Err("RECONCILED: this transaction is reconciled. Confirm to change it; the account will no longer match its last statement.".into());
         }
@@ -314,14 +362,21 @@ impl Ledger {
             if pe.status == "reconciled" && money_fields && !confirm {
                 return Err("RECONCILED: the other side of this transfer is reconciled. Confirm to change it.".into());
             }
-            if p.get("categoryId").is_some() || p.get("splits").is_some() || p.get("accountId").is_some() {
+            if p.get("categoryId").is_some()
+                || p.get("splits").is_some()
+                || p.get("accountId").is_some()
+            {
                 return Err("Transfers have no category and can't move accounts; delete and re-create it instead".into());
             }
             if let Some(d) = gs(p, "date") {
                 if !dates::is_valid(&d) {
                     return Err(format!("'{d}' is not a valid date"));
                 }
-                tx.execute("UPDATE transactions SET date = ?1, updated_at = ?2 WHERE id IN (?3, ?4)", params![d, now, id, peer]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET date = ?1, updated_at = ?2 WHERE id IN (?3, ?4)",
+                    params![d, now, id, peer],
+                )
+                .map_err(err)?;
                 changed.insert("date".into(), json!(d));
             }
             if let Some(a) = gi(p, "amount") {
@@ -329,13 +384,25 @@ impl Ledger {
                     return Err("Amount can't be zero".into());
                 }
                 // Keep this side's direction; the other side is always the negation.
-                tx.execute("UPDATE transactions SET amount = ?1, updated_at = ?2 WHERE id = ?3", params![a, now, id]).map_err(err)?;
-                tx.execute("UPDATE transactions SET amount = ?1, updated_at = ?2 WHERE id = ?3", params![-a, now, peer]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET amount = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![a, now, id],
+                )
+                .map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET amount = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![-a, now, peer],
+                )
+                .map_err(err)?;
                 changed.insert("amount".into(), json!({ "from": ex.amount, "to": a }));
             }
             if let Some(m) = gs(p, "memo") {
                 let m = clean_text(&m, 2000, "Notes")?;
-                tx.execute("UPDATE transactions SET memo = ?1, updated_at = ?2 WHERE id IN (?3, ?4)", params![m, now, id, peer]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET memo = ?1, updated_at = ?2 WHERE id IN (?3, ?4)",
+                    params![m, now, id, peer],
+                )
+                .map_err(err)?;
                 changed.insert("memo".into(), json!(m));
             }
         } else {
@@ -350,17 +417,29 @@ impl Ledger {
                 if !dates::is_valid(&d) {
                     return Err(format!("'{d}' is not a valid date"));
                 }
-                tx.execute("UPDATE transactions SET date = ?1 WHERE id = ?2", params![d, id]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET date = ?1 WHERE id = ?2",
+                    params![d, id],
+                )
+                .map_err(err)?;
                 changed.insert("date".into(), json!(d));
             }
             if let Some(py) = gs(p, "payee") {
                 let py = clean_text(&py, 200, "Payee")?;
-                tx.execute("UPDATE transactions SET payee = ?1 WHERE id = ?2", params![py, id]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET payee = ?1 WHERE id = ?2",
+                    params![py, id],
+                )
+                .map_err(err)?;
                 changed.insert("payee".into(), json!(py));
             }
             if let Some(m) = gs(p, "memo") {
                 let m = clean_text(&m, 2000, "Notes")?;
-                tx.execute("UPDATE transactions SET memo = ?1 WHERE id = ?2", params![m, id]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET memo = ?1 WHERE id = ?2",
+                    params![m, id],
+                )
+                .map_err(err)?;
                 changed.insert("memo".into(), json!(m));
             }
             let amount = gi(p, "amount").unwrap_or(ex.amount);
@@ -368,21 +447,34 @@ impl Ledger {
                 return Err("Amount can't be zero".into());
             }
             if amount != ex.amount {
-                tx.execute("UPDATE transactions SET amount = ?1 WHERE id = ?2", params![amount, id]).map_err(err)?;
+                tx.execute(
+                    "UPDATE transactions SET amount = ?1 WHERE id = ?2",
+                    params![amount, id],
+                )
+                .map_err(err)?;
                 changed.insert("amount".into(), json!({ "from": ex.amount, "to": amount }));
             }
             match parse_splits(&tx, p, amount)? {
                 Some(lines) if !lines.is_empty() => {
-                    tx.execute("UPDATE transactions SET is_split = 1, category_id = NULL WHERE id = ?1", [id]).map_err(err)?;
+                    tx.execute(
+                        "UPDATE transactions SET is_split = 1, category_id = NULL WHERE id = ?1",
+                        [id],
+                    )
+                    .map_err(err)?;
                     write_splits(&tx, id, &lines)?;
                     changed.insert("splitLines".into(), json!(lines.len()));
                 }
                 Some(_) => {
                     // Explicit un-split: lines removed, single category (or none) applies.
-                    tx.execute("DELETE FROM splits WHERE txn_id = ?1", [id]).map_err(err)?;
+                    tx.execute("DELETE FROM splits WHERE txn_id = ?1", [id])
+                        .map_err(err)?;
                     let cat = opt_id(p, "categoryId");
                     check_category(&tx, cat)?;
-                    tx.execute("UPDATE transactions SET is_split = 0, category_id = ?1 WHERE id = ?2", params![cat, id]).map_err(err)?;
+                    tx.execute(
+                        "UPDATE transactions SET is_split = 0, category_id = ?1 WHERE id = ?2",
+                        params![cat, id],
+                    )
+                    .map_err(err)?;
                     changed.insert("splitLines".into(), json!(0));
                 }
                 None => {
@@ -395,18 +487,32 @@ impl Ledger {
                         }
                         let cat = opt_id(p, "categoryId");
                         check_category(&tx, cat)?;
-                        tx.execute("UPDATE transactions SET category_id = ?1 WHERE id = ?2", params![cat, id]).map_err(err)?;
+                        tx.execute(
+                            "UPDATE transactions SET category_id = ?1 WHERE id = ?2",
+                            params![cat, id],
+                        )
+                        .map_err(err)?;
                         changed.insert("categoryId".into(), json!(cat));
                     }
                 }
             }
-            tx.execute("UPDATE transactions SET updated_at = ?1 WHERE id = ?2", params![now, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE transactions SET updated_at = ?1 WHERE id = ?2",
+                params![now, id],
+            )
+            .map_err(err)?;
         }
         if let Some(s) = gs(p, "status") {
             set_status_inner(&tx, &[id], &s, confirm)?;
             changed.insert("status".into(), json!(s));
         }
-        audit(&tx, "update", "transaction", Some(id), Value::Object(changed))?;
+        audit(
+            &tx,
+            "update",
+            "transaction",
+            Some(id),
+            Value::Object(changed),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -432,12 +538,30 @@ impl Ledger {
                     }
                 }
             }
-            let snapshot = tx.query_row(&format!("{TXN_SELECT} WHERE t.id = ?1"), [*id], txn_row).map_err(err)?;
-            tx.execute("UPDATE transactions SET transfer_peer = NULL WHERE id IN (?1, ?2)", params![targets[0], targets.get(1).copied().unwrap_or(-1)]).map_err(err)?;
+            let snapshot = tx
+                .query_row(&format!("{TXN_SELECT} WHERE t.id = ?1"), [*id], txn_row)
+                .map_err(err)?;
+            tx.execute(
+                "UPDATE transactions SET transfer_peer = NULL WHERE id IN (?1, ?2)",
+                params![targets[0], targets.get(1).copied().unwrap_or(-1)],
+            )
+            .map_err(err)?;
             for t in &targets {
-                deleted += tx.execute("DELETE FROM transactions WHERE id = ?1", [*t]).map_err(err)?;
+                deleted += tx
+                    .execute("DELETE FROM transactions WHERE id = ?1", [*t])
+                    .map_err(err)?;
             }
-            audit(&tx, "delete", if ex.is_transfer { "transfer" } else { "transaction" }, Some(*id), snapshot)?;
+            audit(
+                &tx,
+                "delete",
+                if ex.is_transfer {
+                    "transfer"
+                } else {
+                    "transaction"
+                },
+                Some(*id),
+                snapshot,
+            )?;
         }
         tx.commit().map_err(err)?;
         Ok(json!({ "deleted": deleted }))
@@ -449,7 +573,13 @@ impl Ledger {
         let confirm = gb(p, "confirmReconciled") == Some(true);
         let tx = self.conn.transaction().map_err(err)?;
         let n = set_status_inner(&tx, &list, &status, confirm)?;
-        audit(&tx, "status", "transaction", None, json!({ "ids": list, "status": status }))?;
+        audit(
+            &tx,
+            "status",
+            "transaction",
+            None,
+            json!({ "ids": list, "status": status }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "updated": n }))
     }
@@ -473,9 +603,20 @@ impl Ledger {
             if ex.status == "reconciled" && !confirm {
                 return Err("RECONCILED: one or more selected transactions are reconciled. Confirm to change them.".into());
             }
-            n += tx.execute("UPDATE transactions SET category_id = ?1, updated_at = ?2 WHERE id = ?3", params![cat, now_ms(), id]).map_err(err)?;
+            n += tx
+                .execute(
+                    "UPDATE transactions SET category_id = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![cat, now_ms(), id],
+                )
+                .map_err(err)?;
         }
-        audit(&tx, "categorize", "transaction", None, json!({ "ids": list, "categoryId": cat }))?;
+        audit(
+            &tx,
+            "categorize",
+            "transaction",
+            None,
+            json!({ "ids": list, "categoryId": cat }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "updated": n }))
     }
@@ -501,9 +642,18 @@ impl Ledger {
 
     /// Store a receipt inside the ledger (so backups carry it). Called by the
     /// shell after the user picks a file in a native dialog.
-    pub fn attachment_add(&mut self, txn_id: i64, file_name: &str, mime: &str, data: &[u8]) -> R<Value> {
+    pub fn attachment_add(
+        &mut self,
+        txn_id: i64,
+        file_name: &str,
+        mime: &str,
+        data: &[u8],
+    ) -> R<Value> {
         if data.len() > MAX_ATTACHMENT {
-            return Err(format!("Receipts are limited to {} MB", MAX_ATTACHMENT / 1024 / 1024));
+            return Err(format!(
+                "Receipts are limited to {} MB",
+                MAX_ATTACHMENT / 1024 / 1024
+            ));
         }
         if data.is_empty() {
             return Err("That file is empty".into());
@@ -517,7 +667,13 @@ impl Ledger {
         )
         .map_err(err)?;
         let id = tx.last_insert_rowid();
-        audit(&tx, "attach", "transaction", Some(txn_id), json!({ "attachmentId": id, "fileName": name, "size": data.len() }))?;
+        audit(
+            &tx,
+            "attach",
+            "transaction",
+            Some(txn_id),
+            json!({ "attachmentId": id, "fileName": name, "size": data.len() }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -538,7 +694,11 @@ impl Ledger {
     /// Raw bytes for an attachment (the shell uses this to save a copy).
     pub fn attachment_bytes(&self, id: i64) -> R<(String, String, Vec<u8>)> {
         self.conn
-            .query_row("SELECT file_name, mime, data FROM attachments WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .query_row(
+                "SELECT file_name, mime, data FROM attachments WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
             .optional()
             .map_err(err)?
             .ok_or_else(|| format!("attachment {id} does not exist"))
@@ -547,16 +707,32 @@ impl Ledger {
     pub(crate) fn attachment_get(&self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let (name, mime, data) = self.attachment_bytes(id)?;
-        Ok(json!({ "id": id, "fileName": name, "mime": mime, "base64": base64::engine::general_purpose::STANDARD.encode(data) }))
+        Ok(
+            json!({ "id": id, "fileName": name, "mime": mime, "base64": base64::engine::general_purpose::STANDARD.encode(data) }),
+        )
     }
 
     pub(crate) fn attachment_delete(&mut self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let row: Option<(i64, String)> = tx.query_row("SELECT txn_id, file_name FROM attachments WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(err)?;
+        let row: Option<(i64, String)> = tx
+            .query_row(
+                "SELECT txn_id, file_name FROM attachments WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
         let (txn, name) = row.ok_or_else(|| format!("attachment {id} does not exist"))?;
-        tx.execute("DELETE FROM attachments WHERE id = ?1", [id]).map_err(err)?;
-        audit(&tx, "detach", "transaction", Some(txn), json!({ "attachmentId": id, "fileName": name }))?;
+        tx.execute("DELETE FROM attachments WHERE id = ?1", [id])
+            .map_err(err)?;
+        audit(
+            &tx,
+            "detach",
+            "transaction",
+            Some(txn),
+            json!({ "attachmentId": id, "fileName": name }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -590,7 +766,19 @@ impl Ledger {
         Ok(Value::Array(rows))
     }
 
-    fn recurring_validate(c: &Connection, p: &Value) -> R<(i64, Option<i64>, String, String, i64, Option<i64>, String, String)> {
+    fn recurring_validate(
+        c: &Connection,
+        p: &Value,
+    ) -> R<(
+        i64,
+        Option<i64>,
+        String,
+        String,
+        i64,
+        Option<i64>,
+        String,
+        String,
+    )> {
         let acc = req_i(p, "accountId")?;
         Ledger::account_active(c, acc)?;
         let to = opt_id(p, "transferAccountId");
@@ -604,7 +792,11 @@ impl Ledger {
         if amount == 0 || (to.is_some() && amount < 0) {
             return Err("Enter a non-zero amount (transfers use a positive amount)".into());
         }
-        let cat = if to.is_some() { None } else { opt_id(p, "categoryId") };
+        let cat = if to.is_some() {
+            None
+        } else {
+            opt_id(p, "categoryId")
+        };
         check_category(c, cat)?;
         let freq = req_s(p, "frequency")?;
         if !["weekly", "biweekly", "monthly", "quarterly", "yearly"].contains(&freq.as_str()) {
@@ -635,7 +827,13 @@ impl Ledger {
         )
         .map_err(err)?;
         let id = tx.last_insert_rowid();
-        audit(&tx, "create", "recurring", Some(id), json!({ "accountId": acc, "amount": amount, "frequency": freq, "nextDate": next }))?;
+        audit(
+            &tx,
+            "create",
+            "recurring",
+            Some(id),
+            json!({ "accountId": acc, "amount": amount, "frequency": freq, "nextDate": next }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -653,7 +851,13 @@ impl Ledger {
         if n == 0 {
             return Err(format!("scheduled transaction {id} does not exist"));
         }
-        audit(&tx, "update", "recurring", Some(id), json!({ "amount": amount, "frequency": freq, "nextDate": next }))?;
+        audit(
+            &tx,
+            "update",
+            "recurring",
+            Some(id),
+            json!({ "amount": amount, "frequency": freq, "nextDate": next }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -661,7 +865,8 @@ impl Ledger {
     pub(crate) fn recurring_delete(&mut self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
-        tx.execute("DELETE FROM recurring WHERE id = ?1", [id]).map_err(err)?;
+        tx.execute("DELETE FROM recurring WHERE id = ?1", [id])
+            .map_err(err)?;
         audit(&tx, "delete", "recurring", Some(id), json!({}))?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
@@ -669,7 +874,11 @@ impl Ledger {
 
     fn recurring_advance(c: &Connection, id: i64) -> R<(String, String)> {
         let (freq, next): (String, String) = c
-            .query_row("SELECT frequency, next_date FROM recurring WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .query_row(
+                "SELECT frequency, next_date FROM recurring WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .optional()
             .map_err(err)?
             .ok_or_else(|| format!("scheduled transaction {id} does not exist"))?;
@@ -681,7 +890,11 @@ impl Ledger {
             _ => dates::add_months(&next, 12),
         }
         .ok_or("bad schedule date")?;
-        c.execute("UPDATE recurring SET next_date = ?1 WHERE id = ?2", params![following, id]).map_err(err)?;
+        c.execute(
+            "UPDATE recurring SET next_date = ?1 WHERE id = ?2",
+            params![following, id],
+        )
+        .map_err(err)?;
         Ok((next, following))
     }
 
@@ -701,9 +914,27 @@ impl Ledger {
         let date = gs(p, "date").filter(|d| dates::is_valid(d)).unwrap_or(date);
         let txn = match to {
             Some(t) => insert_transfer(&tx, acc, t, &date, amount, &memo, "uncleared")?.0,
-            None => insert_plain(&tx, &NewTxn { account_id: acc, date: date.clone(), payee, memo, amount, category_id: cat, status: "uncleared".into(), import_id: None })?,
+            None => insert_plain(
+                &tx,
+                &NewTxn {
+                    account_id: acc,
+                    date: date.clone(),
+                    payee,
+                    memo,
+                    amount,
+                    category_id: cat,
+                    status: "uncleared".into(),
+                    import_id: None,
+                },
+            )?,
         };
-        audit(&tx, "post", "recurring", Some(id), json!({ "transactionId": txn, "date": date, "nextDate": following }))?;
+        audit(
+            &tx,
+            "post",
+            "recurring",
+            Some(id),
+            json!({ "transactionId": txn, "date": date, "nextDate": following }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "transactionId": txn, "nextDate": following }))
     }
@@ -712,13 +943,24 @@ impl Ledger {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
         let (skipped, following) = Self::recurring_advance(&tx, id)?;
-        audit(&tx, "skip", "recurring", Some(id), json!({ "skipped": skipped, "nextDate": following }))?;
+        audit(
+            &tx,
+            "skip",
+            "recurring",
+            Some(id),
+            json!({ "skipped": skipped, "nextDate": following }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "nextDate": following }))
     }
 }
 
-pub(crate) fn set_status_inner(c: &Connection, list: &[i64], status: &str, confirm: bool) -> R<usize> {
+pub(crate) fn set_status_inner(
+    c: &Connection,
+    list: &[i64],
+    status: &str,
+    confirm: bool,
+) -> R<usize> {
     if status != "uncleared" && status != "cleared" {
         return Err("Status can be set to uncleared or cleared; reconciled is set by finishing a reconciliation".into());
     }
@@ -765,7 +1007,9 @@ pub(crate) fn txn_filters(p: &Value) -> (String, Vec<Sql>) {
         w.push("t.date <= ?".into());
         b.push(Sql::Text(t));
     }
-    if let Some(s) = gs(p, "status").filter(|s| ["uncleared", "cleared", "reconciled"].contains(&s.as_str())) {
+    if let Some(s) =
+        gs(p, "status").filter(|s| ["uncleared", "cleared", "reconciled"].contains(&s.as_str()))
+    {
         w.push("t.status = ?".into());
         b.push(Sql::Text(s));
     }
@@ -775,8 +1019,16 @@ pub(crate) fn txn_filters(p: &Value) -> (String, Vec<Sql>) {
         Some("transfer") => w.push("t.is_transfer = 1".into()),
         _ => {}
     }
-    if let Some(q) = gs(p, "search").map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
-        let like = format!("%{}%", q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
+    if let Some(q) = gs(p, "search")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        let like = format!(
+            "%{}%",
+            q.replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
+        );
         let mut clause = "(t.payee LIKE ? ESCAPE '\\' OR t.memo LIKE ? ESCAPE '\\' OR a.name LIKE ? ESCAPE '\\' OR COALESCE(c.name,'') LIKE ? ESCAPE '\\'".to_string();
         for _ in 0..4 {
             b.push(Sql::Text(like.clone()));
@@ -791,6 +1043,10 @@ pub(crate) fn txn_filters(p: &Value) -> (String, Vec<Sql>) {
     if gb(p, "hasAttachment") == Some(true) {
         w.push("EXISTS (SELECT 1 FROM attachments x WHERE x.txn_id = t.id)".into());
     }
-    let sql = if w.is_empty() { String::new() } else { format!("WHERE {}", w.join(" AND ")) };
+    let sql = if w.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", w.join(" AND "))
+    };
     (sql, b)
 }

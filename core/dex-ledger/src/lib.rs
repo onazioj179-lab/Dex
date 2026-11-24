@@ -73,12 +73,18 @@ pub(crate) fn opt_id(v: &Value, k: &str) -> Option<i64> {
     gi(v, k)
 }
 pub(crate) fn ids(v: &Value, k: &str) -> Vec<i64> {
-    v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default()
+    v.get(k)
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
+        .unwrap_or_default()
 }
 
 pub(crate) fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 pub(crate) fn clean_text(s: &str, max: usize, what: &str) -> R<String> {
@@ -89,7 +95,13 @@ pub(crate) fn clean_text(s: &str, max: usize, what: &str) -> R<String> {
     Ok(t.to_string())
 }
 
-pub(crate) fn audit(c: &Connection, action: &str, entity: &str, id: Option<i64>, detail: Value) -> R<()> {
+pub(crate) fn audit(
+    c: &Connection,
+    action: &str,
+    entity: &str,
+    id: Option<i64>,
+    detail: Value,
+) -> R<()> {
     c.execute(
         "INSERT INTO audit_log (ts, action, entity, entity_id, detail) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![now_ms(), action, entity, id, detail.to_string()],
@@ -99,7 +111,12 @@ pub(crate) fn audit(c: &Connection, action: &str, entity: &str, id: Option<i64>,
 }
 
 pub(crate) fn setting(c: &Connection, key: &str) -> Option<String> {
-    c.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).optional().ok().flatten()
+    c.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
+    .ok()
+    .flatten()
 }
 
 pub(crate) fn set_setting(c: &Connection, key: &str, value: &str) -> R<()> {
@@ -112,7 +129,9 @@ pub(crate) fn set_setting(c: &Connection, key: &str, value: &str) -> R<()> {
 }
 
 pub(crate) fn digits(c: &Connection) -> u32 {
-    setting(c, "currency").map(|cur| money::minor_digits(&cur)).unwrap_or(2)
+    setting(c, "currency")
+        .map(|cur| money::minor_digits(&cur))
+        .unwrap_or(2)
 }
 
 pub(crate) const ACCOUNT_KINDS: &[&str] = &["cash", "checking", "savings", "credit", "other"];
@@ -120,10 +139,32 @@ pub(crate) const ACCOUNT_KINDS: &[&str] = &["cash", "checking", "savings", "cred
 /// Default category structure offered at setup. These are empty envelopes, not
 /// financial data: no amounts, no transactions.
 const DEFAULT_GROUPS: &[(&str, &str, &[&str])] = &[
-    ("Everyday", "expense", &["Groceries", "Eating out", "Transport", "Household"]),
-    ("Bills", "expense", &["Rent or mortgage", "Utilities", "Phone & internet", "Insurance", "Subscriptions"]),
-    ("Savings", "expense", &["Emergency fund", "Holidays", "Large purchases"]),
-    ("Personal", "expense", &["Health", "Clothing", "Gifts", "Personal spending"]),
+    (
+        "Everyday",
+        "expense",
+        &["Groceries", "Eating out", "Transport", "Household"],
+    ),
+    (
+        "Bills",
+        "expense",
+        &[
+            "Rent or mortgage",
+            "Utilities",
+            "Phone & internet",
+            "Insurance",
+            "Subscriptions",
+        ],
+    ),
+    (
+        "Savings",
+        "expense",
+        &["Emergency fund", "Holidays", "Large purchases"],
+    ),
+    (
+        "Personal",
+        "expense",
+        &["Health", "Clothing", "Gifts", "Personal spending"],
+    ),
     ("Income", "income", &["Salary", "Other income"]),
 ];
 
@@ -153,9 +194,13 @@ impl Ledger {
             "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 3000;",
         )
         .map_err(err)?;
-        let check: String = conn.query_row("PRAGMA quick_check", [], |r| r.get(0)).map_err(err)?;
+        let check: String = conn
+            .query_row("PRAGMA quick_check", [], |r| r.get(0))
+            .map_err(err)?;
         if check != "ok" {
-            return Err(format!("CORRUPT: the ledger database failed its integrity check ({check})"));
+            return Err(format!(
+                "CORRUPT: the ledger database failed its integrity check ({check})"
+            ));
         }
         Self::from_conn(conn, backup_dir)
     }
@@ -167,7 +212,11 @@ impl Ledger {
 
     fn from_conn(mut conn: Connection, backup_dir: &Path) -> R<Ledger> {
         schema::migrate(&mut conn)?;
-        Ok(Ledger { conn, backup_dir: backup_dir.to_path_buf(), recent_writes: std::collections::VecDeque::new() })
+        Ok(Ledger {
+            conn,
+            backup_dir: backup_dir.to_path_buf(),
+            recent_writes: std::collections::VecDeque::new(),
+        })
     }
 
     /// Route one `ledger:*` channel. Always returns `{ ok, data | error }`.
@@ -280,8 +329,14 @@ impl Ledger {
 
     fn status(&self) -> R<Value> {
         let currency = setting(&self.conn, "currency");
-        let accounts: i64 = self.conn.query_row("SELECT COUNT(*) FROM accounts", [], |r| r.get(0)).map_err(err)?;
-        let txns: i64 = self.conn.query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0)).map_err(err)?;
+        let accounts: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM accounts", [], |r| r.get(0))
+            .map_err(err)?;
+        let txns: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
+            .map_err(err)?;
         Ok(json!({
             "ready": currency.is_some(),
             "currency": currency,
@@ -298,29 +353,53 @@ impl Ledger {
             return Err(format!("'{cur}' is not an ISO 4217 currency code"));
         }
         if setting(&self.conn, "currency").is_some() {
-            return Err("The ledger is already set up. Change the currency in Ledger settings.".into());
+            return Err(
+                "The ledger is already set up. Change the currency in Ledger settings.".into(),
+            );
         }
         let seed = gb(p, "seedCategories").unwrap_or(true);
         let tx = self.conn.transaction().map_err(err)?;
         set_setting(&tx, "currency", &cur)?;
-        let existing: i64 = tx.query_row("SELECT COUNT(*) FROM category_groups", [], |r| r.get(0)).map_err(err)?;
+        let existing: i64 = tx
+            .query_row("SELECT COUNT(*) FROM category_groups", [], |r| r.get(0))
+            .map_err(err)?;
         if seed && existing == 0 {
             for (gi_, (gname, kind, cats)) in DEFAULT_GROUPS.iter().enumerate() {
-                tx.execute("INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)", params![gname, kind, gi_ as i64])
-                    .map_err(err)?;
+                tx.execute(
+                    "INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)",
+                    params![gname, kind, gi_ as i64],
+                )
+                .map_err(err)?;
                 let gid = tx.last_insert_rowid();
                 for (ci, cname) in cats.iter().enumerate() {
-                    tx.execute("INSERT INTO categories (group_id, name, sort) VALUES (?1, ?2, ?3)", params![gid, cname, ci as i64])
-                        .map_err(err)?;
+                    tx.execute(
+                        "INSERT INTO categories (group_id, name, sort) VALUES (?1, ?2, ?3)",
+                        params![gid, cname, ci as i64],
+                    )
+                    .map_err(err)?;
                 }
             }
         } else if existing == 0 {
             // Income always needs a home so received money can be assigned.
-            tx.execute("INSERT INTO category_groups (name, kind, sort) VALUES ('Income', 'income', 99)", []).map_err(err)?;
+            tx.execute(
+                "INSERT INTO category_groups (name, kind, sort) VALUES ('Income', 'income', 99)",
+                [],
+            )
+            .map_err(err)?;
             let gid = tx.last_insert_rowid();
-            tx.execute("INSERT INTO categories (group_id, name) VALUES (?1, 'Income')", [gid]).map_err(err)?;
+            tx.execute(
+                "INSERT INTO categories (group_id, name) VALUES (?1, 'Income')",
+                [gid],
+            )
+            .map_err(err)?;
         }
-        audit(&tx, "setup", "settings", None, json!({ "currency": cur, "seedCategories": seed }))?;
+        audit(
+            &tx,
+            "setup",
+            "settings",
+            None,
+            json!({ "currency": cur, "seedCategories": seed }),
+        )?;
         tx.commit().map_err(err)?;
         self.status()
     }
@@ -348,7 +427,13 @@ impl Ledger {
         }
         let tx = self.conn.transaction().map_err(err)?;
         set_setting(&tx, "currency", &cur)?;
-        audit(&tx, "update", "settings", None, json!({ "currency": { "from": old, "to": cur } }))?;
+        audit(
+            &tx,
+            "update",
+            "settings",
+            None,
+            json!({ "currency": { "from": old, "to": cur } }),
+        )?;
         tx.commit().map_err(err)?;
         self.status()
     }
@@ -357,7 +442,11 @@ impl Ledger {
 
     pub(crate) fn account_active(c: &Connection, id: i64) -> R<String> {
         let row: Option<(String, i64)> = c
-            .query_row("SELECT name, archived FROM accounts WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .query_row(
+                "SELECT name, archived FROM accounts WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .optional()
             .map_err(err)?;
         match row {
@@ -432,14 +521,26 @@ impl Ledger {
         }
         let notes = clean_text(&gs(p, "notes").unwrap_or_default(), 2000, "Notes")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let sort: i64 = tx.query_row("SELECT COALESCE(MAX(sort), -1) + 1 FROM accounts", [], |r| r.get(0)).map_err(err)?;
+        let sort: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(sort), -1) + 1 FROM accounts",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
         tx.execute(
             "INSERT INTO accounts (name, kind, opening_balance, opening_date, notes, sort, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![name, kind, opening, date, notes, sort, now_ms()],
         )
         .map_err(err)?;
         let id = tx.last_insert_rowid();
-        audit(&tx, "create", "account", Some(id), json!({ "name": name, "kind": kind, "openingBalance": opening, "openingDate": date }))?;
+        audit(
+            &tx,
+            "create",
+            "account",
+            Some(id),
+            json!({ "name": name, "kind": kind, "openingBalance": opening, "openingDate": date }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -447,7 +548,10 @@ impl Ledger {
     fn account_update(&mut self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let exists: Option<i64> = tx.query_row("SELECT id FROM accounts WHERE id = ?1", [id], |r| r.get(0)).optional().map_err(err)?;
+        let exists: Option<i64> = tx
+            .query_row("SELECT id FROM accounts WHERE id = ?1", [id], |r| r.get(0))
+            .optional()
+            .map_err(err)?;
         if exists.is_none() {
             return Err(format!("account {id} does not exist"));
         }
@@ -457,36 +561,60 @@ impl Ledger {
             if name.is_empty() {
                 return Err("Account name is required".into());
             }
-            tx.execute("UPDATE accounts SET name = ?1 WHERE id = ?2", params![name, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET name = ?1 WHERE id = ?2",
+                params![name, id],
+            )
+            .map_err(err)?;
             changed.insert("name".into(), json!(name));
         }
         if let Some(kind) = gs(p, "kind") {
             if !ACCOUNT_KINDS.contains(&kind.as_str()) {
                 return Err(format!("unknown account type '{kind}'"));
             }
-            tx.execute("UPDATE accounts SET kind = ?1 WHERE id = ?2", params![kind, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET kind = ?1 WHERE id = ?2",
+                params![kind, id],
+            )
+            .map_err(err)?;
             changed.insert("kind".into(), json!(kind));
         }
         if let Some(notes) = gs(p, "notes") {
             let notes = clean_text(&notes, 2000, "Notes")?;
-            tx.execute("UPDATE accounts SET notes = ?1 WHERE id = ?2", params![notes, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET notes = ?1 WHERE id = ?2",
+                params![notes, id],
+            )
+            .map_err(err)?;
             changed.insert("notes".into(), json!(notes));
         }
         if let Some(ob) = gi(p, "openingBalance") {
             let recon: i64 = tx
-                .query_row("SELECT COUNT(*) FROM reconciliations WHERE account_id = ?1 AND undone = 0", [id], |r| r.get(0))
+                .query_row(
+                    "SELECT COUNT(*) FROM reconciliations WHERE account_id = ?1 AND undone = 0",
+                    [id],
+                    |r| r.get(0),
+                )
                 .map_err(err)?;
             if recon > 0 && gb(p, "confirmReconciled") != Some(true) {
                 return Err("RECONCILED: this account has been reconciled; changing its opening balance changes reconciled balances".into());
             }
-            tx.execute("UPDATE accounts SET opening_balance = ?1 WHERE id = ?2", params![ob, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET opening_balance = ?1 WHERE id = ?2",
+                params![ob, id],
+            )
+            .map_err(err)?;
             changed.insert("openingBalance".into(), json!(ob));
         }
         if let Some(d) = gs(p, "openingDate") {
             if !dates::is_valid(&d) {
                 return Err(format!("'{d}' is not a valid date"));
             }
-            tx.execute("UPDATE accounts SET opening_date = ?1 WHERE id = ?2", params![d, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET opening_date = ?1 WHERE id = ?2",
+                params![d, id],
+            )
+            .map_err(err)?;
             changed.insert("openingDate".into(), json!(d));
         }
         audit(&tx, "update", "account", Some(id), Value::Object(changed))?;
@@ -503,13 +631,28 @@ impl Ledger {
             if bal != 0 {
                 return Err("Only an account with a zero balance can be archived. Transfer or record the remaining balance first.".into());
             }
-            tx.execute("DELETE FROM recurring WHERE account_id = ?1 OR transfer_account_id = ?1", [id]).map_err(err)?;
+            tx.execute(
+                "DELETE FROM recurring WHERE account_id = ?1 OR transfer_account_id = ?1",
+                [id],
+            )
+            .map_err(err)?;
         }
-        let n = tx.execute("UPDATE accounts SET archived = ?1 WHERE id = ?2", params![archived as i64, id]).map_err(err)?;
+        let n = tx
+            .execute(
+                "UPDATE accounts SET archived = ?1 WHERE id = ?2",
+                params![archived as i64, id],
+            )
+            .map_err(err)?;
         if n == 0 {
             return Err(format!("account {id} does not exist"));
         }
-        audit(&tx, if archived { "archive" } else { "unarchive" }, "account", Some(id), json!({}))?;
+        audit(
+            &tx,
+            if archived { "archive" } else { "unarchive" },
+            "account",
+            Some(id),
+            json!({}),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id, "archived": archived }))
     }
@@ -527,10 +670,20 @@ impl Ledger {
         if used > 0 {
             return Err("This account has history. Archive it instead of deleting it.".into());
         }
-        let name: Option<String> = tx.query_row("SELECT name FROM accounts WHERE id = ?1", [id], |r| r.get(0)).optional().map_err(err)?;
+        let name: Option<String> = tx
+            .query_row("SELECT name FROM accounts WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
+            .map_err(err)?;
         let name = name.ok_or_else(|| format!("account {id} does not exist"))?;
-        tx.execute("DELETE FROM recurring WHERE account_id = ?1 OR transfer_account_id = ?1", [id]).map_err(err)?;
-        tx.execute("DELETE FROM accounts WHERE id = ?1", [id]).map_err(err)?;
+        tx.execute(
+            "DELETE FROM recurring WHERE account_id = ?1 OR transfer_account_id = ?1",
+            [id],
+        )
+        .map_err(err)?;
+        tx.execute("DELETE FROM accounts WHERE id = ?1", [id])
+            .map_err(err)?;
         audit(&tx, "delete", "account", Some(id), json!({ "name": name }))?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
@@ -540,7 +693,11 @@ impl Ledger {
         let order = ids(p, "ids");
         let tx = self.conn.transaction().map_err(err)?;
         for (i, id) in order.iter().enumerate() {
-            tx.execute("UPDATE accounts SET sort = ?1 WHERE id = ?2", params![i as i64, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE accounts SET sort = ?1 WHERE id = ?2",
+                params![i as i64, id],
+            )
+            .map_err(err)?;
         }
         tx.commit().map_err(err)?;
         Ok(json!({}))
@@ -565,7 +722,15 @@ impl Ledger {
             .prepare("SELECT id, name, kind, sort, collapsed FROM category_groups ORDER BY kind = 'income', sort, id")
             .map_err(err)?;
         let groups: Vec<(i64, String, String, i64, bool)> = gst
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, i64>(4)? == 1)))
+            .query_map([], |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get::<_, i64>(4)? == 1,
+                ))
+            })
             .map_err(err)?
             .collect::<Result<_, _>>()
             .map_err(err)?;
@@ -609,10 +774,26 @@ impl Ledger {
             return Err("group kind must be expense or income".into());
         }
         let tx = self.conn.transaction().map_err(err)?;
-        let sort: i64 = tx.query_row("SELECT COALESCE(MAX(sort), -1) + 1 FROM category_groups", [], |r| r.get(0)).map_err(err)?;
-        tx.execute("INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)", params![name, kind, sort]).map_err(err)?;
+        let sort: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(sort), -1) + 1 FROM category_groups",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
+        tx.execute(
+            "INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)",
+            params![name, kind, sort],
+        )
+        .map_err(err)?;
         let id = tx.last_insert_rowid();
-        audit(&tx, "create", "group", Some(id), json!({ "name": name, "kind": kind }))?;
+        audit(
+            &tx,
+            "create",
+            "group",
+            Some(id),
+            json!({ "name": name, "kind": kind }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -625,12 +806,20 @@ impl Ledger {
             if name.is_empty() {
                 return Err("Group name is required".into());
             }
-            tx.execute("UPDATE category_groups SET name = ?1 WHERE id = ?2", params![name, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE category_groups SET name = ?1 WHERE id = ?2",
+                params![name, id],
+            )
+            .map_err(err)?;
             audit(&tx, "rename", "group", Some(id), json!({ "name": name }))?;
         }
         if let Some(c) = gb(p, "collapsed") {
             // View state only; not audited.
-            tx.execute("UPDATE category_groups SET collapsed = ?1 WHERE id = ?2", params![c as i64, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE category_groups SET collapsed = ?1 WHERE id = ?2",
+                params![c as i64, id],
+            )
+            .map_err(err)?;
         }
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
@@ -639,11 +828,18 @@ impl Ledger {
     fn group_delete(&mut self, p: &Value) -> R<Value> {
         let id = req_i(p, "id")?;
         let tx = self.conn.transaction().map_err(err)?;
-        let n: i64 = tx.query_row("SELECT COUNT(*) FROM categories WHERE group_id = ?1", [id], |r| r.get(0)).map_err(err)?;
+        let n: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM categories WHERE group_id = ?1",
+                [id],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
         if n > 0 {
             return Err("Move or delete the categories in this group first".into());
         }
-        tx.execute("DELETE FROM category_groups WHERE id = ?1", [id]).map_err(err)?;
+        tx.execute("DELETE FROM category_groups WHERE id = ?1", [id])
+            .map_err(err)?;
         audit(&tx, "delete", "group", Some(id), json!({}))?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
@@ -653,7 +849,11 @@ impl Ledger {
         let order = ids(p, "ids");
         let tx = self.conn.transaction().map_err(err)?;
         for (i, id) in order.iter().enumerate() {
-            tx.execute("UPDATE category_groups SET sort = ?1 WHERE id = ?2", params![i as i64, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE category_groups SET sort = ?1 WHERE id = ?2",
+                params![i as i64, id],
+            )
+            .map_err(err)?;
         }
         tx.commit().map_err(err)?;
         Ok(json!({}))
@@ -667,9 +867,17 @@ impl Ledger {
         }
         let tx = self.conn.transaction().map_err(err)?;
         let sort: i64 = tx
-            .query_row("SELECT COALESCE(MAX(sort), -1) + 1 FROM categories WHERE group_id = ?1", [gid], |r| r.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(sort), -1) + 1 FROM categories WHERE group_id = ?1",
+                [gid],
+                |r| r.get(0),
+            )
             .map_err(err)?;
-        tx.execute("INSERT INTO categories (group_id, name, sort) VALUES (?1, ?2, ?3)", params![gid, name, sort]).map_err(|e| {
+        tx.execute(
+            "INSERT INTO categories (group_id, name, sort) VALUES (?1, ?2, ?3)",
+            params![gid, name, sort],
+        )
+        .map_err(|e| {
             let s = e.to_string();
             if s.contains("UNIQUE") {
                 format!("A category named '{name}' already exists in this group")
@@ -680,7 +888,13 @@ impl Ledger {
             }
         })?;
         let id = tx.last_insert_rowid();
-        audit(&tx, "create", "category", Some(id), json!({ "name": name, "groupId": gid }))?;
+        audit(
+            &tx,
+            "create",
+            "category",
+            Some(id),
+            json!({ "name": name, "groupId": gid }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
     }
@@ -695,27 +909,58 @@ impl Ledger {
             if name.is_empty() {
                 return Err("Category name is required".into());
             }
-            tx.execute("UPDATE categories SET name = ?1 WHERE id = ?2", params![name, id]).map_err(|e| {
-                if e.to_string().contains("UNIQUE") { format!("A category named '{name}' already exists in this group") } else { e.to_string() }
+            tx.execute(
+                "UPDATE categories SET name = ?1 WHERE id = ?2",
+                params![name, id],
+            )
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE") {
+                    format!("A category named '{name}' already exists in this group")
+                } else {
+                    e.to_string()
+                }
             })?;
             changed.insert("name".into(), json!(name));
         }
         if let Some(gid) = gi(p, "groupId") {
-            let gkind: Option<String> = tx.query_row("SELECT kind FROM category_groups WHERE id = ?1", [gid], |r| r.get(0)).optional().map_err(err)?;
+            let gkind: Option<String> = tx
+                .query_row(
+                    "SELECT kind FROM category_groups WHERE id = ?1",
+                    [gid],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(err)?;
             let gkind = gkind.ok_or_else(|| format!("group {gid} does not exist"))?;
             if gkind != kind {
                 return Err("A category can't move between income and expense groups".into());
             }
             let sort: i64 = tx
-                .query_row("SELECT COALESCE(MAX(sort), -1) + 1 FROM categories WHERE group_id = ?1", [gid], |r| r.get(0))
+                .query_row(
+                    "SELECT COALESCE(MAX(sort), -1) + 1 FROM categories WHERE group_id = ?1",
+                    [gid],
+                    |r| r.get(0),
+                )
                 .map_err(err)?;
-            tx.execute("UPDATE categories SET group_id = ?1, sort = ?2 WHERE id = ?3", params![gid, sort, id]).map_err(|e| {
-                if e.to_string().contains("UNIQUE") { "That group already has a category with this name".to_string() } else { e.to_string() }
+            tx.execute(
+                "UPDATE categories SET group_id = ?1, sort = ?2 WHERE id = ?3",
+                params![gid, sort, id],
+            )
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE") {
+                    "That group already has a category with this name".to_string()
+                } else {
+                    e.to_string()
+                }
             })?;
             changed.insert("groupId".into(), json!(gid));
         }
         if let Some(a) = gb(p, "archived") {
-            tx.execute("UPDATE categories SET archived = ?1 WHERE id = ?2", params![a as i64, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE categories SET archived = ?1 WHERE id = ?2",
+                params![a as i64, id],
+            )
+            .map_err(err)?;
             changed.insert("archived".into(), json!(a));
         }
         audit(&tx, "update", "category", Some(id), Value::Object(changed))?;
@@ -739,8 +984,13 @@ impl Ledger {
         if used > 0 {
             return Err("This category has transactions or budgeted amounts. Archive it to hide it instead.".into());
         }
-        tx.execute("UPDATE recurring SET category_id = NULL WHERE category_id = ?1", [id]).map_err(err)?;
-        tx.execute("DELETE FROM categories WHERE id = ?1", [id]).map_err(err)?;
+        tx.execute(
+            "UPDATE recurring SET category_id = NULL WHERE category_id = ?1",
+            [id],
+        )
+        .map_err(err)?;
+        tx.execute("DELETE FROM categories WHERE id = ?1", [id])
+            .map_err(err)?;
         audit(&tx, "delete", "category", Some(id), json!({}))?;
         tx.commit().map_err(err)?;
         Ok(json!({ "id": id }))
@@ -750,7 +1000,11 @@ impl Ledger {
         let order = ids(p, "ids");
         let tx = self.conn.transaction().map_err(err)?;
         for (i, id) in order.iter().enumerate() {
-            tx.execute("UPDATE categories SET sort = ?1 WHERE id = ?2", params![i as i64, id]).map_err(err)?;
+            tx.execute(
+                "UPDATE categories SET sort = ?1 WHERE id = ?2",
+                params![i as i64, id],
+            )
+            .map_err(err)?;
         }
         tx.commit().map_err(err)?;
         Ok(json!({}))
@@ -784,8 +1038,16 @@ impl Ledger {
     /// SQLite integrity + the ledger's own invariants. Read-only: reports
     /// problems, never repairs them silently.
     fn integrity(&self) -> R<Value> {
-        let quick: String = self.conn.query_row("PRAGMA quick_check", [], |r| r.get(0)).map_err(err)?;
-        let fk: i64 = self.conn.query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |r| r.get(0)).map_err(err)?;
+        let quick: String = self
+            .conn
+            .query_row("PRAGMA quick_check", [], |r| r.get(0))
+            .map_err(err)?;
+        let fk: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |r| {
+                r.get(0)
+            })
+            .map_err(err)?;
         let mut issues: Vec<Value> = Vec::new();
         let mut st = self
             .conn
@@ -795,7 +1057,16 @@ impl Ledger {
                   AND t.amount <> COALESCE((SELECT SUM(amount) FROM splits s WHERE s.txn_id = t.id), 0)",
             )
             .map_err(err)?;
-        for row in st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?))).map_err(err)? {
+        for row in st
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, i64>(2)?,
+                ))
+            })
+            .map_err(err)?
+        {
             let (id, a, s) = row.map_err(err)?;
             issues.push(json!({ "kind": "split-mismatch", "transactionId": id, "amount": a, "splitTotal": s }));
         }
@@ -809,7 +1080,9 @@ impl Ledger {
         for row in st.query_map([], |r| r.get::<_, i64>(0)).map_err(err)? {
             issues.push(json!({ "kind": "transfer-mismatch", "transactionId": row.map_err(err)? }));
         }
-        Ok(json!({ "sqlite": quick, "foreignKeyViolations": fk, "issues": issues, "ok": quick == "ok" && fk == 0 && issues.is_empty() }))
+        Ok(
+            json!({ "sqlite": quick, "foreignKeyViolations": fk, "issues": issues, "ok": quick == "ok" && fk == 0 && issues.is_empty() }),
+        )
     }
 }
 

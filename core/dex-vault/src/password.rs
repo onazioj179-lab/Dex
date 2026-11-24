@@ -17,7 +17,13 @@ pub struct GenOptions {
 
 impl Default for GenOptions {
     fn default() -> Self {
-        Self { length: 20, lowercase: true, uppercase: true, numbers: true, symbols: true }
+        Self {
+            length: 20,
+            lowercase: true,
+            uppercase: true,
+            numbers: true,
+            symbols: true,
+        }
     }
 }
 
@@ -52,7 +58,9 @@ pub fn assess_strength(password: &str) -> (u8, String, Vec<String>) {
     let has_lower = password.chars().any(|c| c.is_ascii_lowercase());
     let has_upper = password.chars().any(|c| c.is_ascii_uppercase());
     let has_digit = password.chars().any(|c| c.is_ascii_digit());
-    let has_symbol = password.chars().any(|c| !c.is_alphanumeric() && !c.is_whitespace());
+    let has_symbol = password
+        .chars()
+        .any(|c| !c.is_alphanumeric() && !c.is_whitespace());
     let classes = [has_lower, has_upper, has_digit, has_symbol]
         .iter()
         .filter(|&&b| b)
@@ -111,7 +119,11 @@ mod tests {
 
     #[test]
     fn generates_requested_length_and_pool() {
-        let opts = GenOptions { length: 24, symbols: false, ..Default::default() };
+        let opts = GenOptions {
+            length: 24,
+            symbols: false,
+            ..Default::default()
+        };
         let pw = generate(&opts);
         assert_eq!(pw.chars().count(), 24);
         assert!(pw.chars().all(|c| c.is_ascii_alphanumeric()));

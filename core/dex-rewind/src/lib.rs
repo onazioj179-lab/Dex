@@ -54,7 +54,10 @@ fn primary_app(events: &[ActivityEvent]) -> (String, Vec<String>) {
     let mut ranked: Vec<(&str, usize)> = counts.into_iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
     let ordered: Vec<String> = ranked.iter().map(|(id, _)| id.to_string()).collect();
-    let primary = ordered.first().cloned().unwrap_or_else(|| "unknown".to_string());
+    let primary = ordered
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "unknown".to_string());
     (primary, ordered)
 }
 
@@ -174,7 +177,11 @@ pub fn reconstruct_workspace(events: &[ActivityEvent]) -> ReconstructedWorkspace
         }
     }
 
-    ReconstructedWorkspace { primary_app_id: primary, app_ids, files }
+    ReconstructedWorkspace {
+        primary_app_id: primary,
+        app_ids,
+        files,
+    }
 }
 
 #[cfg(test)]
@@ -257,7 +264,7 @@ mod tests {
     fn reconstruct_orders_apps_and_dedupes_recent_files() {
         let events = vec![
             ev(0, "notes", "open", Some("a.md")),
-            ev(1000, "notes", "edit", Some("a.md")),    // duplicate label
+            ev(1000, "notes", "edit", Some("a.md")), // duplicate label
             ev(2000, "vinx", "open", Some("clip.mp4")),
             ev(3000, "notes", "focus", Some("ignored")), // 'focus' is not an artifact kind
         ];

@@ -165,16 +165,38 @@ pub fn classify_task(prompt: &str) -> TaskFeatures {
     let estimated = estimate_tokens(prompt);
     TaskFeatures {
         needs_vision: any(&[
-            "image", "screenshot", "photo", "picture", "diagram", "chart", "scan", "ocr",
+            "image",
+            "screenshot",
+            "photo",
+            "picture",
+            "diagram",
+            "chart",
+            "scan",
+            "ocr",
         ]),
         needs_tools: any(&[
-            "search the web", "browse", "run this", "execute", "call the api", "fetch the",
+            "search the web",
+            "browse",
+            "run this",
+            "execute",
+            "call the api",
+            "fetch the",
             "look up online",
         ]),
         is_code: prompt.contains("```")
             || any(&[
-                "function", "const ", "class ", "def ", "import ", "#include", "stack trace",
-                "traceback", "compile", "refactor", "segfault", "null pointer",
+                "function",
+                "const ",
+                "class ",
+                "def ",
+                "import ",
+                "#include",
+                "stack trace",
+                "traceback",
+                "compile",
+                "refactor",
+                "segfault",
+                "null pointer",
             ]),
         is_long_context: estimated > LONG_CONTEXT_TOKENS,
         estimated_tokens: estimated,
@@ -300,7 +322,12 @@ mod tests {
     use super::*;
 
     fn cand(id: &str, ctx: u32, vision: bool, tools: bool) -> RouteCandidate {
-        RouteCandidate { id: id.into(), context_window: ctx, vision, tools }
+        RouteCandidate {
+            id: id.into(),
+            context_window: ctx,
+            vision,
+            tools,
+        }
     }
     fn easy() -> TaskFeatures {
         classify_task("what time is it?")
@@ -328,13 +355,19 @@ mod tests {
 
     #[test]
     fn cheapest_prefers_free_local_then_cheap_hosted() {
-        assert_eq!(route_models(RoutingGoal::Cheapest, &easy(), &all())[0], "llama3.1");
+        assert_eq!(
+            route_models(RoutingGoal::Cheapest, &easy(), &all())[0],
+            "llama3.1"
+        );
         let hosted = vec![
             cand("gpt-4o", 128000, true, true),
             cand("gpt-4o-mini", 128000, true, true),
             cand("claude-3-5-sonnet-latest", 200000, true, true),
         ];
-        assert_eq!(route_models(RoutingGoal::Cheapest, &easy(), &hosted)[0], "gpt-4o-mini");
+        assert_eq!(
+            route_models(RoutingGoal::Cheapest, &easy(), &hosted)[0],
+            "gpt-4o-mini"
+        );
     }
 
     #[test]
@@ -342,20 +375,29 @@ mod tests {
         let smart = route_models(
             RoutingGoal::Smartest,
             &easy(),
-            &[cand("claude-3-5-haiku-latest", 200000, false, true), cand("gpt-4o", 128000, true, true)],
+            &[
+                cand("claude-3-5-haiku-latest", 200000, false, true),
+                cand("gpt-4o", 128000, true, true),
+            ],
         );
         assert_eq!(smart[0], "gpt-4o");
         let fast = route_models(
             RoutingGoal::Fastest,
             &easy(),
-            &[cand("gpt-4o", 128000, true, true), cand("gemini-1.5-flash", 1000000, true, true)],
+            &[
+                cand("gpt-4o", 128000, true, true),
+                cand("gemini-1.5-flash", 1000000, true, true),
+            ],
         );
         assert_eq!(fast[0], "gemini-1.5-flash");
     }
 
     #[test]
     fn offline_keeps_only_local() {
-        assert_eq!(route_models(RoutingGoal::Offline, &easy(), &all()), vec!["llama3.1"]);
+        assert_eq!(
+            route_models(RoutingGoal::Offline, &easy(), &all()),
+            vec!["llama3.1"]
+        );
         assert!(route_models(
             RoutingGoal::Offline,
             &easy(),
@@ -370,7 +412,10 @@ mod tests {
         let r = route_models(
             RoutingGoal::Smartest,
             &vision,
-            &[cand("claude-3-5-haiku-latest", 200000, false, true), cand("gpt-4o", 128000, true, true)],
+            &[
+                cand("claude-3-5-haiku-latest", 200000, false, true),
+                cand("gpt-4o", 128000, true, true),
+            ],
         );
         assert_eq!(r, vec!["gpt-4o"]);
     }
@@ -381,7 +426,10 @@ mod tests {
         let r = route_models(
             RoutingGoal::Smartest,
             &big,
-            &[cand("gpt-4o", 128000, true, true), cand("gemini-1.5-flash", 1000000, true, true)],
+            &[
+                cand("gpt-4o", 128000, true, true),
+                cand("gemini-1.5-flash", 1000000, true, true),
+            ],
         );
         assert_eq!(r, vec!["gemini-1.5-flash"]);
     }
@@ -390,11 +438,25 @@ mod tests {
     fn auto_favours_frontier_for_code_and_cheap_for_easy() {
         let code = classify_task("refactor this ```ts\nfunction f(){}\n```");
         assert_eq!(
-            route_models(RoutingGoal::Auto, &code, &[cand("gpt-4o-mini", 128000, true, true), cand("gpt-4o", 128000, true, true)])[0],
+            route_models(
+                RoutingGoal::Auto,
+                &code,
+                &[
+                    cand("gpt-4o-mini", 128000, true, true),
+                    cand("gpt-4o", 128000, true, true)
+                ]
+            )[0],
             "gpt-4o"
         );
         assert_eq!(
-            route_models(RoutingGoal::Auto, &easy(), &[cand("gpt-4o", 128000, true, true), cand("gpt-4o-mini", 128000, true, true)])[0],
+            route_models(
+                RoutingGoal::Auto,
+                &easy(),
+                &[
+                    cand("gpt-4o", 128000, true, true),
+                    cand("gpt-4o-mini", 128000, true, true)
+                ]
+            )[0],
             "gpt-4o-mini"
         );
     }
@@ -412,9 +474,10 @@ mod tests {
     #[test]
     fn candidates_deserialize_from_camelcase_json() {
         // The renderer sends camelCase keys (contextWindow); ensure they bind.
-        let c: RouteCandidate =
-            serde_json::from_str(r#"{"id":"gpt-4o","contextWindow":128000,"vision":true,"tools":true}"#)
-                .unwrap();
+        let c: RouteCandidate = serde_json::from_str(
+            r#"{"id":"gpt-4o","contextWindow":128000,"vision":true,"tools":true}"#,
+        )
+        .unwrap();
         assert_eq!(c.context_window, 128000);
         assert_eq!(c.id, "gpt-4o");
     }

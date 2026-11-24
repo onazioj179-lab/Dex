@@ -17,7 +17,9 @@ use rayon::prelude::*;
 fn io_pool() -> &'static rayon::ThreadPool {
     static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
-        let n = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let n = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         rayon::ThreadPoolBuilder::new()
             .num_threads((n / 2).max(2))
             .thread_name(|i| format!("dex-scanner-io-{i}"))
@@ -44,8 +46,15 @@ pub struct DupGroup {
 /// and waste the hashing budget. Dot-dirs (.git, ...) are skipped separately.
 /// (Kept in sync with dex-search's SKIP_DIRS so the two native walks agree.)
 const SKIP_DIRS: &[&str] = &[
-    "node_modules", "$recycle.bin", "target", "dist", "build", "out",
-    "coverage", "vendor", "__pycache__",
+    "node_modules",
+    "$recycle.bin",
+    "target",
+    "dist",
+    "build",
+    "out",
+    "coverage",
+    "vendor",
+    "__pycache__",
 ];
 
 /// True when `path` sits inside a directory the walk never descends into
@@ -139,12 +148,14 @@ pub fn find_duplicates(root: &Path, max: usize) -> Vec<DupGroup> {
         .filter(|(_, ps)| ps.len() >= 2)
         .flat_map(|(size, ps)| ps.into_iter().map(move |p| (size, p)))
         .collect();
-    let hashed: Vec<(u64, String, String)> = io_pool().install(|| candidates
-        .par_iter()
-        .filter_map(|(size, p)| {
-            hash_file(p).map(|h| (*size, h, p.to_string_lossy().to_string()))
-        })
-        .collect());
+    let hashed: Vec<(u64, String, String)> = io_pool().install(|| {
+        candidates
+            .par_iter()
+            .filter_map(|(size, p)| {
+                hash_file(p).map(|h| (*size, h, p.to_string_lossy().to_string()))
+            })
+            .collect()
+    });
 
     // Regroup by (size, hash); a group of >=2 identical files is a duplicate set.
     let mut by_sh: HashMap<(u64, String), Vec<String>> = HashMap::new();
@@ -199,7 +210,10 @@ pub struct TypeGroup {
 pub fn group_by_type(root: &Path, max: usize) -> Vec<TypeGroup> {
     let mut map: HashMap<&'static str, (usize, u64, Vec<String>)> = HashMap::new();
     for (path, size, _modified) in walk(root, max) {
-        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         let entry = map.entry(categorize(&name)).or_default();
         entry.0 += 1;
         entry.1 += size;
@@ -241,7 +255,10 @@ pub fn scan_snapshot(root: &Path, max: usize) -> Snapshot {
     walk(root, max)
         .into_iter()
         .map(|(path, size, modified)| {
-            (path.to_string_lossy().to_string(), FileStamp { size, modified })
+            (
+                path.to_string_lossy().to_string(),
+                FileStamp { size, modified },
+            )
         })
         .collect()
 }
@@ -290,21 +307,45 @@ mod tests {
     #[test]
     fn ignored_under_skips_build_dirs_and_dot_dirs_below_root() {
         let root = Path::new("C:/Users/u/Documents");
-        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/app/node_modules/x/i.js")));
-        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/rs/target/release/a.o")));
-        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/repo/.git/index")));
-        assert!(is_ignored_under(root, Path::new("C:/Users/u/Documents/web/Dist/main.js")));
-        assert!(!is_ignored_under(root, Path::new("C:/Users/u/Documents/notes/todo.txt")));
-        assert!(!is_ignored_under(root, Path::new("C:/Users/u/Documents/targets.txt")));
+        assert!(is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/app/node_modules/x/i.js")
+        ));
+        assert!(is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/rs/target/release/a.o")
+        ));
+        assert!(is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/repo/.git/index")
+        ));
+        assert!(is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/web/Dist/main.js")
+        ));
+        assert!(!is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/notes/todo.txt")
+        ));
+        assert!(!is_ignored_under(
+            root,
+            Path::new("C:/Users/u/Documents/targets.txt")
+        ));
     }
 
     #[test]
     fn ignored_under_judges_only_components_below_root() {
         // A home folder literally named "build" must not hide everything.
         let root = Path::new("C:/Users/build/Documents");
-        assert!(!is_ignored_under(root, Path::new("C:/Users/build/Documents/report.docx")));
+        assert!(!is_ignored_under(
+            root,
+            Path::new("C:/Users/build/Documents/report.docx")
+        ));
         // Outside the root: never ignored.
-        assert!(!is_ignored_under(root, Path::new("D:/elsewhere/node_modules/a.js")));
+        assert!(!is_ignored_under(
+            root,
+            Path::new("D:/elsewhere/node_modules/a.js")
+        ));
     }
 
     #[test]
@@ -400,8 +441,14 @@ mod tests {
         std::fs::write(tgt.join("artifact.png"), b"x").unwrap();
         std::fs::write(tgt.join("artifact2.png"), b"x").unwrap();
 
-        let total: usize = group_by_type(dir.path(), 1000).iter().map(|g| g.count).sum();
+        let total: usize = group_by_type(dir.path(), 1000)
+            .iter()
+            .map(|g| g.count)
+            .sum();
         assert_eq!(total, 1, "only keep.png should be scanned");
-        assert!(find_duplicates(dir.path(), 1000).is_empty(), "target/ dupes must not be scanned");
+        assert!(
+            find_duplicates(dir.path(), 1000).is_empty(),
+            "target/ dupes must not be scanned"
+        );
     }
 }
