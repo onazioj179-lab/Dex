@@ -48,7 +48,12 @@ fn id_of(v: &Value) -> Option<&str> {
 
 impl VaultManager {
     pub fn new(path: PathBuf) -> Self {
-        Self { path, salt: Vec::new(), key: None, data: VaultData::default() }
+        Self {
+            path,
+            salt: Vec::new(),
+            key: None,
+            data: VaultData::default(),
+        }
     }
 
     pub fn exists(&self) -> bool {
@@ -99,7 +104,9 @@ impl VaultManager {
     }
 
     fn require_unlocked(&self) -> Result<&[u8; 32], String> {
-        self.key.as_ref().ok_or_else(|| "vault is locked".to_string())
+        self.key
+            .as_ref()
+            .ok_or_else(|| "vault is locked".to_string())
     }
 
     fn save(&self) -> Result<(), String> {
@@ -208,14 +215,20 @@ impl VaultManager {
 
     /// Generate the current TOTP for a stored authenticator.
     pub fn generate_totp(&self, id: &str, unix_seconds: u64) -> Value {
-        let entry = self.data.authenticators.iter().find(|a| id_of(a) == Some(id));
+        let entry = self
+            .data
+            .authenticators
+            .iter()
+            .find(|a| id_of(a) == Some(id));
         match entry {
             Some(a) => {
                 let secret = a.get("secret").and_then(|v| v.as_str()).unwrap_or("");
                 let digits = a.get("digits").and_then(|v| v.as_u64()).unwrap_or(6) as u32;
                 let period = a.get("period").and_then(|v| v.as_u64()).unwrap_or(30);
                 match totp::totp(secret, unix_seconds, digits, period) {
-                    Some(code) => json!({ "code": code, "remaining": totp::seconds_remaining(unix_seconds, period) }),
+                    Some(code) => {
+                        json!({ "code": code, "remaining": totp::seconds_remaining(unix_seconds, period) })
+                    }
                     None => Value::Null,
                 }
             }
@@ -335,7 +348,9 @@ mod tests {
         assert_eq!(v.credential(&id)["title"], "GitHub");
         assert_eq!(v.search_credentials("github").as_array().unwrap().len(), 1);
 
-        assert!(v.update_credential(&id, &json!({ "password": "new" })).unwrap());
+        assert!(v
+            .update_credential(&id, &json!({ "password": "new" }))
+            .unwrap());
         assert_eq!(v.credential(&id)["password"], "new");
         assert!(v.delete_credential(&id).unwrap());
         assert!(v.credentials().as_array().unwrap().is_empty());
@@ -346,7 +361,9 @@ mod tests {
         let (_dir, mut v) = temp_vault();
         v.create("pw").unwrap();
         let a = v
-            .add_authenticator(json!({ "name": "ACME", "secret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ" }))
+            .add_authenticator(
+                json!({ "name": "ACME", "secret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ" }),
+            )
             .unwrap();
         let id = a["id"].as_str().unwrap().to_string();
         let out = v.generate_totp(&id, 59);

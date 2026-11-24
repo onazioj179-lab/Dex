@@ -28,7 +28,9 @@ fn month_arg(p: &Value) -> R<String> {
 
 fn sum_map(c: &Connection, sql: &str, month: &str) -> R<HashMap<i64, i64>> {
     let mut st = c.prepare(sql).map_err(err)?;
-    let rows = st.query_map([month], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?))).map_err(err)?;
+    let rows = st
+        .query_map([month], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
+        .map_err(err)?;
     let mut m = HashMap::new();
     for row in rows {
         let (k, v) = row.map_err(err)?;
@@ -71,7 +73,11 @@ fn expense_category(c: &Connection, id: i64) -> R<()> {
 
 fn put_allocation(c: &Connection, cat: i64, month: &str, amount: i64) -> R<()> {
     if amount == 0 {
-        c.execute("DELETE FROM allocations WHERE category_id = ?1 AND month = ?2", params![cat, month]).map_err(err)?;
+        c.execute(
+            "DELETE FROM allocations WHERE category_id = ?1 AND month = ?2",
+            params![cat, month],
+        )
+        .map_err(err)?;
     } else {
         c.execute(
             "INSERT INTO allocations (category_id, month, amount) VALUES (?1, ?2, ?3)
@@ -84,10 +90,14 @@ fn put_allocation(c: &Connection, cat: i64, month: &str, amount: i64) -> R<()> {
 }
 
 fn get_allocation(c: &Connection, cat: i64, month: &str) -> R<i64> {
-    Ok(c.query_row("SELECT amount FROM allocations WHERE category_id = ?1 AND month = ?2", params![cat, month], |r| r.get(0))
-        .optional()
-        .map_err(err)?
-        .unwrap_or(0))
+    Ok(c.query_row(
+        "SELECT amount FROM allocations WHERE category_id = ?1 AND month = ?2",
+        params![cat, month],
+        |r| r.get(0),
+    )
+    .optional()
+    .map_err(err)?
+    .unwrap_or(0))
 }
 
 impl Ledger {
@@ -95,23 +105,44 @@ impl Ledger {
         let month = month_arg(p)?;
         let prev = dates::shift_month(&month, -1).ok_or("bad month")?;
         let c = &self.conn;
-        let assigned = sum_map(c, "SELECT category_id, amount FROM allocations WHERE month = ?1", &month)?;
-        let assigned_prev = sum_map(c, "SELECT category_id, amount FROM allocations WHERE month = ?1", &prev)?;
+        let assigned = sum_map(
+            c,
+            "SELECT category_id, amount FROM allocations WHERE month = ?1",
+            &month,
+        )?;
+        let assigned_prev = sum_map(
+            c,
+            "SELECT category_id, amount FROM allocations WHERE month = ?1",
+            &prev,
+        )?;
         let activity = sum_map(c, "SELECT category_id, SUM(amount) FROM cat_lines WHERE category_id IS NOT NULL AND substr(date,1,7) = ?1 GROUP BY category_id", &month)?;
         let activity_prev = sum_map(c, "SELECT category_id, SUM(amount) FROM cat_lines WHERE category_id IS NOT NULL AND substr(date,1,7) = ?1 GROUP BY category_id", &prev)?;
         let alloc_to = sum_map(c, "SELECT category_id, SUM(amount) FROM allocations WHERE month <= ?1 GROUP BY category_id", &month)?;
         let act_to = sum_map(c, "SELECT category_id, SUM(amount) FROM cat_lines WHERE category_id IS NOT NULL AND substr(date,1,7) <= ?1 GROUP BY category_id", &month)?;
 
         let mut gst = c.prepare("SELECT id, name, collapsed FROM category_groups WHERE kind = 'expense' ORDER BY sort, id").map_err(err)?;
-        let groups: Vec<(i64, String, bool)> =
-            gst.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? == 1))).map_err(err)?.collect::<Result<_, _>>().map_err(err)?;
-        let mut cst = c.prepare("SELECT id, name, archived FROM categories WHERE group_id = ?1 ORDER BY sort, id").map_err(err)?;
+        let groups: Vec<(i64, String, bool)> = gst
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? == 1)))
+            .map_err(err)?
+            .collect::<Result<_, _>>()
+            .map_err(err)?;
+        let mut cst = c
+            .prepare(
+                "SELECT id, name, archived FROM categories WHERE group_id = ?1 ORDER BY sort, id",
+            )
+            .map_err(err)?;
 
-        let (mut t_assigned, mut t_activity, mut t_available, mut overspent) = (0i64, 0i64, 0i64, 0i64);
+        let (mut t_assigned, mut t_activity, mut t_available, mut overspent) =
+            (0i64, 0i64, 0i64, 0i64);
         let mut out_groups = Vec::new();
         for (gid, gname, collapsed) in groups {
-            let cats: Vec<(i64, String, bool)> =
-                cst.query_map([gid], |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? == 1))).map_err(err)?.collect::<Result<_, _>>().map_err(err)?;
+            let cats: Vec<(i64, String, bool)> = cst
+                .query_map([gid], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? == 1))
+                })
+                .map_err(err)?
+                .collect::<Result<_, _>>()
+                .map_err(err)?;
             let (mut g_assigned, mut g_activity, mut g_available) = (0i64, 0i64, 0i64);
             let mut rows = Vec::new();
             for (cid, cname, archived) in cats {
@@ -175,7 +206,13 @@ impl Ledger {
         expense_category(&tx, cat)?;
         let before = get_allocation(&tx, cat, &month)?;
         put_allocation(&tx, cat, &month, amount)?;
-        audit(&tx, "assign", "category", Some(cat), json!({ "month": month, "from": before, "to": amount }))?;
+        audit(
+            &tx,
+            "assign",
+            "category",
+            Some(cat),
+            json!({ "month": month, "from": before, "to": amount }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "categoryId": cat, "month": month, "assigned": amount }))
     }
@@ -202,7 +239,9 @@ impl Ledger {
                 expense_category(&tx, f)?;
                 let avail = available(&tx, f, &month)?;
                 if avail < amount {
-                    return Err(format!("Only {avail} (minor units) is available in that category"));
+                    return Err(format!(
+                        "Only {avail} (minor units) is available in that category"
+                    ));
                 }
                 let cur = get_allocation(&tx, f, &month)?;
                 put_allocation(&tx, f, &month, cur - amount)?;
@@ -219,7 +258,13 @@ impl Ledger {
             let cur = get_allocation(&tx, t, &month)?;
             put_allocation(&tx, t, &month, cur + amount)?;
         }
-        audit(&tx, "move", "budget", None, json!({ "month": month, "from": from, "to": to, "amount": amount }))?;
+        audit(
+            &tx,
+            "move",
+            "budget",
+            None,
+            json!({ "month": month, "from": from, "to": to, "amount": amount }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "month": month }))
     }
@@ -240,7 +285,13 @@ impl Ledger {
                 params![month, prev],
             )
             .map_err(err)?;
-        audit(&tx, "copy", "budget", None, json!({ "month": month, "from": prev, "categories": n }))?;
+        audit(
+            &tx,
+            "copy",
+            "budget",
+            None,
+            json!({ "month": month, "from": prev, "categories": n }),
+        )?;
         tx.commit().map_err(err)?;
         Ok(json!({ "copied": n }))
     }

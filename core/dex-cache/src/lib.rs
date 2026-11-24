@@ -34,12 +34,22 @@ pub struct Cache<K, V> {
 impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     /// New cache holding at most `capacity` entries (floored at 1). No default TTL.
     pub fn new(capacity: usize) -> Self {
-        Self { map: HashMap::new(), capacity: capacity.max(1), tick: 0, default_ttl: None }
+        Self {
+            map: HashMap::new(),
+            capacity: capacity.max(1),
+            tick: 0,
+            default_ttl: None,
+        }
     }
 
     /// New cache that stamps every insert with `ttl` unless an explicit TTL is given.
     pub fn with_ttl(capacity: usize, ttl: Duration) -> Self {
-        Self { map: HashMap::new(), capacity: capacity.max(1), tick: 0, default_ttl: Some(ttl) }
+        Self {
+            map: HashMap::new(),
+            capacity: capacity.max(1),
+            tick: 0,
+            default_ttl: Some(ttl),
+        }
     }
 
     fn next_tick(&mut self) -> u64 {
@@ -65,7 +75,14 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     fn insert_inner(&mut self, key: K, value: V, ttl: Option<Duration>) {
         let used = self.next_tick();
         let expires_at = ttl.map(|d| Instant::now() + d);
-        self.map.insert(key, Entry { value, used, expires_at });
+        self.map.insert(
+            key,
+            Entry {
+                value,
+                used,
+                expires_at,
+            },
+        );
         self.evict_if_needed();
     }
 
@@ -73,7 +90,11 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     /// entries are removed and reported as a miss.
     pub fn get(&mut self, key: &K) -> Option<&V> {
         let now = Instant::now();
-        let expired = self.map.get(key).map(|e| Self::is_expired(e, now)).unwrap_or(false);
+        let expired = self
+            .map
+            .get(key)
+            .map(|e| Self::is_expired(e, now))
+            .unwrap_or(false);
         if expired {
             self.map.remove(key);
             return None;
@@ -91,7 +112,11 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     /// left untouched, so a peeked entry is no safer from eviction than before.
     pub fn peek(&mut self, key: &K) -> Option<&V> {
         let now = Instant::now();
-        let expired = self.map.get(key).map(|e| Self::is_expired(e, now)).unwrap_or(false);
+        let expired = self
+            .map
+            .get(key)
+            .map(|e| Self::is_expired(e, now))
+            .unwrap_or(false);
         if expired {
             self.map.remove(key);
             return None;
@@ -106,7 +131,11 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     /// callers stop writing the get-or-compute-then-insert dance by hand.
     pub fn get_or_insert_with<F: FnOnce() -> V>(&mut self, key: K, f: F) -> &V {
         let now = Instant::now();
-        let hit = self.map.get(&key).map(|e| !Self::is_expired(e, now)).unwrap_or(false);
+        let hit = self
+            .map
+            .get(&key)
+            .map(|e| !Self::is_expired(e, now))
+            .unwrap_or(false);
         if hit {
             let used = self.next_tick();
             let entry = self.map.get_mut(&key).expect("checked hit");
@@ -209,7 +238,10 @@ mod tests {
         assert_eq!(c.len(), 2);
         assert!(c.contains_key(&"a"));
         assert!(c.contains_key(&"c"));
-        assert!(!c.contains_key(&"b"), "least-recently-used entry should be evicted");
+        assert!(
+            !c.contains_key(&"b"),
+            "least-recently-used entry should be evicted"
+        );
     }
 
     #[test]
@@ -225,7 +257,11 @@ mod tests {
     fn zero_ttl_is_immediately_expired() {
         let mut c: Cache<&str, i32> = Cache::new(8);
         c.insert_with_ttl("k", 1, Duration::from_millis(0));
-        assert_eq!(c.get(&"k"), None, "a 0ms TTL entry is expired on the next access");
+        assert_eq!(
+            c.get(&"k"),
+            None,
+            "a 0ms TTL entry is expired on the next access"
+        );
         assert_eq!(c.len(), 0, "a missed-because-expired get purges the entry");
     }
 
@@ -282,10 +318,13 @@ mod tests {
         let mut c: Cache<&str, i32> = Cache::new(2);
         c.insert("a", 1); // older
         c.insert("b", 2); // newer
-        // Contrast with get(): peeking "a" must NOT make it more recent than "b".
+                          // Contrast with get(): peeking "a" must NOT make it more recent than "b".
         assert_eq!(c.peek(&"a"), Some(&1));
         c.insert("c", 3); // over capacity -> evict LRU, which is still "a"
-        assert!(!c.contains_key(&"a"), "peek must not save the LRU entry from eviction");
+        assert!(
+            !c.contains_key(&"a"),
+            "peek must not save the LRU entry from eviction"
+        );
         assert!(c.contains_key(&"b"));
         assert!(c.contains_key(&"c"));
     }
@@ -302,8 +341,21 @@ mod tests {
     fn get_or_insert_with_computes_only_on_miss() {
         let mut c: Cache<&str, i32> = Cache::new(4);
         let mut calls = 0;
-        assert_eq!(*c.get_or_insert_with("a", || { calls += 1; 10 }), 10);
-        assert_eq!(*c.get_or_insert_with("a", || { calls += 1; 99 }), 10, "second call is a hit");
+        assert_eq!(
+            *c.get_or_insert_with("a", || {
+                calls += 1;
+                10
+            }),
+            10
+        );
+        assert_eq!(
+            *c.get_or_insert_with("a", || {
+                calls += 1;
+                99
+            }),
+            10,
+            "second call is a hit"
+        );
         assert_eq!(calls, 1, "the closure runs only on the miss");
     }
 
@@ -312,7 +364,11 @@ mod tests {
         let mut c: Cache<&str, i32> = Cache::with_ttl(4, Duration::from_millis(0));
         assert_eq!(*c.get_or_insert_with("a", || 1), 1);
         // The 0ms TTL means the entry is expired by the next access -> recompute.
-        assert_eq!(*c.get_or_insert_with("a", || 2), 2, "expired entry recomputes");
+        assert_eq!(
+            *c.get_or_insert_with("a", || 2),
+            2,
+            "expired entry recomputes"
+        );
     }
 
     #[test]

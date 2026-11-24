@@ -72,7 +72,9 @@ fn total_balance_at(c: &Connection, date: &str) -> R<i64> {
 impl Ledger {
     pub(crate) fn overview(&self, p: &Value) -> R<Value> {
         let (from, to) = range(p)?;
-        let today = gs(p, "today").filter(|d| dates::is_valid(d)).unwrap_or_else(dates::today_utc);
+        let today = gs(p, "today")
+            .filter(|d| dates::is_valid(d))
+            .unwrap_or_else(dates::today_utc);
         let c = &self.conn;
         let (income, expense, uncategorized) = income_expense_totals(c, &from, &to)?;
         let total: i64 = c
@@ -89,12 +91,23 @@ impl Ledger {
             )
             .map_err(err)?;
         let mut by_kind = serde_json::Map::new();
-        for row in st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).map_err(err)? {
+        for row in st
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+            .map_err(err)?
+        {
             let (k, v) = row.map_err(err)?;
             by_kind.insert(k, json!(v));
         }
-        let mut st = c.prepare(&format!("{TXN_SELECT} ORDER BY t.date DESC, t.id DESC LIMIT 8")).map_err(err)?;
-        let recent = st.query_map([], txn_row).map_err(err)?.collect::<Result<Vec<_>, _>>().map_err(err)?;
+        let mut st = c
+            .prepare(&format!(
+                "{TXN_SELECT} ORDER BY t.date DESC, t.id DESC LIMIT 8"
+            ))
+            .map_err(err)?;
+        let recent = st
+            .query_map([], txn_row)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)?;
         let horizon = dates::add_days(&today, 30).unwrap_or(today.clone());
         let upcoming: Vec<Value> = self
             .recurring_list()?
@@ -102,10 +115,27 @@ impl Ledger {
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .filter(|r| r["nextDate"].as_str().map(|d| d <= horizon.as_str()).unwrap_or(false))
+            .filter(|r| {
+                r["nextDate"]
+                    .as_str()
+                    .map(|d| d <= horizon.as_str())
+                    .unwrap_or(false)
+            })
             .collect();
-        let uncat_count: i64 = c.query_row("SELECT COUNT(DISTINCT txn_id) FROM cat_lines WHERE category_id IS NULL", [], |r| r.get(0)).map_err(err)?;
-        let uncleared: i64 = c.query_row("SELECT COUNT(*) FROM transactions WHERE status = 'uncleared'", [], |r| r.get(0)).map_err(err)?;
+        let uncat_count: i64 = c
+            .query_row(
+                "SELECT COUNT(DISTINCT txn_id) FROM cat_lines WHERE category_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
+        let uncleared: i64 = c
+            .query_row(
+                "SELECT COUNT(*) FROM transactions WHERE status = 'uncleared'",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
         Ok(json!({
             "from": from, "to": to,
             "totalBalance": total,
@@ -135,7 +165,12 @@ impl Ledger {
             )
             .map_err(err)?;
         let mut by: BTreeMap<String, (i64, i64, i64)> = BTreeMap::new();
-        for row in st.query_map(params![from, to], |r| Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).map_err(err)? {
+        for row in st
+            .query_map(params![from, to], |r| {
+                Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+            })
+            .map_err(err)?
+        {
             let (m, i, e, u) = row.map_err(err)?;
             by.insert(m, (i, e, u));
         }
@@ -147,7 +182,9 @@ impl Ledger {
             })
             .collect();
         let (ti, te, tu) = income_expense_totals(&self.conn, &from, &to)?;
-        Ok(json!({ "from": from, "to": to, "rows": rows, "totals": { "income": ti, "expenses": te, "uncategorized": tu, "net": ti - te + tu } }))
+        Ok(
+            json!({ "from": from, "to": to, "rows": rows, "totals": { "income": ti, "expenses": te, "uncategorized": tu, "net": ti - te + tu } }),
+        )
     }
 
     pub(crate) fn report_cash_flow(&self, p: &Value) -> R<Value> {
@@ -162,7 +199,12 @@ impl Ledger {
             )
             .map_err(err)?;
         let mut by: BTreeMap<String, (i64, i64)> = BTreeMap::new();
-        for row in st.query_map(params![from, to], |r| Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?))).map_err(err)? {
+        for row in st
+            .query_map(params![from, to], |r| {
+                Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?))
+            })
+            .map_err(err)?
+        {
             let (m, i, o) = row.map_err(err)?;
             by.insert(m, (i, o));
         }
@@ -170,11 +212,17 @@ impl Ledger {
         for m in months_between(&from, &to) {
             let (i, o) = by.get(&m).copied().unwrap_or((0, 0));
             let end = dates::month_end(&m).ok_or("bad month")?;
-            let end = if end.as_str() > to.as_str() { to.clone() } else { end };
+            let end = if end.as_str() > to.as_str() {
+                to.clone()
+            } else {
+                end
+            };
             rows.push(json!({ "month": m, "inflow": i, "outflow": o, "net": i - o, "endingBalance": total_balance_at(&self.conn, &end)? }));
         }
         let start = dates::add_days(&from, -1).ok_or("bad date")?;
-        Ok(json!({ "from": from, "to": to, "openingBalance": total_balance_at(&self.conn, &start)?, "closingBalance": total_balance_at(&self.conn, &to)?, "rows": rows }))
+        Ok(
+            json!({ "from": from, "to": to, "openingBalance": total_balance_at(&self.conn, &start)?, "closingBalance": total_balance_at(&self.conn, &to)?, "rows": rows }),
+        )
     }
 
     pub(crate) fn report_spending(&self, p: &Value) -> R<Value> {
@@ -204,11 +252,15 @@ impl Ledger {
             )
             .map_err(err)?;
         let total: i64 = rows.iter().map(|r| r["spent"].as_i64().unwrap_or(0)).sum();
-        Ok(json!({ "from": from, "to": to, "rows": rows, "total": total, "uncategorizedSpent": uncat_out, "uncategorizedCount": uncat_n }))
+        Ok(
+            json!({ "from": from, "to": to, "rows": rows, "total": total, "uncategorizedSpent": uncat_out, "uncategorizedCount": uncat_n }),
+        )
     }
 
     pub(crate) fn report_balances(&self, p: &Value) -> R<Value> {
-        let as_of = gs(p, "asOf").filter(|d| dates::is_valid(d)).unwrap_or_else(dates::today_utc);
+        let as_of = gs(p, "asOf")
+            .filter(|d| dates::is_valid(d))
+            .unwrap_or_else(dates::today_utc);
         let mut st = self
             .conn
             .prepare(
@@ -225,7 +277,10 @@ impl Ledger {
             .map_err(err)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(err)?;
-        let total: i64 = rows.iter().map(|r| r["balance"].as_i64().unwrap_or(0)).sum();
+        let total: i64 = rows
+            .iter()
+            .map(|r| r["balance"].as_i64().unwrap_or(0))
+            .sum();
         Ok(json!({ "asOf": as_of, "rows": rows, "total": total }))
     }
 
@@ -256,9 +311,14 @@ impl Ledger {
             .into_iter()
             .filter(|r| r["assigned"].as_i64() != Some(0) || r["spent"].as_i64() != Some(0))
             .collect();
-        let tb: i64 = rows.iter().map(|r| r["assigned"].as_i64().unwrap_or(0)).sum();
+        let tb: i64 = rows
+            .iter()
+            .map(|r| r["assigned"].as_i64().unwrap_or(0))
+            .sum();
         let ta: i64 = rows.iter().map(|r| r["spent"].as_i64().unwrap_or(0)).sum();
-        Ok(json!({ "fromMonth": fm, "toMonth": tm, "rows": rows, "totals": { "assigned": tb, "spent": ta, "difference": tb - ta } }))
+        Ok(
+            json!({ "fromMonth": fm, "toMonth": tm, "rows": rows, "totals": { "assigned": tb, "spent": ta, "difference": tb - ta } }),
+        )
     }
 
     /// CSV text for any report, in plain decimals of the book currency.
@@ -271,25 +331,59 @@ impl Ledger {
         let data = match kind.as_str() {
             "incomeExpense" => {
                 let r = self.report_income_expense(p)?;
-                out += &csv::write_row(&["Month".into(), "Income".into(), "Expenses".into(), "Uncategorised".into(), "Net".into()]);
+                out += &csv::write_row(&[
+                    "Month".into(),
+                    "Income".into(),
+                    "Expenses".into(),
+                    "Uncategorised".into(),
+                    "Net".into(),
+                ]);
                 for row in r["rows"].as_array().cloned().unwrap_or_default() {
-                    out += &csv::write_row(&[s(&row["month"]), m(&row["income"]), m(&row["expenses"]), m(&row["uncategorized"]), m(&row["net"])]);
+                    out += &csv::write_row(&[
+                        s(&row["month"]),
+                        m(&row["income"]),
+                        m(&row["expenses"]),
+                        m(&row["uncategorized"]),
+                        m(&row["net"]),
+                    ]);
                 }
                 r
             }
             "cashFlow" => {
                 let r = self.report_cash_flow(p)?;
-                out += &csv::write_row(&["Month".into(), "Inflow".into(), "Outflow".into(), "Net".into(), "Ending balance".into()]);
+                out += &csv::write_row(&[
+                    "Month".into(),
+                    "Inflow".into(),
+                    "Outflow".into(),
+                    "Net".into(),
+                    "Ending balance".into(),
+                ]);
                 for row in r["rows"].as_array().cloned().unwrap_or_default() {
-                    out += &csv::write_row(&[s(&row["month"]), m(&row["inflow"]), m(&row["outflow"]), m(&row["net"]), m(&row["endingBalance"])]);
+                    out += &csv::write_row(&[
+                        s(&row["month"]),
+                        m(&row["inflow"]),
+                        m(&row["outflow"]),
+                        m(&row["net"]),
+                        m(&row["endingBalance"]),
+                    ]);
                 }
                 r
             }
             "spending" => {
                 let r = self.report_spending(p)?;
-                out += &csv::write_row(&["Group".into(), "Category".into(), "Spent".into(), "Transactions".into()]);
+                out += &csv::write_row(&[
+                    "Group".into(),
+                    "Category".into(),
+                    "Spent".into(),
+                    "Transactions".into(),
+                ]);
                 for row in r["rows"].as_array().cloned().unwrap_or_default() {
-                    out += &csv::write_row(&[s(&row["group"]), s(&row["category"]), m(&row["spent"]), row["transactions"].to_string()]);
+                    out += &csv::write_row(&[
+                        s(&row["group"]),
+                        s(&row["category"]),
+                        m(&row["spent"]),
+                        row["transactions"].to_string(),
+                    ]);
                 }
                 r
             }
@@ -303,9 +397,21 @@ impl Ledger {
             }
             "budgetVsActual" => {
                 let r = self.report_budget_vs_actual(p)?;
-                out += &csv::write_row(&["Group".into(), "Category".into(), "Assigned".into(), "Spent".into(), "Difference".into()]);
+                out += &csv::write_row(&[
+                    "Group".into(),
+                    "Category".into(),
+                    "Assigned".into(),
+                    "Spent".into(),
+                    "Difference".into(),
+                ]);
                 for row in r["rows"].as_array().cloned().unwrap_or_default() {
-                    out += &csv::write_row(&[s(&row["group"]), s(&row["category"]), m(&row["assigned"]), m(&row["spent"]), m(&row["difference"])]);
+                    out += &csv::write_row(&[
+                        s(&row["group"]),
+                        s(&row["category"]),
+                        m(&row["assigned"]),
+                        m(&row["spent"]),
+                        m(&row["difference"]),
+                    ]);
                 }
                 r
             }

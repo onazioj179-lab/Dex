@@ -82,7 +82,12 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
     for step in steps {
         ran += 1;
         let stype = step.get("type").and_then(|t| t.as_str()).unwrap_or("");
-        let s = |k: &str| step.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let s = |k: &str| {
+            step.get(k)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
 
         match stype {
             "setVar" => {
@@ -114,8 +119,15 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
             "concat" => {
                 let into = s("into");
                 if !into.is_empty() {
-                    let parts = step.get("parts").and_then(|p| p.as_array()).cloned().unwrap_or_default();
-                    let joined: String = parts.iter().map(|p| resolve(&value_to_string(p), &ctx)).collect();
+                    let parts = step
+                        .get("parts")
+                        .and_then(|p| p.as_array())
+                        .cloned()
+                        .unwrap_or_default();
+                    let joined: String = parts
+                        .iter()
+                        .map(|p| resolve(&value_to_string(p), &ctx))
+                        .collect();
                     ctx.insert(into, Value::String(joined));
                 }
             }
@@ -124,7 +136,9 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
                 if !var.is_empty() {
                     let cur = ctx.get(&var).map(num).unwrap_or(0.0);
                     let operand = match step.get("value") {
-                        Some(Value::String(t)) => resolve(t, &ctx).trim().parse::<f64>().unwrap_or(0.0),
+                        Some(Value::String(t)) => {
+                            resolve(t, &ctx).trim().parse::<f64>().unwrap_or(0.0)
+                        }
                         Some(v) => num(v),
                         None => 0.0,
                     };
@@ -132,7 +146,13 @@ pub fn run(definition: &Value, inputs: &Value) -> Value {
                         "add" => cur + operand,
                         "sub" => cur - operand,
                         "mul" => cur * operand,
-                        "div" => if operand != 0.0 { cur / operand } else { cur },
+                        "div" => {
+                            if operand != 0.0 {
+                                cur / operand
+                            } else {
+                                cur
+                            }
+                        }
                         _ => cur,
                     };
                     ctx.insert(var, json!(result));

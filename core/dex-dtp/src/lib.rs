@@ -167,7 +167,8 @@ pub struct Sent {
 // ---------------------------------------------------------------------------
 
 fn write_frame(w: &mut impl Write, bytes: &[u8]) -> Result<()> {
-    let len = u32::try_from(bytes.len()).map_err(|_| DtpError::Protocol("frame too large".into()))?;
+    let len =
+        u32::try_from(bytes.len()).map_err(|_| DtpError::Protocol("frame too large".into()))?;
     w.write_all(&len.to_be_bytes())?;
     w.write_all(bytes)?;
     w.flush()?;
@@ -179,7 +180,9 @@ fn read_frame(r: &mut impl Read, max: usize) -> Result<Vec<u8>> {
     r.read_exact(&mut len)?;
     let len = u32::from_be_bytes(len) as usize;
     if len > max {
-        return Err(DtpError::Protocol(format!("frame of {len} bytes exceeds {max}")));
+        return Err(DtpError::Protocol(format!(
+            "frame of {len} bytes exceeds {max}"
+        )));
     }
     let mut buf = vec![0u8; len];
     r.read_exact(&mut buf)?;
@@ -226,18 +229,30 @@ fn tidy_identity(id: Identity) -> Identity {
 }
 
 fn send_hello(stream: &mut TcpStream, me: &Identity, public: &PublicKey) -> Result<()> {
-    let hello = Hello { magic: MAGIC.into(), v: VERSION, public: hex(public.as_bytes()), id: me.clone() };
-    write_frame(stream, &serde_json::to_vec(&hello).expect("hello serializes"))
+    let hello = Hello {
+        magic: MAGIC.into(),
+        v: VERSION,
+        public: hex(public.as_bytes()),
+        id: me.clone(),
+    };
+    write_frame(
+        stream,
+        &serde_json::to_vec(&hello).expect("hello serializes"),
+    )
 }
 
 fn read_hello(stream: &mut TcpStream) -> Result<(Identity, [u8; 32])> {
     let raw = read_frame(stream, MAX_HELLO)?;
-    let hello: Hello = serde_json::from_slice(&raw).map_err(|_| DtpError::Protocol("not a DTP hello".into()))?;
+    let hello: Hello =
+        serde_json::from_slice(&raw).map_err(|_| DtpError::Protocol("not a DTP hello".into()))?;
     if hello.magic != MAGIC {
         return Err(DtpError::Protocol("not a DTP peer".into()));
     }
     if hello.v != VERSION {
-        return Err(DtpError::Protocol(format!("peer speaks DTP v{}, this DEX speaks v{VERSION}", hello.v)));
+        return Err(DtpError::Protocol(format!(
+            "peer speaks DTP v{}, this DEX speaks v{VERSION}",
+            hello.v
+        )));
     }
     let key = unhex32(&hello.public).ok_or_else(|| DtpError::Protocol("bad public key".into()))?;
     Ok((tidy_identity(hello.id), key))
@@ -257,10 +272,17 @@ fn derive(shared: &[u8; 32], sender_pub: &[u8; 32], receiver_pub: &[u8; 32]) -> 
     let mut c2s = [0u8; 32];
     let mut s2c = [0u8; 32];
     let mut code = [0u8; 4];
-    hk.expand(b"DEX-DTP-V1 c2s", &mut c2s).expect("32 bytes is a valid HKDF length");
-    hk.expand(b"DEX-DTP-V1 s2c", &mut s2c).expect("32 bytes is a valid HKDF length");
-    hk.expand(b"DEX-DTP-V1 code", &mut code).expect("4 bytes is a valid HKDF length");
-    Keys { c2s, s2c, code: format!("{:06}", u32::from_be_bytes(code) % 1_000_000) }
+    hk.expand(b"DEX-DTP-V1 c2s", &mut c2s)
+        .expect("32 bytes is a valid HKDF length");
+    hk.expand(b"DEX-DTP-V1 s2c", &mut s2c)
+        .expect("32 bytes is a valid HKDF length");
+    hk.expand(b"DEX-DTP-V1 code", &mut code)
+        .expect("4 bytes is a valid HKDF length");
+    Keys {
+        c2s,
+        s2c,
+        code: format!("{:06}", u32::from_be_bytes(code) % 1_000_000),
+    }
 }
 
 fn agree(secret: EphemeralSecret, peer: [u8; 32]) -> Result<[u8; 32]> {
@@ -302,7 +324,10 @@ impl Channel {
         pt.extend_from_slice(body);
         let n = nonce(self.tx_ctr);
         self.tx_ctr += 1;
-        let ct = self.tx.encrypt(Nonce::from_slice(&n), pt.as_ref()).map_err(|_| DtpError::Crypto)?;
+        let ct = self
+            .tx
+            .encrypt(Nonce::from_slice(&n), pt.as_ref())
+            .map_err(|_| DtpError::Crypto)?;
         write_frame(&mut self.stream, &ct)
     }
 
@@ -314,7 +339,10 @@ impl Channel {
         let ct = read_frame(&mut self.stream, max + 1 + 16)?;
         let n = nonce(self.rx_ctr);
         self.rx_ctr += 1;
-        let mut pt = self.rx.decrypt(Nonce::from_slice(&n), ct.as_ref()).map_err(|_| DtpError::Crypto)?;
+        let mut pt = self
+            .rx
+            .decrypt(Nonce::from_slice(&n), ct.as_ref())
+            .map_err(|_| DtpError::Crypto)?;
         if pt.is_empty() {
             return Err(DtpError::Protocol("empty frame".into()));
         }
@@ -331,7 +359,11 @@ impl Channel {
 fn remote_message(body: &[u8]) -> String {
     serde_json::from_slice::<serde_json::Value>(body)
         .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(|s| clip(s, 200)))
+        .and_then(|v| {
+            v.get("error")
+                .and_then(|e| e.as_str())
+                .map(|s| clip(s, 200))
+        })
         .unwrap_or_else(|| "the other device stopped the transfer".into())
 }
 
@@ -350,7 +382,11 @@ pub fn sanitize_name(raw: &str) -> String {
         name.pop();
     }
     let name = name.trim_start().to_string();
-    let mut name = if name.is_empty() || name == "." || name == ".." { "file".to_string() } else { name };
+    let mut name = if name.is_empty() || name == "." || name == ".." {
+        "file".to_string()
+    } else {
+        name
+    };
     let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
     let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
         || ((stem.starts_with("COM") || stem.starts_with("LPT"))
@@ -400,12 +436,20 @@ impl TempFile {
         for _ in 0..8 {
             let path = dir.join(format!(".dex-{:016x}.dtp-part", OsRng.next_u64()));
             match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(file) => return Ok(TempFile { path, file: Some(file) }),
+                Ok(file) => {
+                    return Ok(TempFile {
+                        path,
+                        file: Some(file),
+                    })
+                }
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
                 Err(e) => return Err(e.into()),
             }
         }
-        Err(DtpError::Io(io::Error::new(io::ErrorKind::AlreadyExists, "no free temp name")))
+        Err(DtpError::Io(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "no free temp name",
+        )))
     }
 
     fn keep_as(mut self, dest: &Path) -> Result<()> {
@@ -438,8 +482,16 @@ struct Manifest {
 }
 
 /// Serve one incoming connection: handshake, ask `hooks` to approve, write files into `dest`.
-pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn ReceiveHooks) -> Result<Received> {
-    let peer_addr = stream.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default();
+pub fn receive(
+    mut stream: TcpStream,
+    me: &Identity,
+    dest: &Path,
+    hooks: &dyn ReceiveHooks,
+) -> Result<Received> {
+    let peer_addr = stream
+        .peer_addr()
+        .map(|a| a.ip().to_string())
+        .unwrap_or_default();
     stream.set_read_timeout(Some(HANDSHAKE_TIMEOUT))?;
     stream.set_write_timeout(Some(STREAM_TIMEOUT))?;
     let (peer, peer_pub) = read_hello(&mut stream)?;
@@ -453,25 +505,43 @@ pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn Re
     if kind != K_MANIFEST {
         return Err(DtpError::Protocol("expected a manifest".into()));
     }
-    let manifest: Manifest = serde_json::from_slice(&body).map_err(|_| DtpError::Protocol("bad manifest".into()))?;
+    let manifest: Manifest =
+        serde_json::from_slice(&body).map_err(|_| DtpError::Protocol("bad manifest".into()))?;
     if manifest.files.is_empty() || manifest.files.len() > MAX_FILES {
-        return Err(DtpError::Protocol(format!("manifest lists {} files", manifest.files.len())));
+        return Err(DtpError::Protocol(format!(
+            "manifest lists {} files",
+            manifest.files.len()
+        )));
     }
     let mut total: u64 = 0;
     let files: Vec<FileEntry> = manifest
         .files
         .into_iter()
-        .map(|f| FileEntry { name: sanitize_name(&f.name), size: f.size })
+        .map(|f| FileEntry {
+            name: sanitize_name(&f.name),
+            size: f.size,
+        })
         .collect();
     for f in &files {
-        total = total.checked_add(f.size).ok_or_else(|| DtpError::Protocol("sizes overflow".into()))?;
+        total = total
+            .checked_add(f.size)
+            .ok_or_else(|| DtpError::Protocol("sizes overflow".into()))?;
     }
-    let offer = Offer { peer: peer.clone(), peer_addr, files, total_bytes: total, code: keys.code.clone() };
+    let offer = Offer {
+        peer: peer.clone(),
+        peer_addr,
+        files,
+        total_bytes: total,
+        code: keys.code.clone(),
+    };
 
     match hooks.decide(&offer) {
         Decision::Accept => ch.send_json(K_DECISION, &serde_json::json!({ "accept": true }))?,
         Decision::Deny(reason) => {
-            let _ = ch.send_json(K_DECISION, &serde_json::json!({ "accept": false, "reason": reason }));
+            let _ = ch.send_json(
+                K_DECISION,
+                &serde_json::json!({ "accept": false, "reason": reason }),
+            );
             return Err(DtpError::Denied(reason));
         }
     }
@@ -486,16 +556,25 @@ pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn Re
         let mut left = entry.size;
         loop {
             if hooks.cancelled() {
-                let _ = ch.send_json(K_ERROR, &serde_json::json!({ "error": "The receiver cancelled the transfer." }));
+                let _ = ch.send_json(
+                    K_ERROR,
+                    &serde_json::json!({ "error": "The receiver cancelled the transfer." }),
+                );
                 return Err(DtpError::Cancelled);
             }
             let (kind, body) = ch.recv(CHUNK)?;
             match kind {
                 K_CHUNK => {
                     if body.len() as u64 > left {
-                        return Err(DtpError::Protocol(format!("{} is longer than announced", entry.name)));
+                        return Err(DtpError::Protocol(format!(
+                            "{} is longer than announced",
+                            entry.name
+                        )));
                     }
-                    tmp.file.as_mut().expect("open temp file").write_all(&body)?;
+                    tmp.file
+                        .as_mut()
+                        .expect("open temp file")
+                        .write_all(&body)?;
                     hasher.update(&body);
                     left -= body.len() as u64;
                     received += body.len() as u64;
@@ -503,10 +582,16 @@ pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn Re
                 }
                 K_FILE_END => {
                     if left != 0 {
-                        return Err(DtpError::Protocol(format!("{} ended {left} bytes short", entry.name)));
+                        return Err(DtpError::Protocol(format!(
+                            "{} ended {left} bytes short",
+                            entry.name
+                        )));
                     }
                     if body.as_slice() != hasher.finalize_reset().as_slice() {
-                        return Err(DtpError::Protocol(format!("{} failed its checksum", entry.name)));
+                        return Err(DtpError::Protocol(format!(
+                            "{} failed its checksum",
+                            entry.name
+                        )));
                     }
                     break;
                 }
@@ -523,7 +608,12 @@ pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn Re
         .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
         .collect();
     ch.send_json(K_DONE, &serde_json::json!({ "saved": names }))?;
-    Ok(Received { peer, files: saved, total_bytes: total, code: keys.code })
+    Ok(Received {
+        peer,
+        files: saved,
+        total_bytes: total,
+        code: keys.code,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -532,20 +622,38 @@ pub fn receive(mut stream: TcpStream, me: &Identity, dest: &Path, hooks: &dyn Re
 
 /// Send `files` to the DEX listening at `addr` (`host:port`). Blocks until the receiver
 /// accepts (up to `decision_timeout`) and every file is confirmed.
-pub fn send(addr: &str, me: &Identity, files: &[PathBuf], hooks: &dyn SendHooks, decision_timeout: Duration) -> Result<Sent> {
+pub fn send(
+    addr: &str,
+    me: &Identity,
+    files: &[PathBuf],
+    hooks: &dyn SendHooks,
+    decision_timeout: Duration,
+) -> Result<Sent> {
     if files.is_empty() || files.len() > MAX_FILES {
-        return Err(DtpError::Protocol(format!("{} files is not a valid batch", files.len())));
+        return Err(DtpError::Protocol(format!(
+            "{} files is not a valid batch",
+            files.len()
+        )));
     }
     let mut entries = Vec::with_capacity(files.len());
     let mut total: u64 = 0;
     for p in files {
         let meta = fs::metadata(p)?;
         if !meta.is_file() {
-            return Err(DtpError::Io(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a file", p.display()))));
+            return Err(DtpError::Io(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("{} is not a file", p.display()),
+            )));
         }
-        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "file".into());
         total += meta.len();
-        entries.push(FileEntry { name, size: meta.len() });
+        entries.push(FileEntry {
+            name,
+            size: meta.len(),
+        });
     }
 
     let target = addr
@@ -567,7 +675,12 @@ pub fn send(addr: &str, me: &Identity, files: &[PathBuf], hooks: &dyn SendHooks,
     ch.send_json(K_MANIFEST, &serde_json::json!({ "files": entries }))?;
     ch.timeout(decision_timeout)?;
     let (kind, body) = ch.recv(MAX_HELLO).map_err(|e| match e {
-        DtpError::Io(ref io) if matches!(io.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+        DtpError::Io(ref io)
+            if matches!(
+                io.kind(),
+                io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+            ) =>
+        {
             DtpError::Denied("The other device didn't answer in time.".into())
         }
         other => other,
@@ -575,10 +688,16 @@ pub fn send(addr: &str, me: &Identity, files: &[PathBuf], hooks: &dyn SendHooks,
     if kind != K_DECISION {
         return Err(DtpError::Protocol("expected a decision".into()));
     }
-    let decision: serde_json::Value = serde_json::from_slice(&body).map_err(|_| DtpError::Protocol("bad decision".into()))?;
+    let decision: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|_| DtpError::Protocol("bad decision".into()))?;
     if decision.get("accept").and_then(|v| v.as_bool()) != Some(true) {
-        let reason = decision.get("reason").and_then(|r| r.as_str()).map(|s| clip(s, 200));
-        return Err(DtpError::Denied(reason.unwrap_or_else(|| "The other device declined.".into())));
+        let reason = decision
+            .get("reason")
+            .and_then(|r| r.as_str())
+            .map(|s| clip(s, 200));
+        return Err(DtpError::Denied(
+            reason.unwrap_or_else(|| "The other device declined.".into()),
+        ));
     }
 
     ch.timeout(STREAM_TIMEOUT)?;
@@ -590,7 +709,10 @@ pub fn send(addr: &str, me: &Identity, files: &[PathBuf], hooks: &dyn SendHooks,
         let mut left = entry.size;
         while left > 0 {
             if hooks.cancelled() {
-                let _ = ch.send_json(K_CANCEL, &serde_json::json!({ "error": "The sender cancelled the transfer." }));
+                let _ = ch.send_json(
+                    K_CANCEL,
+                    &serde_json::json!({ "error": "The sender cancelled the transfer." }),
+                );
                 return Err(DtpError::Cancelled);
             }
             let want = (left as usize).min(CHUNK);
@@ -601,17 +723,24 @@ pub fn send(addr: &str, me: &Identity, files: &[PathBuf], hooks: &dyn SendHooks,
                 return Err(DtpError::Protocol(msg));
             }
             hasher.update(&buf[..n]);
-            ch.send(K_CHUNK, &buf[..n]).map_err(|e| peer_hangup(&mut ch, e))?;
+            ch.send(K_CHUNK, &buf[..n])
+                .map_err(|e| peer_hangup(&mut ch, e))?;
             left -= n as u64;
             sent += n as u64;
             hooks.progress(sent, total);
         }
-        ch.send(K_FILE_END, hasher.finalize().as_slice()).map_err(|e| peer_hangup(&mut ch, e))?;
+        ch.send(K_FILE_END, hasher.finalize().as_slice())
+            .map_err(|e| peer_hangup(&mut ch, e))?;
     }
 
     let (kind, body) = ch.recv(MAX_MANIFEST)?;
     match kind {
-        K_DONE => Ok(Sent { peer, file_count: entries.len(), total_bytes: total, code: keys.code }),
+        K_DONE => Ok(Sent {
+            peer,
+            file_count: entries.len(),
+            total_bytes: total,
+            code: keys.code,
+        }),
         K_ERROR | K_CANCEL => Err(DtpError::Remote(remote_message(&body))),
         _ => Err(DtpError::Protocol("expected done".into())),
     }
@@ -642,7 +771,11 @@ mod tests {
     use std::thread;
 
     fn id(name: &str) -> Identity {
-        Identity { device_id: format!("{name}-id"), device_name: name.into(), device_type: "desktop".into() }
+        Identity {
+            device_id: format!("{name}-id"),
+            device_name: name.into(),
+            device_type: "desktop".into(),
+        }
     }
 
     struct Rx {
@@ -655,13 +788,18 @@ mod tests {
     impl ReceiveHooks for Rx {
         fn decide(&self, offer: &Offer) -> Decision {
             *self.offer.lock().unwrap() = Some(offer.clone());
-            if self.accept { Decision::Accept } else { Decision::Deny("Not now.".into()) }
+            if self.accept {
+                Decision::Accept
+            } else {
+                Decision::Deny("Not now.".into())
+            }
         }
         fn progress(&self, _o: &Offer, received: u64) {
             self.seen.store(received, Ordering::SeqCst);
         }
         fn cancelled(&self) -> bool {
-            self.cancel_after.map_or(false, |n| self.seen.load(Ordering::SeqCst) >= n)
+            self.cancel_after
+                .map_or(false, |n| self.seen.load(Ordering::SeqCst) >= n)
         }
     }
 
@@ -681,7 +819,12 @@ mod tests {
     }
 
     fn rx(accept: bool, cancel_after: Option<u64>) -> Arc<Rx> {
-        Arc::new(Rx { accept, cancel_after, seen: AtomicU64::new(0), offer: Mutex::new(None) })
+        Arc::new(Rx {
+            accept,
+            cancel_after,
+            seen: AtomicU64::new(0),
+            offer: Mutex::new(None),
+        })
     }
 
     /// One receive on a loopback listener; returns (address, join handle).
@@ -714,7 +857,9 @@ mod tests {
     fn sends_files_with_matching_codes_and_checksums() {
         let src = tempfile::tempdir().unwrap();
         let dest = tempfile::tempdir().unwrap();
-        let big: Vec<u8> = (0..(CHUNK * 3 + 777)).map(|i| (i * 31 % 251) as u8).collect();
+        let big: Vec<u8> = (0..(CHUNK * 3 + 777))
+            .map(|i| (i * 31 % 251) as u8)
+            .collect();
         let a = write(src.path(), "photo.jpg", &big);
         let b = write(src.path(), "empty.txt", b"");
         fs::write(dest.path().join("photo.jpg"), b"already here").unwrap();
@@ -730,9 +875,17 @@ mod tests {
         assert_eq!(sent.peer.device_name, "Desk");
         assert_eq!(got.peer.device_name, "Laptop");
         assert_eq!(got.code.len(), 6);
-        assert_eq!(*tx.code.lock().unwrap(), got.code, "both sides show the same code");
+        assert_eq!(
+            *tx.code.lock().unwrap(),
+            got.code,
+            "both sides show the same code"
+        );
         assert_eq!(fs::read(dest.path().join("photo (1).jpg")).unwrap(), big);
-        assert_eq!(fs::read(dest.path().join("photo.jpg")).unwrap(), b"already here", "existing file untouched");
+        assert_eq!(
+            fs::read(dest.path().join("photo.jpg")).unwrap(),
+            b"already here",
+            "existing file untouched"
+        );
         assert_eq!(fs::read(dest.path().join("empty.txt")).unwrap(), b"");
         assert!(leftovers(dest.path()).is_empty());
         let offer = hooks.offer.lock().unwrap().clone().unwrap();
@@ -746,8 +899,18 @@ mod tests {
         let dest = tempfile::tempdir().unwrap();
         let a = write(src.path(), "a.txt", b"hello");
         let (addr, h) = serve(dest.path().to_path_buf(), rx(false, None));
-        let err = send(&addr, &id("Laptop"), &[a], &Tx::default(), Duration::from_secs(5)).unwrap_err();
-        assert!(matches!(err, DtpError::Denied(ref m) if m == "Not now."), "{err}");
+        let err = send(
+            &addr,
+            &id("Laptop"),
+            &[a],
+            &Tx::default(),
+            Duration::from_secs(5),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, DtpError::Denied(ref m) if m == "Not now."),
+            "{err}"
+        );
         assert!(matches!(h.join().unwrap(), Err(DtpError::Denied(_))));
         assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 0);
     }
@@ -758,10 +921,21 @@ mod tests {
         let dest = tempfile::tempdir().unwrap();
         let a = write(src.path(), "big.bin", &vec![7u8; CHUNK * 8]);
         let (addr, h) = serve(dest.path().to_path_buf(), rx(true, Some(CHUNK as u64)));
-        let err = send(&addr, &id("Laptop"), &[a], &Tx::default(), Duration::from_secs(5)).unwrap_err();
+        let err = send(
+            &addr,
+            &id("Laptop"),
+            &[a],
+            &Tx::default(),
+            Duration::from_secs(5),
+        )
+        .unwrap_err();
         assert!(matches!(h.join().unwrap(), Err(DtpError::Cancelled)));
         assert!(!matches!(err, DtpError::Denied(_)), "{err}");
-        assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 0, "no partial or final file");
+        assert_eq!(
+            fs::read_dir(dest.path()).unwrap().count(),
+            0,
+            "no partial or final file"
+        );
     }
 
     #[test]
@@ -772,8 +946,13 @@ mod tests {
         let (addr, h) = serve(dest.path().to_path_buf(), rx(true, None));
         let tx = Tx::default();
         tx.cancel.store(true, Ordering::SeqCst);
-        assert!(matches!(send(&addr, &id("L"), &[a], &tx, Duration::from_secs(5)), Err(DtpError::Cancelled)));
-        assert!(matches!(h.join().unwrap(), Err(DtpError::Remote(ref m)) if m.contains("sender cancelled")));
+        assert!(matches!(
+            send(&addr, &id("L"), &[a], &tx, Duration::from_secs(5)),
+            Err(DtpError::Cancelled)
+        ));
+        assert!(
+            matches!(h.join().unwrap(), Err(DtpError::Remote(ref m)) if m.contains("sender cancelled"))
+        );
         assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 0);
     }
 
@@ -791,9 +970,16 @@ mod tests {
         let dest = tempfile::tempdir().unwrap();
         let (addr, h) = serve(dest.path().to_path_buf(), rx(true, None));
         let mut s = TcpStream::connect(&addr).unwrap();
-        let hello = Hello { magic: MAGIC.into(), v: VERSION, public: "0".repeat(64), id: id("Evil") };
+        let hello = Hello {
+            magic: MAGIC.into(),
+            v: VERSION,
+            public: "0".repeat(64),
+            id: id("Evil"),
+        };
         write_frame(&mut s, &serde_json::to_vec(&hello).unwrap()).unwrap();
-        assert!(matches!(h.join().unwrap(), Err(DtpError::Protocol(ref m)) if m.contains("weak key")));
+        assert!(
+            matches!(h.join().unwrap(), Err(DtpError::Protocol(ref m)) if m.contains("weak key"))
+        );
     }
 
     #[test]

@@ -110,8 +110,14 @@ mod tests {
     #[test]
     fn key_derivation_is_deterministic_per_salt() {
         let salt = random_bytes(16);
-        assert_eq!(derive_key("pw", &salt).unwrap(), derive_key("pw", &salt).unwrap());
+        assert_eq!(
+            derive_key("pw", &salt).unwrap(),
+            derive_key("pw", &salt).unwrap()
+        );
         let salt2 = random_bytes(16);
-        assert_ne!(derive_key("pw", &salt).unwrap(), derive_key("pw", &salt2).unwrap());
+        assert_ne!(
+            derive_key("pw", &salt).unwrap(),
+            derive_key("pw", &salt2).unwrap()
+        );
     }
 }

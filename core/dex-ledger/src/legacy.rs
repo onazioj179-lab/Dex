@@ -32,20 +32,34 @@ fn int(v: &Value, k: &str) -> Option<i64> {
     v.get(k).and_then(|x| x.as_i64())
 }
 fn list<'a>(v: &'a Value, k: &str) -> Vec<&'a Value> {
-    v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().collect()).unwrap_or_default()
+    v.get(k)
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().collect())
+        .unwrap_or_default()
 }
 
 impl Ledger {
     pub fn import_legacy(&mut self, doc: &Value) -> R<Value> {
         let has_data: i64 = self
             .conn
-            .query_row("SELECT (SELECT COUNT(*) FROM accounts) + (SELECT COUNT(*) FROM transactions)", [], |r| r.get(0))
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM accounts) + (SELECT COUNT(*) FROM transactions)",
+                [],
+                |r| r.get(0),
+            )
             .map_err(err)?;
         if has_data > 0 {
-            return Err("This ledger already has accounts or transactions. Import only into a new ledger.".into());
+            return Err(
+                "This ledger already has accounts or transactions. Import only into a new ledger."
+                    .into(),
+            );
         }
         let currency = s(doc, "currency").trim().to_uppercase();
-        let currency = if money::is_valid_code(&currency) { currency } else { "USD".into() };
+        let currency = if money::is_valid_code(&currency) {
+            currency
+        } else {
+            "USD".into()
+        };
         let now = now_ms();
         let tx = self.conn.transaction().map_err(err)?;
         match setting(&tx, "currency") {
@@ -72,7 +86,9 @@ impl Ledger {
                 "checking" | "savings" | "cash" | "credit" => (kind_in.clone(), String::new()),
                 other => ("other".to_string(), format!("Imported as type: {other}")),
             };
-            let date = Some(s(a, "openingDate")).filter(|d| dates::is_valid(d)).unwrap_or_else(dates::today_utc);
+            let date = Some(s(a, "openingDate"))
+                .filter(|d| dates::is_valid(d))
+                .unwrap_or_else(dates::today_utc);
             let name = s(a, "name");
             tx.execute(
                 "INSERT INTO accounts (name, kind, opening_balance, opening_date, archived, notes, sort, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
@@ -86,37 +102,76 @@ impl Ledger {
         let mut group_ids: HashMap<(String, String), i64> = HashMap::new();
         let mut cat_ids: HashMap<String, (i64, String)> = HashMap::new();
         for (i, c) in list(doc, "categories").into_iter().enumerate() {
-            let kind = if s(c, "kind") == "income" { "income" } else { "expense" }.to_string();
-            let gname = Some(s(c, "group")).filter(|g| !g.trim().is_empty()).unwrap_or_else(|| if kind == "income" { "Income".into() } else { "Imported".into() });
+            let kind = if s(c, "kind") == "income" {
+                "income"
+            } else {
+                "expense"
+            }
+            .to_string();
+            let gname = Some(s(c, "group"))
+                .filter(|g| !g.trim().is_empty())
+                .unwrap_or_else(|| {
+                    if kind == "income" {
+                        "Income".into()
+                    } else {
+                        "Imported".into()
+                    }
+                });
             let key = (gname.clone(), kind.clone());
             let gid = match group_ids.get(&key) {
                 Some(g) => *g,
                 None => {
-                    tx.execute("INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)", params![gname, kind, group_ids.len() as i64]).map_err(err)?;
+                    tx.execute(
+                        "INSERT INTO category_groups (name, kind, sort) VALUES (?1, ?2, ?3)",
+                        params![gname, kind, group_ids.len() as i64],
+                    )
+                    .map_err(err)?;
                     let g = tx.last_insert_rowid();
                     group_ids.insert(key, g);
                     g
                 }
             };
-            let base = Some(s(c, "name")).filter(|n| !n.trim().is_empty()).unwrap_or_else(|| "Category".into());
+            let base = Some(s(c, "name"))
+                .filter(|n| !n.trim().is_empty())
+                .unwrap_or_else(|| "Category".into());
             // Names are unique within a group; suffix a number on a clash.
             let mut name = base.clone();
             let mut n = 2;
-            while tx.query_row("SELECT 1 FROM categories WHERE group_id = ?1 AND name = ?2", params![gid, name], |_| Ok(())).is_ok() {
+            while tx
+                .query_row(
+                    "SELECT 1 FROM categories WHERE group_id = ?1 AND name = ?2",
+                    params![gid, name],
+                    |_| Ok(()),
+                )
+                .is_ok()
+            {
                 name = format!("{base} ({n})");
                 n += 1;
             }
             tx.execute(
                 "INSERT INTO categories (group_id, name, archived, sort) VALUES (?1, ?2, ?3, ?4)",
-                params![gid, name, c.get("archived").and_then(|x| x.as_bool()).unwrap_or(false) as i64, i as i64],
+                params![
+                    gid,
+                    name,
+                    c.get("archived").and_then(|x| x.as_bool()).unwrap_or(false) as i64,
+                    i as i64
+                ],
             )
             .map_err(err)?;
             cat_ids.insert(s(c, "id"), (tx.last_insert_rowid(), kind));
         }
         if group_ids.values().count() == 0 || !group_ids.keys().any(|(_, k)| k == "income") {
-            tx.execute("INSERT INTO category_groups (name, kind, sort) VALUES ('Income', 'income', 99)", []).map_err(err)?;
+            tx.execute(
+                "INSERT INTO category_groups (name, kind, sort) VALUES ('Income', 'income', 99)",
+                [],
+            )
+            .map_err(err)?;
             let gid = tx.last_insert_rowid();
-            tx.execute("INSERT INTO categories (group_id, name) VALUES (?1, 'Income')", [gid]).map_err(err)?;
+            tx.execute(
+                "INSERT INTO categories (group_id, name) VALUES (?1, 'Income')",
+                [gid],
+            )
+            .map_err(err)?;
         }
 
         let status = |t: &Value| match int(t, "status").unwrap_or(0) {
@@ -127,18 +182,34 @@ impl Ledger {
         let lines = |t: &Value| -> Vec<(Option<i64>, i64, String)> {
             list(t, "splits")
                 .into_iter()
-                .map(|l| (l.get("categoryId").and_then(|x| x.as_str()).and_then(|c| cat_ids.get(c)).map(|c| c.0), int(l, "amountMinor").unwrap_or(0), s(l, "memo")))
+                .map(|l| {
+                    (
+                        l.get("categoryId")
+                            .and_then(|x| x.as_str())
+                            .and_then(|c| cat_ids.get(c))
+                            .map(|c| c.0),
+                        int(l, "amountMinor").unwrap_or(0),
+                        s(l, "memo"),
+                    )
+                })
                 .collect()
         };
 
         let mut imported = 0usize;
         let mut transfers: HashMap<String, Vec<&Value>> = HashMap::new();
         for t in list(doc, "transactions") {
-            if let Some(tid) = t.get("transferId").and_then(|x| x.as_str()).filter(|x| !x.is_empty()) {
+            if let Some(tid) = t
+                .get("transferId")
+                .and_then(|x| x.as_str())
+                .filter(|x| !x.is_empty())
+            {
                 transfers.entry(tid.to_string()).or_default().push(t);
                 continue;
             }
-            let Some(&acc) = acc_ids.get(&s(t, "accountId")) else { skipped.push(format!("{}: unknown account", s(t, "id"))); continue };
+            let Some(&acc) = acc_ids.get(&s(t, "accountId")) else {
+                skipped.push(format!("{}: unknown account", s(t, "id")));
+                continue;
+            };
             let date = s(t, "date");
             if !dates::is_valid(&date) {
                 skipped.push(format!("{}: bad date", s(t, "id")));
@@ -167,8 +238,13 @@ impl Ledger {
         }
         for (tid, legs) in transfers {
             let ok = legs.len() == 2
-                && legs.iter().all(|l| acc_ids.contains_key(&s(l, "accountId")) && dates::is_valid(&s(l, "date")));
-            let amounts: Vec<i64> = legs.iter().map(|l| lines(l).iter().map(|x| x.1).sum()).collect();
+                && legs.iter().all(|l| {
+                    acc_ids.contains_key(&s(l, "accountId")) && dates::is_valid(&s(l, "date"))
+                });
+            let amounts: Vec<i64> = legs
+                .iter()
+                .map(|l| lines(l).iter().map(|x| x.1).sum())
+                .collect();
             if !ok || amounts.len() != 2 || amounts[0] == 0 || amounts[0] != -amounts[1] {
                 skipped.push(format!("transfer {tid}: legs don't match"));
                 continue;
@@ -182,15 +258,29 @@ impl Ledger {
                 .map_err(err)?;
                 ids.push(tx.last_insert_rowid());
             }
-            tx.execute("UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2", params![ids[1], ids[0]]).map_err(err)?;
-            tx.execute("UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2", params![ids[0], ids[1]]).map_err(err)?;
+            tx.execute(
+                "UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2",
+                params![ids[1], ids[0]],
+            )
+            .map_err(err)?;
+            tx.execute(
+                "UPDATE transactions SET transfer_peer = ?1 WHERE id = ?2",
+                params![ids[0], ids[1]],
+            )
+            .map_err(err)?;
             imported += 2;
         }
 
         let mut budgets = 0usize;
         for b in list(doc, "budgets") {
             let month = s(b, "month");
-            let Some((cat, kind)) = b.get("categoryId").and_then(|x| x.as_str()).and_then(|c| cat_ids.get(c)) else { continue };
+            let Some((cat, kind)) = b
+                .get("categoryId")
+                .and_then(|x| x.as_str())
+                .and_then(|c| cat_ids.get(c))
+            else {
+                continue;
+            };
             let amount = int(b, "amountMinor").unwrap_or(0);
             if kind != "expense" || amount == 0 || !dates::is_valid_month(&month) {
                 continue;

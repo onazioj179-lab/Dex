@@ -165,6 +165,10 @@ jobs:
         with:
           workspaces: core
 
+      - name: Format
+        working-directory: core
+        run: cargo fmt --all -- --check
+
       - name: Test
         working-directory: core
         run: cargo test --workspace --locked

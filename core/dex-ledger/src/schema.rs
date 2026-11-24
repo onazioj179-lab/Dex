@@ -154,7 +154,8 @@ pub fn user_version(conn: &Connection) -> rusqlite::Result<i64> {
 /// Bring the database to `CURRENT_VERSION`. Refuses a database written by a
 /// newer DEX (it would not understand its schema).
 pub fn migrate(conn: &mut Connection) -> Result<i64, String> {
-    conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| e.to_string())?;
     let mut v = user_version(conn).map_err(|e| e.to_string())?;
     if v > CURRENT_VERSION {
         return Err(format!(
@@ -166,8 +167,10 @@ pub fn migrate(conn: &mut Connection) -> Result<i64, String> {
             continue;
         }
         let tx = conn.transaction().map_err(|e| e.to_string())?;
-        tx.execute_batch(sql).map_err(|e| format!("migration {ver} failed: {e}"))?;
-        tx.execute_batch(&format!("PRAGMA user_version = {ver};")).map_err(|e| e.to_string())?;
+        tx.execute_batch(sql)
+            .map_err(|e| format!("migration {ver} failed: {e}"))?;
+        tx.execute_batch(&format!("PRAGMA user_version = {ver};"))
+            .map_err(|e| e.to_string())?;
         tx.commit().map_err(|e| e.to_string())?;
         v = *ver;
     }
