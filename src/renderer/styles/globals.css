@@ -544,21 +544,20 @@ html[data-perf-tier="mid"] [data-resizing="true"],
 /* ═══════════════════════════════════════════════════════════════════════════
    MID TIER: Balance performance and beauty (4-core, 4-8GB, integrated GPU)
    ═══════════════════════════════════════════════════════════════════════════ */
-[data-perf-tier="mid"] * {
-  transition-duration: 80ms !important;
-}
-[data-perf-tier="mid"] *::before, [data-perf-tier="mid"] *::after {
-  animation-duration: 100ms !important;
-}
+/* Motion on mid tier is shortened through the duration tokens (TierManager ->
+   applyMotionDurations, animationDurationScale), not by forcing every element
+   to 80 ms / every pseudo-element animation to 100 ms (spinners ran 8-10x too
+   fast and every transition snapped). */
 /* Mid: cap all backdrop-filter blur at 8px for performance */
 [data-perf-tier="mid"] [style*="backdrop-filter"] {
   backdrop-filter: var(--blur-md) saturate(120%) !important;
   -webkit-backdrop-filter: var(--blur-md) saturate(120%) !important;
 }
-/* Mid: reduce heavy shadows */
-[data-perf-tier="mid"] [style*="box-shadow"] {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
-}
+/* (A mid-tier rule forced `box-shadow: 0 4px 16px rgba(0,0,0,.4) !important`
+   on every element whose inline style mentioned box-shadow -- including
+   `box-shadow: none` -- so on mid-tier machines every App Menu tile, Settings
+   row and panel became a heavy floating card. Static shadows are cheap; the
+   rule is gone. Guarded by tests/unit/perf-tier-css.test.ts.) */
 /* Mid: lower-res canvas rendering for integrated GPUs */
 [data-perf-tier="mid"] canvas {
   image-rendering: auto;

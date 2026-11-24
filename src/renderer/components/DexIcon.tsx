@@ -701,6 +701,7 @@ export const ICON_NAME_MAP: Record<string, string> = {
   // These two app ids had no glyph and rendered the letter fallback.
   'dashboard': 'layout-dashboard',
   'powerrename': 'type',
+  'uki': 'sparkle',
   
   // Text aliases for common use
   'star': 'emoji-star', 'sparkle': 'emoji-sparkle',

@@ -500,7 +500,7 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   { id: 'gallery', label: 'Gallery' },
   { id: 'audio', label: 'Audio' },
   // Tools
-  { id: 'uki', label: 'uki' },
+  { id: 'uki', label: 'UKI' },
   { id: 'calculator', label: 'Calculator' },
   { id: 'passwordgenerator', label: 'Passwords' },
   { id: 'transfers', label: 'Share' },
@@ -5200,9 +5200,10 @@ export const AppManager: React.FC = () => {
             <div
               key={app.id}
               ref={el => { if (el) tabRefs.current.set(app.id, el); else tabRefs.current.delete(app.id); }}
-              role="tab"
-              aria-selected={isActive}
-              aria-label={def?.name || app.id}
+              // The pill is presentational; the tab itself is the icon + name
+              // below, so the close button sits BESIDE the tab, not inside it
+              // (a button nested in role="tab" is unreachable to screen readers).
+              role="presentation"
               onPointerDown={e => handleTabDragStart(e, app.id)}
               onPointerMove={handleTabDragMove}
               onPointerUp={handleTabDragEnd}
@@ -5215,7 +5216,6 @@ export const AppManager: React.FC = () => {
                 }
               }}
               onDoubleClick={() => { if (!draggingTab) tileWindow(app.id as AppId, 'maximize'); }}
-              title="Double-click to maximize / restore"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '0 10px', height: 24, borderRadius: 6, /* pill-shaped tabs (owner request) */
@@ -5236,6 +5236,19 @@ export const AppManager: React.FC = () => {
               onMouseEnter={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
               onMouseLeave={e => { if (!isActive && !draggingTab) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
+              <span
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  if (minimizedApps.has(app.id)) restoreFloatingApp(app.id);
+                  bringToFront(app.id as AppId);
+                  setCurrentApp(app.id as AppId);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, borderRadius: 4, outlineOffset: 2 }}
+              >
               <span style={{ display: 'flex', color, alignItems: 'center', justifyContent: 'center', flexShrink: 0, pointerEvents: 'none' }}>
                 {AppIconPngs[app.id]
                   ? <AppIconImg appId={app.id} size={14} />
@@ -5248,6 +5261,7 @@ export const AppManager: React.FC = () => {
                 letterSpacing: '-0.01em', pointerEvents: 'none',
               }}>
                 {def?.name || app.id}
+              </span>
               </span>
               <button
                 aria-label={`Close ${def?.name || app.id}`}
