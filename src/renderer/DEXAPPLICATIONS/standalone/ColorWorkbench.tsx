@@ -110,7 +110,7 @@ export function ColorWorkbench({ hex, hsl, pick, copy }: {
       <summary>Contrast and color vision</summary>
       <div style={row}>
         <label>Background <input type="color" aria-label="Contrast background" value={colorInputValue(background)} onChange={event => setBackground(event.target.value)} /></label>
-        <span style={{ background, color: hex, padding: '3px 8px', borderRadius: 4 }}>Sample text</span>
+        <span aria-hidden="true" style={{ background, color: hex, padding: '3px 8px', borderRadius: 4 }}>Sample text</span>
         <output aria-live="polite">{ratio.toFixed(2)}:1 · {ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : 'Below AA'} for normal text</output>
       </div>
       <div style={row}>

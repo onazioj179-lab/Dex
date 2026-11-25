@@ -69,7 +69,7 @@ export const BudgetView: React.FC = () => {
         </select>
         {month !== monthOf(today) && <Btn small variant="ghost" onClick={() => setM(monthOf(today))}>This month</Btn>}
         <span className="lg-spacer" />
-        <Btn small icon="columns" aria-pressed={compare} onClick={() => setCompare(c => !c)} className={compare ? 'lg-active' : ''}>{compare ? 'Hide last month' : 'Compare with last month'}</Btn>
+        <Btn small icon="columns" aria-pressed={compare} onClick={() => setCompare(c => !c)}>{compare ? 'Hide last month' : 'Compare with last month'}</Btn>
         <Btn small icon="copy" onClick={copyPrev} className="lg-hide-xs">Copy last month</Btn>
         <Btn small icon="shuffle" onClick={() => setMoveFrom({ id: null, name: 'To assign', available: b?.toAssign ?? 0 })}>Move money</Btn>
         <Btn small icon="plus" onClick={() => setNewGroup(true)} className="lg-hide-xs">Group</Btn>
@@ -94,7 +94,7 @@ export const BudgetView: React.FC = () => {
           {b.overspentCount > 0 && <div className="lg-banner lg-warn" style={{ marginTop: 8 }}>{b.overspentCount} categor{b.overspentCount === 1 ? 'y is' : 'ies are'} overspent. Move money to cover {b.overspentCount === 1 ? 'it' : 'them'}.</div>}
           {b.uncategorizedCount > 0 && (
             <div className="lg-banner" style={{ marginTop: 8 }}>
-              <span style={{ flex: 1 }}>{b.uncategorizedCount} transaction{b.uncategorizedCount === 1 ? '' : 's'} this month ({<Money minor={b.uncategorizedAmount} sign />}) have no category and aren't in the budget.</span>
+              <span style={{ flex: 1 }}>{b.uncategorizedCount} transaction{b.uncategorizedCount === 1 ? '' : 's'} this month ({<Money minor={b.uncategorizedAmount} sign />}) {b.uncategorizedCount === 1 ? "has no category and isn't" : "have no category and aren't"} in the budget.</span>
               <Btn small onClick={() => go('transactions', { categoryId: -1 })}>Categorise</Btn>
             </div>
           )}
@@ -129,7 +129,7 @@ export const BudgetView: React.FC = () => {
                             <DexIcon name={g.collapsed ? 'chevron-right' : 'chevron-down'} size={11} color="currentColor" />
                             {g.name}
                           </button>
-                          <button type="button" className="lg-btn lg-btn-ghost lg-btn-sm" style={{ marginLeft: 6 }} aria-label={`Add category to ${g.name}`} onClick={() => { setAdding(g.id); setNewName(''); }}>+</button>
+                          <IconBtn icon="plus" label={`Add category to ${g.name}`} style={{ marginLeft: 6, width: 22, height: 22, verticalAlign: 'middle' }} onClick={() => { setAdding(g.id); setNewName(''); }} />
                         </td>
                         {compare && <td className="lg-hide-sm" />}
                         {compare && <td className="lg-hide-sm" />}

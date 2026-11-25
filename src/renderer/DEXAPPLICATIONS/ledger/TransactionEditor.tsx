@@ -7,6 +7,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { SegmentedControl } from '../../components/controls';
 import { ledger, LedgerError, newIdempotencyKey, type TxnDetail, type Attachment } from './ledgerApi';
 import { todayLocal } from './money';
 import { useLedger, Btn, IconBtn, Field, MoneyInput, CategorySelect, AccountSelect, Money, errText, type EditorRequest } from './ledgerUi';
@@ -182,19 +183,22 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
       <Head title={isEdit ? (kind === 'transfer' ? 'Transfer' : 'Transaction') : 'New transaction'} onClose={onClose} />
       <div className="lg-inspector-body">
         {!isEdit && (
-          <div className="lg-segment" role="group" aria-label="Type" style={{ alignSelf: 'flex-start' }}>
-            {(['expense', 'income', 'transfer'] as Kind[]).map(k => (
-              <button key={k} type="button" aria-pressed={kind === k} onClick={() => { setKind(k); if (k === 'transfer') setSplit(false); }}>
-                {k === 'expense' ? 'Money out' : k === 'income' ? 'Money in' : 'Transfer'}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<Kind>
+            aria-label="Type"
+            style={{ alignSelf: 'flex-start' }}
+            value={kind}
+            onChange={k => { setKind(k); if (k === 'transfer') setSplit(false); }}
+            options={[{ value: 'expense', label: 'Money out' }, { value: 'income', label: 'Money in' }, { value: 'transfer', label: 'Transfer' }]}
+          />
         )}
         {isEdit && kind !== 'transfer' && (
-          <div className="lg-segment" role="group" aria-label="Direction" style={{ alignSelf: 'flex-start' }}>
-            <button type="button" aria-pressed={kind === 'expense'} onClick={() => setKind('expense')}>Money out</button>
-            <button type="button" aria-pressed={kind === 'income'} onClick={() => setKind('income')}>Money in</button>
-          </div>
+          <SegmentedControl<Kind>
+            aria-label="Direction"
+            style={{ alignSelf: 'flex-start' }}
+            value={kind}
+            onChange={setKind}
+            options={[{ value: 'expense', label: 'Money out' }, { value: 'income', label: 'Money in' }]}
+          />
         )}
         {reconciled && <div className="lg-banner"><DexIcon name="lock" size={12} color="currentColor" /> Reconciled on a statement. Notes can change freely; amounts and dates ask first.</div>}
 
@@ -287,7 +291,7 @@ export const TransactionEditor: React.FC<{ request: EditorRequest; onClose: () =
         {isEdit && <Btn variant="danger" icon="trash" onClick={remove}>Delete</Btn>}
         <span className="lg-spacer" />
         <Btn variant="ghost" onClick={onClose}>{isEdit ? 'Close' : 'Cancel'}</Btn>
-        <button type="submit" className="lg-btn lg-btn-primary" disabled={!canSave || busy}>{busy ? 'Saving…' : isEdit ? 'Save' : 'Add'}</button>
+        <Btn type="submit" variant="primary" disabled={!canSave || busy}>{busy ? 'Saving…' : isEdit ? 'Save' : 'Add'}</Btn>
       </div>
       {preview && (
         <div className="lg-modal-backdrop" onMouseDown={() => setPreview(null)} role="dialog" aria-label={preview.name}>

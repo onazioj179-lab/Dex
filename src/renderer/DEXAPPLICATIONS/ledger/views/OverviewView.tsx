@@ -4,9 +4,10 @@
 // =============================================================================
 
 import React, { useState } from 'react';
-import { ledger, ACCOUNT_KIND_LABEL, type AccountKind, type Overview } from '../ledgerApi';
+import { ledger, ACCOUNT_KIND_LABEL, ACCOUNT_KINDS, type Overview } from '../ledgerApi';
 import { formatDate, monthEnd, monthOf, shiftMonth, formatMonth } from '../money';
 import { useLedger, useLedgerQuery, Money, Btn, Empty, errText, StatusDot } from '../ledgerUi';
+import { SegmentedControl } from '../../../components/controls';
 
 type Period = 'month' | 'last' | 'quarter' | 'year';
 
@@ -40,13 +41,12 @@ export const OverviewView: React.FC = () => {
         <h1>Overview</h1>
         <span className="lg-sub">{r.label}</span>
         <span className="lg-spacer" />
-        <div className="lg-segment" role="group" aria-label="Period">
-          {(['month', 'last', 'quarter', 'year'] as Period[]).map(p => (
-            <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)}>
-              {p === 'month' ? 'This month' : p === 'last' ? 'Last month' : p === 'quarter' ? '3 months' : 'Year'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<Period>
+          aria-label="Period"
+          value={period}
+          onChange={setPeriod}
+          options={[{ value: 'month', label: 'This month' }, { value: 'last', label: 'Last month' }, { value: 'quarter', label: '3 months' }, { value: 'year', label: 'Year' }]}
+        />
       </div>
       <div className="lg-scroll">
         <div className="lg-pad">
@@ -93,7 +93,7 @@ export const OverviewView: React.FC = () => {
               <div className="lg-panel">
                 <table className="lg-table">
                   <tbody>
-                    {(Object.keys(o.balanceByKind) as AccountKind[]).map(k => (
+                    {ACCOUNT_KINDS.filter(k => o.balanceByKind[k] !== undefined).map(k => (
                       <tr key={k}><td>{ACCOUNT_KIND_LABEL[k]}</td><td className="lg-r"><Money minor={o.balanceByKind[k] || 0} /></td></tr>
                     ))}
                   </tbody>
@@ -114,7 +114,7 @@ export const OverviewView: React.FC = () => {
                           <td className="lg-muted" style={{ width: 96 }}>{formatDate(t.date)}</td>
                           <td>{t.isTransfer ? `Transfer ${t.amount < 0 ? 'to' : 'from'} ${t.transferAccountName}` : t.payee || <span className="lg-muted">No payee</span>}</td>
                           <td className="lg-muted lg-hide-sm">{t.accountName}</td>
-                          <td className="lg-hide-xs" style={{ width: 22 }}><StatusDot status={t.status} /></td>
+                          <td className="lg-hide-xs" style={{ width: 40 }}><StatusDot status={t.status} /></td>
                           <td className="lg-r"><Money minor={t.amount} tone="auto" /></td>
                         </tr>
                       ))}

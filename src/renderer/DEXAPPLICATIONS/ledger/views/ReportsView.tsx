@@ -127,7 +127,7 @@ const IncomeExpense: React.FC<{ d: IE }> = ({ d }) => {
       </div>
       {!any ? <Empty icon="bar-chart-2" title="No categorised income or spending in this period" /> : (
         <>
-          <div className="lg-section-title">By month <span className="lg-muted" style={{ fontWeight: 400 }}>· <span style={{ color: 'var(--color-accent)' }}>■</span> income <span>■</span> expenses</span></div>
+          <div className="lg-section-title">By month <span className="lg-muted" style={{ fontWeight: 400 }}>·<span className="lg-swatch" aria-hidden="true" />income<span className="lg-swatch lg-alt" aria-hidden="true" />expenses</span></div>
           <div className="lg-bars" role="img" aria-label="Income and expenses by month">
             {d.rows.map(r => (
               <div key={r.month} className="lg-bar-row">

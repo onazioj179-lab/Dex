@@ -202,6 +202,9 @@ export default defineConfig({
           // lazy-imported separately by AppManager, but were all collapsed into one
           // ~370K `app-standalone` chunk — so opening any one downloaded all of them.
           // Give each standalone app its own chunk so only what's opened loads.
+          // MapsDirections is part of the Maps app (only Maps imports it) and
+          // shares maplibre-gl with it; its own chunk made a maps <-> directions cycle.
+          if (id.includes('DEXAPPLICATIONS/standalone/MapsDirections')) return 'app-standalone-maps';
           if (id.includes('DEXAPPLICATIONS/standalone/')) {
             const m = id.match(/DEXAPPLICATIONS\/standalone\/([^/.]+)/);
             return m ? `app-standalone-${m[1].toLowerCase()}` : 'app-standalone';

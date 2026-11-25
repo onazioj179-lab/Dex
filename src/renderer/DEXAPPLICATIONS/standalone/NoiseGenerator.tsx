@@ -939,7 +939,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   presetBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-    padding: '14px var(--space-2)', borderRadius: 16, cursor: 'pointer',
+    padding: '14px var(--space-2)', borderRadius: 18, cursor: 'pointer',
     border: '1px solid', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s',
   },

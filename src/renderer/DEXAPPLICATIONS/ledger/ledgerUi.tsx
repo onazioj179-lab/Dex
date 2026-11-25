@@ -7,6 +7,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { Button, type ButtonVariant } from '../../ui/Button';
 import { formatMoney, parseMoneyInput, minorToDecimalString, localeDecimalSeparator } from './money';
 import { LEDGER_CHANGED, LedgerError, type Account, type CategoryGroup, type LedgerStatus } from './ledgerApi';
 
@@ -138,11 +139,22 @@ export const MoneyInput: React.FC<{
   );
 };
 
-export const Btn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' | 'default'; icon?: string; small?: boolean }> = ({ variant = 'default', icon, small, children, className, ...rest }) => (
-  <button type="button" className={`lg-btn lg-btn-${variant} ${small ? 'lg-btn-sm' : ''} ${className || ''}`} {...rest}>
-    {icon && <DexIcon name={icon} size={small ? 12 : 14} color="currentColor" />}
-    {children !== undefined && children !== null && children !== false && <span>{children}</span>}
-  </button>
+const BTN_VARIANT: Record<'primary' | 'ghost' | 'danger' | 'default', ButtonVariant> = {
+  primary: 'primary', ghost: 'ghost', danger: 'danger', default: 'secondary',
+};
+
+/** The shared DEX pill button (ui/Button) with Ledger's short prop names. */
+export const Btn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' | 'default'; icon?: string; small?: boolean }> = ({ variant = 'default', icon, small, children, className, style, ...rest }) => (
+  <Button
+    size="sm"
+    variant={BTN_VARIANT[variant]}
+    leftIcon={icon ? <DexIcon name={icon} size={small ? 12 : 14} color="currentColor" /> : undefined}
+    className={`lg-btn-x ${className || ''}`}
+    style={small ? { height: 26, ...style } : style}
+    {...rest}
+  >
+    {children !== undefined && children !== null && children !== false ? children : null}
+  </Button>
 );
 
 export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: string; label: string; active?: boolean }> = ({ icon, label, active, className, ...rest }) => (
@@ -229,7 +241,7 @@ export const StatusDot: React.FC<{ status: 'uncleared' | 'cleared' | 'reconciled
   const label = status === 'reconciled' ? 'Reconciled' : status === 'cleared' ? 'Cleared' : 'Uncleared';
   const content = (
     <span className={`lg-status lg-status-${status}`} aria-hidden="true">
-      {status === 'reconciled' ? <DexIcon name="lock" size={10} color="currentColor" /> : status === 'cleared' ? 'C' : ''}
+      {status === 'reconciled' ? <DexIcon name="lock" size={10} color="currentColor" /> : status === 'cleared' ? <DexIcon name="check" size={10} color="currentColor" /> : null}
     </span>
   );
   if (!onToggle || status === 'reconciled') return <span title={label} aria-label={label} role="img">{content}</span>;
@@ -244,7 +256,7 @@ export const LEDGER_CSS = `
 .lg-side { width: var(--lg-side); flex-shrink: 0; border-right: 1px solid var(--color-border-subtle); background: var(--color-bg-inset); display: flex; flex-direction: column; min-height: 0; }
 .lg-side.lg-collapsed { width: 48px; }
 .lg-side-scroll { overflow-y: auto; flex: 1; padding: 8px 6px; scrollbar-width: thin; }
-.lg-nav-row { display: flex; align-items: center; gap: 9px; width: 100%; height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+.lg-nav-row { display: flex; align-items: center; gap: 9px; width: 100%; height: 28px; padding: 0 10px; border: none; border-radius: 9999px; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
 .lg-nav-row:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .lg-nav-row.lg-active { background: var(--color-accent-light); color: var(--color-text-primary); }
 .lg-nav-row.lg-active .lg-nav-icon { color: var(--color-accent); }
@@ -253,7 +265,7 @@ export const LEDGER_CSS = `
 .lg-nav-meta { font-size: 12px; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lg-side-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-tertiary); }
 .lg-side-group { margin-top: 2px; }
-.lg-side-group-btn { display: flex; align-items: center; gap: 6px; width: 100%; height: 24px; padding: 0 8px; border: none; background: transparent; color: var(--color-text-tertiary); font: inherit; font-size: 12px; cursor: pointer; border-radius: 6px; }
+.lg-side-group-btn { display: flex; align-items: center; gap: 6px; width: 100%; height: 24px; padding: 0 8px; border: none; background: transparent; color: var(--color-text-tertiary); font: inherit; font-size: 12px; cursor: pointer; border-radius: 9999px; }
 .lg-side-group-btn:hover { color: var(--color-text-primary); }
 .lg-side-group-btn .lg-nav-meta { margin-left: auto; }
 .lg-side-foot { border-top: 1px solid var(--color-border-subtle); padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; }
@@ -263,9 +275,8 @@ export const LEDGER_CSS = `
 .lg-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; margin: 8px 8px 4px; border-radius: 14px; min-height: 44px; flex-wrap: wrap;
   /* Floating toolbar on the shared frosted material; the tables below stay opaque. */
   background: color-mix(in srgb, var(--color-bg-base, #0c0c0e) 72%, transparent); backdrop-filter: blur(24px) saturate(170%); -webkit-backdrop-filter: blur(24px) saturate(170%);
-  border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 6px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.10); }
+  border: 1px solid var(--color-border-subtle); box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
 @media (prefers-reduced-transparency: reduce) { .lg-toolbar { backdrop-filter: none; background: var(--color-bg-elevated); } }
-.lg-toolbar .lg-btn, .lg-toolbar .lg-input, .lg-toolbar select.lg-input { border-radius: 9999px; }
 .lg-toolbar h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.01em; color: var(--color-text-primary); }
 .lg-toolbar .lg-sub { color: var(--color-text-tertiary); font-size: 12px; }
 .lg-spacer { flex: 1; }
@@ -274,24 +285,25 @@ export const LEDGER_CSS = `
 .lg-inspector { width: 320px; flex-shrink: 0; border-left: 1px solid var(--color-border-subtle); background: var(--color-bg-inset); display: flex; flex-direction: column; min-height: 0; }
 .lg-inspector-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border-subtle); font-weight: 600; font-size: 13px; }
 .lg-inspector-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.lg-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text-primary); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
-.lg-btn:hover:not(:disabled) { background: var(--color-bg-hover); }
+/* Buttons are the shared ui/Button pill (Btn). These classes remain only for
+   the borderless in-table text buttons (account names, activity amounts). */
+.lg-btn { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 9999px; border: 1px solid transparent; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.lg-btn:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .lg-btn:disabled { opacity: .45; cursor: default; }
 .lg-btn-sm { height: 24px; padding: 0 8px; font-size: 12px; }
-.lg-btn-primary { background: var(--color-accent-fill); border-color: transparent; color: var(--color-accent-text, #fff); }
-.lg-btn-primary:hover:not(:disabled) { background: var(--color-accent); }
-.lg-btn-ghost { background: transparent; border-color: transparent; color: var(--color-text-secondary); }
-.lg-btn-ghost:hover:not(:disabled) { color: var(--color-text-primary); }
-.lg-btn-danger { background: transparent; border-color: var(--color-border); color: var(--color-error); }
-.lg-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; flex-shrink: 0; }
+.dex-ledger .dex-btn.lg-btn-x[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 16%, transparent); border-color: transparent; color: var(--color-text-primary); }
+.lg-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; flex-shrink: 0; }
 .lg-icon-btn:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .lg-icon-btn.lg-active { color: var(--color-accent); background: var(--color-accent-soft); }
 .lg-icon-btn:disabled { opacity: .4; cursor: default; }
-.lg-input { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg-base); color: var(--color-text-primary); font: inherit; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
-textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height: 56px; }
+.lg-input { height: 28px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--color-border); background: var(--color-bg-inset); color: var(--color-text-primary); font: inherit; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
+textarea.lg-input { height: auto; padding: 8px 12px; border-radius: 14px; resize: vertical; min-height: 56px; }
+/* No focus glow: the caret is the cue, the hairline only steps up a shade. */
+.lg-input:focus, .lg-input:focus-visible { outline: none !important; border-color: var(--color-border-strong, var(--color-border)); box-shadow: none; }
+select.lg-input { padding-right: 8px; }
 .lg-input.lg-invalid { border-color: var(--color-error); }
 .lg-table td.lg-cell-edit { padding: 0 4px; overflow: visible; }
-.lg-table td.lg-cell-edit .lg-input { height: 24px; }
+.lg-table td.lg-cell-edit .lg-input { height: 24px; padding: 0 9px; }
 .lg-money-input { display: inline-flex; flex-direction: column; width: 100%; }
 .lg-field-error { color: var(--color-error); font-size: 11.5px; margin-top: 3px; }
 .lg-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -309,45 +321,41 @@ textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height
 .lg-table th { position: sticky; top: 0; z-index: 1; background: var(--color-bg-base); text-align: left; font-weight: 500; font-size: 11.5px; color: var(--color-text-tertiary); padding: 0 10px; height: 30px; border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; user-select: none; }
 .lg-table th.lg-r, .lg-table td.lg-r { text-align: right; }
 .lg-table th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
-.lg-table th button:hover { color: var(--color-text-primary); }
+.dex-ledger .lg-table th button:hover, .dex-ledger .lg-table th button:active { color: var(--color-text-primary); background: transparent; }
 .lg-table td { padding: 0 10px; height: var(--lg-row); border-bottom: 1px solid var(--color-border-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 .lg-table tbody tr { cursor: default; }
 .lg-table tbody tr:hover td { background: color-mix(in srgb, var(--color-bg-hover) 55%, transparent); }
 .lg-table tbody tr.lg-selected td { background: var(--color-accent-light); }
 .lg-table tbody tr:focus-visible td { background: var(--color-bg-hover); }
 .lg-muted { color: var(--color-text-tertiary); }
-.lg-tag { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; height: 18px; border-radius: 4px; background: var(--color-bg-hover); color: var(--color-text-secondary); font-size: 11.5px; }
+.lg-tag { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; height: 18px; border-radius: 9999px; background: var(--color-bg-hover); color: var(--color-text-secondary); font-size: 11.5px; }
 .lg-status { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 9.5px; font-weight: 700; border: 1.5px solid var(--color-border); color: transparent; }
 .lg-status-cleared { border-color: var(--color-accent); color: var(--color-accent); }
 .lg-status-reconciled { border-color: transparent; background: var(--color-accent-fill); color: #fff; }
 .lg-status-btn { all: unset; cursor: pointer; display: inline-flex; border-radius: 50%; }
 .lg-status-btn:hover .lg-status { border-color: var(--color-border-strong); }
-.lg-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--color-border-subtle); border-radius: 10px; overflow: hidden; }
+.lg-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--color-border-subtle); border-radius: 14px; overflow: hidden; }
 .lg-summary > div { padding: 12px 14px; border-right: 1px solid var(--color-border-subtle); min-width: 0; }
 .lg-summary > div:last-child { border-right: none; }
 .lg-summary-label { font-size: 11.5px; color: var(--color-text-tertiary); margin-bottom: 4px; }
 .lg-summary-value { font-size: 18px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .lg-section-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
-.lg-panel { border: 1px solid var(--color-border-subtle); border-radius: 10px; overflow: hidden; }
+.lg-panel { border: 1px solid var(--color-border-subtle); border-radius: 14px; overflow: hidden; }
+.lg-panel-head { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 4px 10px 4px 14px; background: var(--color-bg-inset); border-bottom: 1px solid var(--color-border-subtle); }
+.lg-footer { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 16px; border-top: 1px solid var(--color-border-subtle); font-size: 12px; }
+.lg-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: var(--color-accent); margin: 0 4px 0 6px; vertical-align: 0; }
+.lg-swatch.lg-alt { background: var(--color-text-tertiary); }
 .lg-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px 16px; text-align: center; }
 .lg-empty-title { font-weight: 600; color: var(--color-text-secondary); }
 .lg-empty-body { color: var(--color-text-tertiary); max-width: 420px; line-height: 1.5; font-size: 12.5px; }
 .lg-modal-backdrop { position: absolute; inset: 0; z-index: 50; background: rgba(0,0,0,.42); display: flex; align-items: center; justify-content: center; }
-.lg-modal { background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,.45); max-height: calc(100% - 32px); display: flex; flex-direction: column; }
+.lg-modal { background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 18px; box-shadow: 0 16px 48px rgba(0,0,0,.45); max-height: calc(100% - 32px); display: flex; flex-direction: column; }
 .lg-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; font-weight: 600; }
 .lg-modal-body { padding: 4px 16px 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .lg-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border-subtle); }
-/* DEX Capsule geometry (controls/capsuleTokens): one pill, 2 px inset + 1 px
-   outline, segments are concentric pills (radius 12 inside the 15 px outer), no
-   dividers, shared accent tint for the selected one. */
-.lg-segment { display: inline-flex; align-items: center; gap: 0; padding: 2px; border: 1px solid var(--color-border-subtle); border-radius: 15px; background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
-.lg-segment button { border: none; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12.5px; padding: 0 10px; height: 24px; border-radius: 12px; cursor: pointer; transition: background .12s ease, color .12s ease; }
-.lg-segment button:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
 .lg-month { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--color-border-subtle); border-radius: 17px; background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
 .lg-month h1 { min-width: 140px; text-align: center; margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.lg-month button { border-radius: 14px; }
-.lg-segment button[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 22%, transparent); color: var(--color-text-primary); font-weight: 600; }
-.lg-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: 8px; background: var(--color-bg-hover); font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; }
+.lg-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: 10px; background: var(--color-bg-hover); font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; }
 .lg-banner.lg-warn { background: rgba(255,159,10,.12); color: var(--color-text-primary); }
 .lg-banner.lg-error { background: rgba(255,69,58,.12); color: var(--color-text-primary); }
 .lg-bars { display: flex; flex-direction: column; gap: 6px; }
@@ -356,10 +364,10 @@ textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height
 .lg-bar-fill { height: 100%; background: var(--color-accent); border-radius: 4px; }
 .lg-bar-fill.lg-alt { background: var(--color-text-tertiary); }
 .lg-budget-group td { background: var(--color-bg-inset); font-weight: 600; font-size: 12px; }
-.lg-budget-cell { cursor: text; border-radius: 4px; padding: 2px 6px; }
+.lg-budget-cell { cursor: text; border-radius: 9999px; padding: 2px 8px; }
 .lg-budget-cell:hover { background: var(--color-bg-hover); }
 .lg-hscroll { overflow-x: auto; }
-.lg-kbd { font-size: 11px; color: var(--color-text-tertiary); border: 1px solid var(--color-border); border-radius: 4px; padding: 0 4px; }
+.lg-kbd { font-size: 11px; color: var(--color-text-tertiary); border: 1px solid var(--color-border); border-radius: 6px; padding: 0 5px; }
 @container ledger (max-width: 760px) {
   .lg-side:not(.lg-collapsed) { position: absolute; left: 0; top: 0; bottom: 0; z-index: 21; box-shadow: 8px 0 24px rgba(0,0,0,.35); }
   .lg-inspector { position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; box-shadow: -8px 0 24px rgba(0,0,0,.35); width: min(340px, 92%); }
@@ -368,7 +376,7 @@ textarea.lg-input { height: auto; padding: 6px 8px; resize: vertical; min-height
 }
 @container ledger (max-width: 520px) { .lg-hide-xs { display: none !important; } .lg-toolbar { padding: 8px 10px; } .lg-pad { padding: 10px; } }
 @media print {
-  .lg-side, .lg-toolbar .lg-btn, .lg-toolbar .lg-icon-btn, .lg-inspector, .dex-app-shell > header { display: none !important; }
+  .lg-side, .lg-toolbar .dex-btn, .lg-toolbar .lg-icon-btn, .lg-toolbar [data-dex-capsule], .lg-toolbar .dex-search-control, .lg-inspector, .dex-app-shell > header { display: none !important; }
   .lg-scroll { overflow: visible !important; }
   .dex-ledger { color: #000; }
 }
