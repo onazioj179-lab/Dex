@@ -5868,18 +5868,19 @@ export const AppManager: React.FC = () => {
         <div style={{
           position: 'fixed', inset: 0, zIndex: 'var(--z-max)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: 'linear-gradient(165deg, #0a0a0c 0%, #111114 50%, #0a0a0c 100%)',
+          // Theme surface, not a dark gradient: light mode no longer flashes a
+          // black screen at every start.
+          background: 'var(--color-bg-base)',
           animation: splashProgress >= 100 ? 'fadeOut 0.3s ease forwards' : undefined,
         }}>
           <style>{`@keyframes fadeOut { to { opacity: 0; } } @keyframes splashPulse { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }`}</style>
           <div style={{ marginBottom: 28, animation: 'splashPulse 1.5s ease-in-out infinite' }}>
             <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
-              <defs><linearGradient id="sg" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stopColor="#4a9eff"/><stop offset="100%" stopColor="#a855f7"/></linearGradient></defs>
-              <rect x="2" y="2" width="20" height="20" rx="5" stroke="url(#sg)" strokeWidth="1.5" fill="none"/>
-              <path d="M8 7l4 5-4 5M13 17h4" stroke="url(#sg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="2" y="2" width="20" height="20" rx="5" stroke="var(--color-accent)" strokeWidth="1.5" fill="none"/>
+              <path d="M8 7l4 5-4 5M13 17h4" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', marginBottom: 'var(--space-6)' }}>DEX</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', marginBottom: 'var(--space-6)' }}>DEX</div>
           <div style={{ width: 200, height: 3, borderRadius: 2, background: 'var(--color-border-subtle)', overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 2, background: 'var(--color-accent-fill, #0A84FF)', width: `${splashProgress}%`, transition: 'width 0.3s ease' }} />
           </div>

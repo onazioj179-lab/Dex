@@ -41,14 +41,20 @@ vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().m
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); map.handlers.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); takeCalendarDraft(); });
 
+/** The map starts once its tile worker URL is set (async): wait for it. */
+async function mapReady() {
+  await waitFor(() => expect(map.handlers.has('click')).toBe(true));
+}
+
 function clickMap(lng: number, lat: number) {
   act(() => map.handlers.get('click')?.({ lngLat: { lng, lat } }));
 }
 
-it('starts a Calendar draft and encodes the dropped pin as a geo QR payload', () => {
+it('starts a Calendar draft and encodes the dropped pin as a geo QR payload', async () => {
   const receive = vi.fn();
   function Receiver() { useCreativeInput('qrcode', receive); return null; }
   render(<><Maps /><Receiver /></>);
+  await mapReady();
   clickMap(3.39, 6.45);
   fireEvent.click(screen.getByRole('button', { name: 'QR code' }));
   expect(receive).toHaveBeenCalledWith('geo:6.45,3.39');
@@ -58,8 +64,9 @@ it('starts a Calendar draft and encodes the dropped pin as a geo QR payload', ()
   expect(draft.end.getTime() - draft.start.getTime()).toBe(30 * 60_000);
 });
 
-it('measures each segment of a map path and can undo the last point', () => {
+it('measures each segment of a map path and can undo the last point', async () => {
   render(<Maps />);
+  await mapReady();
   fireEvent.click(screen.getByRole('button', { name: 'Measure distance' }));
   clickMap(0, 0);
   clickMap(0, 1);

@@ -37,8 +37,17 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // Production only: the dev server rewrites that file for the window (it injects
 // its client and a 4.5 MB inline source map), so the worker never answered and
 // the map hung on "Loading map"; in dev maplibre's own resolution works.
+// Dev: neither works (maplibre's own lookup 404s on the pre-bundled copy; the
+// served file gets the dev client injected and hangs), so the raw source runs
+// from a Blob URL (CSP worker-src allows blob:). The map waits for this.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-if (import.meta.env.PROD) maplibregl.setWorkerUrl?.(maplibreWorkerUrl);
+const workerReady: Promise<void> = import.meta.env.PROD
+  ? Promise.resolve(maplibregl.setWorkerUrl?.(maplibreWorkerUrl))
+  : import.meta.env.MODE === 'test'
+    ? Promise.resolve() // unit tests mock the map; no worker runs
+    : import('maplibre-gl/dist/maplibre-gl-worker.mjs?raw')
+    .then((m) => { maplibregl.setWorkerUrl?.(URL.createObjectURL(new Blob([m.default], { type: 'text/javascript' }))); })
+    .catch(() => undefined);
 import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
 import { DexSearchInput } from '../../styles/components';
@@ -346,8 +355,13 @@ const DexMaps: React.FC = () => {
   const distanceKm = measurePts.slice(1).reduce((total, point, i) => total + haversineKm(measurePts[i], point), 0);
 
   // Initialise the map once.
+  const [workerSet, setWorkerSet] = useState(false);
+  // The map is created asynchronously (after its worker URL), so effects that
+  // attach to it re-run once it exists.
+  const [mapLive, setMapLive] = useState(false);
+  useEffect(() => { let live = true; void workerReady.then(() => { if (live) setWorkerSet(true); }); return () => { live = false; }; }, []);
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!workerSet || !containerRef.current || mapRef.current) return;
     let map: maplibregl.Map;
     try {
       map = new maplibregl.Map({
@@ -364,6 +378,7 @@ const DexMaps: React.FC = () => {
       return;
     }
     mapRef.current = map;
+    setMapLive(true);
     map.once('idle', () => setMapReady(true));
     // Track rotation/tilt for the compass, and remember the view (debounced).
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -391,9 +406,9 @@ const DexMaps: React.FC = () => {
     map.on('data', (e: maplibregl.MapSourceDataEvent | maplibregl.MapStyleDataEvent) => {
       if ((e as { tile?: unknown }).tile && lastTileError && Date.now() - lastTileError > 3000) { lastTileError = 0; setTilesFailing(false); }
     });
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; };
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; setMapLive(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [workerSet]);
 
   // Map click: in measure mode collect points; otherwise drop a pin.
   const measuringRef = useRef(measuring);
@@ -416,11 +431,11 @@ const DexMaps: React.FC = () => {
     map.on('click', onClick);
     return () => { map.off('click', onClick); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addMeasurePoint]);
+  }, [addMeasurePoint, mapLive]);
 
   useEffect(() => {
     mapRef.current?.setStyle(MAP_STYLES[styleKey].style);
-  }, [styleKey]);
+  }, [styleKey]); // the map is created with the current style; only changes re-style it
 
   useEffect(() => {
     const map = mapRef.current;
@@ -454,7 +469,7 @@ const DexMaps: React.FC = () => {
     else map.once('idle', draw);
     map.on('style.load', draw);
     return () => { map.off('style.load', draw); map.off('idle', draw); };
-  }, [measurePts, styleKey]);
+  }, [measurePts, styleKey, mapLive]);
 
   // UKI-driven navigation: assistant dispatches `dex-maps-goto`.
   useEffect(() => {
