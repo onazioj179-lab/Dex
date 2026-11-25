@@ -10,6 +10,7 @@
  * Grid + list views, favorites, albums, lightbox with video playback.
  */
 
+import { VideoEnhance } from '../components/media/VideoEnhance';
 import { useCreativeInput } from '../services/creativeIntake';
 import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
@@ -423,6 +424,10 @@ export const Gallery: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Real-time upscaling of small videos to the screen's resolution (remembered).
+  const [enhanceVideo, setEnhanceVideo] = useState<boolean>(() => { try { return localStorage.getItem('dex-gallery-enhance') !== '0'; } catch { return true; } });
+  const [enhanceActive, setEnhanceActive] = useState(false);
+  useEffect(() => { try { localStorage.setItem('dex-gallery-enhance', enhanceVideo ? '1' : '0'); } catch { /* storage blocked */ } }, [enhanceVideo]);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   // Image zoom/pan state (iOS-style)
@@ -2251,8 +2256,16 @@ export const Gallery: React.FC = () => {
                   <DexIcon name="film" size={16} />
                 </button>
               )}
+              {selectedMedia.type === 'video' && (
+                <button
+                  style={{ ...styles.lightboxBtn, width: 'auto', padding: '0 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600, background: enhanceVideo ? 'var(--color-accent-fill)' : (styles.lightboxBtn as React.CSSProperties).background, color: enhanceVideo ? 'var(--color-accent-text)' : undefined }}
+                  onClick={() => setEnhanceVideo(v => !v)}
+                  aria-pressed={enhanceVideo}
+                  aria-label={enhanceVideo ? (enhanceActive ? 'Enhance video: upscaling to screen resolution' : 'Enhance video: on (not needed at this size)') : 'Enhance video: off'}
+                >Enhance</button>
+              )}
               <button style={styles.lightboxBtn} onClick={() => setShowMediaInfo(prev => !prev)} aria-label="Info">{Icons.info}</button>
-              <button style={styles.lightboxBtn} onClick={() => deleteMedia(selectedMedia)} aria-label="Move to Recycle Bin" title="Move to Recycle Bin">{Icons.trash}</button>
+              <button style={styles.lightboxBtn} onClick={() => deleteMedia(selectedMedia)} aria-label="Move to Recycle Bin">{Icons.trash}</button>
             </div>
           </div>
 
@@ -2281,6 +2294,7 @@ export const Gallery: React.FC = () => {
                       onPause={() => setVideoPlaying(false)}
                       style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 10 }}
                     />
+                    <VideoEnhance video={videoRef} enabled={enhanceVideo} onActiveChange={setEnhanceActive} />
                     {/* Center play/pause overlay */}
                     {!videoPlaying && (
                       <div

@@ -3318,6 +3318,17 @@ export const AppManager: React.FC = () => {
     // Pinch/spread only drive the overview when started on the bare desktop: a
     // pinch inside an app (zooming a photo, a map, a canvas) is the app's, and on
     // the spatial desktop it zooms the camera instead.
+    // Three fingers down: leave Stage Manager, or show the desktop.
+    const unsub3D = gestureRecognizer.on('three-finger-swipe-down', () => {
+      if (onCanvas()) return;
+      if (showOverviewRef.current) { setShowOverview(false); return; }
+      setCurrentRunningApp('home' as AppId);
+    });
+    // Up from the bottom edge (touch): the App Menu, like a tablet home swipe.
+    const unsubEdgeUp = gestureRecognizer.on('edge-swipe-up', () => {
+      if (onCanvas()) return;
+      setShowAppMenu(true);
+    });
     const unsubPinch = gestureRecognizer.on('two-finger-pinch', (g) => {
       if (!g.onDesktop || isSpatialEnabled()) return;
       setShowOverview(false);
@@ -3395,7 +3406,7 @@ export const AppManager: React.FC = () => {
       gestureEngine.destroy();
       window.removeEventListener('dex-gesture', handleGesture);
       window.removeEventListener('dex-stage-toggle', toggleStage);
-      unsub3L(); unsub3R(); unsub3U(); unsubPinch(); unsubSpread();
+      unsub3L(); unsub3R(); unsub3U(); unsub3D(); unsubEdgeUp(); unsubPinch(); unsubSpread();
       gestureRecognizer.detach();
     };
   }, [goBack, goForward, runningApps, currentAppId, setCurrentRunningApp]);
