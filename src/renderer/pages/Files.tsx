@@ -11,6 +11,11 @@
  */
 
 import { toMediaUrl } from '../utils/mediaUrl';
+import { PlayableVideo, PlayableAudio } from '../components/media/PlayableMedia';
+
+/** Every common audio/video type previews; formats WebView2 cannot decode are prepared first. */
+const PREVIEW_VIDEO_EXTS = ['.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.mpg', '.mpeg', '.ts', '.mts', '.m2ts', '.3gp', '.ogv', '.vob', '.asf', '.f4v'];
+const PREVIEW_AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.wma', '.aiff', '.aif', '.ape', '.alac', '.wv', '.ac3', '.dts', '.mka', '.amr'];
 import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
@@ -2440,8 +2445,8 @@ export const Files: React.FC = () => {
               />
             )}
             {/* Video Preview */}
-            {['.mp4', '.mov', '.webm'].includes(previewFile.extension.toLowerCase()) && (
-              <video
+            {PREVIEW_VIDEO_EXTS.includes(previewFile.extension.toLowerCase()) && (
+              <PlayableVideo
                 src={toMediaUrl(previewFile.path)}
                 controls
                 autoPlay
@@ -2449,11 +2454,11 @@ export const Files: React.FC = () => {
               />
             )}
             {/* Audio Preview */}
-            {['.mp3', '.wav', '.m4a', '.ogg'].includes(previewFile.extension.toLowerCase()) && (
+            {PREVIEW_AUDIO_EXTS.includes(previewFile.extension.toLowerCase()) && (
               <div style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-8)', borderRadius: 10 }}>
                 <Icons.music size={64} />
                 <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)', fontSize: 16 }}>{previewFile.name}</div>
-                <audio src={toMediaUrl(previewFile.path)} controls autoPlay style={{ width: 300 }} />
+                <PlayableAudio src={toMediaUrl(previewFile.path)} controls autoPlay style={{ width: 300 }} />
               </div>
             )}
             {/* File Name */}

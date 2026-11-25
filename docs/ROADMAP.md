@@ -7,8 +7,13 @@
 > PowerShell sessions accept ls -la / rm -rf / grep / head / tail / which / touch / open / pbcopy (terminal_compat.rs, tested
 > in real PowerShell); Task Manager hover readout, now/avg/peak/low, collapsible rail and details; Notes export to Word
 > (.docx, no dependency) + superscript/subscript/justify/clear formatting. Store contrast fix (Pill opaque tint).
-> **Not done (owner list):** AXL / Bio / engineering / Ledger completion passes; VLC-class audio/video playback engine for
-> Gallery (all formats and sizes) and audio scrubber UI; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
+> **Media playback (third batch): DONE.** `media_compat.rs` (media:probe/prepare/cacheInfo/clearCache): ffprobe decides
+> direct / remux / transcode; remux copies streams (seconds), transcode -> H.264+AAC or FLAC for lossless audio; cached in
+> <data>/media-cache (20 GB, oldest-first). Gallery, Quick Look, Files preview and Audio fall back automatically; shared
+> MediaScrubber (second-accurate, hover time, buffered, keyboard); Gallery speed control + light-mode-safe controls. Needs
+> system FFmpeg (winget install Gyan.FFmpeg); without it direct formats still stream and others say so.
+> **Not done (owner list):** AXL / Bio / engineering / Ledger completion passes; Gallery grid thumbnails for non-direct
+> video formats; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
 > surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.
 
 > **GOAL (2026-11-25) — Owner: "users still complain: Terminal, coding in DEX Code, UKI files in and out + indexing,

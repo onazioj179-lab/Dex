@@ -10,6 +10,7 @@
  * Renders centered preview panel with backdrop blur.
  */
 
+import { PlayableVideo, PlayableAudio } from '../components/media/PlayableMedia';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
 import { analyzeBeats, analyzeKey, analyzeLoudness, analyzeSilence } from '../services/media/analyzeBeats';
@@ -264,7 +265,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'video':
       return (
-        <video
+        <PlayableVideo
           src={item.content}
           controls
           autoPlay
@@ -276,7 +277,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <audio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} />
+          <PlayableAudio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} wrapperStyle={{ width: '100%', maxWidth: 400 }} />
           <AudioAnalysis source={item.content} />
         </div>
       );
