@@ -62,13 +62,39 @@ That is roughly **40 assigned slots**; the other ~960 stay **unbound and reserve
 catalog (or, for an app, it derives automatically) — and it appears in the terminal,
 palette, UKI, and keyboard at once.
 
+## System-wide shortcuts (work from any app in Windows)
+
+Registered with Windows (`RegisterHotKey`) by `src-tauri/src/global_hotkeys.rs`, so they
+work while DEX is in the background or minimized. A press brings DEX to the front and
+runs the action (`services/globalHotkeys.ts`). Change, turn off or reset them in
+Settings › Help › System-wide shortcuts; each row shows whether Windows accepted the key
+or another app already holds it. Stored in `<data>/dex-global-hotkeys.json`. An isolated
+test profile (`DEX_DATA_DIR`) does not register them.
+
+| Default | Action |
+|---------|--------|
+| `Ctrl+Alt+D` | Show DEX, or minimize it when it is already in front |
+| `Ctrl+Alt+U` | Ask UKI (opens the UKI panel) |
+| `Ctrl+Alt+Space` | Search DEX (App Menu) |
+| `Ctrl+Alt+V` | Clipboard history |
+| `Ctrl+Alt+N` | New note |
+| `Ctrl+Alt+T` | Open Terminal |
+
+The defaults avoid DEX's own in-app `Ctrl+Alt` keys (arrows, digits, S, Z, F, W, G, `[`, `]`,
+`` ` ``), because a registered key is taken from every app, DEX included. A key needs Ctrl,
+Alt or Win, so a system-wide shortcut can never swallow plain typing.
+
 ## Per-app shortcuts (in-app, not global)
 
 These live inside individual apps (part of the reserved per-app space above), so
 they are scoped to the focused app and do not appear in the global catalog:
 
 - **DexCode** — `Ctrl/Cmd+M` jump to the matching bracket; the status bar shows
-  live selection stats (chars / lines) while text is selected.
+  live selection stats (chars / lines) while text is selected. `Ctrl/Cmd+/` comments
+  or uncomments the selected lines (`//`, `#` or `--` by file type); `Tab` / `Shift+Tab`
+  indent / outdent the selected lines; `Alt+Up/Down` move lines; `Shift+Alt+Up/Down`
+  duplicate them. Brackets and quotes wrap a selection. These win over the shell's
+  `Ctrl+/` (shortcut list) and `Alt+Shift+Arrows` (tiling) while the editor has focus.
 - **Any modal / overlay** — `Escape` closes it (now uniformly, incl. the Kanban
   card editor).
 

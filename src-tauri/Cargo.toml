@@ -49,7 +49,7 @@ webview2-com = "0.39"
 windows-core = "0.62"
 # UKI voice: Windows.Media.SpeechRecognition (speech_ctl.rs). Windows Speech uses the 0.61 bindings separately from
 # the WebView2 interop above.
-windows = { version = "0.61", features = ["Media_SpeechRecognition", "Foundation", "Foundation_Collections", "Globalization"] }
+windows = { version = "0.61", features = ["Media_SpeechRecognition", "Foundation", "Foundation_Collections", "Globalization", "Win32_Foundation", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
 tauri-plugin-updater = { version = "2.14.1", default-features = false, features = ["native-tls", "system-proxy"] }
 # The updater's reqwest negotiates TLS ALPN (native-tls-alpn), so GitHub answers
 # over HTTP/2; without reqwest's http2 feature hyper panics ("http2 feature is not

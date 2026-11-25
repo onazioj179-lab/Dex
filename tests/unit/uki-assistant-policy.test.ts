@@ -153,6 +153,20 @@ describe('file tools', () => {
     expect(invoke).toHaveBeenCalledWith('files:trash', 'C:\\Users\\me\\Downloads\\old.zip');
     expect(invoke.mock.calls.some((c) => c[0] === 'files:delete')).toBe(false);
   });
+  it('write_file saves a new file, never overwrites, and refreshes the index', async () => {
+    const existing = new Set(['C:\\Users\\me\\Documents\\sum.md', 'C:\\Users\\me\\Documents\\sum (2).md']);
+    const invoke = vi.fn(async (ch: string, path?: unknown) => {
+      if (ch === 'fs:readFileHead') return existing.has(String(path)) ? { __dexBinary: btoa('x') } : null;
+      if (ch === 'fs:writeText') return { ok: true };
+      return { success: true };
+    });
+    const r = await runFileTool('write_file', { path: 'C:\\Users\\me\\Documents\\sum.md', content: '# Hi' }, { invoke, scopes });
+    expect(invoke).toHaveBeenCalledWith('fs:writeText', 'C:\\Users\\me\\Documents\\sum (3).md', '# Hi');
+    expect(invoke).toHaveBeenCalledWith('search:sync');
+    expect(r).toMatch(/Saved .*sum \(3\)\.md.*number was added/);
+    expect(await runFileTool('write_file', { path: 'C:\\Windows\\x.txt', content: 'a' }, { invoke, scopes })).toMatch(/outside your allowed folders/);
+    expect(await runFileTool('write_file', { path: 'C:\\Users\\me\\Documents\\e.txt', content: '' }, { invoke, scopes })).toMatch(/Nothing to write/);
+  });
   it('find_files drops results outside the scopes', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, files: [{ path: 'C:\\Users\\me\\Documents\\a.txt' }, { path: 'C:\\Windows\\a.txt' }] });
     const r = await runFileTool('find_files', { query: 'a' }, { invoke, scopes });

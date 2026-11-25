@@ -19,7 +19,7 @@ vi.mock('../../src/renderer/uki/permissions', () => ({
 }));
 const fileCalls: string[] = [];
 vi.mock('../../src/renderer/uki/fileTools', () => ({
-  FILE_TOOL_NAMES: ['find_files', 'read_file', 'create_folder', 'rename_file', 'move_file', 'trash_file'],
+  FILE_TOOL_NAMES: ['find_files', 'read_file', 'write_file', 'create_folder', 'rename_file', 'move_file', 'trash_file'],
   runFileTool: vi.fn(async (name: string) => { fileCalls.push(name); return `ok ${name}`; }),
 }));
 

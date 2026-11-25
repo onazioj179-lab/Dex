@@ -67,6 +67,7 @@ const TOOL_TITLES: Record<string, string> = {
   move_file: 'move a file',
   rename_file: 'rename a file',
   create_folder: 'create a folder',
+  write_file: 'save a file',
   schedule_task: 'schedule a task',
   cancel_scheduled_task: 'delete a scheduled task',
   cancel_command: 'stop a running command',
@@ -365,7 +366,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
     web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
-    find_files: 4, find_context: 4, list_projects: 2, read_file: 6, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
+    find_files: 4, find_context: 4, list_projects: 2, read_file: 6, write_file: 3, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
     schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
     run_command: 3, command_status: 6, cancel_command: 2,
   });

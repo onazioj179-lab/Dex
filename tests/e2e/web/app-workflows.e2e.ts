@@ -48,7 +48,7 @@ test.describe('App workflows (web renderer)', () => {
       const nav = settings.getByRole('button', { name: 'Navigate to General settings' });
       await expect(nav).toHaveCSS('box-shadow', 'none');
       const field = settings.getByRole('searchbox', { name: 'Search all settings' });
-      await expect(field.locator('..')).toHaveCSS('border-radius', '6px');
+      await expect(field.locator('..')).toHaveCSS('border-radius', '9999px');
       const reopen = settings.locator('[data-setting-row="Reopen apps and windows"]');
       const label = await reopen.getByText('Reopen apps and windows', { exact: true }).boundingBox();
       const toggle = await reopen.getByRole('switch').boundingBox();
@@ -70,7 +70,7 @@ test.describe('App workflows (web renderer)', () => {
 
       await open(page, 'inbox');
       const inbox = page.locator('.smart-inbox');
-      await expect(inbox.getByRole('searchbox', { name: 'Search inbox' }).locator('..')).toHaveCSS('border-radius', '6px');
+      await expect(inbox.getByRole('searchbox', { name: 'Search inbox' }).locator('..')).toHaveCSS('border-radius', '9999px');
       await page.evaluate(() => window.dispatchEvent(new CustomEvent('dex-notification', {
         detail: { title: 'Design review', body: 'Read the notes from this morning', source: 'Notes' },
       })));

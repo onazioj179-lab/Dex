@@ -28,6 +28,15 @@ import { classifyOperatorIntent, diagnose } from '../../uki/operator';
 import { useSpinnerVerb } from '../../uki/spinnerVerbs';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import type { ChatMessage } from '../../uki/providers/types';
+import {
+  attachmentFromFile, attachmentFromPath, pickFilePaths, attachmentsPrompt, attachmentImages, attachmentsLabel,
+  replyFileName, saveTextAs, MAX_ATTACHMENTS, UKI_ATTACH_EVENT, takeHandedOffAttachments, type UkiAttachment,
+} from '../../uki/attachments';
+import { summarizeText } from '../../uki/assistive';
+
+function toast(type: 'success' | 'error' | 'info', message: string): void {
+  try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
+}
 
 interface Conversation {
   id: string;
@@ -272,6 +281,11 @@ export default function Uki(): React.ReactElement {
   // screenshot for a vision-capable model. Only offered when both screen capture
   // (Electron) and a vision provider are available.
   const [lookAtScreen, setLookAtScreen] = useState(false);
+  // Files the user attached for the next message (dropped or picked).
+  const [attachments, setAttachments] = useState<UkiAttachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [savedPath, setSavedPath] = useState<{ id: string; path: string } | null>(null);
   const screenVisionReady = isScreenCaptureAvailable() && hasVisionProvider();
   const [lookWithCamera, setLookWithCamera] = useState(false);
   const cameraVisionReady = isCameraCaptureAvailable() && hasVisionProvider();
@@ -412,9 +426,62 @@ export default function Uki(): React.ReactElement {
     setMessages((m) => [...m, note]);
   }, []);
 
+  const addAttachments = useCallback((items: Array<UkiAttachment | string>) => {
+    const errors = items.filter((x): x is string => typeof x === 'string');
+    const ok = items.filter((x): x is UkiAttachment => typeof x !== 'string');
+    if (errors.length) toast('error', errors.join(' '));
+    if (!ok.length) return;
+    setAttachments((prev) => {
+      const next = [...prev, ...ok].slice(0, MAX_ATTACHMENTS);
+      if (prev.length + ok.length > MAX_ATTACHMENTS) toast('info', `Up to ${MAX_ATTACHMENTS} files per message.`);
+      return next;
+    });
+    inputRef.current?.focus();
+  }, []);
+  // Files dropped on the floating UKI panel arrive here.
+  useEffect(() => {
+    const take = () => { const got = takeHandedOffAttachments(); if (got.length) addAttachments(got); };
+    take();
+    window.addEventListener(UKI_ATTACH_EVENT, take);
+    return () => window.removeEventListener(UKI_ATTACH_EVENT, take);
+  }, [addAttachments]);
+  const attachFiles = useCallback(async (files: FileList | File[]) => {
+    addAttachments(await Promise.all(Array.from(files).map((f) => attachmentFromFile(f).catch(() => `Could not read ${f.name}.`))));
+  }, [addAttachments]);
+  const pickAttachments = useCallback(async () => {
+    const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    if (dex?.invoke) {
+      const invoke = dex.invoke.bind(dex);
+      const paths = await pickFilePaths(invoke);
+      if (paths.length) addAttachments(await Promise.all(paths.map((p) => attachmentFromPath(invoke, p))));
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [addAttachments]);
+  const saveReply = useCallback(async (m: Message) => {
+    const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    if (!dex?.invoke) {
+      // Web preview: hand the reply over as a download instead.
+      const url = URL.createObjectURL(new Blob([m.content], { type: 'text/markdown' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = replyFileName(m.content); a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
+    try {
+      const path = await saveTextAs(dex.invoke.bind(dex), m.content, replyFileName(m.content));
+      if (path) { setSavedPath({ id: m.id, path }); toast('success', `Saved ${path.split(/[\\/]/).pop()}`); }
+    } catch (e) {
+      toast('error', `Could not save: ${(e as Error).message}`);
+    }
+  }, []);
+
   const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || busy) return;
+    const typed = input.trim();
+    const atts = attachments;
+    if ((!typed && !atts.length) || busy) return;
+    // With files attached, an empty message means "look at these".
+    const text = typed || (atts.some((a) => a.kind === 'text') ? 'Summarize the attached file.' : 'Describe the attached image.');
 
     // Ensure a conversation exists.
     let cid = activeId;
@@ -425,16 +492,18 @@ export default function Uki(): React.ReactElement {
       await refreshConversations();
     }
 
-    const userMsg: Message = { id: newId(), role: 'user', content: text, timestamp: Date.now() };
+    const label = attachmentsLabel(atts);
+    const userMsg: Message = { id: newId(), role: 'user', content: label ? `${typed}${typed ? '\n' : ''}${label}` : text, timestamp: Date.now() };
     setMessages((m) => [...m, userMsg]);
     setInput('');
+    setAttachments([]);
     autosize(inputRef.current);
     if (cid) void dexInvoke('uki-chat:appendMessage', cid, userMsg);
 
     // Slash commands run first against real DEX mechanisms (open/note/task/find/
     // run/timer/clipboard/focus/mute/notify). `/summarize` is intentionally left
     // to the planner below (uki.summarize). Unknown slashes fall through.
-    if (text.startsWith('/') && !/^\/summari[sz]e\b/i.test(text)) {
+    if (!atts.length && text.startsWith('/') && !/^\/summari[sz]e\b/i.test(text)) {
       const outcome = await runSlashCommand(text);
       if (outcome) {
         const reply: Message = { id: newId(), role: outcome.role, content: outcome.reply, timestamp: Date.now() };
@@ -447,7 +516,7 @@ export default function Uki(): React.ReactElement {
     // Imperative action? Decompose into a plan, then either hold for explicit
     // approval (mutating, e.g. opening an app) or run read-only LLM transforms.
     const command = buildChatCommand(text);
-    if (command.understood) {
+    if (!atts.length && command.understood) {
       if (command.tier === 'forbidden') {
         const note: Message = { id: newId(), role: 'system', content: 'That action is not allowed.', timestamp: Date.now() };
         setMessages((m) => [...m, note]);
@@ -480,7 +549,7 @@ export default function Uki(): React.ReactElement {
     // With no provider configured we reply with it directly (so factual questions
     // work without a key); with one configured we fold it into the prompt below.
     let grounding: string | null = null;
-    if (classifyKnowledgeIntent(text) !== 'none') {
+    if (!atts.length && classifyKnowledgeIntent(text) !== 'none') {
       const knowledge = await answerFactualQuestion(text);
       if (knowledge) {
         if (!hasConfiguredProvider()) {
@@ -497,7 +566,7 @@ export default function Uki(): React.ReactElement {
     // Operator (light touch): if the message clearly describes a problem and the
     // on-device troubleshooting knowledge has a confident hit, answer locally
     // instead of falling back to the raw LLM. Guarded so normal chat is untouched.
-    const localAnswer = tryOperatorLocalAnswer(text);
+    const localAnswer = atts.length ? null : tryOperatorLocalAnswer(text);
     if (localAnswer) {
       const reply: Message = { id: newId(), role: 'copilot', content: localAnswer, timestamp: Date.now() };
       setMessages((m) => [...m, reply]);
@@ -508,6 +577,14 @@ export default function Uki(): React.ReactElement {
     // Re-check live (the once-on-mount value can be stale if a key was just added).
     const isConfigured = hasConfiguredProvider();
     if (isConfigured !== configured) setConfigured(isConfigured);
+    if (!isConfigured && atts.some((a) => a.kind === 'text')) {
+      // No model: summarize the attached text on this device instead of refusing.
+      const parts = atts.filter((a) => a.kind === 'text' && a.text).map((a) => `${a.name}: ${summarizeText(a.text as string, 4) || '(empty)'}`);
+      const reply: Message = { id: newId(), role: 'copilot', content: `${parts.join('\n\n')}\n\nSummarized on this device. Add an AI provider for full answers about files.`, timestamp: Date.now() };
+      setMessages((m) => [...m, reply]);
+      if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+      return;
+    }
     if (!isConfigured) {
       const note: Message = {
         id: newId(),
@@ -530,11 +607,12 @@ export default function Uki(): React.ReactElement {
     }));
     // "Look at my screen": grab a still for this turn, then disarm the toggle so
     // it only applies to this one message. Capture failure degrades to text-only.
-    let images: string[] | undefined;
+    let images: string[] | undefined = atts.length ? attachmentImages(atts) : undefined;
+    if (images && !images.length) images = undefined;
     if (lookAtScreen) {
       setLookAtScreen(false);
       const shot = await captureScreenImage();
-      if (shot) images = [shot];
+      if (shot) images = [...(images ?? []), shot];
     }
     // "Use my camera": one frame for this message only; the camera is off again
     // before the request is sent.
@@ -545,8 +623,9 @@ export default function Uki(): React.ReactElement {
     }
     let full = '';
     try {
+      const filesBlock = attachmentsPrompt(atts);
       const result = await streamConfiguredLLM(
-        text,
+        filesBlock ? `${text}\n\n${filesBlock}` : text,
         buildSystemPrompt(grounding, text),
         (_token, running) => {
           full = running;
@@ -577,7 +656,7 @@ export default function Uki(): React.ReactElement {
       void dexInvoke('uki-chat:appendMessage', cid, reply);
       void refreshConversations();
     }
-  }, [input, busy, activeId, configured, messages, refreshConversations, autosize]);
+  }, [input, attachments, busy, activeId, configured, messages, refreshConversations, autosize]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -666,7 +745,27 @@ export default function Uki(): React.ReactElement {
       </aside>
 
       {/* Main: thread + composer */}
-      <main style={S.main}>
+      <main
+        style={S.main}
+        onDragOver={(e) => { if (Array.from(e.dataTransfer.types).includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragOver(false);
+          void attachFiles(e.dataTransfer.files);
+        }}
+      >
+        {dragOver && (
+          <div style={S.dropZone} aria-hidden="true">Drop files to attach them to your message</div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => { if (e.target.files?.length) void attachFiles(e.target.files); e.target.value = ''; }}
+        />
         <div ref={threadRef} style={S.thread} role="log" aria-live="polite" aria-relevant="additions">
           {messages.length === 0 && !streamingText && (
             <div style={S.welcome}>
@@ -679,8 +778,15 @@ export default function Uki(): React.ReactElement {
           )}
           {messages.map((m) => (
             <div key={m.id} style={{ ...S.row, justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ ...S.bubble, ...(m.role === 'user' ? S.bubbleUser : m.role === 'system' ? S.bubbleSystem : S.bubbleAi) }}>
-                {m.content}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 4, maxWidth: '76%' }}>
+                <div style={{ ...S.bubble, maxWidth: '100%', ...(m.role === 'user' ? S.bubbleUser : m.role === 'system' ? S.bubbleSystem : S.bubbleAi) }}>
+                  {m.content}
+                </div>
+                {m.role === 'copilot' && m.content.length > 40 && (
+                  <button type="button" style={S.replyAction} onClick={() => void saveReply(m)} aria-label="Save this reply as a file">
+                    {savedPath?.id === m.id ? 'Saved' : 'Save as file'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -721,6 +827,28 @@ export default function Uki(): React.ReactElement {
         </div>
 
         <div style={S.composer} className="dex-mat-frosted">
+          {attachments.length > 0 && (
+            <div style={S.chips} aria-label="Attached files">
+              {attachments.map((a) => (
+                <span key={a.id} style={S.chip}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}{a.truncated ? ' (cut)' : ''}</span>
+                  <button
+                    type="button"
+                    style={S.chipRemove}
+                    onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                    aria-label={`Remove ${a.name}`}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => void pickAttachments()} aria-label="Attach files" style={S.attachBtn}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
           <textarea
             ref={inputRef}
             style={S.textarea}
@@ -730,7 +858,10 @@ export default function Uki(): React.ReactElement {
               autosize(e.target);
             }}
             onKeyDown={onKeyDown}
-            placeholder={busy ? 'uki is thinking…' : 'Message uki…  (Enter to send, Shift+Enter for newline)'}
+            onPaste={(e) => {
+              if (e.clipboardData.files.length) { e.preventDefault(); void attachFiles(e.clipboardData.files); }
+            }}
+            placeholder={busy ? 'Thinking…' : 'Message UKI'}
             rows={1}
             aria-label="Message uki"
           />
@@ -775,9 +906,9 @@ export default function Uki(): React.ReactElement {
             </button>
           )}
           <button
-            style={{ ...S.sendBtn, ...(!busy && !input.trim() ? S.sendBtnDisabled : null) }}
+            style={{ ...S.sendBtn, ...(!busy && !input.trim() && !attachments.length ? S.sendBtnDisabled : null) }}
             onClick={() => (busy ? stop() : void send())}
-            disabled={!busy && !input.trim()}
+            disabled={!busy && !input.trim() && !attachments.length}
             aria-label={busy ? 'Stop generating' : 'Send message'}
           >
             {busy ? 'Stop' : 'Send'}
@@ -793,7 +924,7 @@ const S: Record<string, React.CSSProperties> = {
   sidebar: { width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' },
   sidebarHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 14px var(--space-2)' },
   brand: { fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)' },
-  newBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  newBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 9999, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   // fullWidth is 100%: the side margins come off the width, or it overran the sidebar.
   searchInput: { margin: '0 var(--space-3) 10px', width: 'calc(100% - 2 * var(--space-3))', boxSizing: 'border-box' },
   convList: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 var(--space-2) var(--space-2)' },
@@ -821,11 +952,17 @@ const S: Record<string, React.CSSProperties> = {
   actionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: 6 },
   actionSummary: { margin: 0, fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', color: 'var(--color-text-secondary)', lineHeight: 1.5 },
   actionRow: { display: 'flex', gap: 'var(--space-2)', marginTop: 10 },
-  runBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '6px var(--space-4)', fontSize: 13, cursor: 'pointer' },
+  runBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 9999, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  cancelBtn: { background: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', borderRadius: 9999, padding: '6px var(--space-4)', fontSize: 13, cursor: 'pointer' },
   // Floating composer (DEX Floating Surface System, frosted material).
-  composer: { position: 'absolute', left: 0, right: 0, bottom: 14, margin: '0 auto', width: 'min(760px, calc(100% - 28px))', display: 'flex', gap: 6, alignItems: 'flex-end', padding: 6, borderRadius: 24, zIndex: 2 },
+  composer: { position: 'absolute', left: 0, right: 0, bottom: 14, margin: '0 auto', width: 'min(760px, calc(100% - 28px))', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'flex-end', padding: 6, borderRadius: 24, zIndex: 2 },
   textarea: { flex: 1, minWidth: 0, resize: 'none', maxHeight: 160, padding: '9px 12px', borderRadius: 14, border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: 14, lineHeight: 1.4, outline: 'none', fontFamily: 'inherit' },
   sendBtn: { background: 'var(--color-accent-fill)', color: '#fff', border: 'none', borderRadius: 9999, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
   sendBtnDisabled: { opacity: 0.5, cursor: 'default' },
+  attachBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, flexShrink: 0, cursor: 'pointer', background: 'transparent', color: 'var(--color-text-tertiary)', border: 'none', borderRadius: 9999 },
+  chips: { flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: 6, padding: '2px 4px 0' },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 240, height: 26, padding: '0 4px 0 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 12 },
+  chipRemove: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, flexShrink: 0, borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', cursor: 'pointer' },
+  replyAction: { height: 24, padding: '0 10px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' },
+  dropZone: { position: 'absolute', inset: 10, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 18, border: '2px dashed var(--color-accent)', background: 'var(--color-accent-light)', color: 'var(--color-accent)', fontSize: 14, fontWeight: 600, pointerEvents: 'none' },
 };

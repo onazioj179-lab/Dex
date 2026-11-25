@@ -79,6 +79,7 @@ mod connectors_ctl;
 mod containment_ctl;
 mod sandbox_ctl;
 mod gpu_priority;
+mod global_hotkeys;
 mod context_ctl;
 mod controls_ctl;
 mod corepc_ctl;
@@ -2576,6 +2577,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("healing:") { return healing_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("history:") { return history_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("hotkeys:") { return hotkey_ctl::dispatch(&app, &channel, &args); }
+    if channel.starts_with("global-hotkeys:") { return global_hotkeys::dispatch(&app, &channel, &args); }
     if channel.starts_with("http-transfer:") { return http_transfer_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("idle:") { return idle_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("import:") { return import_ctl::dispatch(&app, &channel, &args); }
@@ -3335,6 +3337,12 @@ fn main() {
             // path). Starts empty; the first sync restores it from disk (kept off
             // the startup path) so a relaunch diffs instead of rebuilding.
             app.manage(std::sync::Mutex::new(dex_scanner::Snapshot::new()));
+            // System-wide shortcuts (RegisterHotKey thread). An isolated test
+            // profile does not grab them, or it would take the keys from the
+            // user's own DEX running beside it.
+            if paths::data_dir_override().is_none() {
+                global_hotkeys::init(app.handle());
+            }
             // Notification center — persists under the app data dir, mirroring
             // Electron's userData/notifications.
             let notif_dir = app

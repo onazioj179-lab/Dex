@@ -171,8 +171,9 @@ const KeyboardShortcuts: React.FC = () => {
       if (!isEditable) { e.preventDefault(); openSticky(); return; }
     }
 
-    // Ctrl+/ or Cmd+/ toggles the pinned overlay.
-    if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.code === 'Slash')) {
+    // Ctrl+/ or Cmd+/ toggles the pinned overlay, unless the focused app already
+    // used the key (DEX Code: comment the selected lines).
+    if ((e.ctrlKey || e.metaKey) && (e.key === '/' || e.code === 'Slash') && !e.defaultPrevented) {
       e.preventDefault();
       if (sticky) { close(); } else { openSticky(); }
       return;

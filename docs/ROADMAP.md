@@ -1,5 +1,27 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-25) — Owner: "users still complain: Terminal, coding in DEX Code, UKI files in and out + indexing,
+> system-wide shortcuts with real behaviour, pill UI".** Done on `claude/main-ci-fix-uki`:
+> - **System-wide shortcuts: REAL.** `src-tauri/src/global_hotkeys.rs` registers keys with Windows (`RegisterHotKey`
+>   thread, `WM_HOTKEY`), brings DEX to the front, routes to UKI / search / clipboard / new note / Terminal; Show DEX
+>   toggles. Settings › Help lists each key with Windows' real answer (working / taken by another app), click-to-record,
+>   per-key and global switches, Restore defaults. Channels `global-hotkeys:*` (ABI lock updated). Rust tests incl. a
+>   real register/unregister. The old `hotkeys:*` store (stale Electron pages) is untouched and still unused.
+> - **DEX Code editing:** Tab with a multi-line selection replaced the code with two spaces; `(`/quotes over a selection
+>   deleted it; `'` in `don't` doubled. New `dexCode/editing.ts` (tested): block indent/outdent, wrap selection,
+>   word-aware quotes, Backspace one indent, Enter after `{([`/`:`, Ctrl+/ comment, Alt+Up/Down move, Shift+Alt duplicate.
+>   The shell's Ctrl+/ list and Alt+Shift tiling yield when the editor used the key.
+> - **Terminal:** restart race (the old shell's late exit could mark the new one exited and spawn a second shell); keys
+>   typed while the shell starts are queued instead of dropped; after exit, Enter starts a new shell.
+> - **UKI files:** in = attach (paperclip / native picker), drag-and-drop and paste into the UKI app; text/code fenced as
+>   untrusted data, images to vision; no provider = on-device summary of attached text. Out = "Save as file" on replies
+>   and a new `write_file` tool (Xack `uki.write_file` modify/ask, scoped, never overwrites, numbered name). Both trigger
+>   `search:sync` so new files are findable at once.
+> - **Pill UI:** UKI app buttons/chips, DEX Code mode tabs + icon buttons + find field, UKI panel header buttons,
+>   Terminal empty state.
+> - **Not done:** packaged-app click-through of the hotkeys and UKI native picker/save (needs a release build); file
+>   attach in the floating UKI panel (overlay) — only the UKI app has it.
+
 > **GOAL (2026-11-24) — Owner directive "system-wide design, architecture, maintenance and production reliability" (P0 light mode).**
 > - **Theme architecture: DONE (this branch).** `utils/theme.ts` is the one controller (preference dark | light | system,
 >   resolve, apply, OS-follow, cross-window `storage` sync, `dex-theme-changed` event); the `index.html` pre-paint script
@@ -3829,3 +3851,4 @@ These need DSP/ML or native hosting we don't fake.
 - Utility polish: Weather hourly/day names/day-night now use the city's clock; Converter's unit suffix and precision fixed; Colors, QR Code and Noise lost their letter placeholders; Stopwatch digits fit small windows; shared `ui/Button` and `TextInput` are pills with no focus glow.
 - Not done this round: Browser tab row into the top bar (its popovers would clip), UKI pass.
 - Browser: its tab row now sits in the DEX top bar when full-surface (one row; the global Back/Forward drive its history, popovers stay in the page). UKI: "what time is it" / date phrasings answered locally (`uki/localIntents.ts`), ordinary questions no longer get a "No worries, let me explain" prefix, "how do I open X" opens X, honest no-provider fallback. Pills/highlights: DexSearchInput is a real pill everywhere, Settings sidebar lost the extra accent bar, Power/Chat/icon-button glows removed.
+- UKI (owner correction 2026-11-24): no unprompted thought process (live step list, "step N" and per-answer "Show thinking" removed; "show your thinking" / "how did you get that" explains the last answer); spoken replies only when the user turns speech on (default off); placeholder "Ask UKI"; on-device assistive intents in `uki/assistive.ts` (natural-language notes saved to Notes, summaries of given text / the open app / clipboard / last answer, `/summarize` implemented); LLM prompt told not to narrate reasoning.

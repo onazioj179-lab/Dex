@@ -20,6 +20,7 @@ const ALLOWED = new Set([
   'src/renderer/DEXAPPLICATIONS/imosion/Imosion.tsx:resume',            // once: resumes the AudioContext
   'src/renderer/DEXAPPLICATIONS/standalone/KanbanApp.tsx:onKey',        // Escape closes its own dialog
   'src/renderer/pages/settingsPanels/SpatialDesktopPanel.tsx:onKey',    // shortcut capture while recording
+  'src/renderer/pages/settingsPanels/GlobalShortcutsPanel.tsx:onKey',   // shortcut capture while recording
 ]);
 
 function files(dir: string): string[] {
