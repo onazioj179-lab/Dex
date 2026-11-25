@@ -37,12 +37,31 @@ interface QuickLookRequest {
 const EXT_TYPE: Record<string, QuickLookItemType> = {};
 const register = (type: QuickLookItemType, exts: string[]) => exts.forEach(e => { EXT_TYPE[e] = type; });
 register('image', ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
-register('video', ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v']);
-register('audio', ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac']);
+// Every common media type: the ones WebView2 cannot decode are prepared for playback (media_compat.rs).
+register('video', ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg', 'ts', 'mts', 'm2ts', '3gp', 'ogv', 'vob', 'asf']);
+register('audio', ['mp3', 'wav', 'ogg', 'oga', 'opus', 'flac', 'm4a', 'aac', 'wma', 'aiff', 'aif', 'ape', 'alac', 'wv', 'ac3', 'mka', 'amr']);
 register('pdf', ['pdf']);
-register('note', ['txt', 'log', 'rtf']);
-register('code', ['js', 'jsx', 'ts', 'tsx', 'json', 'css', 'scss', 'html', 'xml', 'md', 'markdown',
+register('note', ['txt', 'log', 'rtf', 'nfo']);
+register('markdown', ['md', 'markdown']);
+register('table', ['csv', 'tsv']);
+register('code', ['js', 'jsx', 'ts', 'tsx', 'json', 'css', 'scss', 'html', 'xml',
   'py', 'rs', 'go', 'java', 'c', 'h', 'cpp', 'cs', 'sh', 'bash', 'yml', 'yaml', 'toml', 'ini', 'sql', 'php', 'rb', 'swift', 'kt']);
+
+const PREVIEW_CHARS = 200_000;
+
+function fmtSize(chars: number): string {
+  return chars >= 1_048_576 ? `${(chars / 1_048_576).toFixed(1)} MB` : `${Math.round(chars / 1024)} KB`;
+}
+
+/** Markdown → sanitised HTML, reusing Notes' parser. */
+async function markdownHtml(md: string): Promise<string> {
+  const [{ markdownToDoc }, { docToHTML }, purify] = await Promise.all([
+    import('../DEXAPPLICATIONS/notes/notesFileFormat'),
+    import('../DEXAPPLICATIONS/notes/NotesDocumentModel'),
+    import('dompurify'),
+  ]);
+  return purify.default.sanitize(docToHTML(markdownToDoc(md)));
+}
 
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.');
@@ -96,13 +115,29 @@ export const QuickLookHost: React.FC = () => {
       }
       if (!req.path) { show({ type: 'unknown', title, content: '' }); return; }
 
-      if (type === 'note' || type === 'code') {
-        const text = await readText(req.path);
-        show({ type: text != null ? type : 'unknown', title, content: text ?? '' });
+      const path = req.path;
+      if (type === 'note' || type === 'code' || type === 'markdown' || type === 'table') {
+        const text = await readText(path);
+        if (text == null) { show({ type: 'unknown', title, content: '', path, note: 'This file could not be read as text.' }); return; }
+        // Big logs and data files: preview the start instead of freezing the window.
+        const cut = text.length > PREVIEW_CHARS;
+        const shown = cut ? text.slice(0, PREVIEW_CHARS) : text;
+        const note = cut ? `Showing the first ${fmtSize(PREVIEW_CHARS)} of ${fmtSize(text.length)}. Open the file for all of it.` : undefined;
+        if (type === 'markdown') {
+          show({ type, title, content: await markdownHtml(shown), path, note });
+        } else {
+          show({ type, title, content: shown, path, note: type === 'table' ? (note ?? 'Showing up to 500 rows.') : note });
+        }
+      } else if (type === 'folder') {
+        const r = await (window as any).dex?.invoke?.('files:list', path).catch(() => null) as { files?: Array<{ name: string; isDirectory?: boolean }> } | null;
+        const files = (r?.files ?? []).slice().sort((a, b) => Number(!!b.isDirectory) - Number(!!a.isDirectory) || a.name.localeCompare(b.name));
+        const shown = files.slice(0, 400).map(f => ({ name: f.name, isDirectory: !!f.isDirectory }));
+        show({ type, title, content: JSON.stringify(shown), path, note: `${files.length.toLocaleString()} item${files.length === 1 ? '' : 's'}${files.length > shown.length ? `; showing ${shown.length}` : ''}` });
       } else if (type === 'image' || type === 'video' || type === 'audio' || type === 'pdf') {
-        show({ type, title, content: toFileUrl(req.path) });
+        show({ type, title, content: toFileUrl(path), path });
       } else {
-        show({ type, title, content: req.path });
+        const ext = extOf(title);
+        show({ type, title, content: path, path, note: ext ? `No preview for .${ext} files. Open it in its app.` : undefined });
       }
     };
     window.addEventListener('dex-quicklook', onRequest as EventListener);

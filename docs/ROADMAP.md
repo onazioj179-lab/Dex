@@ -16,6 +16,10 @@
 > preview/import; engine test). Bio Studio gains an Align tab (bioAlign.ts: Gotoh affine gaps, global/local, BLOSUM62, worker,
 > text export). AXL exports OBJ and 3MF from one shared tessellation (welded vertices) and saves every export through the native
 > Save dialog in the desktop app (backlog #168 export). Engineering = AXL; no separate app.
+> **Maps + Quick Look (fifth batch): DONE.** Maps: coordinates in search (decimal or DMS, offline), open GPX/KML/GeoJSON tracks
+> (line + waypoints, fit, length), export saved places / track as GPX. Quick Look: folders list their contents, Markdown rendered
+> (sanitised), CSV/TSV as a table, big text cut at 200 KB, all media types, click-to-zoom images, Open / Show in Explorer.
+> Shared downloadText/downloadBlob now use the native Save dialog in the desktop app (Bio, Maps, Presentation, Spatial exports).
 > **Not done (owner list):** further AXL/Bio/Ledger depth (e.g. multi-currency, MSA/BLAST-style search, B-rep solids); Gallery grid thumbnails for non-direct
 > video formats; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
 > surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.

@@ -54,6 +54,8 @@ import { DexSearchInput } from '../../styles/components';
 import { WindowToolbar, useUnifiedChrome } from '../../shell/windowChrome';
 import { searchPlaces, reversePlace, type Place } from './mapsServices';
 import { MapsDirections } from './MapsDirections';
+import { parseCoordinates, formatCoordinates, parseTrackFile, trackLengthKm, trackBounds, toGpx, type TrackData } from './mapsTracks';
+import { downloadText } from '../../improvements500/downloadBlob';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
@@ -297,6 +299,10 @@ const DexMaps: React.FC = () => {
 
   // Current dropped pin (for copy / save / send-to-notes), and the latest goTo target.
   const [pin, setPin] = useState<{ lat: number; lon: number; name: string; detail: string } | null>(null);
+  // An opened GPX / KML / GeoJSON file, drawn over the map.
+  const [track, setTrack] = useState<TrackData | null>(null);
+  const trackInputRef = useRef<HTMLInputElement>(null);
+  const trackMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   // Distance measuring uses a path of up to 32 points.
   const [measuring, setMeasuring] = useState(false);
@@ -540,9 +546,39 @@ const DexMaps: React.FC = () => {
     return () => unregisterUkiAppContext('maps');
   }, []);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const SRC = 'dex-track';
+    const draw = () => {
+      // Tiles still loading: try again when the map settles (as the measure line does).
+      if (!map.isStyleLoaded()) { map.once('idle', draw); return; }
+      if (map.getLayer(SRC)) map.removeLayer(SRC);
+      if (map.getSource(SRC)) map.removeSource(SRC);
+      if (!track) return;
+      map.addSource(SRC, { type: 'geojson', data: { type: 'FeatureCollection', features: track.lines.map((l) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: l } })) } });
+      map.addLayer({ id: SRC, type: 'line', source: SRC, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': canvasColor('--color-accent'), 'line-width': 4, 'line-opacity': 0.9 } });
+    };
+    for (const m of trackMarkersRef.current) m.remove();
+    trackMarkersRef.current = (track?.points ?? []).slice(0, 300).map((p) => {
+      const el = document.createElement('div');
+      el.style.cssText = 'width:10px;height:10px;border-radius:50%;background:var(--color-accent);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)';
+      el.setAttribute('aria-label', p.name);
+      return new maplibregl.Marker({ element: el }).setLngLat([p.lon, p.lat]).setPopup(new maplibregl.Popup({ offset: 10, closeButton: false }).setText(p.name)).addTo(map);
+    });
+    draw();
+    map.on('style.load', draw);
+    return () => { map.off('style.load', draw); map.off('idle', draw); };
+  }, [track]);
+
   // Cancel request work on query changes and ignore late responses.
   useEffect(() => {
     if (!searchQuery) return;
+    const coord = parseCoordinates(searchQuery);
+    if (coord) {
+      setSettledSearch({ query: searchQuery, results: [{ name: formatCoordinates(coord), detail: 'Coordinates', lat: coord.lat, lon: coord.lon }], error: null });
+      return;
+    }
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       // Photon knows addresses, streets, landmarks and businesses (ranked near
@@ -655,8 +691,30 @@ const DexMaps: React.FC = () => {
       aria-label="Search places"
     />
   );
+  const openTrackFile = async (file: File) => {
+    try {
+      const t = parseTrackFile(file.name, await file.text());
+      setTrack(t);
+      const b = trackBounds(t);
+      if (b && mapRef.current) mapRef.current.fitBounds(b, { padding: 60, maxZoom: 16, duration: isReduceMotion() ? 0 : 800 });
+    } catch (e) {
+      toast('error', (e as Error).message);
+    }
+  };
+  const exportGpx = (withTrack: boolean) => {
+    const lines = withTrack && track ? track.lines : [];
+    const name = withTrack && track ? track.name : 'DEX saved places';
+    downloadText(`${name.replace(/[\\/:*?"<>|]/g, '_')}.gpx`, toGpx(name, saved, lines), 'application/gpx+xml');
+  };
+
   const actionButtons = (
     <>
+      <input ref={trackInputRef} type="file" accept=".gpx,.kml,.geojson,.json" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void openTrackFile(f); e.target.value = ''; }} />
+      <button aria-label="Open a GPX, KML or GeoJSON track" onClick={() => trackInputRef.current?.click()} style={pillStyle}>
+        <DexIcon name="file-plus" size={14} />
+        Track
+      </button>
       <button aria-label="Directions" aria-pressed={drawer === 'directions'}
         onClick={() => (drawer === 'directions' ? setDrawer(null) : openDirections(pin))}
         style={{ ...pillStyle, ...(drawer === 'directions' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
@@ -821,10 +879,31 @@ const DexMaps: React.FC = () => {
       )}
 
       {/* Saved places drawer */}
+      {track && (
+        <div role="region" aria-label="Opened track" className="dex-mat-opaque dex-maps-card-enter"
+          style={{ position: 'absolute', left: 12, bottom: 12, zIndex: 6, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 6px 6px 12px', ...panel, borderRadius: 9999 }}>
+          <DexIcon name="map" size={14} color="var(--color-accent)" />
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-primary)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.name}</span>
+          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+            {track.lines.length ? `${trackLengthKm(track).toFixed(trackLengthKm(track) < 10 ? 2 : 1)} km` : ''}{track.points.length ? `${track.lines.length ? ' · ' : ''}${track.points.length} place${track.points.length === 1 ? '' : 's'}` : ''}
+          </span>
+          <button onClick={() => exportGpx(true)} style={{ ...pillStyle, height: 26 }}>Export GPX</button>
+          <button aria-label="Close track" onClick={() => setTrack(null)} className="dex-maps-iconbtn"
+            style={{ width: 26, height: 26, borderRadius: 9999, background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <DexIcon name="close" size={13} />
+          </button>
+        </div>
+      )}
       {drawer === 'saved' && (
         <div className="dex-mat-opaque dex-maps-card-enter" style={{ position: 'absolute', top: unified ? 8 : 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Saved places{saved.length ? ` · ${saved.length}` : ''}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', flex: 1 }}>Saved places{saved.length ? ` · ${saved.length}` : ''}</span>
+            {saved.length > 0 && (
+              <button onClick={() => exportGpx(false)} className="dex-maps-iconbtn"
+                style={{ height: 24, padding: '0 10px', borderRadius: 9999, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginRight: 4 }}>
+                Export GPX
+              </button>
+            )}
             <button aria-label="Close" className="dex-maps-iconbtn" onClick={() => setDrawer(null)} style={{ width: 24, height: 24, background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DexIcon name="close" size={15} />
             </button>
