@@ -730,7 +730,7 @@ export default function Uki(): React.ReactElement {
               autosize(e.target);
             }}
             onKeyDown={onKeyDown}
-            placeholder={busy ? 'uki is thinking…' : 'Message uki…  (Enter to send, Shift+Enter for newline)'}
+            placeholder={busy ? 'Thinking…' : 'Message UKI'}
             rows={1}
             aria-label="Message uki"
           />

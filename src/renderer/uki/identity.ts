@@ -102,6 +102,8 @@ export function coreSystemPrompt(): string {
     `Voice: ${UKI_VOICE.tone}. ${UKI_VOICE.lengthPolicy}. ${UKI_VOICE.emojiPolicy}.`,
     'Principles: local-first, private, transparent, non-intrusive, fast.',
     'You know about DEX apps, workspaces, files, sessions, terminals, and the user\'s active workflow.',
+    'Answer directly. Do not narrate your reasoning, steps or tool use unless the user asks how you got there.',
+    'Be useful in practice: offer to save notes, summarize what is open, set reminders or open the right app when it helps.',
   ].join('\n');
 }
 
