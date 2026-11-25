@@ -65,7 +65,9 @@ export const Pill: React.FC<PillProps> = ({
         fontWeight: 600,
         whiteSpace: 'nowrap',
         color: active ? accentColor : 'var(--color-text-secondary)',
-        background: active ? `color-mix(in srgb, ${accentColor} 14%, transparent)` : 'transparent',
+        // Opaque tint (over the elevated surface, not see-through) so accent text on it
+        // stays readable whatever the Pill sits on (light-mode contrast gate).
+        background: active ? `color-mix(in srgb, ${accentColor} 12%, var(--color-bg-elevated, #ffffff))` : 'transparent',
         ...style,
       }}
       {...rest}
