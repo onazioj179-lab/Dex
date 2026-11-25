@@ -774,7 +774,7 @@ const styles: Record<string, React.CSSProperties> = {
   appIcon: {
     width: 46,
     height: 46,
-    borderRadius: 12,
+    borderRadius: 10,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
