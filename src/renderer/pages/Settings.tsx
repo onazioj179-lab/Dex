@@ -58,6 +58,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
+import GlobalShortcutsPanel from './settingsPanels/GlobalShortcutsPanel';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { UmariFoldersSection } from './settingsPanels/UmariFoldersSection';
@@ -3563,6 +3564,14 @@ export const Settings: React.FC = () => {
         ['Alt+Shift+1 … 6', 'Arrange all windows with a layout'],
         ['Win+` or Ctrl+Alt+`', 'Cycle floating windows'],
       ] },
+      { title: 'DEX Code', rows: [
+        [`${_M}+/`, 'Comment or uncomment the selected lines'],
+        ['Tab / Shift+Tab', 'Indent / outdent the selected lines'],
+        ['Alt+Up / Down', 'Move the line up / down'],
+        ['Shift+Alt+Up / Down', 'Duplicate the line'],
+        [`${_M}+M`, 'Jump to the matching bracket'],
+        ['F12 / Shift+F12', 'Go to definition / find references'],
+      ] },
       { title: 'Spatial desktop', rows: [
         [`${_M}+Alt+S`, 'Turn the spatial desktop on / off'],
         [`${_M}+Alt+= / -`, 'Zoom in / out'],
@@ -3609,6 +3618,7 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         ))}
+        <GlobalShortcutsPanel styles={styles} />
         {groups.map((g) => (
           <React.Fragment key={g.title}>
             <h3 style={styles.sectionTitle}>{g.title}</h3>
@@ -3623,7 +3633,7 @@ export const Settings: React.FC = () => {
           </React.Fragment>
         ))}
         <div style={{ ...styles.settingDesc, marginTop: 'var(--space-3)' }}>
-          Shortcuts can't be changed yet.
+          The in-app shortcuts above are fixed; system-wide ones can be changed under System-wide shortcuts.
         </div>
       </div>
     );

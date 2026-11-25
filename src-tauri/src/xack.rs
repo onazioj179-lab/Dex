@@ -193,6 +193,7 @@ pub fn builtin_catalog() -> Vec<Capability> {
         core("uki.find_context", "Retrieve indexed context from authorized folders (Umari)", Read, Never),
         core("uki.list_projects", "List detected projects in authorized folders (Umari)", Read, Never),
         core("uki.read_file", "Read a file in an allowed folder", Read, Never),
+        core("uki.write_file", "Save text as a new file", Modify, Ask),
         core("uki.create_folder", "Create a folder", Modify, Ask),
         core("uki.rename_file", "Rename a file", Modify, Ask),
         core("uki.move_file", "Move a file", Modify, Ask),

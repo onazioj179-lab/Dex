@@ -20,6 +20,7 @@ import { runUkiAgent } from '../../uki/agentRunner';
 import { buildSystemPrompt } from '../../uki';
 import { findMatchingBracket } from '../../../shared/format/bracketMatcher';
 import { highlightDexScript } from './dexCode/highlight';
+import { editForKey } from './dexCode/editing';
 import { extractSymbols, lineStartOffset, SYMBOL_TAG } from './dexCode/symbols';
 import {
   getRecentFiles,
@@ -1023,87 +1024,20 @@ const DexCode: React.FC = () => {
       }
     }
 
-    // Tab indent
-    if (e.key === 'Tab') {
+    // Smart editing (Tab/Shift+Tab, brackets, quotes, Enter, Backspace,
+    // Ctrl+/ comment, Alt+Up/Down move, Shift+Alt+Up/Down duplicate). Never
+    // while an IME is composing a character.
+    if (e.nativeEvent.isComposing) return;
+    const edit = editForKey(
+      { key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey },
+      code, start, end, fileName,
+    );
+    if (edit) {
       e.preventDefault();
-      const newCode = code.substring(0, start) + '  ' + code.substring(end);
-      setCode(newCode);
-      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 2; });
-      return;
+      if (edit.text !== code) setCode(edit.text);
+      requestAnimationFrame(() => { ta.selectionStart = edit.start; ta.selectionEnd = edit.end; });
     }
-
-    // Bracket auto-close
-    const bracketPairs: Record<string, string> = { '{': '}', '[': ']', '(': ')' };
-    if (bracketPairs[e.key]) {
-      e.preventDefault();
-      const close = bracketPairs[e.key];
-      const newCode = code.substring(0, start) + e.key + close + code.substring(end);
-      setCode(newCode);
-      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 1; });
-      return;
-    }
-
-    // Quote auto-close
-    if (e.key === '"' || e.key === "'") {
-      const charAfter = code[start] || '';
-      if (charAfter === e.key) {
-        e.preventDefault();
-        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 1; });
-        return;
-      }
-      e.preventDefault();
-      const newCode = code.substring(0, start) + e.key + e.key + code.substring(end);
-      setCode(newCode);
-      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 1; });
-      return;
-    }
-
-    // Skip closing bracket/paren/brace
-    if (([')', ']', '}'].includes(e.key)) && code[start] === e.key) {
-      e.preventDefault();
-      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 1; });
-      return;
-    }
-
-    // Enter auto-indent
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const before = code.substring(0, start);
-      const after = code.substring(end);
-      const currentLine = before.split('\n').pop() || '';
-      const indent = currentLine.match(/^(\s*)/)?.[1] || '';
-      const charBefore = code[start - 1];
-      const charAfter = code[start];
-      if (charBefore === '{' && charAfter === '}') {
-        const newCode = before + '\n' + indent + '  \n' + indent + after;
-        setCode(newCode);
-        requestAnimationFrame(() => {
-          const pos = start + 1 + indent.length + 2;
-          ta.selectionStart = ta.selectionEnd = pos;
-        });
-      } else {
-        const extra = charBefore === '{' ? '  ' : '';
-        const newCode = before + '\n' + indent + extra + after;
-        setCode(newCode);
-        requestAnimationFrame(() => {
-          ta.selectionStart = ta.selectionEnd = start + 1 + indent.length + extra.length;
-        });
-      }
-      return;
-    }
-
-    // Backspace: delete matching pair
-    if (e.key === 'Backspace' && start === end && start > 0) {
-      const pair = code[start - 1] + code[start];
-      if (pair === '{}' || pair === '[]' || pair === '()' || pair === '""' || pair === "''") {
-        e.preventDefault();
-        const newCode = code.substring(0, start - 1) + code.substring(start + 1);
-        setCode(newCode);
-        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start - 1; });
-        return;
-      }
-    }
-  }, [code, identifierAt, gotoDefinition, findReferences, historyKey]);
+  }, [code, fileName, identifierAt, gotoDefinition, findReferences, historyKey]);
 
   const highlighted = useMemo(() => highlightDexScript(code), [code]);
 
@@ -1590,7 +1524,7 @@ const DexCode: React.FC = () => {
                   aria-selected={langMode === m}
                   onClick={() => setLangMode(m)}
                   style={{
-                    padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+                    padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 9999, border: 'none', cursor: 'pointer',
                     background: langMode === m ? 'var(--color-accent-fill)' : 'transparent',
                     color: langMode === m ? '#fff' : 'var(--color-text-secondary)',
                     transition: 'background 0.15s ease, color 0.15s ease',
@@ -1609,7 +1543,7 @@ const DexCode: React.FC = () => {
                     title={m === 'code' ? 'UKI writes DexScript you can see and edit, then runs it' : 'UKI carries out your request directly'}
                     onClick={() => setPlainMode(m)}
                     style={{
-                      padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+                      padding: '3px 9px', fontSize: 11, fontWeight: 600, borderRadius: 9999, border: 'none', cursor: 'pointer',
                       background: plainMode === m ? 'var(--color-accent-light)' : 'transparent',
                       color: plainMode === m ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                       transition: 'background 0.15s ease, color 0.15s ease',
@@ -2440,7 +2374,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: 9999,
     border: '1px solid var(--color-border)',
     background: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -2460,7 +2394,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'var(--color-bg-base, #0C0C0E)',
     border: '1px solid var(--color-border)',
-    borderRadius: 4,
+    borderRadius: 9999,
     padding: '3px var(--space-2)',
     color: 'var(--color-text-primary)',
     fontSize: 12,
@@ -2474,7 +2408,7 @@ const S: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: 9999,
     border: 'none',
     background: 'transparent',
     color: 'var(--color-text-secondary)',

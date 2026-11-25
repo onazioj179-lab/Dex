@@ -20,6 +20,7 @@ import { AssistedTextarea } from './AssistedTextarea';
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
+import { attachmentFromFile, handOffAttachments, type UkiAttachment } from '../uki/attachments';
 import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
@@ -1865,6 +1866,22 @@ const UkiOverlay: React.FC = () => {
   return (
     <div
       ref={panelRef}
+      // Files dropped on the panel open in the UKI app, attached to the next message.
+      onDragOver={(e) => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault(); }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files);
+        void Promise.all(files.map((f) => attachmentFromFile(f).catch(() => `Could not read ${f.name}.`))).then((items) => {
+          const ok = items.filter((x): x is UkiAttachment => typeof x !== 'string');
+          const bad = items.filter((x): x is string => typeof x === 'string');
+          if (bad.length) window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: bad.join(' ') } }));
+          if (!ok.length) return;
+          handOffAttachments(ok);
+          const def = APP_DEFINITIONS.uki;
+          useRunningApps.getState().launchApp({ id: 'uki', name: def?.name ?? 'UKI', icon: def?.icon || 'uki', color: def?.color ?? 'var(--color-accent)' });
+        });
+      }}
       onMouseEnter={() => { hoveredRef.current = true; cancelSleep(); }}
       onMouseLeave={() => { hoveredRef.current = false; armSleep(); }}
       style={{
@@ -1979,7 +1996,7 @@ const UkiOverlay: React.FC = () => {
             aria-pressed={speakResponses}
             style={{
               marginLeft: state === 'listening' ? 0 : 'auto',
-              width: 24, height: 22, borderRadius: 4,
+              width: 24, height: 22, borderRadius: 9999,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: speakResponses ? 'var(--color-accent-light)' : 'transparent',
               border: 'none', color: speakResponses ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
@@ -2002,7 +2019,7 @@ const UkiOverlay: React.FC = () => {
             aria-label={collapsed ? 'Expand UKI panel' : 'Collapse UKI panel'}
             aria-expanded={!collapsed}
             style={{
-              width: 24, height: 22, borderRadius: 4,
+              width: 24, height: 22, borderRadius: 9999,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', flexShrink: 0,
               transition: 'background 0.15s ease, color 0.15s ease',
@@ -2020,7 +2037,7 @@ const UkiOverlay: React.FC = () => {
             onClick={() => useUkiStore.getState().reset()}
             style={{
               marginLeft: 0,
-              width: 20, height: 20, borderRadius: 4,
+              width: 20, height: 20, borderRadius: 9999,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none',
               color: 'var(--color-text-tertiary)', cursor: 'pointer',
@@ -2280,7 +2297,7 @@ const UkiOverlay: React.FC = () => {
                 marginBottom: 6, padding: 6,
                 background: 'var(--color-bg-elevated, rgba(28,28,30,0.95))',
                 border: '1px solid var(--color-border-subtle)',
-                borderRadius: 6, fontSize: 11,
+                borderRadius: 10, fontSize: 11,
                 maxHeight: 220, overflowY: 'auto',
                 boxShadow: 'var(--pg-shadow-tooltip)',
                 zIndex: 2,

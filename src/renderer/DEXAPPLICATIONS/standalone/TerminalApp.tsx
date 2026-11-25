@@ -29,7 +29,7 @@ const TerminalApp: React.FC = () => {
       <div className="dex-theme-dark" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#0a0a0a', color: 'var(--color-text-secondary, #b8b8bd)', fontSize: 12 }}>
         <span>All sessions are closed.</span>
         <button type="button" onClick={() => { setGen((g) => g + 1); setOpen(true); }}
-          style={{ height: 26, padding: '0 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: '#e0e0e0', cursor: 'pointer' }}>
+          style={{ height: 28, padding: '0 14px', fontSize: 12, borderRadius: 9999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.06)', color: '#e0e0e0', cursor: 'pointer' }}>
           New session
         </button>
       </div>

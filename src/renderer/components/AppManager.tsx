@@ -27,6 +27,7 @@ import { AppContextMenuHost, openAppContextMenu, runAppAction, type AppCommandDe
 import { AppMenuPanel } from './AppMenuPanel';
 import { dispatchAppIntent } from '../services/appIntents';
 import { useUkiStore } from '../store/ukiStore';
+import { startGlobalHotkeyListener } from '../services/globalHotkeys';
 import { glassModal } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
@@ -1413,6 +1414,16 @@ export const AppManager: React.FC = () => {
       window.removeEventListener('focus', onFocus);
     };
   }, [currentAppId, setCurrentRunningApp]);
+
+  // System-wide shortcuts: the native side brings DEX to the front, then the
+  // pressed action opens UKI, search, the clipboard, a note or the Terminal.
+  useEffect(() => startGlobalHotkeyListener(
+    (appId) => {
+      const def = APP_DEFINITIONS[appId as AppId];
+      useRunningApps.getState().launchApp({ id: appId as AppId, name: def?.name ?? appId, icon: def?.icon || appId, color: def?.color ?? 'var(--color-accent)' });
+    },
+    () => { try { useUkiStore.getState().openPanel(); } catch { /* store not ready */ } },
+  ), []);
 
   // Keep the native search index fresh: a debounced `search:sync` on window focus
   // (and once on mount). Fire-and-forget + caught — in the Tauri shell this runs
@@ -2932,7 +2943,8 @@ export const AppManager: React.FC = () => {
       // Alt+Shift+Arrow: Up = top half, Down = bottom half (the up/down split),
       // Left/Right = top quadrants. Pairs with Meta+Left/Right (side-by-side halves)
       // and drag-to-edge snapping for a full keyboard + pointer tiling set.
-      if (focusedApp && e.altKey && e.shiftKey) {
+      // Skipped when the focused app already used the key (DEX Code: Shift+Alt+Up/Down duplicates a line).
+      if (focusedApp && e.altKey && e.shiftKey && !e.defaultPrevented) {
         if (e.key === 'ArrowUp') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top'); return; }
         if (e.key === 'ArrowDown') { e.preventDefault(); tileWindow(focusedApp as AppId, 'bottom'); return; }
         if (e.key === 'ArrowLeft') { e.preventDefault(); tileWindow(focusedApp as AppId, 'top-left'); return; }
@@ -3059,6 +3071,7 @@ export const AppManager: React.FC = () => {
         case 'splitScreen': if (splitMode !== 'off') { exitSplit(); } else { setShowAppMenu(true); } break;
         case 'arrangeWindows': window.dispatchEvent(new CustomEvent('dex-arrange-windows')); break;
         case 'overview': setShowOverview(p => !p); break;
+        case 'appMenu': setShowAppMenu(true); break;
         case 'clipboard': window.dispatchEvent(new CustomEvent('dex-open-clipboard')); break;
         case 'sendto': window.dispatchEvent(new CustomEvent('dex-flow-open')); break;
         case 'context': window.dispatchEvent(new CustomEvent('dex-open-context')); break;

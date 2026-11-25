@@ -10,6 +10,14 @@
 ---
 
 
+## System-wide shortcuts + UKI files (2026-11-25, `claude/main-ci-fix-uki`)
+
+- New native module `global_hotkeys.rs` (Win32 `RegisterHotKey`, `windows` crate gained the Win32 Foundation /
+  Threading / KeyboardAndMouse / WindowsAndMessaging features). Channels: `global-hotkeys:list|set|setEnabled|reset`;
+  event `global-hotkey:pressed { action }`, `global-hotkey:changed`. Started from `setup` (skipped for isolated profiles).
+- UKI `write_file` reuses `fs:writeText`; UKI attachments reuse `fs:readText`, `dialog:showOpenDialog`,
+  `dialog:showSaveDialog`. No other new channels.
+
 ## Part 24 batch 1 — Xack + Umari (2026-11-18, `claude/part24-xack-umari`)
 
 - New native modules `src-tauri/src/xack.rs` (UKI action broker: catalog, decide, single-use tickets,

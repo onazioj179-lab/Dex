@@ -185,6 +185,7 @@ export const TOOL_RISK: Record<string, ToolRiskSpec> = {
   find_context: { risk: 'low', capability: 'file-read' },
   list_projects: { risk: 'low' },
   read_file: { risk: 'low', capability: 'file-read' },
+  write_file: { risk: 'medium', capability: 'file-write' },
   create_folder: { risk: 'medium', capability: 'file-write' },
   rename_file: { risk: 'medium', capability: 'file-write' },
   move_file: { risk: 'medium', capability: 'file-write' },

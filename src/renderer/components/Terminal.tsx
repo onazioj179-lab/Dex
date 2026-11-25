@@ -191,10 +191,21 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
 
   const dexCommands = useMemo(() => buildDexCommands(APP_DEFINITIONS), []);
 
+  // Keys typed while the shell is still starting are held here and sent once it
+  // is up (they used to be dropped, so the first command typed fast was lost).
+  const pendingRef = useRef('');
+  const statusRef = useRef<Status>('starting');
+  statusRef.current = status;
+  const restartRef = useRef<(() => void) | null>(null);
+
   const write = useCallback((data: string) => {
     const b = bridge();
     const id = sessionRef.current;
-    if (!b || !id) return;
+    if (!b) return;
+    if (!id) {
+      if (statusRef.current === 'starting' && pendingRef.current.length < 4096) pendingRef.current += data;
+      return;
+    }
     b.invoke('pty:write', { sessionId: id, data }).catch(() => { /* session gone */ });
   }, []);
 
@@ -301,6 +312,11 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
     });
 
     const dataSub = term.onData((data) => {
+      // After the shell exits, Enter starts a new one (as in Windows Terminal).
+      if (statusRef.current === 'exited') {
+        if (data.includes('\r')) restartRef.current?.();
+        return;
+      }
       const res = trackInput(trackerRef.current, data);
       if (res.kind === 'enter') {
         if (isDexCommandLine(res.line)) {
@@ -382,6 +398,10 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
 
     const start = () => {
       if (!mounted) return;
+      // Forget the previous session first: its late `pty:exit` (after a
+      // restart) must not be taken for the new shell's exit.
+      activeId = null;
+      statusRef.current = 'starting';
       setStatus('starting');
       setError(null);
       setExitCode(null);
@@ -400,7 +420,13 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         sessionRef.current = r.sessionId;
         setSessionId(r.sessionId);
         setShellName(r.shell ? r.shell.split(/[\\/]/).pop()!.replace(/\.exe$/i, '') : '');
+        statusRef.current = 'running';
         setStatus('running');
+        if (pendingRef.current) {
+          const queued = pendingRef.current;
+          pendingRef.current = '';
+          b.invoke('pty:write', { sessionId: r.sessionId, data: queued }).catch(() => {});
+        }
         // The panel may have been measured after spawn; sync the pseudoconsole.
         const tt = termRef.current;
         if (tt && (tt.cols !== cols || tt.rows !== rows)) {
@@ -426,7 +452,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       setExitCode(code);
       setStatus('exited');
       try { onRunningRef.current?.(null); } catch { /* host detached */ }
-      termRef.current?.write(`\r\n\x1b[90m[process exited with code ${code}]\x1b[0m\r\n`);
+      pendingRef.current = '';
+      termRef.current?.write(`\r\n\x1b[90m[process exited with code ${code}. Press Enter to start a new shell]\x1b[0m\r\n`);
       if (code !== 0 && Date.now() - spawnedAt < FAST_EXIT_MS) failed(`The shell exited right away (code ${code}).`);
       else retriesRef.current = 0;
     };
@@ -455,9 +482,11 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       b.invoke('pty:kill', { sessionId: id }).catch(() => {});
       sessionRef.current = null;
     }
+    pendingRef.current = '';
     termRef.current?.reset();
     startRef.current?.();
   }, []);
+  restartRef.current = restart;
 
   // -------------------------------------------------------------------------
   // Toolbar actions
