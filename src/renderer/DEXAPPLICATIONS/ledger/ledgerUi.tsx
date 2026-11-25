@@ -291,7 +291,7 @@ export const LEDGER_CSS = `
 .lg-btn:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .lg-btn:disabled { opacity: .45; cursor: default; }
 .lg-btn-sm { height: 24px; padding: 0 8px; font-size: 12px; }
-.dex-ledger .dex-btn.lg-btn-x[aria-pressed="true"], .dex-ledger .dex-btn.lg-btn-x[aria-pressed="true"]:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 16%, transparent); border-color: transparent; color: var(--color-text-primary); }
+.dex-ledger .dex-btn.lg-btn-x[aria-pressed="true"] { background: color-mix(in srgb, var(--color-accent) 16%, transparent); border-color: transparent; color: var(--color-text-primary); }
 .lg-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; flex-shrink: 0; }
 .lg-icon-btn:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .lg-icon-btn.lg-active { color: var(--color-accent); background: var(--color-accent-soft); }
