@@ -65,7 +65,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         opacity: isDisabled ? 0.55 : 1,
-        borderRadius: radius.md,
+        // Pill: one button shape across DEX (owner 2026-11-24).
+        borderRadius: radius.full,
         fontFamily: 'inherit',
         fontWeight: fontWeight.semibold,
         whiteSpace: 'nowrap',

@@ -89,7 +89,7 @@ const PomodoroTimer: React.FC = () => {
             className="pomo-tab"
             onClick={() => setPhase(p)}
             aria-pressed={p === phase}
-            style={{ ...s.phaseTab, ...(p === phase ? { background: PHASE_COLORS[p] + '22', color: PHASE_COLORS[p], boxShadow: `inset 0 0 0 1px ${PHASE_COLORS[p]}44` } : {}) }}
+            style={{ ...s.phaseTab, ...(p === phase ? { background: PHASE_COLORS[p] + '22', color: PHASE_COLORS[p] } : {}) }}
           >
             {PHASE_LABELS[p]}
           </button>
@@ -265,9 +265,9 @@ const s: Record<string, React.CSSProperties> = {
   },
   phaseTab: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '6px 14px', borderRadius: 10, border: 'none',
+    padding: '6px 12px', borderRadius: 9999, border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
     background: 'transparent', color: 'var(--color-text-secondary)',
-    cursor: 'pointer', fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', fontSize: 12.5, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   timerArea: {

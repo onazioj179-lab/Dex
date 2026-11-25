@@ -3859,7 +3859,9 @@ export const AppManager: React.FC = () => {
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
     const inHud = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-spatial-hud]');
-    const inWindow = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-floating-window]');
+    // Surfaces that own pinch / Ctrl+wheel / two-finger pan themselves (maps,
+    // image and PDF viewers) count as windows, so the workspace never steals them.
+    const inWindow = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('[data-floating-window], [data-own-gestures]');
     // Can some scroll container between the target and its window still move
     // in this direction? Text fields and editors count as scrollable.
     const canScrollInside = (target: EventTarget | null, dx: number, dy: number): boolean => {

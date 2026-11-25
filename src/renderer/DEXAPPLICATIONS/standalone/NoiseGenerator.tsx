@@ -13,6 +13,33 @@ import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { formatClock } from '../../../shared/format/units';
 
+/** Line glyph per sound (was a two-letter code like "WN"). */
+const GLYPHS: Record<string, React.ReactNode> = {
+  white: <path d="M3 12h1M6 8v8M9 5v14M12 9v6M15 4v16M18 7v10M21 12h0" />,
+  pink: <path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-1" />,
+  brown: <path d="M2 14c3-4 6-4 9 0s6 4 9 0M2 18c3-2 6-2 9 0s6 2 9 0" />,
+  rain: <><path d="M20 15.5A4.5 4.5 0 0 0 17.5 7a6 6 0 0 0-11.4 1.6A4 4 0 0 0 7 16.5" /><path d="M8 19v2M12 17v3M16 19v2" /></>,
+  waves: <path d="M2 7c2 2 4 2 6 0s4-2 6 0 4 2 6 0M2 12c2 2 4 2 6 0s4-2 6 0 4 2 6 0M2 17c2 2 4 2 6 0s4-2 6 0 4 2 6 0" />,
+  wind: <path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8" />,
+  fire: <path d="M12 3c1 3 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5.5 1-8.5Z" />,
+  stream: <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z" />,
+  cafe: <><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9Z" /><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3" /></>,
+};
+const NoiseGlyph: React.FC<{ id: string; size?: number }> = ({ id, size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {GLYPHS[id] ?? GLYPHS.white}
+  </svg>
+);
+const EQ_CSS = `
+.dex-noise-eq { display: flex; align-items: flex-end; gap: 5px; height: 48px; }
+.dex-noise-eq span { width: 6px; border-radius: 9999px; background: currentColor; height: 30%; }
+.dex-noise-eq[data-on] span { animation: dexNoiseEq 1.1s ease-in-out infinite; }
+.dex-noise-eq[data-on] span:nth-child(2) { animation-delay: -0.3s; } .dex-noise-eq[data-on] span:nth-child(3) { animation-delay: -0.7s; }
+.dex-noise-eq[data-on] span:nth-child(4) { animation-delay: -0.15s; } .dex-noise-eq[data-on] span:nth-child(5) { animation-delay: -0.5s; }
+@keyframes dexNoiseEq { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+@media (prefers-reduced-motion: reduce) { .dex-noise-eq[data-on] span { animation: none; height: 70%; } }
+`;
+
 interface LayerDef {
   id: string;
   label: string;
@@ -674,8 +701,10 @@ const NoiseGenerator: React.FC = () => {
     <div style={st.container}>
       {/* Main Display */}
       <div className="dex-liquid-glass-strong" style={st.display}>
-        <div style={{ fontSize: 56, marginBottom: 'var(--space-1)', letterSpacing: 1 }}>
-          {playing ? 'MX' : 'NG'}
+        <style>{EQ_CSS}</style>
+        <div className="dex-noise-eq" data-on={playing || undefined} aria-hidden="true"
+          style={{ marginBottom: 'var(--space-2)', color: playing ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
+          <span /><span /><span /><span /><span />
         </div>
         <div style={st.presetName}>
           {activeCount === 0 ? 'No layers selected' : `${activeCount} layer${activeCount > 1 ? 's' : ''} mixed`}
@@ -802,7 +831,7 @@ const NoiseGenerator: React.FC = () => {
                 aria-label={l.label}
                 aria-pressed={isActive}
               >
-                <span style={{ fontSize: 22 }}>{l.icon}</span>
+                <span style={{ display: 'flex', color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}><NoiseGlyph id={l.id} /></span>
                 {/* Label stays theme text (White Noise's #e8e8e8 vanished on light); the border carries the layer colour. */}
                 <span style={{ fontSize: 11, fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>{l.label}</span>
               </button>
@@ -910,7 +939,7 @@ const st: Record<string, React.CSSProperties> = {
   },
   presetBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-    padding: '14px var(--space-2)', borderRadius: 10, cursor: 'pointer',
+    padding: '14px var(--space-2)', borderRadius: 16, cursor: 'pointer',
     border: '1px solid', fontFamily: 'var(--font-family)',
     transition: 'all 0.15s',
   },

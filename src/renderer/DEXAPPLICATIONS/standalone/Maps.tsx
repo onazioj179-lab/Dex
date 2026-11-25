@@ -52,6 +52,8 @@ import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
 import { DexSearchInput } from '../../styles/components';
 import { WindowToolbar, useUnifiedChrome } from '../../shell/windowChrome';
+import { searchPlaces, reversePlace, type Place } from './mapsServices';
+import { MapsDirections } from './MapsDirections';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
@@ -301,7 +303,8 @@ const DexMaps: React.FC = () => {
   const [measurePts, setMeasurePts] = useState<Pin[]>([]);
 
   // Which side panel is open.
-  const [drawer, setDrawer] = useState<null | 'saved' | 'measure'>(null);
+  const [drawer, setDrawer] = useState<null | 'saved' | 'measure' | 'directions'>(null);
+  const [dirTo, setDirTo] = useState<Place | null>(null);
 
   // -- persistence ------------------------------------------------------------
   useEffect(() => { saveList(RECENT_KEY, recent); }, [recent]);
@@ -366,6 +369,9 @@ const DexMaps: React.FC = () => {
   // The map is created asynchronously (after its worker URL), so effects that
   // attach to it re-run once it exists.
   const [mapLive, setMapLive] = useState(false);
+  // Bumped by Retry: tears the map down and builds it again.
+  const [mapGen, setMapGen] = useState(0);
+  const [slowLoad, setSlowLoad] = useState(false);
   useEffect(() => { let live = true; void workerReady.then(() => { if (live) setWorkerSet(true); }); return () => { live = false; }; }, []);
   useEffect(() => {
     if (!workerSet || !containerRef.current || mapRef.current) return;
@@ -386,7 +392,13 @@ const DexMaps: React.FC = () => {
     }
     mapRef.current = map;
     setMapLive(true);
-    map.once('idle', () => setMapReady(true));
+    // Ready on whichever comes first ('idle' alone could be missed, leaving
+    // "Loading map" forever); past 15 s offer Retry instead of a spinner.
+    let ready = false;
+    const markReady = () => { if (ready) return; ready = true; setMapReady(true); setSlowLoad(false); };
+    map.once('load', markReady);
+    map.once('idle', markReady);
+    const slowTimer = setTimeout(() => { if (!ready) setSlowLoad(true); }, 15000);
     // Track rotation/tilt for the compass, and remember the view (debounced).
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
     map.on('rotate', () => setBearing(map.getBearing()));
@@ -413,9 +425,9 @@ const DexMaps: React.FC = () => {
     map.on('data', (e: maplibregl.MapSourceDataEvent | maplibregl.MapStyleDataEvent) => {
       if ((e as { tile?: unknown }).tile && lastTileError && Date.now() - lastTileError > 3000) { lastTileError = 0; setTilesFailing(false); }
     });
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; setMapLive(false); };
+    return () => { clearTimeout(slowTimer); map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; setMapLive(false); setMapReady(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workerSet]);
+  }, [workerSet, mapGen]);
 
   // Map click: in measure mode collect points; otherwise drop a pin.
   const measuringRef = useRef(measuring);
@@ -434,9 +446,19 @@ const DexMaps: React.FC = () => {
       const label = `Pin ${fmtCoord(lat, lng)}`;
       setPin({ lat, lon: lng, name: label, detail: '' });
       setPlace(label);
+      // Name the pin by what is there (street address or place).
+      reverseCtl?.abort();
+      const ctl = new AbortController();
+      reverseCtl = ctl;
+      void reversePlace(lat, lng, fetch, ctl.signal).then(found => {
+        if (!found || ctl.signal.aborted) return;
+        setPin(prev => (prev && prev.lat === lat && prev.lon === lng ? { ...prev, name: found.name, detail: found.detail } : prev));
+        setPlace(found.name);
+      });
     };
+    let reverseCtl: AbortController | null = null;
     map.on('click', onClick);
-    return () => { map.off('click', onClick); };
+    return () => { map.off('click', onClick); reverseCtl?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addMeasurePoint, mapLive]);
 
@@ -523,7 +545,15 @@ const DexMaps: React.FC = () => {
     if (!searchQuery) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      const outcome = await geocode(searchQuery, fetch, controller.signal);
+      // Photon knows addresses, streets, landmarks and businesses (ranked near
+      // the map view); Open-Meteo (city names only) is the fallback.
+      let c: { lat: number; lng: number } | undefined;
+      try { c = mapRef.current?.getCenter(); } catch { c = undefined; }
+      let outcome = await searchPlaces(searchQuery, fetch, controller.signal, c ? { lat: c.lat, lon: c.lng } : undefined);
+      if (outcome.error === 'service' && !controller.signal.aborted) {
+        const fallback = await geocode(searchQuery, fetch, controller.signal);
+        if (!fallback.error) outcome = fallback;
+      }
       if (!controller.signal.aborted) setSettledSearch({ query: searchQuery, ...outcome });
     }, 320);
     return () => { clearTimeout(timer); controller.abort(); };
@@ -542,20 +572,29 @@ const DexMaps: React.FC = () => {
     setFocused(false);
   }, [goTo, pushRecent]);
 
-  const locate = useCallback(() => {
-    if (!navigator.geolocation) { toast('info', 'Location is not available on this device.'); return; }
+  // The device position as a Place, or null (with a toast saying why).
+  const myLocation = useCallback((): Promise<Place | null> => new Promise(resolve => {
+    if (!navigator.geolocation) { toast('info', 'Location is not available on this device.'); resolve(null); return; }
     // Honor Settings > Privacy & Security > Location Services (off by default).
-    // It used to be ignored: "My location" read the position regardless.
     if (!locationServicesEnabled()) {
       toast('info', 'Location Services is off. Turn it on in Settings > Privacy & Security to use My location.');
+      resolve(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => goTo(pos.coords.latitude, pos.coords.longitude, 'My location', 14),
-      (err) => { console.warn('[Maps] geolocation failed:', err.message); toast('error', locationErrorMessage(err.code)); },
+      (pos) => resolve({ name: 'My location', detail: '', lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      (err) => { console.warn('[Maps] geolocation failed:', err.message); toast('error', locationErrorMessage(err.code)); resolve(null); },
       { timeout: 15000, maximumAge: 60000 },
     );
-  }, [goTo]);
+  }), []);
+  const locate = useCallback(() => {
+    void myLocation().then(p => { if (p) goTo(p.lat, p.lon, p.name, 14); });
+  }, [goTo, myLocation]);
+  const openDirections = useCallback((to: Place | null) => {
+    setDirTo(to);
+    setMeasuring(false);
+    setDrawer('directions');
+  }, []);
 
   // Copy current pin coordinates to clipboard (guarded).
   const copyPin = useCallback(async () => {
@@ -616,6 +655,12 @@ const DexMaps: React.FC = () => {
   );
   const actionButtons = (
     <>
+      <button aria-label="Directions" aria-pressed={drawer === 'directions'}
+        onClick={() => (drawer === 'directions' ? setDrawer(null) : openDirections(pin))}
+        style={{ ...pillStyle, ...(drawer === 'directions' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
+        <DexIcon name="navigation" size={14} />
+        Directions
+      </button>
       <button aria-label="Saved places" aria-pressed={drawer === 'saved'}
             onClick={() => setDrawer((d) => (d === 'saved' ? null : 'saved'))}
             style={{ ...pillStyle, ...(drawer === 'saved' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
@@ -639,15 +684,22 @@ const DexMaps: React.FC = () => {
   );
 
   return (
-    <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
+    <div className="dex-maps-root" data-own-gestures="" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
       <style>{MAPS_STYLE}</style>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
       {!mapReady && (
         <div role="status" aria-live="polite" style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--color-bg-base)', color: 'var(--color-text-secondary)', fontSize: 13, pointerEvents: 'none',
+          flexDirection: 'column', gap: 10,
+          background: 'var(--color-bg-base)', color: 'var(--color-text-secondary)', fontSize: 13, pointerEvents: slowLoad ? 'auto' : 'none',
         }}>
-          Loading map…
+          {slowLoad ? (navigator.onLine === false ? 'You are offline. The map needs a connection.' : 'The map is taking longer than usual.') : 'Loading map…'}
+          {slowLoad && (
+            <button type="button" onClick={() => { setSlowLoad(false); setMapGen(g => g + 1); }}
+              style={{ height: 30, padding: '0 16px', borderRadius: 9999, border: 'none', cursor: 'pointer', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', fontSize: 12.5, fontWeight: 600 }}>
+              Retry
+            </button>
+          )}
         </div>
       )}
       {tilesFailing && (
@@ -754,6 +806,17 @@ const DexMaps: React.FC = () => {
         </div>
       )}
 
+      {drawer === 'directions' && (
+        <MapsDirections
+          map={mapLive ? mapRef.current : null}
+          initialTo={dirTo}
+          pin={pin}
+          myLocation={myLocation}
+          top={unified ? 8 : 58}
+          onClose={() => setDrawer(null)}
+        />
+      )}
+
       {/* Saved places drawer */}
       {drawer === 'saved' && (
         <div className="dex-mat-opaque dex-maps-card-enter" style={{ position: 'absolute', top: unified ? 8 : 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
@@ -835,7 +898,7 @@ const DexMaps: React.FC = () => {
       )}
 
       {/* Pin info card (coords + copy / save / send-to-notes) */}
-      {pin && !measuring && (
+      {pin && !measuring && drawer !== 'directions' && (
         <div className="dex-mat-opaque" style={{ position: 'absolute', left: 12, bottom: 72, width: 'min(300px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
           <div style={{ padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -849,6 +912,9 @@ const DexMaps: React.FC = () => {
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              <button type="button" onClick={() => openDirections(pin)} style={{ ...cardBtn, flexBasis: '100%', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', border: 'none', borderRadius: 9999 }}>
+                <DexIcon name="navigation" size={13} /> Directions
+              </button>
               <button onClick={copyPin} style={{ flex: 1, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--color-bg-base)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 <DexIcon name="copy" size={13} /> Copy
               </button>

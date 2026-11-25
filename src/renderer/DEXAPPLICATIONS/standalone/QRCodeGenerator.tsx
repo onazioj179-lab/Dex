@@ -349,14 +349,14 @@ const QRCodeGenerator: React.FC = () => {
       {/* Mode tabs */}
       <div style={s.tabs}>
         {([
-          { id: 'text' as QRMode, label: 'Text', icon: 'T' },
-          { id: 'url' as QRMode, label: 'URL', icon: 'U' },
-          { id: 'wifi' as QRMode, label: 'Wi-Fi', icon: 'W' },
-          { id: 'contact' as QRMode, label: 'Contact', icon: 'C' },
-          { id: 'geo' as QRMode, label: 'Geo', icon: 'G' },
-          { id: 'email' as QRMode, label: 'Email', icon: '' },
-          { id: 'event' as QRMode, label: 'Event', icon: '' },
-          { id: 'batch' as QRMode, label: 'Batch', icon: '' },
+          { id: 'text' as QRMode, label: 'Text' },
+          { id: 'url' as QRMode, label: 'URL' },
+          { id: 'wifi' as QRMode, label: 'Wi-Fi' },
+          { id: 'contact' as QRMode, label: 'Contact' },
+          { id: 'geo' as QRMode, label: 'Geo' },
+          { id: 'email' as QRMode, label: 'Email' },
+          { id: 'event' as QRMode, label: 'Event' },
+          { id: 'batch' as QRMode, label: 'Batch' },
         ]).map(m => (
           <button
             key={m.id}
@@ -366,7 +366,7 @@ const QRCodeGenerator: React.FC = () => {
             aria-label={`${m.label} mode`}
             aria-pressed={mode === m.id}
           >
-            {m.icon && <span style={s.tabIcon} aria-hidden="true">{m.icon}</span>} {m.label}
+            {m.label}
           </button>
         ))}
       </div>
@@ -495,7 +495,8 @@ const QRCodeGenerator: React.FC = () => {
 
         {/* Color pickers */}
         <div style={s.colorRow}>
-          <label style={s.colorLabel}>Apply Color Picker swatch to
+          <label style={s.colorLabel}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Colors app sets</span>
             <select value={swatchTarget} style={s.select} aria-label="Color Picker swatch target"
               onChange={event => setSwatchTarget(event.target.value === 'background' ? 'background' : 'foreground')}>
               <option value="foreground">Foreground</option>
@@ -574,7 +575,7 @@ const QRCodeGenerator: React.FC = () => {
                   style={s.historyItem}
                   title={entry.data}
                 >
-                  <span style={s.historyBadge}>{MODE_ICONS[entry.mode] || 'T'}</span>
+                  <span style={s.historyBadge}>{MODE_ICONS[entry.mode] || 'Text'}</span>
                   <span style={s.historyText}>{entry.data}</span>
                 </button>
               ))}
@@ -593,7 +594,7 @@ const EC_LABELS: Record<ECLevel, string> = {
   L: 'Low (~7%)', M: 'Medium (~15%)', Q: 'Quartile (~25%)', H: 'High (~30%)',
 };
 const MODE_ICONS: Record<QRMode, string> = {
-  text: 'T', url: 'U', wifi: 'W', contact: 'C', geo: 'G', email: '', event: '', batch: '',
+  text: 'Text', url: 'URL', wifi: 'Wi-Fi', contact: 'Contact', geo: 'Place', email: 'Email', event: 'Event', batch: 'Batch',
 };
 
 // WIFI: payload escaping per the de-facto spec (\, ;, ,, : and " are special).
@@ -633,7 +634,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 9999, border: 'none', whiteSpace: 'nowrap',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
@@ -686,13 +687,13 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   colorRow: {
-    display: 'flex', justifyContent: 'center', gap: 'var(--space-4)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3) var(--space-4)',
   },
   colorLabel: {
     display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
   },
   colorInput: {
-    width: 28, height: 28, border: 'none', borderRadius: 10,
+    width: 28, height: 28, border: 'none', borderRadius: 9999,
     cursor: 'pointer', background: 'transparent',
   },
   quickRow: {
@@ -752,10 +753,10 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   historyBadge: {
-    flexShrink: 0, width: 18, height: 18, borderRadius: 10,
+    flexShrink: 0, height: 18, padding: '0 7px', borderRadius: 9999,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)',
-    fontSize: 11, fontWeight: 700,
+    fontSize: 10, fontWeight: 600,
   },
   historyText: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

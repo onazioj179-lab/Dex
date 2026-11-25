@@ -91,10 +91,6 @@ const UNITS: Record<Category, UnitDef[]> = {
   ],
 };
 
-const CAT_ICONS: Record<Category, string> = {
-  length: 'L', weight: 'W', temperature: 'T', volume: 'V', speed: 'S', data: 'D', energy: 'E', cooking: 'C', fuel: 'F', density: 'D',
-};
-
 const CATEGORIES: Category[] = ['length', 'weight', 'temperature', 'volume', 'speed', 'data', 'energy', 'cooking', 'fuel', 'density'];
 const pairKey = ({ cat, from, to }: RecentConversion) => cat + ':' + from + ':' + to;
 const MAX_PINNED = 8;
@@ -333,7 +329,7 @@ const UnitConverter: React.FC = () => {
           semantics="tabs"
           size="md"
           aria-label="Conversion category"
-          options={CATEGORIES.map(cat => ({ value: cat, icon: <span aria-hidden="true" style={s.tabIcon}>{CAT_ICONS[cat]}</span>, label: cat === 'fuel' ? 'Fuel economy' : cat.charAt(0).toUpperCase() + cat.slice(1) }))}
+          options={CATEGORIES.map(cat => ({ value: cat, label: cat === 'fuel' ? 'Fuel economy' : cat.charAt(0).toUpperCase() + cat.slice(1) }))}
           value={category}
           onChange={(v) => handleCategoryChange(v as Category)}
         />
@@ -422,15 +418,17 @@ const UnitConverter: React.FC = () => {
         })}>Send to Notes</Button>
         {canCustomize(category) && <Button size="sm" variant="subtle" onClick={() => setShowCustom(value => !value)}
           aria-expanded={showCustom}>Custom units</Button>}
-        <select aria-label="Precision mode" value={precision.mode} style={s.select}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>Precision</span>
+        <select aria-label="Precision mode" value={precision.mode} style={s.selectSm}
           onChange={event => {
             const mode = event.target.value as Precision['mode'];
             setPrecision({ mode, digits: Math.max(mode === 'decimals' ? 0 : 1, precision.digits) });
           }}>
-          <option value="decimals">Decimal places</option>
-          <option value="significant">Significant digits</option>
+          <option value="decimals">Decimals</option>
+          <option value="significant">Significant</option>
         </select>
-        <select aria-label="Precision digits" value={precision.digits} style={s.select}
+        <select aria-label="Precision digits" value={precision.digits} style={{ ...s.selectSm, width: 56 }}
           onChange={event => setPrecision({ ...precision, digits: Number(event.target.value) })}>
           {precision.mode === 'decimals' && <option value="0">0</option>}
           {Array.from({ length: 12 }, (_, index) => <option key={index + 1}>{index + 1}</option>)}
@@ -532,7 +530,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-3) var(--space-4) 0', flexShrink: 0,
   },
   search: {
-    width: '100%', padding: '8px var(--space-3)', borderRadius: 14,
+    width: '100%', padding: '8px var(--space-3)', borderRadius: 9999,
     color: 'var(--color-text-primary)', fontSize: 13, outline: 'none',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
   },
@@ -542,7 +540,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   tab: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px var(--space-3)', borderRadius: 10, border: 'none',
+    padding: '6px var(--space-3)', borderRadius: 9999, border: 'none',
     background: 'transparent', color: 'var(--color-text-secondary)',
     cursor: 'pointer', fontSize: 13, fontWeight: 500,
     whiteSpace: 'nowrap', fontFamily: 'var(--font-family)',
@@ -568,13 +566,27 @@ const s: Record<string, React.CSSProperties> = {
   unitBlock: {
     width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
   },
+  // The value suffix sits inside the field (it used to fall out below it:
+  // these four styles were referenced but never defined).
+  inputWrap: { position: 'relative', width: '100%' },
+  inputUnit: {
+    position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none',
+    fontSize: 14, color: 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums',
+  },
+  resultValue: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
+  resultUnit: { marginLeft: 6, fontSize: 14, color: 'var(--color-text-tertiary)', flexShrink: 0 },
+  selectSm: {
+    width: 'auto', height: 28, padding: '0 10px', borderRadius: 9999, fontSize: 12, fontWeight: 500,
+    color: 'var(--color-text-primary)', background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)',
+    border: 'none', cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
+  },
   select: {
-    width: '100%', padding: '10px var(--space-3)', borderRadius: 14,
+    width: '100%', padding: '10px var(--space-3)', borderRadius: 9999,
     color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
     cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-family)',
   },
   input: {
-    width: '100%', padding: '14px var(--space-4)', borderRadius: 14,
+    width: '100%', padding: '14px 52px 14px var(--space-4)', borderRadius: 18,
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 300,
     outline: 'none', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
     fontFamily: 'var(--font-family)', boxSizing: 'border-box',
@@ -583,7 +595,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%', display: 'flex', alignItems: 'stretch', gap: 'var(--space-2)',
   },
   resultDisplay: {
-    flex: 1, padding: '14px var(--space-4)', borderRadius: 14,
+    flex: 1, padding: '14px var(--space-4)', borderRadius: 18,
     background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
     color: 'var(--color-text-primary)', fontSize: 24, fontWeight: 400,
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
@@ -591,7 +603,7 @@ const s: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   copyBtn: {
-    width: 44, borderRadius: 14, flexShrink: 0,
+    width: 48, borderRadius: 9999, flexShrink: 0,
     color: 'var(--color-text-secondary)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'all 0.15s ease',
