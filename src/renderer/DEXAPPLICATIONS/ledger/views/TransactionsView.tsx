@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from '../../../components/DexIcon';
+import { DexSearchInput } from '../../../styles/components';
 import { ledger, LedgerError, type TxnList, type Txn } from '../ledgerApi';
 import { editableFields, nextField, inlinePatch, amountDraft, type InlineField } from '../inlineEdit';
 import { formatDate, parseMoneyInput, todayLocal } from '../money';
@@ -221,9 +222,15 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
           <span className="lg-tag">Category: {categoryName}<button type="button" className="lg-status-btn" aria-label="Clear category filter" onClick={() => go('transactions', { accountId: accountFilter, categoryId: null })}><DexIcon name="close" size={10} color="currentColor" /></button></span>
         )}
         <span className="lg-spacer" />
-        <div style={{ position: 'relative', width: 220, maxWidth: '100%' }}>
-          <input className="lg-input" type="search" aria-label="Search transactions" placeholder="Search payee, notes, amount" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setSearch(''); }} />
-        </div>
+        <DexSearchInput
+          size="sm"
+          aria-label="Search transactions"
+          placeholder="Search payee, notes, amount"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onClear={() => setSearch('')}
+          style={{ width: 230, maxWidth: '100%' }}
+        />
         <IconBtn icon="filter" label="Filters" active={showFilters || filtersActive} onClick={() => setShowFilters(s => !s)} />
         <Btn small icon="import" onClick={() => openImport(accountFilter ?? undefined)} className="lg-hide-xs">Import</Btn>
         <Btn small icon="export" onClick={exportCsv} className="lg-hide-xs">Export</Btn>
@@ -337,7 +344,7 @@ export const TransactionsView: React.FC<{ selectedId: number | null }> = ({ sele
         )}
       </div>
       {q.data && (
-        <div className="lg-toolbar" style={{ minHeight: 34, borderTop: '1px solid var(--color-border-subtle)', borderBottom: 'none', padding: '4px 16px', fontSize: 12 }}>
+        <div className="lg-footer">
           <span className="lg-muted">{q.data.total} transaction{q.data.total === 1 ? '' : 's'}</span>
           <span className="lg-spacer" />
           <span className="lg-muted">Total</span> <Money minor={q.data.sum} sign />

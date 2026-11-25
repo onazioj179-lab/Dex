@@ -8,6 +8,7 @@ import { ledger, ACCOUNT_KIND_SINGULAR, type Account, type Recurring } from '../
 import { formatDate, todayLocal } from '../money';
 import { useLedger, useLedgerQuery, Money, Btn, IconBtn, Empty, Modal, Field, MoneyInput, CategorySelect, AccountSelect, errText } from '../ledgerUi';
 import { AccountDialog } from '../AccountDialog';
+import { SegmentedControl } from '../../../components/controls';
 
 export const AccountsView: React.FC<{ onNewAccount: () => void }> = ({ onNewAccount }) => {
   const { accounts, go, toast, confirm } = useLedger();
@@ -150,9 +151,13 @@ const ScheduleDialog: React.FC<{ existing: Recurring | null; onClose: () => void
   return (
     <Modal title={existing ? 'Edit schedule' : 'Schedule a transaction'} onClose={onClose} width={480}
       footer={<><Btn variant="ghost" onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={!ok} onClick={save}>Save</Btn></>}>
-      <div className="lg-segment" role="group" aria-label="Type" style={{ alignSelf: 'flex-start' }}>
-        {(['expense', 'income', 'transfer'] as const).map(k => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}>{k === 'expense' ? 'Money out' : k === 'income' ? 'Money in' : 'Transfer'}</button>)}
-      </div>
+      <SegmentedControl<'expense' | 'income' | 'transfer'>
+        aria-label="Type"
+        style={{ alignSelf: 'flex-start' }}
+        value={kind}
+        onChange={setKind}
+        options={[{ value: 'expense', label: 'Money out' }, { value: 'income', label: 'Money in' }, { value: 'transfer', label: 'Transfer' }]}
+      />
       <div className="lg-grid2">
         <Field label={kind === 'transfer' ? 'From account' : 'Account'}><AccountSelect value={accountId} onChange={setAccountId} accounts={active} ariaLabel="Account" /></Field>
         {kind === 'transfer'

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ledger, type AuditEntry, type Backup } from '../ledgerApi';
 import { CURRENCIES } from '../money';
 import { useLedger, useLedgerQuery, Btn, Empty, Field, errText } from '../ledgerUi';
+import { describeAudit, type AuditNames } from '../auditText';
 
 function when(ms: number): string {
   try { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms)); } catch { return String(ms); }
@@ -15,7 +16,12 @@ function size(b: number): string { return b > 1024 * 1024 ? `${(b / 1024 / 1024)
 const LABELS: Record<string, string> = { manual: 'Manual', 'before-import': 'Before CSV import', 'before-restore': 'Before restore' };
 
 export const DataView: React.FC = () => {
-  const { toast, confirm, currency, status } = useLedger();
+  const { toast, confirm, currency, status, fmt, accounts, groups } = useLedger();
+  const names: AuditNames = {
+    fmt,
+    account: (id) => accounts.find(a => a.id === id)?.name,
+    category: (id) => groups.flatMap(g => g.categories).find(c => c.id === id)?.name,
+  };
   const backupsQ = useLedgerQuery<Backup[]>(() => ledger.backups(), []);
   const auditQ = useLedgerQuery<AuditEntry[]>(() => ledger.audit(150), []);
   const [check, setCheck] = useState<{ ok: boolean; sqlite: string; foreignKeyViolations: number; issues: unknown[] } | null>(null);
@@ -101,13 +107,16 @@ export const DataView: React.FC = () => {
               <table className="lg-table" aria-label="Change history">
                 <thead><tr><th>When</th><th>Change</th><th className="lg-hide-sm">Details</th></tr></thead>
                 <tbody>
-                  {(auditQ.data || []).map(a => (
-                    <tr key={a.id}>
-                      <td className="lg-muted" style={{ width: 170 }}>{when(a.ts)}</td>
-                      <td>{a.action} {a.entity}{a.entityId ? ` #${a.entityId}` : ''}</td>
-                      <td className="lg-muted lg-hide-sm" style={{ maxWidth: 420 }} title={JSON.stringify(a.detail)}>{JSON.stringify(a.detail)}</td>
-                    </tr>
-                  ))}
+                  {(auditQ.data || []).map(a => {
+                    const t = describeAudit(a, names);
+                    return (
+                      <tr key={a.id}>
+                        <td className="lg-muted lg-num" style={{ width: 170 }}>{when(a.ts)}</td>
+                        <td>{t.title}</td>
+                        <td className="lg-muted lg-hide-sm" style={{ maxWidth: 420 }}>{t.detail}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

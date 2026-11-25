@@ -81,7 +81,7 @@ export const CategoriesView: React.FC = () => {
           {groups.length === 0 && <Empty icon="tags" title="No categories" />}
           {groups.map(g => (
             <div key={g.id} className="lg-panel" style={{ marginBottom: 12 }}>
-              <div className="lg-toolbar" style={{ minHeight: 38, padding: '4px 10px', background: 'var(--color-bg-inset)' }}>
+              <div className="lg-panel-head">
                 <strong style={{ fontSize: 13 }}>{name('group', g.id, g.name)}</strong>
                 <span className="lg-tag">{g.kind === 'income' ? 'Income' : 'Expense'}</span>
                 <span className="lg-spacer" />
