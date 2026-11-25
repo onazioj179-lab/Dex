@@ -355,7 +355,7 @@ select.lg-input { padding-right: 8px; }
 .lg-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border-subtle); }
 .lg-month { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--color-border-subtle); border-radius: 17px; background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); }
 .lg-month h1 { min-width: 140px; text-align: center; margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.lg-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: 12px; background: var(--color-bg-hover); font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; }
+.lg-banner { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: 10px; background: var(--color-bg-hover); font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; }
 .lg-banner.lg-warn { background: rgba(255,159,10,.12); color: var(--color-text-primary); }
 .lg-banner.lg-error { background: rgba(255,69,58,.12); color: var(--color-text-primary); }
 .lg-bars { display: flex; flex-direction: column; gap: 6px; }
