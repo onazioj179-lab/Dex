@@ -1566,27 +1566,6 @@ const DexCode: React.FC = () => {
           )}
         </div>
 
-        <div style={S.sidebarBlock}>
-          <div
-            style={{ ...S.sectionHeading, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-            onClick={() => toggleSection('stats')}
-            role="button"
-            tabIndex={0}
-            aria-expanded={openSections.stats}
-            aria-label="Toggle Stats section"
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection('stats'); } }}
-          >
-            <DexIcon name={openSections.stats ? 'chevron-down' : 'chevron-right'} size={10} />
-            Stats
-          </div>
-          {openSections.stats && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-            <div style={S.statCard}><span style={S.statLabel}>L</span><span style={S.statValue}>{stats.lines}</span></div>
-            <div style={S.statCard}><span style={S.statLabel}>W</span><span style={S.statValue}>{stats.words}</span></div>
-            <div style={S.statCard}><span style={S.statLabel}>C</span><span style={S.statValue}>{stats.chars}</span></div>
-          </div>
-          )}
-        </div>
       </aside>
       )}
 
@@ -2007,8 +1986,6 @@ const DexCode: React.FC = () => {
           >
             {problems.length ? `${problems.length} problem${problems.length === 1 ? '' : 's'}` : 'No problems'}
           </button>
-          <button type="button" onClick={() => togglePanel('terminal')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', color: 'inherit' }}>Terminal</button>
-          <span>DexScript</span>
           <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
           {selStats ? (
             <span>
@@ -2017,8 +1994,6 @@ const DexCode: React.FC = () => {
           ) : (
             <span>{stats.lines} lines</span>
           )}
-          <span>{stats.chars} chars</span>
-          <span style={{ fontSize: 9 }}>{fontSize}px</span>
           {/* Autosave indicator -- mirrors the local-storage autosave state */}
           <span
             style={{
@@ -2028,7 +2003,6 @@ const DexCode: React.FC = () => {
               opacity: saveState === 'idle' ? 0.45 : 1,
               transition: 'opacity 0.2s',
             }}
-            title="Editor content is autosaved to this device"
           >
             <span
               aria-hidden="true"
@@ -2046,16 +2020,15 @@ const DexCode: React.FC = () => {
           <button
             type="button"
             onClick={() => setTerminalOpen(v => !v)}
-            title="Toggle terminal (Ctrl+`)"
             aria-label="Toggle terminal"
             aria-pressed={terminalOpen}
             style={{
               marginLeft: 'auto',
               background: terminalOpen ? 'var(--color-accent-fill)' : 'transparent',
-              color: terminalOpen ? '#fff' : 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 4,
-              padding: '2px var(--space-2)',
+              color: terminalOpen ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
+              border: 'none',
+              borderRadius: 9999,
+              padding: '2px 10px',
               fontSize: 10,
               fontWeight: 600,
               cursor: 'pointer',
@@ -2063,7 +2036,6 @@ const DexCode: React.FC = () => {
           >
             Terminal
           </button>
-          <span>Ctrl+F find · Ctrl+H replace · Ctrl+S export · Ctrl+` terminal</span>
         </div>
 
         {terminalOpen && (
@@ -2474,7 +2446,10 @@ const S: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 'var(--space-3)',
     padding: '0 var(--space-3)',
-    height: 24,
+    height: 26,
+    // One line at any width: items never wrap, the row clips at the end.
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
     fontSize: 10,
     color: 'var(--color-text-tertiary)',
     borderTop: '1px solid var(--color-border)',

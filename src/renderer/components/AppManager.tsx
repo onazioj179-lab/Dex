@@ -37,6 +37,8 @@ import { spotlightEngine } from '../shell/SpotlightEngine';
 import { WindowChromeProvider, windowModeFor, NO_DRAG_SELECTOR } from '../shell/windowChrome';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
+import { applyLaunchOrigin, installLaunchOriginTracking } from '../shell/launchOrigin';
+installLaunchOriginTracking();
 // SpotlightSearch overlay retired (Ctrl+Space now opens UKI panel; Ctrl+K opens CommandPalette).
 // The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
@@ -4085,6 +4087,7 @@ export const AppManager: React.FC = () => {
         return (
           <div
             key={appId}
+            ref={applyLaunchOrigin}
             data-floating-window={appId}
             data-testid={`app-instance-${appId}`}
             data-app-state="foreground"

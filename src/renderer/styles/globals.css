@@ -804,7 +804,7 @@ button, a, input, select, textarea,
      to 1.01 then settled back, which read as a cheap "boing" on every launch. */
   /* Snappy, not sluggish: switching apps replays this, so it starts most of
      the way there (a fade from zero over 220 ms felt slow on every switch). */
-  0%   { opacity: 0.55; transform: scale(0.985); }
+  0%   { opacity: 0.55; transform: scale(var(--dex-open-scale, 0.985)); }
   100% { opacity: 1;    transform: none; }
 }
 @keyframes dex-app-close {
