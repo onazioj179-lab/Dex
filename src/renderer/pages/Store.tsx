@@ -10,9 +10,11 @@
  * them all as "installed" and surfaces discovery instead of acquisition:
  *
  *   - search + category filtering + sort (name / category)
- *   - Featured + Recently added rails
- *   - a per-app detail view (name, description, category, icon, metadata, perms)
- *   - local ratings/favorites (localStorage) with a "My favorites" filter
+ *   - Featured + "Your most used" rails (real per-app open counts from the
+ *     engagement store; hidden until you have used apps)
+ *   - a per-app detail view (name, description, category, icon, metadata,
+ *     how often you opened it)
+ *   - your own ratings/favorites (localStorage) with a "My favorites" filter
  *   - one-click open via the `dex-open-app` CustomEvent
  *
  * Favorites and ratings persist to localStorage; everything else derives from
@@ -22,6 +24,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { DexSearchInput } from '../styles/components';
+import { Button } from '../ui/Button';
+import { Pill, SegmentedControl } from '../components/controls';
+import { loadEngagement } from '../services/engagement';
+import { mostUsedAppIds } from './storeUsage';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useInstalledAppsStore, canRemoveApp, appTier, type AppTier } from '../store/installedAppsStore';
 import { APP_TITLE, APP_SUBTITLE } from '../styles/appHeader';
@@ -69,34 +75,6 @@ const HIDDEN_APP_IDS = new Set(['home', 'store', 'power', 'recyclebin']);
 /** A short, human-readable capability line when the registry omits a description. */
 function fallbackDescription(name: string, category: AppCategory): string {
   return `${name} — a built-in DEX ${CATEGORY_LABELS[category].toLowerCase()} app.`;
-}
-
-/**
- * Heuristic permission/metadata surface. The registry does not store a formal
- * permissions list, so we derive a plausible, honest set from the category and
- * known traits of each app. This is presentational metadata only — it grants
- * nothing.
- */
-function derivePermissions(app: StoreApp): string[] {
-  const perms = new Set<string>();
-  const cat = app.category;
-  if (cat === 'creative' || cat === 'media') {
-    perms.add('Files & media');
-  }
-  if (cat === 'productivity' || cat === 'creative') {
-    perms.add('Local storage');
-  }
-  if (cat === 'system' || cat === 'utility') {
-    perms.add('System info');
-  }
-  // App-specific signals from the id.
-  const id = app.id;
-  if (/audio|imosion|noise|music|screenrecorder/.test(id)) perms.add('Microphone / audio');
-  if (/screenrecorder|gallery|prism|pixelart|canvas/.test(id)) perms.add('Screen & camera');
-  if (/browser|maps|weather|ssh|git|collabhub|transfers/.test(id)) perms.add('Network');
-  if (/calendar|tasks|notes|kanban|workflows/.test(id)) perms.add('Notifications');
-  if (perms.size === 0) perms.add('Local storage');
-  return [...perms];
 }
 
 function buildCatalog(): StoreApp[] {
@@ -275,6 +253,10 @@ export default function Store(): React.ReactElement {
     toast('All apps restored to defaults', 'success');
   }, [resetApps]);
 
+  // Real per-app open counts (engagement store). Read once per mount; the Store
+  // is a browse surface, not a live dashboard.
+  const usageCounts = useMemo(() => loadEngagement().stats.appUsageCounts ?? {}, []);
+
   // Featured: a stable, curated subset (flagship apps) that exist in the catalog.
   const featured = useMemo(() => {
     const flagship = ['videoeditor', 'imosion', 'prism', 'flux', 'axl', 'nexus', 'dexcode', 'maps'];
@@ -282,13 +264,14 @@ export default function Store(): React.ReactElement {
     return flagship.map(id => byId.get(id)).filter((a): a is StoreApp => !!a);
   }, [catalog]);
 
-  // Recently added: newest build dates first.
-  const recentlyAdded = useMemo(() => {
-    return [...catalog]
-      .filter(a => a.buildTime > 0)
-      .sort((a, b) => b.buildTime - a.buildTime || a.name.localeCompare(b.name))
-      .slice(0, 8);
-  }, [catalog]);
+  // Your most used: real open counts, most first. Every built-in app shares one
+  // build date, so the old newest-build rail was just an alphabetical list.
+  const mostUsed = useMemo(() => {
+    const byId = new Map(catalog.map(a => [a.id, a]));
+    return mostUsedAppIds(usageCounts, 8, id => byId.has(id) && !removedSet.has(id))
+      .map(id => byId.get(id))
+      .filter((a): a is StoreApp => !!a);
+  }, [catalog, usageCounts, removedSet]);
 
   // Main filtered + sorted grid.
   const filtered = useMemo(() => {
@@ -427,15 +410,14 @@ export default function Store(): React.ReactElement {
 
   if (selected) {
     const isFav = favorites.has(selected.id);
-    const perms = derivePermissions(selected);
+    const opens = usageCounts[selected.id] ?? 0;
     return (
       <div style={styles.container}>
         <header style={styles.header}>
           <div style={styles.titleBlock}>
-            <button type="button" onClick={() => setSelectedId(null)} style={styles.backBtn} title="Back to store">
-              <DexIcon name="arrow-left" size={16} />
-              <span>Store</span>
-            </button>
+            <Button size="sm" variant="secondary" onClick={() => setSelectedId(null)} leftIcon={<DexIcon name="arrow-left" size={15} />}>
+              Store
+            </Button>
           </div>
         </header>
 
@@ -459,33 +441,31 @@ export default function Store(): React.ReactElement {
               <div style={styles.detailActions}>
                 {isRemoved(selected.id) ? (
                   // Removed → the only primary action is to reinstall ("Get").
-                  <button type="button" style={styles.primaryBtn} onClick={() => handleReinstall(selected.id)}>
-                    <DexIcon name="download" size={15} /> Get
-                  </button>
+                  <Button variant="primary" onClick={() => handleReinstall(selected.id)} leftIcon={<DexIcon name="download" size={15} />}>
+                    Get
+                  </Button>
                 ) : (
-                  <button type="button" style={styles.primaryBtn} onClick={() => launch(selected.id)}>
-                    <DexIcon name="external-link" size={15} /> Open
-                  </button>
+                  <Button variant="primary" onClick={() => launch(selected.id)} leftIcon={<DexIcon name="external-link" size={15} />}>
+                    Open
+                  </Button>
                 )}
-                <button
-                  type="button"
-                  style={{ ...styles.secondaryBtn, color: isFav ? 'var(--color-error)' : 'var(--color-text-primary)' }}
+                <Button
+                  variant="secondary"
                   onClick={() => toggleFavorite(selected.id)}
                   aria-pressed={isFav}
+                  leftIcon={<DexIcon name="heart" size={15} color={isFav ? 'var(--color-error)' : undefined} />}
                 >
-                  <DexIcon name="heart" size={15} />
                   {isFav ? 'Favorited' : 'Favorite'}
-                </button>
+                </Button>
                 {/* Remove is only offered for non-protected, currently-installed apps. */}
                 {!isRemoved(selected.id) && canRemoveApp(selected.id) && (
-                  <button
-                    type="button"
-                    style={{ ...styles.secondaryBtn, color: 'var(--color-error)' }}
+                  <Button
+                    variant="danger"
                     onClick={() => handleRemove(selected.id)}
-                    title={`Remove ${selected.name} — reinstall any time from the Store`}
+                    leftIcon={<DexIcon name="trash" size={15} />}
                   >
-                    <DexIcon name="trash" size={15} /> Remove
-                  </button>
+                    Remove
+                  </Button>
                 )}
               </div>
               {canRemoveApp(selected.id) && (
@@ -513,23 +493,13 @@ export default function Store(): React.ReactElement {
           </section>
 
           <section style={styles.detailSection}>
-            <h3 style={styles.sectionTitle}>Permissions</h3>
-            <div style={styles.permGrid}>
-              {perms.map(p => (
-                <span key={p} style={styles.permChip}>
-                  <DexIcon name="security-shield" size={13} /> {p}
-                </span>
-              ))}
-            </div>
-          </section>
-
-          <section style={styles.detailSection}>
             <h3 style={styles.sectionTitle}>Information</h3>
             <dl style={styles.infoGrid}>
               <InfoRow label="Category" value={CATEGORY_LABELS[selected.category]} />
               {selected.version && <InfoRow label="Version" value={selected.version} />}
               {selected.buildDate && <InfoRow label="Updated" value={selected.buildDate} />}
               {selected.shortcut && <InfoRow label="Shortcut" value={selected.shortcut} />}
+              <InfoRow label="Opened" value={opens === 0 ? 'Not yet' : `${opens.toLocaleString()} time${opens === 1 ? '' : 's'}`} />
               <InfoRow label="App ID" value={selected.id} />
               <InfoRow label="Source" value="Built-in (DEX)" />
             </dl>
@@ -558,14 +528,9 @@ export default function Store(): React.ReactElement {
           {/* Reset restores every removed app to the default set (mandate:
               "reset... default setting, that's when you can get the app back"). */}
           {removedAppIds.length > 0 && (
-            <button
-              type="button"
-              style={styles.resetAppsBtn}
-              onClick={handleResetApps}
-              title="Reinstall every removed app"
-            >
-              <DexIcon name="refresh" size={13} /> Reset apps
-            </button>
+            <Button size="sm" variant="secondary" onClick={handleResetApps} leftIcon={<DexIcon name="refresh" size={13} />} style={{ marginLeft: 'auto' }}>
+              Reset apps
+            </Button>
           )}
         </div>
 
@@ -581,28 +546,22 @@ export default function Store(): React.ReactElement {
               style={{ maxWidth: 340 }}
             />
           </div>
-          <label style={styles.filterPill}>
-            <input
-              type="checkbox"
-              checked={favoritesOnly}
-              onChange={e => setFavoritesOnly(e.target.checked)}
-              style={{ accentColor: 'var(--color-accent)' }}
-            />
-            <DexIcon name="heart" size={14} />
-            <span>Favorites</span>
-          </label>
-          <label style={styles.sortPill} title="Sort apps">
-            <DexIcon name="sliders" size={14} />
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as SortMode)}
-              style={styles.sortSelect}
-              aria-label="Sort apps"
-            >
-              <option value="category">Category</option>
-              <option value="name">Name</option>
-            </select>
-          </label>
+          <Pill
+            size="md"
+            active={favoritesOnly}
+            onClick={() => setFavoritesOnly(v => !v)}
+            icon={<DexIcon name="heart" size={14} />}
+            style={favoritesOnly ? styles.chip : { ...styles.chip, ...styles.chipIdle }}
+          >
+            Favorites
+          </Pill>
+          <SegmentedControl<SortMode>
+            aria-label="Sort apps"
+            size="sm"
+            options={[{ value: 'category', label: 'By category' }, { value: 'name', label: 'A–Z' }]}
+            value={sort}
+            onChange={setSort}
+          />
         </div>
       </header>
 
@@ -626,7 +585,7 @@ export default function Store(): React.ReactElement {
         {!isSearching && (
           <>
             <Rail title="Featured" icon="star" apps={featured} />
-            <Rail title="Recently added" icon="stopwatch" apps={recentlyAdded} />
+            <Rail title="Your most used" icon="stopwatch" apps={mostUsed} />
           </>
         )}
 
@@ -675,45 +634,30 @@ function CategoryButton(
   { id, label, count, active, onClick }: { id: string; label: string; count: number; active: boolean; onClick: () => void },
 ): React.ReactElement {
   return (
-    <button
-      type="button"
+    <Pill
+      size="md"
       onClick={onClick}
-      style={{ ...styles.catBtn, ...(active ? styles.catBtnActive : null) }}
-      aria-pressed={active}
+      active={active}
+      data-category={id}
+      style={active ? styles.chip : { ...styles.chip, ...styles.chipIdle }}
     >
       {label}
-      <span style={{ ...styles.catBtnCount, color: active ? 'inherit' : 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
-    </button>
+      <span style={{ ...styles.catBtnCount, color: active ? 'inherit' : 'var(--color-text-tertiary)', fontVariantNumeric: 'tabular-nums', marginLeft: 6 }}>{count}</span>
+    </Pill>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Color helpers — tint an app's accent color into a soft icon background.
-// CSS-variable colors (e.g. "var(--color-accent)") can't be parsed to rgba,
-// so fall back to neutral surfaces for those.
+// Color helpers: tint an app's accent color into a soft icon background.
+// color-mix handles hex and CSS-variable colors alike.
 // ---------------------------------------------------------------------------
 
-function isHex(color: string): boolean {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color);
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  let h = hex.replace('#', '');
-  if (h.length === 3) h = h.split('').map(c => c + c).join('');
-  const n = parseInt(h, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
 function tintBg(color: string): string {
-  if (!isHex(color)) return 'var(--color-bg-hover)';
-  const [r, g, b] = hexToRgb(color);
-  return `rgba(${r},${g},${b},0.14)`;
+  return `color-mix(in srgb, ${color} 14%, transparent)`;
 }
 
 function tintBorder(color: string): string {
-  if (!isHex(color)) return 'var(--pg-border)';
-  const [r, g, b] = hexToRgb(color);
-  return `rgba(${r},${g},${b},0.30)`;
+  return `color-mix(in srgb, ${color} 30%, transparent)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -745,20 +689,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   titleBlock: { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 },
-  backBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 32,
-    padding: '0 var(--space-3)',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--pg-border-strong)',
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-primary)',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
   storeIcon: {
     width: 34,
     height: 34,
@@ -769,7 +699,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     color: 'var(--color-text-secondary)',
     background: 'var(--color-bg-hover)',
-    border: '1px solid var(--color-accent-soft, rgba(10,132,255,0.28))',
+    border: '1px solid var(--pg-border)',
   },
   title: APP_TITLE,
   subtitle: APP_SUBTITLE,
@@ -785,46 +715,6 @@ const styles: Record<string, React.CSSProperties> = {
     scrollbarWidth: 'thin',
   },
   searchWrap: { display: 'flex', alignItems: 'center', minWidth: 180, flex: '1 1 240px' },
-  filterPill: {
-    minHeight: 32,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-    padding: '0 10px',
-    border: '1px solid var(--pg-border-strong)',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 12,
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-    cursor: 'pointer',
-  },
-  sortPill: {
-    minHeight: 32,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '0 8px 0 10px',
-    border: '1px solid var(--pg-border-strong)',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 12,
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  },
-  sortSelect: {
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--color-text-primary)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    outline: 'none',
-    appearance: 'none',
-    paddingRight: 2,
-  },
   catStrip: {
     display: 'flex',
     alignItems: 'center',
@@ -834,28 +724,10 @@ const styles: Record<string, React.CSSProperties> = {
     scrollbarWidth: 'thin',
     flexShrink: 0,
   },
-  catBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 30,
-    padding: '0 12px',
-    border: '1px solid var(--pg-border)',
-    borderRadius: 9999,
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 12.5,
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-    flexShrink: 0,
-  },
-  catBtnActive: {
-    background: 'var(--color-accent-fill)',
-    borderColor: 'var(--color-accent)',
-    color: '#fff',
-  },
   catBtnCount: { fontSize: 11, fontWeight: 700 },
+  // Pill chips: soft accent fill when selected (Pill's own), never a ring.
+  chip: { height: 30, padding: '0 12px', fontSize: 12.5, flexShrink: 0 },
+  chipIdle: { background: 'var(--color-bg-surface)', boxShadow: 'inset 0 0 0 1px var(--pg-border)' },
   scroll: {
     flex: 1,
     minHeight: 0,
@@ -889,7 +761,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 8,
     padding: 'var(--space-3)',
-    borderRadius: 'var(--radius-lg)',
+    borderRadius: 14,
     background: 'var(--color-bg-surface)',
     border: '1px solid var(--pg-border)',
     color: 'var(--color-text-primary)',
@@ -915,7 +787,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 'var(--radius-md)',
+    borderRadius: 9999,
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
@@ -976,7 +848,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-secondary)',
     textAlign: 'center',
     border: '1px dashed var(--pg-border)',
-    borderRadius: 10,
+    borderRadius: 14,
   },
   // Detail view
   detailScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' },
@@ -994,66 +866,10 @@ const styles: Record<string, React.CSSProperties> = {
   detailName: { margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' },
   detailMetaRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   detailActions: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' },
-  primaryBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    minHeight: 36,
-    padding: '0 16px',
-    borderRadius: 'var(--radius-lg)',
-    border: 'none',
-    background: 'var(--color-accent-fill)',
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  secondaryBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    minHeight: 36,
-    padding: '0 14px',
-    borderRadius: 'var(--radius-lg)',
-    border: '1px solid var(--pg-border-strong)',
-    background: 'var(--color-bg-surface)',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  resetAppsBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 32,
-    padding: '0 12px',
-    marginLeft: 'auto',
-    borderRadius: 9999,
-    border: '1px solid var(--color-border-subtle)',
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  } as React.CSSProperties,
   detailSection: { display: 'flex', flexDirection: 'column', gap: 8 },
   sectionTitle: { margin: 0, fontSize: 13, fontWeight: 700, textTransform: 'none', letterSpacing: '0.01em', color: 'var(--color-text-secondary)' },
   detailDesc: { margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-primary)' },
   metaDim: { fontSize: 12, color: 'var(--color-text-tertiary)' },
-  permGrid: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  permChip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '5px 10px',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--pg-border)',
-    background: 'var(--color-bg-surface)',
-    color: 'var(--color-text-secondary)',
-    fontSize: 12,
-    fontWeight: 600,
-  },
   infoGrid: { display: 'flex', flexDirection: 'column', gap: 0, margin: 0 },
   infoRow: {
     display: 'flex',

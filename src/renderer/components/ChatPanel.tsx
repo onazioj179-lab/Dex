@@ -222,14 +222,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-end',
     gap: space[2],
     background: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
+    borderRadius: 20,
     padding: '6px 6px 6px var(--space-4)',
     border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
   },
   inputWrapperFocused: {
-    borderColor: 'rgba(10,132,255,0.5)',
-    boxShadow: '0 0 0 3px var(--color-accent-muted, rgba(10,132,255,0.1))',
+    borderColor: 'color-mix(in srgb, var(--color-text-primary) 30%, transparent)',
+    boxShadow: 'none',
   },
   textarea: {
     flex: 1,

@@ -3892,10 +3892,7 @@ export const Settings: React.FC = () => {
     <div className="settings-shell" style={styles.container}>
       <style>{`
         .settings-nav:hover { background: var(--pg-row-hover) !important; color: var(--color-text-primary) !important; }
-        .settings-nav[data-active="true"]::before {
-          content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
-          width: 2px; background: var(--color-accent); border-radius: 2px;
-        }
+        /* The selected row is its soft fill alone (no extra accent bar). */
         .settings-btn:hover { background: var(--color-bg-hover) !important; }
         .settings-btn:active { transform: scale(0.97); }
         .settings-toggle:hover { background: var(--color-bg-hover) !important; }
@@ -4034,7 +4031,7 @@ export const Settings: React.FC = () => {
             onClick={() => importSettings(setSettings)}
             aria-label="Import settings from file"
             style={{
-              flex: 1, padding: '5px var(--space-2)', borderRadius: 4, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px var(--space-2)', borderRadius: 9999, fontSize: 10.5, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4051,7 +4048,7 @@ export const Settings: React.FC = () => {
             onClick={() => exportSettings(settings)}
             aria-label="Export settings to file"
             style={{
-              flex: 1, padding: '5px var(--space-2)', borderRadius: 4, fontSize: 10, fontWeight: 500,
+              flex: 1, padding: '5px var(--space-2)', borderRadius: 9999, fontSize: 10.5, fontWeight: 500,
               background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
               color: 'var(--color-text-secondary)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -4069,7 +4066,7 @@ export const Settings: React.FC = () => {
         {/* Changed settings count */}
         {countChangedSettings(settings) > 0 && (
           <div style={{ 
-            padding: '6px var(--space-3)', margin: '0 var(--space-3) var(--space-2)', borderRadius: 4,
+            padding: '6px var(--space-3)', margin: '0 var(--space-3) var(--space-2)', borderRadius: 9999,
             background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
             fontSize: 10, color: 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center', gap: 6,
@@ -4272,7 +4269,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '10px',
     padding: '7px var(--space-3)',
     minHeight: 'var(--dex-control-h-md)',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: 10,
     flexShrink: 0,
     border: 'none',
     cursor: 'pointer',
@@ -4404,7 +4401,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 'var(--space-3)',
     minHeight: 'var(--dex-control-h-md)',
     padding: '0 var(--space-3)',
-    borderRadius: '6px',
+    borderRadius: 9999,
     border: 'none',
     background: 'color-mix(in srgb, var(--color-error) 12%, transparent)',
     // Toward the text colour: lighter in dark, darker in light. Plain error red

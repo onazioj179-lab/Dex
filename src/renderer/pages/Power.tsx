@@ -459,8 +459,8 @@ const S: Record<string, React.CSSProperties> = {
   num: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
   segment: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' },
   segmentItem: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', cursor: 'pointer', textAlign: 'left', fontSize: 13 },
-  segmentItemOn: { borderColor: 'var(--color-accent)', boxShadow: 'inset 0 0 0 1px var(--color-accent)' },
-  button: { padding: '6px var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer' },
+  segmentItemOn: { borderColor: 'transparent', background: 'var(--color-accent-muted, color-mix(in srgb, var(--color-accent) 14%, transparent))' },
+  button: { padding: '6px var(--space-3)', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-hover)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer' },
   link: { background: 'none', border: 'none', padding: 0, color: 'var(--color-accent)', fontSize: 12, cursor: 'pointer' },
 };
 

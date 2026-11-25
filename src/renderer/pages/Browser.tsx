@@ -31,6 +31,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRe
 import { NativeWebview } from '../components/NativeWebview';
 import ContextMenu, { useContextMenu } from '../components/ContextMenu';
 import { TabSearch } from '../components/browser/TabSearch';
+import { WindowToolbar, useUnifiedChrome } from '../shell/windowChrome';
 import { DexSwitch, DexCapsuleButton } from '../components/controls';
 import { pickFolder } from '../services/nativeFiles';
 import { computeLiveTabs, liveTabBudget, PAGE_BUSY_CHECK, parseBusyCheck } from '../services/browser/tabResidency';
@@ -601,6 +602,7 @@ ${text}
   // is playing sound or holds edited fields; if so it stays awake.
   const tabMenu = useContextMenu();
   const [showTabSearch, setShowTabSearch] = useState(false);
+  const barInTopBar = useUnifiedChrome();
   const toggleKeepAwake = useCallback((id: string) => {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, keepAwake: t.keepAwake ? undefined : true, ...(t.keepAwake ? {} : { background: false }) } : t));
   }, []);
@@ -2097,8 +2099,11 @@ ${text}
 
   return (
     <div style={styles.container}>
-      {/* Safari-style unified bar: tabs + navigation */}
-      <div style={styles.topBar}>
+      {/* Tabs + navigation. Full-surface, this row moves into the DEX top bar
+          (one row of chrome); the DEX Back / Forward already drive this tab's
+          history there, so the duplicate arrows are dropped. */}
+      <WindowToolbar inline={(bar) => <div style={styles.topBar}>{bar}</div>}>
+        {!barInTopBar && (<>
         {/* Navigation controls */}
         <div style={styles.navControls}>
           <button
@@ -2123,23 +2128,7 @@ ${text}
           </button>
         </div>
 
-        {/* Tab Groups header bar */}
-        {tabGroups.size > 0 && (
-          <div style={{ display: 'flex', gap: 4, padding: '2px var(--space-2)', background: 'var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
-            {Array.from(tabGroups.entries()).map(([gid, group]) => (
-              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', borderRadius: 4, background: `${group.color}22`, cursor: 'pointer' }}
-                onClick={() => { const firstTab = group.tabIds[0]; if (firstTab) setActiveTab(firstTab); }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color }} />
-                <span style={{ fontSize: 10, color: group.color, fontWeight: 500 }}>{group.name} ({group.tabIds.length})</span>
-                <button onClick={(e) => { e.stopPropagation(); setTabGroups(prev => { const next = new Map(prev); next.delete(gid); return next; }); }}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0 }} aria-label={`Delete group ${group.name}`}><DexIcon name="close" size={10} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tabMenu.menuState && <ContextMenu items={tabMenu.menuState.items} position={tabMenu.menuState.position} onClose={tabMenu.close} />}
+        </>)}
         {/* Tab strip */}
         <div style={styles.tabStrip} ref={tabContainerRef} role="tablist" aria-label="Tabs">
           {tabs.map((tab) => {
@@ -2235,14 +2224,6 @@ ${text}
             {Icon.search}
           </button>
         </div>
-        {showTabSearch && (
-          <TabSearch
-            tabs={tabs.map(t => ({ id: t.id, title: t.title, url: t.url, pinned: t.pinned, active: t.id === activeTab, sleeping: !!t.background && t.id !== activeTab && !!t.url }))}
-            onPick={(id) => { const t = tabs.find(x => x.id === id); setActiveTab(id); if (t) setUrlInput(t.url); }}
-            onClose={() => setShowTabSearch(false)}
-          />
-        )}
-
         {/* Right actions */}
         <div style={styles.rightActions}>
           <button
@@ -2270,7 +2251,32 @@ ${text}
             {Icon.settings}
           </button>
         </div>
-      </div>
+      </WindowToolbar>
+        {/* Tab Groups header bar */}
+        {tabGroups.size > 0 && (
+          <div style={{ display: 'flex', gap: 4, padding: '2px var(--space-2)', background: 'var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
+            {Array.from(tabGroups.entries()).map(([gid, group]) => (
+              <div key={gid} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px var(--space-2)', borderRadius: 4, background: `${group.color}22`, cursor: 'pointer' }}
+                onClick={() => { const firstTab = group.tabIds[0]; if (firstTab) setActiveTab(firstTab); }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: group.color }} />
+                <span style={{ fontSize: 10, color: group.color, fontWeight: 500 }}>{group.name} ({group.tabIds.length})</span>
+                <button onClick={(e) => { e.stopPropagation(); setTabGroups(prev => { const next = new Map(prev); next.delete(gid); return next; }); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0 }} aria-label={`Delete group ${group.name}`}><DexIcon name="close" size={10} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tabMenu.menuState && <ContextMenu items={tabMenu.menuState.items} position={tabMenu.menuState.position} onClose={tabMenu.close} />}
+        {showTabSearch && (
+          <TabSearch
+            tabs={tabs.map(t => ({ id: t.id, title: t.title, url: t.url, pinned: t.pinned, active: t.id === activeTab, sleeping: !!t.background && t.id !== activeTab && !!t.url }))}
+            onPick={(id) => { const t = tabs.find(x => x.id === id); setActiveTab(id); if (t) setUrlInput(t.url); }}
+            onClose={() => setShowTabSearch(false)}
+          />
+        )}
+
 
       {/* Unified address bar with consolidated actions */}
       <div style={styles.addressBar}>

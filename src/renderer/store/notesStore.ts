@@ -636,6 +636,8 @@ const notesStoreInit: StateCreator<NotesStoreState> = (set, get) => ({
       folder_id: folder,
     });
     if (result?.id) {
+      // Real user action -> Trophies "notes created" + the daily note challenge.
+      try { window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'notesCreated', amount: 1 } })); } catch { /* non-DOM env */ }
       await get().loadNotes();
       await get().loadNote(result.id);
       await get().loadStats();

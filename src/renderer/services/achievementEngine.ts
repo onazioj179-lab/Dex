@@ -117,8 +117,7 @@ const STAT_TO_CHALLENGE: Partial<Record<keyof UserStats, string>> = {
   notesCreated: 'notes:create',
   tasksCompleted: 'tasks:complete',
   kanbanCardsCreated: 'kanban:add_card',
-  spotlightSearches: 'spotlight:search',
-  browserPageLoads: 'browser:navigate',
+  workflowsCreated: 'workflows:create',
 };
 
 /**

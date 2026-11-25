@@ -11,6 +11,7 @@
  * ENHANCED v2.0: Smart understanding with typo correction, slang support,
  * screen reading, improved TTS/STT, and accessibility tools
  */
+import { detectEmotion, isDateQuestion, isLocalTimeQuestion, type EmotionType } from '../uki/localIntents';
 import { discoverEasterEgg } from '../services/easterEggs';
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { AssistedTextarea } from './AssistedTextarea';
@@ -435,16 +436,7 @@ function speakWithVoice(text: string, onEnd?: () => void): void {
 // EMOTION DETECTION — empathy-first responses
 // ===========================================================================
 
-type EmotionType = 'frustration' | 'happiness' | 'sadness' | 'confusion' | 'neutral';
-
-function detectEmotion(text: string): EmotionType {
-  const lower = text.toLowerCase();
-  if (/\b(ugh|argh|wtf|damn|hate|broken|stupid|useless|not working|doesn't work|doesnt work|fuck|sucks|terrible|awful)\b/.test(lower)) return 'frustration';
-  if (/\b(thank|thanks|great|awesome|amazing|love|perfect|yay|cool|nice|brilliant|excellent|wonderful)\b/.test(lower)) return 'happiness';
-  if (/\b(sad|upset|crying|depressed|lonely|miss|hate my|worried|anxious|stress)\b/.test(lower)) return 'sadness';
-  if (/^(huh|what|i don.?t understand|not sure|confused|help me|explain|what do you mean|how do i|how does)\b/.test(lower)) return 'confusion';
-  return 'neutral';
-}
+// Tone + local time/date intents live in uki/localIntents.ts (tested).
 
 function getEmpathyPrefix(emotion: EmotionType): string {
   switch (emotion) {
@@ -662,6 +654,8 @@ function tryAppCommand(text: string): string | null {
     /^(?:open|launch|start|show|run|load|opne|oepn|opn)\s+(.+)$/,
     /^(?:can you |please |pls )?(?:open|launch|start)\s+(.+)$/,
     /^(?:i want to |i wanna |lemme |let me )(?:open|use|see)\s+(.+)$/,
+    // "how do I open notes" means "open Notes", not a web search for "i open notes".
+    /^(?:how (?:do|can) i |how to |where (?:do|can) i )(?:open|launch|start|find|get to)\s+(?:the\s+)?(.+?)(?:\s+app)?\??$/,
   ];
   const closePatterns = [
     /^(?:close|hide|quit|exit|shut|clsoe|closee)\s+(.+)$/,
@@ -982,11 +976,11 @@ function trySystemTool(text: string): ToolResult {
   }
 
   // Time / Date (with typo tolerance)
-  if (/^(?:what(?:'s| is) the )?(?:time|current time|tiem|tmie)/.test(lower) || lower === 'time' || lower === 'tiem') {
+  if (isLocalTimeQuestion(lower)) {
     const now = new Date();
     return { handled: true, response: `It's ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} on ${now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.` };
   }
-  if (/^(?:what(?:'s| is) (?:the |today(?:'s)? )?)?(?:date|dat|dtae)/.test(lower) || lower === 'date' || lower === 'today' || lower === 'todya') {
+  if (isDateQuestion(lower)) {
     return { handled: true, response: `Today is ${new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.` };
   }
   
@@ -1151,12 +1145,14 @@ function trySearchCommand(text: string): string | null {
   const patterns = [
     // Longer prefixes first so "search for X" extracts "X", not "for X".
     /^(?:search for|search up|search|look up|lookup|google|find me|find)\s+(.+)$/,
-    /^(?:what is|what's|who is|who's|where is|when is|how to|how do)\s+(.+)$/,
+    /^(?:what is|what's|who is|who's|where is|when is)\s+(.+)$/,
   ];
   for (const pat of patterns) {
     const m = lower.match(pat);
     if (m) return m[1].trim();
   }
+  // How-to questions keep their whole wording ("how do i fix wifi", not "i fix wifi").
+  if (/^(?:how to|how do|how can|how does)\s+\S/.test(lower)) return lower.replace(/[?]+$/, '');
   return null;
 }
 
@@ -1197,7 +1193,7 @@ function useTypewriter(target: string, speed = 18): string {
 
 const STATE_LABELS: Record<string, { label: string; color: string }> = {
   dormant: { label: 'Asleep', color: 'var(--color-text-tertiary)' },
-  idle: { label: 'Idle', color: 'var(--color-text-tertiary)' },
+  idle: { label: 'Ready', color: 'var(--color-text-tertiary)' },
   listening: { label: 'Listening...', color: 'var(--color-accent)' },
   processing: { label: 'Processing...', color: '#BF5AF2' },
   thinking: { label: 'Thinking...', color: 'var(--color-warning)' },
@@ -1742,7 +1738,7 @@ const UkiOverlay: React.FC = () => {
     } else {
       // No AI bridge and no configured provider: answer locally only.
       pushStep('No AI bridge -- using safe fallback');
-      const fallback = empathyPrefix + "I can hear you! Try 'open notes', 'what time is it', math like '5 + 3', or /help for all commands.";
+      const fallback = empathyPrefix + "I can't answer that on this device alone. Add an AI provider in Settings > AI Providers for open questions. Without one I can still open and close apps, tell the time and date, do math and unit conversions, look up weather and definitions, and run /help commands.";
       streamResponse(fallback, 'fallback', text, false);
     }
   }, [inputText, streamResponse, commitTurn]);

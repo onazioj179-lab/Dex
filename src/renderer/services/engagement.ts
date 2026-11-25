@@ -15,6 +15,7 @@ import {
 } from './achievementsCatalog';
 import { platform } from '../utils';
 import { toLocalDateInput } from '../utils/localDate';
+import { RANK_POINTS, FINAL_PTS, visibleAchievements } from './achievementTracking';
 
 // Re-export types and catalog for backward compatibility
 export type { UserStats, Achievement, AchievementCategory };
@@ -265,12 +266,6 @@ export function getUserRank(points: number): { title: string; icon: string; next
   return { title: 'Newcomer', icon: 'hand-wave', next: 'Beginner', pointsNeeded: 50 - points, level: 0 };
 }
 
-const RANK_POINTS: Record<string, number> = {
-  'rank-beginner': 50, 'rank-regular': 250, 'rank-pro': 800, 'rank-expert': 2000,
-  'rank-legend': 4000, 'rank-champion': 8000, 'rank-transcend': 15000, 'rank-grandmaster': 25000,
-  'rank-titan': 50000, 'rank-mythical': 100000, 'rank-celestial': 250000, 'rank-eternal': 500000,
-};
-const FINAL_PTS: Record<string, number> = { '10k': 10000, '25k': 25000, '50k': 50000, '100k': 100000 };
 
 /**
  * Drop meta trophies (points tiers, trophy-count tiers, rank and "final" point /
@@ -310,25 +305,30 @@ export function repairMetaUnlocks(state: EngagementState): EngagementState {
   return { ...state, unlockedAchievements: unlocked, unlockedAt };
 }
 
-/** Get achievement stats summary */
+/**
+ * Achievement stats summary over the trophies DEX can actually award (plus any
+ * already earned) -- see achievementTracking.ts. Counting the thousands of
+ * trophies whose stats nothing records made "N of M" and the ring fake.
+ */
 export function getAchievementStats(unlocked: string[]) {
   const set = new Set(unlocked);
+  const visible = visibleAchievements(set);
   const points = getTotalPoints(unlocked);
   const rank = getUserRank(points);
   const byCategory: Record<string, { unlocked: number; total: number }> = {};
 
   for (const cat of Object.keys(CATEGORY_META) as AchievementCategory[]) {
-    const total = ACHIEVEMENTS.filter(a => a.category === cat).length;
-    const unl = ACHIEVEMENTS.filter(a => a.category === cat && set.has(a.id)).length;
-    byCategory[cat] = { unlocked: unl, total };
+    const inCat = visible.filter(a => a.category === cat);
+    byCategory[cat] = { unlocked: inCat.filter(a => set.has(a.id)).length, total: inCat.length };
   }
+  const totalUnlocked = visible.filter(a => set.has(a.id)).length;
 
   return {
-    totalUnlocked: unlocked.length,
-    totalAchievements: ACHIEVEMENTS.length,
+    totalUnlocked,
+    totalAchievements: visible.length,
     points,
     rank,
     byCategory,
-    completionPercent: Math.round((unlocked.length / ACHIEVEMENTS.length) * 100),
+    completionPercent: visible.length ? Math.round((totalUnlocked / visible.length) * 100) : 0,
   };
 }

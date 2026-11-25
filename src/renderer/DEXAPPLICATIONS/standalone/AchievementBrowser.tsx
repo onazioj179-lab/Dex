@@ -12,8 +12,12 @@
 
 import React, { useMemo, useState } from 'react';
 import DexIcon from '../../components/DexIcon';
-import { SegmentedControl, DexFloatingSearch, DexCapsuleButton } from '../../components/controls';
-import { ACHIEVEMENTS, CATEGORY_META, RARITY_META, type Achievement, type AchievementCategory, type UserStats } from '../../services/achievementsCatalog';
+import { SegmentedControl, Pill } from '../../components/controls';
+import { DexSearchInput } from '../../styles/components';
+import { Button } from '../../ui/Button';
+import { CATEGORY_META, RARITY_META, type Achievement, type AchievementCategory, type UserStats } from '../../services/achievementsCatalog';
+
+const CHIP: React.CSSProperties = { fontSize: 12, padding: '0 12px', height: 30 };
 
 type Status = 'all' | 'earned' | 'progress' | 'locked';
 const PAGE = 60;
@@ -24,7 +28,17 @@ export function achievementStatus(a: Achievement, unlocked: ReadonlySet<string>,
   return p && p.target > 0 && p.current > 0 ? 'progress' : 'locked';
 }
 
-export const AchievementBrowser: React.FC<{ unlocked: ReadonlySet<string>; unlockedAt: Record<string, number>; stats: UserStats }> = ({ unlocked, unlockedAt, stats }) => {
+/**
+ * `achievements` is the set DEX can actually award plus anything already earned
+ * (services/achievementTracking.visibleAchievements) -- not the raw catalog,
+ * whose untracked trophies could never move.
+ */
+export const AchievementBrowser: React.FC<{
+  achievements: readonly Achievement[];
+  unlocked: ReadonlySet<string>;
+  unlockedAt: Record<string, number>;
+  stats: UserStats;
+}> = ({ achievements, unlocked, unlockedAt, stats }) => {
   const [status, setStatus] = useState<Status>('all');
   const [category, setCategory] = useState<AchievementCategory | 'all'>('all');
   const [q, setQ] = useState('');
@@ -33,7 +47,7 @@ export const AchievementBrowser: React.FC<{ unlocked: ReadonlySet<string>; unloc
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return ACHIEVEMENTS.map((a) => ({ a, st: achievementStatus(a, unlocked, stats) }))
+    return achievements.map((a) => ({ a, st: achievementStatus(a, unlocked, stats) }))
       .filter(({ a, st }) => (status === 'all' || st === status)
         && (category === 'all' || a.category === category)
         && !(a.secret && st !== 'earned' && t) // secrets can't be found by searching their hidden text
@@ -44,15 +58,19 @@ export const AchievementBrowser: React.FC<{ unlocked: ReadonlySet<string>; unloc
         if (x.st === 'earned') return (unlockedAt[y.a.id] ?? 0) - (unlockedAt[x.a.id] ?? 0);
         return x.a.points - y.a.points;
       });
-  }, [status, category, q, unlocked, unlockedAt, stats]);
+  }, [achievements, status, category, q, unlocked, unlockedAt, stats]);
 
   const counts = useMemo(() => {
-    const c = { all: ACHIEVEMENTS.length, earned: 0, progress: 0, locked: 0 };
-    for (const a of ACHIEVEMENTS) c[achievementStatus(a, unlocked, stats)]++;
+    const c = { all: achievements.length, earned: 0, progress: 0, locked: 0 };
+    for (const a of achievements) c[achievementStatus(a, unlocked, stats)]++;
     return c;
-  }, [unlocked, stats]);
+  }, [achievements, unlocked, stats]);
 
-  const cats = Object.keys(CATEGORY_META) as AchievementCategory[];
+  // Only categories that hold at least one awardable trophy.
+  const cats = useMemo(() => {
+    const present = new Set(achievements.map(a => a.category));
+    return (Object.keys(CATEGORY_META) as AchievementCategory[]).filter(c => present.has(c));
+  }, [achievements]);
 
   return (
     <section style={{ marginBottom: 16 }} aria-label="All rewards">
@@ -70,19 +88,26 @@ export const AchievementBrowser: React.FC<{ unlocked: ReadonlySet<string>; unloc
           value={status}
           onChange={(v) => { setStatus(v as Status); setLimit(PAGE); }}
         />
-        <DexFloatingSearch value={q} onChange={(v) => { setQ(v); setLimit(PAGE); }} label="Search rewards" size="md" width={200} />
+        <DexSearchInput
+          aria-label="Search rewards"
+          placeholder="Search rewards"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }}
+          onClear={() => { setQ(''); setLimit(PAGE); }}
+          style={{ width: 220 }}
+        />
       </div>
-      <div role="group" aria-label="Category" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+      <div role="group" aria-label="Category" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
         {(['all', ...cats] as const).map((c) => (
-          <DexCapsuleButton
+          <Pill
             key={c}
-            size="sm"
+            size="md"
             active={category === c}
             onClick={() => { setCategory(c); setLimit(PAGE); }}
-            style={{ border: '1px solid var(--color-border-subtle)' }}
+            style={category === c ? CHIP : { ...CHIP, background: 'var(--color-bg-surface)' }}
           >
             {c === 'all' ? 'All categories' : CATEGORY_META[c].title}
-          </DexCapsuleButton>
+          </Pill>
         ))}
       </div>
 
@@ -134,9 +159,9 @@ export const AchievementBrowser: React.FC<{ unlocked: ReadonlySet<string>; unloc
         {rows.length === 0 && <div style={{ padding: 14, fontSize: 12, color: 'var(--color-text-tertiary)' }}>Nothing here yet.</div>}
       </div>
       {rows.length > limit && (
-        <DexCapsuleButton size="md" onClick={() => setLimit((l) => l + PAGE)} style={{ marginTop: 8, border: '1px solid var(--color-border-subtle)' }}>
+        <Button size="sm" variant="secondary" onClick={() => setLimit((l) => l + PAGE)} style={{ marginTop: 10 }}>
           Show {Math.min(PAGE, rows.length - limit)} more of {rows.length - limit}
-        </DexCapsuleButton>
+        </Button>
       )}
     </section>
   );
