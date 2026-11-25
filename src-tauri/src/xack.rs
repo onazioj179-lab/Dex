@@ -191,6 +191,7 @@ pub fn builtin_catalog() -> Vec<Capability> {
         core("uki.list_apps", "List DEX apps", Read, Never),
         core("uki.find_files", "Search indexed files", Read, Never),
         core("uki.find_context", "Retrieve indexed context from authorized folders (Umari)", Read, Never),
+        core("uki.recall_conversations", "Search the saved UKI conversations", Read, Never),
         core("uki.list_projects", "List detected projects in authorized folders (Umari)", Read, Never),
         core("uki.read_file", "Read a file in an allowed folder", Read, Never),
         core("uki.write_file", "Save text as a new file", Modify, Ask),

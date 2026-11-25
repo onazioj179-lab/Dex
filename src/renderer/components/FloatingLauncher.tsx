@@ -23,7 +23,9 @@ import { useUkiStore } from '../store/ukiStore';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useLearningStore } from '../store/learningStore';
-import { EDGE_PAD, clampBarToBounds } from './floatingLauncherGeometry';
+import {
+  EDGE_PAD, clampBarToBounds, tuckEdgeFor, tuckAlong, slitRect, poppedOrb, distanceToRect, SLIT_NEAR, type TuckEdge,
+} from './floatingLauncherGeometry';
 
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import DexIcon from './DexIcon';
@@ -39,6 +41,8 @@ const SEARCH_W_DEFAULT = 240;
 const DOCKED_KEY = 'dex-bar-docked';
 const ORB = 44;           // folded search orb diameter
 const MAGNET = 24;        // px within which a released bar snaps to an edge / centre
+const TUCK_KEY = 'dex-orb-tuck';
+const HIDE_AFTER_MS = 650; // a popped-out orb slides back this long after the pointer leaves it
 
 /**
  * Edge magnet for a released bar or orb: within MAGNET px of an edge (or the
@@ -311,6 +315,59 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     return () => window.removeEventListener('storage', onStorage);
   }, [expanded]);
 
+  // --- edge tuck (folded orb hidden in one of DEX's four walls) ---------------
+  const [tuck, setTuck] = useState<{ edge: TuckEdge; along: number } | null>(() => {
+    try {
+      const t = JSON.parse(localStorage.getItem(TUCK_KEY) || 'null') as { edge?: TuckEdge; along?: number } | null;
+      return t && t.edge && typeof t.along === 'number' ? { edge: t.edge, along: t.along } : null;
+    } catch { return null; }
+  });
+  const [popped, setPopped] = useState(false);
+  const [slitNear, setSlitNear] = useState(false);
+  const reduceMotion = useMemo(() => {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  }, []);
+  const saveTuck = useCallback((t: { edge: TuckEdge; along: number } | null) => {
+    setTuck(t);
+    try { if (t) localStorage.setItem(TUCK_KEY, JSON.stringify(t)); else localStorage.removeItem(TUCK_KEY); } catch { /* storage blocked */ }
+  }, []);
+  const tuckedAlong = tuck ? tuckAlong(tuck.edge,
+    tuck.edge === 'left' || tuck.edge === 'right' ? 0 : tuck.along - ORB / 2,
+    tuck.edge === 'left' || tuck.edge === 'right' ? tuck.along - ORB / 2 : 0,
+    typeof window !== 'undefined' ? window.innerWidth : 1280, vhNow, ORB) : 0;
+  const popOut = useCallback(() => {
+    if (!tuck) return;
+    const o = poppedOrb(tuck.edge, tuckedAlong, window.innerWidth, window.innerHeight, ORB, true);
+    setPos(o);
+    setPopped(true);
+  }, [tuck, tuckedAlong]);
+  // Cursor awareness: the slit grows as the pointer approaches (so it is easy to
+  // find) and the orb slides out when the pointer reaches it; once out, it slides
+  // back into the wall a moment after the pointer leaves.
+  useEffect(() => {
+    if (!enabled || !folded || !tuck || dragging) return;
+    let timer: number | null = null;
+    const clear = () => { if (timer != null) { window.clearTimeout(timer); timer = null; } };
+    const onMove = (e: PointerEvent) => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      if (!popped) {
+        const d = distanceToRect(e.clientX, e.clientY, slitRect(tuck.edge, tuckedAlong, vw, vh, true));
+        setSlitNear(d < SLIT_NEAR);
+        if (d <= 4) popOut();
+        return;
+      }
+      const o = poppedOrb(tuck.edge, tuckedAlong, vw, vh, ORB, true);
+      const d = distanceToRect(e.clientX, e.clientY, { left: o.x, top: o.y, width: ORB, height: ORB });
+      const focused = !!containerRef.current && containerRef.current.contains(document.activeElement);
+      if (d < 90 || focused || dragRef.current) { clear(); return; }
+      if (timer == null) timer = window.setTimeout(() => { timer = null; setPopped(false); setSlitNear(false); }, HIDE_AFTER_MS);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => { clear(); window.removeEventListener('pointermove', onMove); };
+  }, [enabled, folded, tuck, tuckedAlong, popped, dragging, popOut]);
+  // Unfolding the bar leaves the wall.
+  useEffect(() => { if (!folded) { setPopped(false); setSlitNear(false); } }, [folded]);
+
   const beginDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
@@ -354,8 +411,19 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
     }
     pendingRef.current = null;
     setPosition(fx, fy);
+    if (folded) {
+      const edge = tuckEdgeFor(fx, fy, window.innerWidth, window.innerHeight, ORB);
+      if (edge) {
+        saveTuck({ edge, along: tuckAlong(edge, fx, fy, window.innerWidth, window.innerHeight, ORB) });
+        const o = poppedOrb(edge, tuckAlong(edge, fx, fy, window.innerWidth, window.innerHeight, ORB), window.innerWidth, window.innerHeight, ORB, true);
+        setPos(o);
+        setPopped(true);
+      } else {
+        saveTuck(null);
+      }
+    }
     try { localStorage.setItem(DOCKED_KEY, window.innerHeight - (fy + sizeRef.current.h) <= 64 ? '1' : '0'); } catch { /* quota */ }
-  }, [pos.x, pos.y, setPosition]);
+  }, [pos.x, pos.y, setPosition, folded, saveTuck]);
 
   // Publish the strip the docked bar occupies so maximized / tiled windows
   // stop above it (never under it). Folded, floating, hidden or off = 0.
@@ -390,17 +458,51 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
   if (!enabled) return null;
 
   if (folded) {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const tucked = !!tuck && !dragging;
+    const orbAt = tucked ? poppedOrb(tuck!.edge, tuckedAlong, vw, vhNow, ORB, popped) : pos;
+    const slit = tuck ? slitRect(tuck.edge, tuckedAlong, vw, vhNow, slitNear) : null;
+    const slide = reduceMotion ? 'none' : 'left 0.26s cubic-bezier(0.2, 0.9, 0.25, 1.15), top 0.26s cubic-bezier(0.2, 0.9, 0.25, 1.15), opacity 0.18s ease';
+    return (
+      <>
+      {tucked && slit && (
+        // The slit: a slim rounded handle flush with the wall. Touch, click,
+        // Enter or the pointer reaching it slides the orb out.
+        <div
+          role="button"
+          tabIndex={popped ? -1 : 0}
+          data-dex-chrome="dex-bar"
+          data-dex-orb-slit={tuck!.edge}
+          aria-label="Show the DEX orb"
+          className="dex-liquid-glass"
+          onPointerDown={(e) => { e.preventDefault(); popOut(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); popOut(); window.setTimeout(() => containerRef.current?.focus(), 30); } }}
+          style={{
+            position: 'fixed', left: slit.left, top: slit.top, width: slit.width, height: slit.height,
+            zIndex: 'var(--z-dock)' as unknown as number, borderRadius: 9999, boxSizing: 'border-box',
+            cursor: 'pointer', touchAction: 'none',
+            opacity: popped ? 0 : slitNear ? 1 : 0.72,
+            pointerEvents: popped ? 'none' : undefined,
+            boxShadow: slitNear
+              ? '0 0 0 1px var(--color-accent), 0 2px 8px rgba(0,0,0,0.28)'
+              : '0 0 0 0.5px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)',
+            transition: reduceMotion ? 'none' : 'left 0.18s ease, top 0.18s ease, width 0.18s ease, height 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease',
+          }}
+        />
+      )}
     return (
       <div
         ref={containerRef}
         role="button"
-        tabIndex={0}
         data-dex-chrome="dex-bar"
         data-dex-nook
         data-folded=""
         aria-label="Search (unfold the DEX menu)"
         title="Search: click to unfold, drag to move"
         className="dex-liquid-glass dex-glass-specular dex-glass-refract dex-bar-orb"
+        data-tucked={tuck ? tuck.edge : undefined}
+        aria-hidden={tucked && !popped ? true : undefined}
+        tabIndex={tucked && !popped ? -1 : 0}
         onPointerDown={beginDrag}
         onPointerMove={onDragMove}
         onPointerUp={onDragUp}
@@ -408,8 +510,11 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
         onClick={unfold}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); justDraggedRef.current = false; unfold(); } }}
         style={{
-          position: 'fixed', left: pos.x, top: pos.y, zIndex: 'var(--z-dock)' as unknown as number,
+          position: 'fixed', left: orbAt.x, top: orbAt.y, zIndex: 'var(--z-dock)' as unknown as number,
           width: ORB, height: ORB, borderRadius: '50%', boxSizing: 'border-box',
+          opacity: tucked && !popped ? 0 : 1,
+          pointerEvents: tucked && !popped ? 'none' : undefined,
+          transition: tucked ? slide : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--color-text-primary)', cursor: dragging ? 'grabbing' : 'pointer',
           touchAction: 'none', userSelect: 'none',
@@ -419,6 +524,7 @@ export const FloatingLauncher: React.FC<FloatingLauncherProps> = ({ onOpen, onSe
           <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.2" y2="16.2" />
         </svg>
       </div>
+      </>
     );
   }
 

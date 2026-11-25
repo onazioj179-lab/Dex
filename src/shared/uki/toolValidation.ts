@@ -37,6 +37,7 @@ export const KNOWN_TOOLS = [
   'list_apps',
   'find_files',
   'find_context',
+  'recall_conversations',
   'list_projects',
   'read_file',
   'write_file',
@@ -121,6 +122,13 @@ export const CORE_TOOLS: ToolSpec[] = [
     description: "search the user's files (Documents, Desktop, Downloads) by name or content; returns full paths.",
     args: [{ name: 'query', type: 'string' }],
     example: '{"query": "budget 2026"}',
+  },
+  {
+    name: 'recall_conversations',
+    argline: '{"query": string}',
+    description: "search the user's saved conversations with UKI (unlimited history, all sessions) for a topic; use it when the user mentions an earlier chat, asks what was said before, or asks you to continue earlier work.",
+    args: [{ name: 'query', type: 'string' }],
+    example: '{"query": "trip to Lagos budget"}',
   },
   {
     name: 'find_context',

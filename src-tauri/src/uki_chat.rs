@@ -129,9 +129,12 @@ fn create_conversation(conn: &Connection, args: &Value) -> Value {
     get_conversation(conn, &id)
 }
 
+/// History is unlimited: nothing is ever pruned, and a read can ask for all of it.
+const READ_ALL: i64 = 1_000_000;
+
 /// uki-chat:listConversations(limit?) -> rows newest-activity first.
 fn list_conversations(conn: &Connection, args: &Value) -> Value {
-    let limit = args.get(0).and_then(|v| v.as_i64()).unwrap_or(100).clamp(1, 500);
+    let limit = args.get(0).and_then(|v| v.as_i64()).unwrap_or(100).clamp(1, READ_ALL);
     let sql = format!("{} ORDER BY updated_at DESC LIMIT ?", CONV_COLS);
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,
@@ -145,14 +148,17 @@ fn list_conversations(conn: &Connection, args: &Value) -> Value {
     json!(out)
 }
 
-/// uki-chat:getMessages(conversationId, limit?) -> messages oldest-first
-/// (chronological, ready to render).
+/// uki-chat:getMessages(conversationId, limit?) -> the NEWEST `limit` messages,
+/// oldest-first (chronological, ready to render). It used to return the first
+/// `limit` rows, so a long conversation lost its newest messages on reload.
 fn get_messages(conn: &Connection, args: &Value) -> Value {
     let conv_id = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
-    let limit = args.get(1).and_then(|v| v.as_i64()).unwrap_or(500).clamp(1, 2000);
+    let limit = args.get(1).and_then(|v| v.as_i64()).unwrap_or(READ_ALL).clamp(1, READ_ALL);
     let mut stmt = match conn.prepare(
-        "SELECT id, conversation_id, role, content, data, created_at FROM uki_messages
-         WHERE conversation_id = ? ORDER BY created_at ASC, rowid ASC LIMIT ?",
+        "SELECT id, conversation_id, role, content, data, created_at FROM (
+           SELECT id, conversation_id, role, content, data, created_at, rowid AS rid FROM uki_messages
+           WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?
+         ) ORDER BY created_at ASC, rid ASC",
     ) {
         Ok(s) => s,
         Err(_) => return json!([]),
@@ -238,7 +244,7 @@ fn search(conn: &Connection, args: &Value) -> Value {
     if q.is_empty() {
         return json!([]);
     }
-    let limit = args.get(1).and_then(|v| v.as_i64()).unwrap_or(50).clamp(1, 200);
+    let limit = args.get(1).and_then(|v| v.as_i64()).unwrap_or(50).clamp(1, 1000);
     let like = format!("%{}%", q);
     let mut stmt = match conn.prepare(
         "SELECT m.id, m.conversation_id, m.role, m.content, m.created_at, c.title
@@ -304,5 +310,40 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         }
         "uki-chat:search" => search(conn, args),
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn db() -> Connection {
+        let c = Connection::open_in_memory().unwrap();
+        ensure_schema(&c);
+        c
+    }
+
+    #[test]
+    fn a_long_conversation_keeps_its_newest_messages() {
+        let c = db();
+        let conv = create_conversation(&c, &json!(["chat"]));
+        let id = conv["id"].as_str().unwrap().to_string();
+        for i in 0..5 {
+            append_message(&c, &json!([id, { "id": format!("m{i}"), "role": "user", "content": format!("msg {i}"), "timestamp": 1000 + i }]));
+        }
+        let last2 = get_messages(&c, &json!([id, 2]));
+        let got: Vec<&str> = last2.as_array().unwrap().iter().map(|m| m["content"].as_str().unwrap()).collect();
+        assert_eq!(got, vec!["msg 3", "msg 4"]);
+        // No limit = the whole history.
+        assert_eq!(get_messages(&c, &json!([id])).as_array().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn lists_more_than_the_old_500_cap() {
+        let c = db();
+        for i in 0..600 {
+            create_conversation(&c, &json!([format!("c{i}")]));
+        }
+        assert_eq!(list_conversations(&c, &json!([100000])).as_array().unwrap().len(), 600);
     }
 }

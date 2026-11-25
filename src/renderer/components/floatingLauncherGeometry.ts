@@ -81,3 +81,58 @@ export function clampBarToBounds(
   const maxY = Math.max(EDGE_PAD, vh - barH - EDGE_PAD);
   return { x: clamp(px, EDGE_PAD, maxX), y: clamp(py, EDGE_PAD, maxY) };
 }
+
+// ---------------------------------------------------------------------------
+// Edge tuck: the folded orb hides in any of DEX's four walls as a slim slit.
+// ---------------------------------------------------------------------------
+
+export type TuckEdge = 'left' | 'right' | 'top' | 'bottom';
+/** A released orb within this many px of a wall tucks into it. */
+export const TUCK_DIST = 36;
+/** Slit size at rest, and when the pointer is near (so it is hard to miss). */
+export const SLIT = { thick: 6, long: 44, nearThick: 10, nearLong: 64 } as const;
+/** Pointer distance (px) at which the slit starts to grow toward the cursor. */
+export const SLIT_NEAR = 110;
+
+/** Which wall a released orb (top-left x/y, size s) tucks into, or null to stay free. Corners pick the closer wall. */
+export function tuckEdgeFor(x: number, y: number, vw: number, vh: number, s: number): TuckEdge | null {
+  const d: Array<[TuckEdge, number]> = [
+    ['left', x], ['right', vw - (x + s)], ['top', y], ['bottom', vh - (y + s)],
+  ];
+  const near = d.filter(([, v]) => v <= TUCK_DIST).sort((a, b) => a[1] - b[1]);
+  return near.length ? near[0][0] : null;
+}
+
+/** Where the orb sits along its wall: centre of the orb on the cross axis, kept inside the corners. */
+export function tuckAlong(edge: TuckEdge, x: number, y: number, vw: number, vh: number, s: number): number {
+  const vertical = edge === 'left' || edge === 'right';
+  const c = vertical ? y + s / 2 : x + s / 2;
+  const max = (vertical ? vh : vw) - EDGE_PAD - s / 2;
+  return clamp(c, EDGE_PAD + s / 2, Math.max(EDGE_PAD + s / 2, max));
+}
+
+/** The slit's rectangle on its wall (flush with the window edge), centred at `along`. */
+export function slitRect(edge: TuckEdge, along: number, vw: number, vh: number, near = false): { left: number; top: number; width: number; height: number } {
+  const thick = near ? SLIT.nearThick : SLIT.thick;
+  const long = near ? SLIT.nearLong : SLIT.long;
+  if (edge === 'left') return { left: 0, top: along - long / 2, width: thick, height: long };
+  if (edge === 'right') return { left: vw - thick, top: along - long / 2, width: thick, height: long };
+  if (edge === 'top') return { left: along - long / 2, top: 0, width: long, height: thick };
+  return { left: along - long / 2, top: vh - thick, width: long, height: thick };
+}
+
+/** Top-left of the orb when it pops out of (or hides into) its wall. Hidden = just past the edge. */
+export function poppedOrb(edge: TuckEdge, along: number, vw: number, vh: number, s: number, out: boolean): { x: number; y: number } {
+  const inset = out ? EDGE_PAD : -s - 4;
+  if (edge === 'left') return { x: inset, y: along - s / 2 };
+  if (edge === 'right') return { x: vw - s - inset, y: along - s / 2 };
+  if (edge === 'top') return { x: along - s / 2, y: inset };
+  return { x: along - s / 2, y: vh - s - inset };
+}
+
+/** Distance from a point to the slit rectangle (0 inside). */
+export function distanceToRect(px: number, py: number, r: { left: number; top: number; width: number; height: number }): number {
+  const dx = Math.max(r.left - px, 0, px - (r.left + r.width));
+  const dy = Math.max(r.top - py, 0, py - (r.top + r.height));
+  return Math.hypot(dx, dy);
+}

@@ -33,6 +33,8 @@ import {
   replyFileName, saveTextAs, MAX_ATTACHMENTS, UKI_ATTACH_EVENT, takeHandedOffAttachments, type UkiAttachment,
 } from '../../uki/attachments';
 import { summarizeText } from '../../uki/assistive';
+import { recallFromHistory, isHistoryRequest, recentWindow } from '../../uki/chatHistory';
+import { updateRelationship } from '../../uki/philosophy';
 
 function toast(type: 'success' | 'error' | 'info', message: string): void {
   try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
@@ -294,12 +296,18 @@ export default function Uki(): React.ReactElement {
   const abortRef = useRef<AbortController | null>(null);
 
   const refreshConversations = useCallback(async () => {
-    const list = await dexInvoke<Conversation[]>('uki-chat:listConversations', 200);
-    if (Array.isArray(list)) setConversations(list);
+    const list = await dexInvoke<Conversation[]>('uki-chat:listConversations', 100000);
+    if (Array.isArray(list)) { setConversations(list); updateRelationship(list); }
   }, []);
+  // Chats in the floating UKI panel are saved here too; show them as they land.
+  useEffect(() => {
+    const onChange = () => { void refreshConversations(); };
+    window.addEventListener('dex-uki-history-changed', onChange);
+    return () => window.removeEventListener('dex-uki-history-changed', onChange);
+  }, [refreshConversations]);
 
   const loadMessages = useCallback(async (cid: string) => {
-    const msgs = await dexInvoke<Message[]>('uki-chat:getMessages', cid, 500);
+    const msgs = await dexInvoke<Message[]>('uki-chat:getMessages', cid);
     setMessages(Array.isArray(msgs) ? msgs : []);
   }, []);
 
@@ -574,8 +582,22 @@ export default function Uki(): React.ReactElement {
       return;
     }
 
+    // Her saved conversations: what the user asked before about this topic.
+    const bridgeInvoke = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    const recall = bridgeInvoke?.invoke && !atts.length
+      ? await recallFromHistory(bridgeInvoke.invoke.bind(bridgeInvoke), text, { excludeConversation: cid })
+      : '';
+
     // Re-check live (the once-on-mount value can be stale if a key was just added).
     const isConfigured = hasConfiguredProvider();
+    if (!isConfigured && isHistoryRequest(text)) {
+      // No model: answer "what did we talk about…" straight from the saved history.
+      const found = recall ? recall.split('\n').slice(1).join('\n') : '';
+      const reply: Message = { id: newId(), role: 'copilot', content: found ? `Here is what I found in our earlier conversations:\n${found}` : 'I could not find that in our earlier conversations.', timestamp: Date.now() };
+      setMessages((m) => [...m, reply]);
+      if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+      return;
+    }
     if (isConfigured !== configured) setConfigured(isConfigured);
     if (!isConfigured && atts.some((a) => a.kind === 'text')) {
       // No model: summarize the attached text on this device instead of refusing.
@@ -601,7 +623,9 @@ export default function Uki(): React.ReactElement {
     setStreamingText('');
     const controller = new AbortController();
     abortRef.current = controller;
-    const history: ChatMessage[] = messages.map((m) => ({
+    // The live prompt carries the recent part of this conversation; older turns
+    // (and other conversations) come back through recall when they are relevant.
+    const history: ChatMessage[] = recentWindow(messages, 40).map((m) => ({
       role: m.role === 'copilot' ? 'assistant' : m.role === 'system' ? 'system' : 'user',
       content: m.content,
     }));
@@ -626,7 +650,7 @@ export default function Uki(): React.ReactElement {
       const filesBlock = attachmentsPrompt(atts);
       const result = await streamConfiguredLLM(
         filesBlock ? `${text}\n\n${filesBlock}` : text,
-        buildSystemPrompt(grounding, text),
+        recall ? `${buildSystemPrompt(grounding, text)}\n\n${recall}` : buildSystemPrompt(grounding, text),
         (_token, running) => {
           full = running;
           setStreamingText(running);

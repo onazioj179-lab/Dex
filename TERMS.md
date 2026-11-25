@@ -1,10 +1,10 @@
 # DEX -- Terms of Use
 
-**Effective date:** 2026-11-04  
+**Effective date:** 2026-11-25  
 **Contact:** onazi75@gmail.com  
 **Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.**
 
-These Terms are intentionally strict. DEX is a powerful desktop automation, diagnostics, creative, plugin, and system-control environment. DEX is free for everyone: every feature is available to all users at no cost, with no paid plans, no paid tiers, no in-app purchases, and no advertising. In exchange, DEX may use limited data to operate and improve the product, as described in the Privacy Policy. By installing, launching, accessing, or using DEX, you agree to these Terms and the DEX Privacy Policy. If you do not agree, do not use DEX.
+These Terms are intentionally strict. DEX is a powerful desktop automation, diagnostics, creative, plugin, and system-control environment. DEX is commercial software. It is licensed, not sold, under the DEX Software License Agreement: every new installation gets a 30-day full-feature trial, and continued use after the trial requires a paid licence. DEX has no advertising. DEX may use limited data to operate and improve the product, as described in the Privacy Policy. By installing, launching, accessing, or using DEX, you agree to these Terms and the DEX Privacy Policy. If you do not agree, do not use DEX.
 
 This document is not a substitute for professional legal advice before commercial release.
 
@@ -18,7 +18,7 @@ DEX, the DEX name, logo, icon family, product identity, wallpapers, DEX-OS asset
 
 ## 2. Source License and Reserved Rights
 
-Portions of DEX source code are provided under the MIT License where that license applies. The MIT License does not grant rights to:
+DEX, including its source code, is proprietary and is licensed only under the DEX Software License Agreement (the LICENSE file). Publishing the source for transparency and security review does not grant any right to use, copy, modify, or redistribute DEX outside that agreement. Nothing in these Terms or the source repository grants rights to:
 
 - DEX trademarks, logos, names, icons, brand assets, product identity, or trade dress.
 - Hosted services, marketplace listings, update infrastructure, telemetry systems, model systems, datasets, keys, accounts, certificates, or private repositories.
@@ -78,7 +78,7 @@ Plugins are independent software. You are responsible for plugins you install, p
 
 DEX may review, reject, block, quarantine, disable, delist, remove, rate-limit, or restrict plugins, integrations, accounts, features, workflows, or developers that create risk, violate policy, infringe rights, harm users, threaten infrastructure, or undermine DEX.
 
-DEX is free for everyone and does not include advertising, sponsored content, in-app purchases, or paid features. Features you use may contact third-party online services, which are listed in the Privacy Policy; those services handle requests under their own terms.
+DEX does not include advertising or sponsored content. Paid licences are described in the DEX Software License Agreement and the pricing page. Features you use may contact third-party online services, which are listed in the Privacy Policy; those services handle requests under their own terms.
 
 ## 11. Updates, Changes, and Feature Control
 

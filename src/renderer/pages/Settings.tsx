@@ -59,6 +59,7 @@ import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settin
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import GlobalShortcutsPanel from './settingsPanels/GlobalShortcutsPanel';
+import { pickUkiVoice, DEFAULT_RATE } from '../uki/voice';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { UmariFoldersSection } from './settingsPanels/UmariFoldersSection';
@@ -717,7 +718,7 @@ const DEFAULT_SETTINGS = {
   // UKI Voice (TTS) preferences -- default to a female voice when available
   ukiVoiceGender: 'female' as 'female' | 'male' | 'auto',
   ukiVoiceURI: '' as string,
-  ukiVoiceRate: 1.0,
+  ukiVoiceRate: DEFAULT_RATE,
   ukiVoicePitch: 1.0,
   ukiVoiceVolume: 1.0,
 
@@ -846,24 +847,8 @@ export function pickPreferredVoice(
   voices: SpeechSynthesisVoice[],
   prefs: { gender?: 'female' | 'male' | 'auto'; voiceURI?: string; locale?: string },
 ): SpeechSynthesisVoice | null {
-  if (!voices.length) return null;
-  if (prefs.voiceURI) {
-    const exact = voices.find(v => v.voiceURI === prefs.voiceURI);
-    if (exact) return exact;
-  }
-  const localePrefix = (prefs.locale && prefs.locale !== 'auto')
-    ? prefs.locale.toLowerCase()
-    : (typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en');
-  const localeMatches = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(localePrefix.slice(0, 2)));
-  const pool = localeMatches.length ? localeMatches : voices;
-  if (prefs.gender && prefs.gender !== 'auto') {
-    const hit = pool.find(v => classifyVoiceGender(v) === prefs.gender);
-    if (hit) return hit;
-  }
-  // Default preference: female voice if available
-  const female = pool.find(v => classifyVoiceGender(v) === 'female');
-  if (female) return female;
-  return pool[0] ?? null;
+  // Same choice UKI makes when she speaks (uki/voice.ts): a British woman by default.
+  return pickUkiVoice(voices, { gender: prefs.gender, voiceURI: prefs.voiceURI });
 }
 
 const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, setSettings, renderSelect }) => {

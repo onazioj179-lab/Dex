@@ -21,6 +21,14 @@ import { useUkiStore } from '../store/ukiStore';
 import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { attachmentFromFile, handOffAttachments, type UkiAttachment } from '../uki/attachments';
+import { PanelHistory } from '../uki/chatHistory';
+import { speakAsUki, readVoicePrefs, writeVoicePref, stepRate, SPEED_STEPS } from '../uki/voice';
+
+// Panel chats are kept in the UKI app's history (one conversation per panel session).
+const panelHistory = new PanelHistory(() => {
+  const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+  return dex?.invoke ? dex.invoke.bind(dex) : null;
+});
 import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
@@ -364,79 +372,12 @@ async function tryScreenQuestion(text: string): Promise<string | null> {
 }
 
 // ===========================================================================
-// TEXT-TO-SPEECH CONFIGURATION - Female Voice with Better Quality
+// TEXT-TO-SPEECH: her voice, speed, pitch and volume live in uki/voice.ts and
+// follow Settings › UKI (they used to be fixed values here that ignored it).
 // ===========================================================================
 
-interface TTSConfig {
-  rate: number;      // 0.5 - 2.0 (1.0 = normal)
-  pitch: number;     // 0.5 - 2.0 (1.0 = normal)
-  volume: number;    // 0 - 1.0
-  voiceName: string; // Preferred voice name
-}
-
-const TTS_CONFIG: TTSConfig = {
-  rate: 1.05,        // Slightly faster for snappier responses
-  pitch: 1.15,       // Slightly higher for female voice
-  volume: 0.85,
-  voiceName: '',     // Will be set to best available female voice
-};
-
-/** Find the best female voice available */
-function findBestVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-  
-  // Priority order for female voices (en-US preferred)
-  const femaleVoicePatterns = [
-    // High quality neural voices
-    /samantha/i, /victoria/i, /zira/i, /aria/i, /jenny/i, /emma/i,
-    /female/i, /woman/i, /girl/i,
-    // Common female voice names
-    /susan/i, /karen/i, /moira/i, /fiona/i, /kate/i, /serena/i,
-    /heather/i, /allison/i, /ava/i, /stephanie/i, /nicole/i,
-    // Google voices
-    /google.*female/i, /google.*uk/i,
-  ];
-  
-  // Try to find a female English voice
-  for (const pattern of femaleVoicePatterns) {
-    const match = voices.find(v => 
-      pattern.test(v.name) && v.lang.startsWith('en')
-    );
-    if (match) return match;
-  }
-  
-  // Fallback to any English voice
-  return voices.find(v => v.lang.startsWith('en')) || voices[0];
-}
-
-/** Speak text with optimized female voice settings */
 function speakWithVoice(text: string, onEnd?: () => void): void {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
-    onEnd?.();
-    return;
-  }
-  
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
-  
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = TTS_CONFIG.rate;
-  utterance.pitch = TTS_CONFIG.pitch;
-  utterance.volume = TTS_CONFIG.volume;
-  
-  const voice = findBestVoice();
-  if (voice) {
-    utterance.voice = voice;
-    TTS_CONFIG.voiceName = voice.name;
-  }
-  
-  utterance.onend = () => onEnd?.();
-  utterance.onerror = () => onEnd?.();
-  
-  window.speechSynthesis.speak(utterance);
+  speakAsUki(text, onEnd);
 }
 
 // ===========================================================================
@@ -546,16 +487,18 @@ const ACCESSIBILITY_ACTIONS: A11yAction[] = [
     name: 'speak slower',
     description: 'Slow down speech rate',
     execute: () => {
-      TTS_CONFIG.rate = Math.max(0.6, TTS_CONFIG.rate - 0.15);
-      return `Speech rate set to ${Math.round(TTS_CONFIG.rate * 100)}%. Say "speak faster" to speed up.`;
+      const rate = stepRate(readVoicePrefs().rate, -1);
+      writeVoicePref('ukiVoiceRate', rate);
+      return `Speech speed set to ${rate}x. Say "speak faster" to speed up.`;
     }
   },
   {
     name: 'speak faster',
     description: 'Speed up speech rate',
     execute: () => {
-      TTS_CONFIG.rate = Math.min(1.8, TTS_CONFIG.rate + 0.15);
-      return `Speech rate set to ${Math.round(TTS_CONFIG.rate * 100)}%. Say "speak slower" to slow down.`;
+      const rate = stepRate(readVoicePrefs().rate, 1);
+      writeVoicePref('ukiVoiceRate', rate);
+      return `Speech speed set to ${rate}x. Say "speak slower" to slow down.`;
     }
   },
   {
@@ -1123,16 +1066,19 @@ function trySystemTool(text: string): ToolResult {
 
   // Volume control
   if (/(?:volume|vol)\s*(?:up|louder|higher)/.test(lower)) {
-    TTS_CONFIG.volume = Math.min(1.0, TTS_CONFIG.volume + 0.15);
-    return { handled: true, response: `Volume increased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
+    const vol = Math.min(1.0, readVoicePrefs().volume + 0.15);
+    writeVoicePref('ukiVoiceVolume', vol);
+    return { handled: true, response: `Volume increased to ${Math.round(vol * 100)}%.` };
   }
   if (/(?:volume|vol)\s*(?:down|softer|lower|quieter)/.test(lower)) {
-    TTS_CONFIG.volume = Math.max(0.2, TTS_CONFIG.volume - 0.15);
-    return { handled: true, response: `Volume decreased to ${Math.round(TTS_CONFIG.volume * 100)}%.` };
+    const vol = Math.max(0.2, readVoicePrefs().volume - 0.15);
+    writeVoicePref('ukiVoiceVolume', vol);
+    return { handled: true, response: `Volume decreased to ${Math.round(vol * 100)}%.` };
   }
   if (/mute|unmute/.test(lower)) {
-    TTS_CONFIG.volume = TTS_CONFIG.volume > 0.1 ? 0 : 0.8;
-    return { handled: true, response: TTS_CONFIG.volume === 0 ? 'Muted.' : 'Unmuted.' };
+    const vol = readVoicePrefs().volume > 0.1 ? 0 : 0.8;
+    writeVoicePref('ukiVoiceVolume', vol);
+    return { handled: true, response: vol === 0 ? 'Muted.' : 'Unmuted.' };
   }
 
   // Help
@@ -1429,7 +1375,7 @@ const UkiOverlay: React.FC = () => {
   // and unmount cleanup for in-flight streaming timer.
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    const handler = () => { try { findBestVoice(); } catch { /* noop */ } };
+    const handler = () => { try { window.speechSynthesis.getVoices(); } catch { /* noop */ } };
     window.speechSynthesis.addEventListener?.('voiceschanged', handler);
     return () => {
       window.speechSynthesis?.removeEventListener?.('voiceschanged', handler);
@@ -1463,6 +1409,7 @@ const UkiOverlay: React.FC = () => {
       intent,
       thoughtSteps: finalSteps.length > 0 ? finalSteps : undefined,
     })).catch(() => { /* memory write failed, non-fatal */ });
+    void panelHistory.record(userText, reply);
     // Clear the live transcript + streaming buffer once the turn is committed
     // to history, otherwise the same You/UKI pair renders twice.
     useUkiStore.getState().setTranscript('');
@@ -1497,6 +1444,13 @@ const UkiOverlay: React.FC = () => {
 
   // Last user query, so async system-tool results (top processes / battery)
   // can be committed to history against the question that triggered them.
+  // Speech speed (Settings › UKI › Speech rate, shared with voice commands).
+  const [speechRate, setSpeechRate] = useState(() => readVoicePrefs().rate);
+  useEffect(() => {
+    const sync = () => setSpeechRate(readVoicePrefs().rate);
+    window.addEventListener('dex-uki-voice-changed', sync);
+    return () => window.removeEventListener('dex-uki-voice-changed', sync);
+  }, []);
   const lastUserTextRef = useRef('');
   const streamResponse = useCallback((reply: string, intent: string, userText: string, speakIt = true) => {
     setIsThinking(false);
@@ -2012,6 +1966,30 @@ const UkiOverlay: React.FC = () => {
               {speakResponses ? <path d="M17.5 6.5a8 8 0 0 1 0 11" /> : <line x1="22" y1="9" x2="16" y2="15" />}
             </svg>
           </button>
+
+          {speakResponses && (
+            // Speech speed: click to go faster, right-click (or Shift+click) to go slower.
+            <button
+              type="button"
+              onClick={(e) => {
+                // Faster each click, wrapping from the fastest back to the slowest.
+                const next = stepRate(speechRate, e.shiftKey ? -1 : 1);
+                const r = !e.shiftKey && next === speechRate ? SPEED_STEPS[0] : next;
+                writeVoicePref('ukiVoiceRate', r);
+                setSpeechRate(r);
+              }}
+              onContextMenu={(e) => { e.preventDefault(); const r = stepRate(speechRate, -1); writeVoicePref('ukiVoiceRate', r); setSpeechRate(r); }}
+              aria-label={`Speech speed ${speechRate}x. Click for faster, right-click for slower`}
+              style={{
+                height: 22, minWidth: 34, padding: '0 8px', borderRadius: 9999, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--color-bg-hover)', border: 'none', cursor: 'pointer',
+                color: 'var(--color-text-secondary)', fontSize: 10.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {`${speechRate}x`}
+            </button>
+          )}
 
           <button
             onClick={() => setCollapsed(v => !v)}

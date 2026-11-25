@@ -12,7 +12,7 @@
 
 export const POLICY_CONTACT_EMAIL = 'onazi75@gmail.com';
 export const POLICY_REPOSITORY_URL = 'https://github.com/onazioj179-lab/Dex';
-export const POLICY_EFFECTIVE_DATE = '2026-11-04';
+export const POLICY_EFFECTIVE_DATE = '2026-11-25';
 export const DATA_POLICY_VERSION = '3.0.0';
 
 export type PolicySlug = 'terms' | 'privacy' | 'security' | 'thirdParty' | 'plugins';
@@ -51,7 +51,7 @@ export const POLICY_METADATA: readonly PolicyMetadata[] = [
   {
     slug: 'terms',
     title: 'Terms of Use',
-    version: '2.3.0',
+    version: '3.0.0',
     effectiveDate: POLICY_EFFECTIVE_DATE,
     requiredForUse: true,
     summary: 'Rules for using DEX, ownership, responsibility for automation and plugins, updates, warranties, liability limits, and the license for content you submit.',

@@ -3,12 +3,15 @@
 A desktop environment for Windows that brings notes, files, a web browser,
 creative tools and an AI assistant into one workspace.
 
-**Version:** 7.0.2 (001z) · **Creator:** Onazi oJ · **License:** [DEX Software License v1.0](LICENSE)
+**Version:** 7.0.3 · **Creator:** Onazi OJ · **Licence:** proprietary, paid ([DEX Software License v1.0](LICENSE))
 
-> **Release status.** The source in this repository is version 7.0.2 (001z). The 7.0.2
-> installer has not been published yet; the newest published installer is
-> [v6.1.0](https://github.com/onazioj179-lab/Dex/releases/tag/v6.1.0). What
-> remains before 7.0.2 ships is listed in [DEX_REMAINING_WORK.md](DEX_REMAINING_WORK.md).
+> **DEX is not free software.** Every installation includes a 30-day full-feature trial; continued use
+> after the trial needs a paid licence (see [Pricing](docs/PRICING.md)). The source is published for
+> transparency and security review only. It does not grant any right to use, copy, modify or redistribute DEX.
+
+> **Release status.** The source in this repository is version 7.0.3. The newest installer is on
+> [Releases](https://github.com/onazioj179-lab/Dex/releases). What remains before the next release is
+> listed in [DEX_REMAINING_WORK.md](DEX_REMAINING_WORK.md).
 
 ---
 
@@ -47,9 +50,12 @@ checksums so you can verify the download (see [Verifying a download](#verifying-
   (motion), FORGE (3D), AXL (CAD), Canvas, Pixel Art, Presentation and DexCode.
 - **Nexus.** System overview and task manager with live CPU, memory, disk and
   network figures.
-- **UKI assistant.** Answers questions and runs actions across DEX apps. Changes
-  to your data are shown for confirmation first. Cloud models need your own API
-  key; a local model through Ollama is optional.
+- **UKI assistant.** Answers questions and runs actions across DEX apps, reads
+  files you attach and saves files on request, and keeps your conversations in
+  her app so she can recall earlier chats. Changes to your data are shown for
+  confirmation first. Cloud models need your own API key.
+- **System-wide shortcuts.** `Ctrl+Alt+U` asks UKI, `Ctrl+Alt+Space` searches,
+  `Ctrl+Alt+D` shows DEX, from any app in Windows (change them in Settings › Help).
 - **Local first.** No account is required. Data is stored on your computer.
   Analytics are off by default. See [PRIVACY.md](PRIVACY.md).
 
@@ -106,7 +112,7 @@ entry and one upgrade path.
 ### Verifying a download
 
 ```powershell
-Get-FileHash .\DEX_7.0.2_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\DEX_7.0.3_x64-setup.exe -Algorithm SHA256
 ```
 
 Compare the result with the checksum listed on the release page.
@@ -144,8 +150,9 @@ issue for a vulnerability. See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## License
 
-DEX is proprietary software distributed under the
-[DEX Software License Agreement v1.0](LICENSE). See also [TERMS.md](TERMS.md),
+DEX is proprietary, paid software distributed under the
+[DEX Software License Agreement v1.0](LICENSE): a 30-day trial, then a paid
+licence ([Pricing](docs/PRICING.md)). It is not open source and not free. See also [TERMS.md](TERMS.md),
 [PRIVACY.md](PRIVACY.md) and [NOTICE](NOTICE) for third-party components.
 
-© 2026 Onazi Treasure OJ. DEX OS is created by Onazi oJ.
+© 2026 Onazi Treasure OJ. All rights reserved. DEX OS is created by Onazi OJ.

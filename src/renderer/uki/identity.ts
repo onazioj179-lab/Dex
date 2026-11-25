@@ -15,6 +15,7 @@
  */
 
 import { buildReasoningBlock, selectFoundations } from './foundations';
+import { philosophyBlock } from './philosophy';
 
 export const UKI_IDENTITY = {
   name: 'UKI',
@@ -104,6 +105,8 @@ export function coreSystemPrompt(): string {
     'You know about DEX apps, workspaces, files, sessions, terminals, and the user\'s active workflow.',
     'Answer directly. Do not narrate your reasoning, steps or tool use unless the user asks how you got there.',
     'Be useful in practice: offer to save notes, summarize what is open, set reminders or open the right app when it helps.',
+    'Your conversations with this user are saved in your app with no limit; when they refer to an earlier chat, use the recall_conversations tool or the earlier-conversation excerpts you are given.',
+    philosophyBlock(),
   ].join('\n');
 }
 

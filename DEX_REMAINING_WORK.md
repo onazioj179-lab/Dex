@@ -59,7 +59,7 @@ These open items came from Markdown task files that were deleted in the Part 5 c
 
 ## 7.0.1 pass (2026-11-01, `claude/cranky-hopper-4f196b`)
 
-Shipped: Interface Transparency slider, theme-aware glass vars (light mode no longer gets dark panels), Reduce Motion no longer disables glass, creator attribution, version 7.0.1, Tauri release profile, `npm run release:checksums`. Evidence: `DEX_7.0.1_VERIFICATION.md`. Release verdict **NOT READY**.
+Shipped: Interface Transparency slider, theme-aware glass vars (light mode no longer gets dark panels), Reduce Motion no longer disables glass, creator attribution, version 7.0.1, Tauri release profile, `npm run release:checksums`. Evidence: `DEX_7.0.1_VERIFICATION.md` (in git history). Release verdict **NOT READY**.
 
 | # | Requirement | Status | Why incomplete | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|
@@ -73,12 +73,12 @@ Shipped: Interface Transparency slider, theme-aware glass vars (light mode no lo
 
 ## Part 8: completion + stress testing (2026-11-03, `claude/dex-os-completion-stabilization-93cea6`)
 
-Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 8 checks.
+Evidence: `DEX_7.0.1_VERIFICATION.md` (in git history) › Part 8 checks.
 
 
 ## Part 9: spatial UX, multitouch, haptics, search (2026-11-03, `claude/dex-os-functional-completion-682249`)
 
-Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 9.
+Evidence: `DEX_7.0.1_VERIFICATION.md` (in git history) › Part 9.
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
@@ -87,7 +87,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 9.
 
 ## Part 10: permissions, Password Generator+, spatial layout, docs (2026-11-03, `claude/dex-part10`)
 
-Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 10.
+Evidence: `DEX_7.0.1_VERIFICATION.md` (in git history) › Part 10.
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
@@ -95,7 +95,7 @@ Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 10.
 
 ## Part 12: one installer, release build, full-height apps (2026-11-04, `claude/dex-os-final-release-27d6d4`)
 
-Evidence: `DEX_7.0.1_VERIFICATION.md` › Part 12.
+Evidence: `DEX_7.0.1_VERIFICATION.md` (in git history) › Part 12.
 
 | # | Requirement | Status | Detail | Components | Next action | Needs | Priority |
 |---|---|---|---|---|---|---|---|
