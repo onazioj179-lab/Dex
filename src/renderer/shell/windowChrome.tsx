@@ -50,7 +50,12 @@ export function windowModeFor(appId: string, width = Infinity): WindowMode {
  * app keeps one row of chrome: nav, the app's controls, status, window
  * controls. Big bars (DexCode, Files) keep their own row there.
  */
-const TOPBAR_APPS = new Set(['terminal', 'maps', 'calculator']);
+const TOPBAR_APPS = new Set(['terminal', 'maps', 'calculator', 'browser']);
+
+/** How much of the top bar an app's bar may take (tab-heavy bars get more). */
+export function topBarSlotMaxWidth(appId: string): string {
+  return appId.split('~')[0] === 'browser' ? '66%' : '48%';
+}
 
 /** The mode for an app shown full-surface (its bar in the DEX top bar, or its own). */
 export function topBarModeFor(appId: string): WindowMode {

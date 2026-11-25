@@ -690,7 +690,7 @@
   color: var(--color-accent);
 }
 
-.dex-stage-search:focus-within { box-shadow: 0 0 0 1px var(--color-accent); }
+.dex-stage-search:focus-within { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 18%, transparent); }
 
 .dex-stage-launch:focus-visible,
 .dex-stage-close:focus-visible,
@@ -7275,10 +7275,7 @@ input[type="search"] {
   color: var(--color-accent);
   border-color: rgba(10,132,255,0.30);
 }
-.dex-icon-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(10,132,255,0.30);
-}
+/* .dex-icon-button keyboard focus: the canonical thin ring (globals.css). */
 
 /* Generic menu / dropdown primitive */
 .dex-menu {

@@ -34,7 +34,7 @@ import { MorphingDock } from './dock/MorphingDock';
 import { useDockStore, dockReserve } from '../store/dockStore';
 import { computeWorkArea } from '../../shared/shell/workArea';
 import { spotlightEngine } from '../shell/SpotlightEngine';
-import { WindowChromeProvider, windowModeFor, topBarModeFor, NO_DRAG_SELECTOR } from '../shell/windowChrome';
+import { WindowChromeProvider, windowModeFor, topBarModeFor, topBarSlotMaxWidth, NO_DRAG_SELECTOR } from '../shell/windowChrome';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { applyLaunchOrigin, installLaunchOriginTracking } from '../shell/launchOrigin';
@@ -5414,7 +5414,7 @@ export const AppManager: React.FC = () => {
         // The current app's own bar (Terminal tabs, Maps search, Calculator
         // modes): one row of chrome instead of the top bar plus an app strip.
         <div ref={setTopBarSlot} data-topbar-app-slot={currentApp} role="group" aria-label={`${getLabel(currentApp)} toolbar`}
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0, flex: '0 1 auto', maxWidth: '48%', height: '100%', marginLeft: 8, overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties} />
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0, flex: currentApp === 'browser' ? '1 1 auto' : '0 1 auto', maxWidth: topBarSlotMaxWidth(currentApp), height: '100%', marginLeft: 8, overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties} />
       )}
       {renderAppTabBar() ?? (
       <span style={{

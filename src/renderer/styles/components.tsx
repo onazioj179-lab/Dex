@@ -1644,7 +1644,7 @@ export const DexSearchInput = forwardRef<HTMLInputElement, DexSearchInputProps>(
     // :focus-visible outline is suppressed via .dex-search-field, so the field
     // never shows a highlight box. One calm, consistent search field everywhere.
     border: `1px solid ${focused ? 'var(--color-border-strong, var(--color-border))' : 'var(--color-border)'}`,
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: 9999,
     boxShadow: 'none',
     transition: `border-color ${transition.fast}`,
     width: fullWidth ? '100%' : 'auto',

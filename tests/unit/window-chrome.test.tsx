@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from '@testing-library/react';
-import { windowModeFor, WindowChromeProvider, WindowToolbar, UNIFIED_MIN_WIDTH, NO_DRAG_SELECTOR } from '../../src/renderer/shell/windowChrome';
+import { windowModeFor, topBarModeFor, WindowChromeProvider, WindowToolbar, UNIFIED_MIN_WIDTH, NO_DRAG_SELECTOR } from '../../src/renderer/shell/windowChrome';
 
 describe('unified window chrome', () => {
   it('unified only for listed apps and wide enough windows; extra windows follow their app', () => {
@@ -20,6 +20,10 @@ describe('unified window chrome', () => {
     expect(windowModeFor('calculator', 340)).toBe('unified');
     expect(windowModeFor('calculator', 300)).toBe('standard');
     expect(windowModeFor('maps', 900)).toBe('unified');
+    // Full-surface: small bars move into the DEX top bar; big ones keep their row.
+    expect(topBarModeFor('browser')).toBe('unified');
+    expect(topBarModeFor('terminal~2')).toBe('unified');
+    expect(topBarModeFor('dexcode')).toBe('standard');
   });
 
   it('renders the bar inline when not in a unified window', () => {
