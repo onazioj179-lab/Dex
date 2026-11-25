@@ -51,6 +51,7 @@ const workerReady: Promise<void> = import.meta.env.PROD
 import DexIcon from '../../components/DexIcon';
 import { canvasColor } from '../../utils/canvasTheme';
 import { DexSearchInput } from '../../styles/components';
+import { WindowToolbar, useUnifiedChrome } from '../../shell/windowChrome';
 import { AppErrorState } from '../../ui/AppStates';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
@@ -210,6 +211,12 @@ const glassPill: React.CSSProperties = {
   background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
   border: '1px solid var(--glass-edge)', boxShadow: 'var(--glass-shadow), var(--glass-rim)',
   color: 'var(--color-text-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+};
+
+/** The same controls when they sit in the window bar: flat, compact pills. */
+const barPill: React.CSSProperties = {
+  height: 26, padding: '0 10px', gap: 6, borderRadius: 9999, display: 'flex', alignItems: 'center', flexShrink: 0,
+  background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
 };
 
 const ctrlBtn: React.CSSProperties = {
@@ -587,9 +594,49 @@ const DexMaps: React.FC = () => {
 
   const showRecentPanel = focused && !query.trim() && recent.length > 0;
 
+  const unified = useUnifiedChrome();
   if (failed) {
     return <AppErrorState description="The map engine could not start on this device." icon="map-pin" />;
   }
+
+  const pillStyle = unified ? barPill : glassPill;
+  const searchField = (
+    <DexSearchInput
+      fullWidth
+      value={query}
+      onChange={(e) => changeSearch(e.target.value)}
+      onClear={() => changeSearch('')}
+      loading={searching}
+      style={unified
+        ? { height: 28, borderRadius: 9999 }
+        : { background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderRadius: 9999, border: '1px solid var(--glass-edge)', boxShadow: 'var(--glass-shadow), var(--glass-rim)' }}
+      placeholder="Search places"
+      aria-label="Search places"
+    />
+  );
+  const actionButtons = (
+    <>
+      <button aria-label="Saved places" aria-pressed={drawer === 'saved'}
+            onClick={() => setDrawer((d) => (d === 'saved' ? null : 'saved'))}
+            style={{ ...pillStyle, ...(drawer === 'saved' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
+            <DexIcon name="star" size={14} color="#FFD60A" />
+            Saved{saved.length ? ` (${saved.length})` : ''}
+          </button>
+          <button aria-label="Measure distance" aria-pressed={measuring}
+            onClick={() => {
+              setMeasuring((m) => {
+                const next = !m;
+                if (next) { setDrawer('measure'); } else { setDrawer((d) => (d === 'measure' ? null : d)); clearMeasure(); }
+                return next;
+              });
+            }}
+            // (Active used --color-accent-primary, which does not exist: no fill at all.)
+            style={{ ...pillStyle, ...(measuring ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
+            <DexIcon name="crosshair" size={14} />
+            Measure
+          </button>
+    </>
+  );
 
   return (
     <div className="dex-maps-root" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
@@ -604,7 +651,7 @@ const DexMaps: React.FC = () => {
         </div>
       )}
       {tilesFailing && (
-        <div role="status" className="dex-mat-opaque" style={{ position: 'absolute', left: '50%', top: 58, transform: 'translateX(-50%)', borderRadius: 9999, zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
+        <div role="status" className="dex-mat-opaque" style={{ position: 'absolute', left: '50%', top: unified ? 12 : 58, transform: 'translateX(-50%)', borderRadius: 9999, zIndex: 6, padding: '8px 12px', ...panel, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 32px)' }}>
           <DexIcon name="alert-triangle" size={14} color="var(--color-text-tertiary)" />
           Some map tiles could not load. Check your connection.
         </div>
@@ -615,23 +662,27 @@ const DexMaps: React.FC = () => {
         DEX Maps centered on {place}
       </span>
 
-      {/* Search */}
+      {/* Search. In a unified window the field (and Saved / Measure) live in
+          the window bar, so the map gets the whole body; results still drop
+          down over the map. */}
+      {unified && (
+        <WindowToolbar inline={(bar) => <>{bar}</>}>
+          <div style={{ width: 'min(320px, 50%)', minWidth: 160 }}
+            onFocus={() => setFocused(true)}
+            onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node) && !(e.relatedTarget as Element | null)?.closest?.('.dex-maps-search')) setFocused(false); }}>
+            {searchField}
+          </div>
+          <span aria-hidden="true" style={{ flex: 1 }} />
+          {actionButtons}
+        </WindowToolbar>
+      )}
       <div
         className="dex-maps-search"
-        style={{ position: 'absolute', top: 12, left: 12, width: 'min(340px, calc(100% - 156px))', zIndex: 6 }}
+        style={{ position: 'absolute', top: unified ? 8 : 12, left: 12, width: 'min(340px, calc(100% - 156px))', zIndex: 6 }}
         onFocus={() => setFocused(true)}
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false); }}
       >
-        <DexSearchInput
-          fullWidth
-          value={query}
-          onChange={(e) => changeSearch(e.target.value)}
-          onClear={() => changeSearch('')}
-          loading={searching}
-          style={{ background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderRadius: 9999, border: '1px solid var(--glass-edge)', boxShadow: 'var(--glass-shadow), var(--glass-rim)' }}
-          placeholder="Search places"
-          aria-label="Search places"
-        />
+        {!unified && searchField}
         {results.length > 0 && (
           <div role="listbox" aria-label="Search results" className="dex-mat-opaque dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
             {results.map((r, i) => (
@@ -697,31 +748,15 @@ const DexMaps: React.FC = () => {
       </div>
 
       {/* Top-right action cluster: saved places + measure toggles */}
-      <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, zIndex: 6 }}>
-        <button aria-label="Saved places" aria-pressed={drawer === 'saved'}
-          onClick={() => setDrawer((d) => (d === 'saved' ? null : 'saved'))}
-          style={{ ...glassPill, ...(drawer === 'saved' ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
-          <DexIcon name="star" size={14} color="#FFD60A" />
-          Saved{saved.length ? ` (${saved.length})` : ''}
-        </button>
-        <button aria-label="Measure distance" aria-pressed={measuring}
-          onClick={() => {
-            setMeasuring((m) => {
-              const next = !m;
-              if (next) { setDrawer('measure'); } else { setDrawer((d) => (d === 'measure' ? null : d)); clearMeasure(); }
-              return next;
-            });
-          }}
-          // (Active used --color-accent-primary, which does not exist: no fill at all.)
-          style={{ ...glassPill, ...(measuring ? { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', borderColor: 'transparent' } : null) }}>
-          <DexIcon name="crosshair" size={14} />
-          Measure
-        </button>
-      </div>
+      {!unified && (
+        <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, zIndex: 6 }}>
+          {actionButtons}
+        </div>
+      )}
 
       {/* Saved places drawer */}
       {drawer === 'saved' && (
-        <div className="dex-mat-opaque dex-maps-card-enter" style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
+        <div className="dex-mat-opaque dex-maps-card-enter" style={{ position: 'absolute', top: unified ? 8 : 56, right: 12, width: 'min(280px, calc(100% - 24px))', maxHeight: 'calc(100% - 120px)', display: 'flex', flexDirection: 'column', ...panel, zIndex: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Saved places{saved.length ? ` · ${saved.length}` : ''}</span>
             <button aria-label="Close" className="dex-maps-iconbtn" onClick={() => setDrawer(null)} style={{ width: 24, height: 24, background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -761,7 +796,7 @@ const DexMaps: React.FC = () => {
 
       {/* Measure drawer */}
       {drawer === 'measure' && (
-        <div className="dex-mat-opaque" style={{ position: 'absolute', top: 56, right: 12, width: 'min(280px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
+        <div className="dex-mat-opaque" style={{ position: 'absolute', top: unified ? 8 : 56, right: 12, width: 'min(280px, calc(100% - 24px))', ...panel, zIndex: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Distance</span>
             <button aria-label="Close" onClick={() => { setDrawer(null); setMeasuring(false); clearMeasure(); }} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', padding: 0, display: 'flex' }}>

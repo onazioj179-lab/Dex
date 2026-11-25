@@ -34,7 +34,7 @@ import { MorphingDock } from './dock/MorphingDock';
 import { useDockStore, dockReserve } from '../store/dockStore';
 import { computeWorkArea } from '../../shared/shell/workArea';
 import { spotlightEngine } from '../shell/SpotlightEngine';
-import { WindowChromeProvider, windowModeFor, NO_DRAG_SELECTOR } from '../shell/windowChrome';
+import { WindowChromeProvider, windowModeFor, topBarModeFor, NO_DRAG_SELECTOR } from '../shell/windowChrome';
 import type { SpotlightAction } from '../shell/SpotlightEngine';
 import { SpotlightSearch } from '../shell/SpotlightSearch';
 import { applyLaunchOrigin, installLaunchOriginTracking } from '../shell/launchOrigin';
@@ -3988,6 +3988,8 @@ export const AppManager: React.FC = () => {
   // Unified window chrome: each window header has a slot the app's toolbar
   // can move into (shell/windowChrome.tsx). Element per window id.
   const [chromeSlots, setChromeSlots] = useState<Record<string, HTMLElement | null>>({});
+  // The DEX top bar's app slot: the current full-surface app's bar renders there.
+  const [topBarSlot, setTopBarSlot] = useState<HTMLElement | null>(null);
   const chromeSlotRefs = useRef<Record<string, (el: HTMLElement | null) => void>>({});
   const chromeSlotRef = useCallback((id: string) => {
     if (!chromeSlotRefs.current[id]) {
@@ -4357,7 +4359,7 @@ export const AppManager: React.FC = () => {
                     title={`${getLabel(appId)} menu`}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openAppContextMenu({ appId, x: r.left, y: r.bottom + 4, source: 'titlebar', floating: true }); }}
-                    style={{ width: 22, height: 22, borderRadius: 4, padding: 0, border: 'none', cursor: 'pointer', background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                    style={{ width: 22, height: 22, borderRadius: 6, padding: 0, border: 'none', cursor: 'pointer', background: AppIconPngs[appId] ? 'transparent' : appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                     {AppIconPngs[appId]
                       ? <AppIconImg appId={appId} size={22} />
                       : <span style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icons[appId] || <DexIcon name={APP_DEFINITIONS[appId]?.icon || appId} size={16} color="#fff" />}</span>}
@@ -4396,11 +4398,11 @@ export const AppManager: React.FC = () => {
                     title="Minimize"
                     aria-label={`Minimize ${getLabel(appId)}`}
                     style={{
-                      width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 4,
+                      width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: 'none', borderRadius: 9999,
                       color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = spatialEnabled ? 'var(--color-accent-light)' : 'var(--color-border)'; e.currentTarget.style.color = spatialEnabled ? 'var(--color-accent)' : '#fff'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -4416,11 +4418,11 @@ export const AppManager: React.FC = () => {
                       title={isMaximized ? 'Restore' : 'Maximize'}
                       aria-label={isMaximized ? `Restore ${getLabel(appId)}` : `Maximize ${getLabel(appId)}`}
                       style={{
-                        width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'transparent', border: 'none', borderRadius: 4,
+                        width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'transparent', border: 'none', borderRadius: 9999,
                         color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = spatialEnabled ? 'var(--color-accent-light)' : 'var(--color-border)'; e.currentTarget.style.color = spatialEnabled ? 'var(--color-accent)' : '#fff'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                     >
                       {isMaximized ? (
@@ -4444,8 +4446,8 @@ export const AppManager: React.FC = () => {
                     title={`Close ${getLabel(appId)}`}
                     aria-label={`Close ${getLabel(appId)}`}
                     style={{
-                      width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none', borderRadius: 4,
+                      width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: 'none', borderRadius: 9999,
                       color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.18)'; e.currentTarget.style.color = 'var(--color-error)'; }}
@@ -4989,7 +4991,8 @@ export const AppManager: React.FC = () => {
               the Spatial canvas) keeps the app mounted with its state. */}
           {false}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-            <WindowChromeProvider mode="standard" slot={null}>
+            {/* Only the app in front owns the top-bar slot; the rest keep their bar inline. */}
+            <WindowChromeProvider mode={appId === currentApp ? topBarModeFor(appId) : 'standard'} slot={appId === currentApp ? topBarSlot : null}>
               <AppBody appId={appId} />
             </WindowChromeProvider>
           </div>
@@ -4997,7 +5000,7 @@ export const AppManager: React.FC = () => {
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, immersive, chromeSlots, mountedAppsSafeSnapshot.join(',')]);
+  }, [currentApp, splitMode, splitApp, detachedApps, minimizedApps, spatialEnabled, immersive, chromeSlots, topBarSlot, mountedAppsSafeSnapshot.join(',')]);
 
   // -- AppLifecycle phase emitter ------------------------------------------
   // Keep-alive never unmounts apps; instead we broadcast a per-app phase so
@@ -5349,6 +5352,9 @@ export const AppManager: React.FC = () => {
     );
   };
 
+  // The front full-surface app hands its small bar to the top bar (not when
+  // it is a floating window: then its own window header carries it).
+  const appBarInTopBar = currentApp !== 'home' && topBarModeFor(currentApp) === 'unified' && !detachedApps.has(currentApp) && !immersive;
   const renderTitleBar = () => (
     // data-tauri-drag-region: makes the bar draggable under Tauri (the Electron
     // -webkit-app-region below only works in Electron). Tauri starts a drag only
@@ -5402,6 +5408,12 @@ export const AppManager: React.FC = () => {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
       </div>
+      {appBarInTopBar && (
+        // The current app's own bar (Terminal tabs, Maps search, Calculator
+        // modes): one row of chrome instead of the top bar plus an app strip.
+        <div ref={setTopBarSlot} data-topbar-app-slot={currentApp} role="group" aria-label={`${getLabel(currentApp)} toolbar`}
+          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0, flex: '0 1 auto', maxWidth: '48%', height: '100%', marginLeft: 8, overflow: 'hidden', WebkitAppRegion: 'no-drag' } as React.CSSProperties} />
+      )}
       {renderAppTabBar() ?? (
       <span style={{
         fontSize: 13, fontWeight: 500, color: 'var(--color-text-tertiary)',
@@ -5411,7 +5423,8 @@ export const AppManager: React.FC = () => {
         // status cluster (ellipsises instead).
         position: 'absolute', left: '50%', transform: 'translateX(-50%)',
         letterSpacing: '-0.01em',
-        display: currentApp === 'home' ? 'none' : 'flex', alignItems: 'center', gap: 6,
+        // Hidden while the app's own bar sits in the top bar (it names the app).
+        display: currentApp === 'home' || appBarInTopBar ? 'none' : 'flex', alignItems: 'center', gap: 6,
         WebkitAppRegion: 'no-drag',
         cursor: 'pointer',
         maxWidth: 'min(46vw, 460px)',

@@ -5745,7 +5745,7 @@ button:active:not(:disabled),
 button[data-active="true"] {
   background: rgba(10, 132, 255, 0.2);
   color: var(--color-accent);
-  box-shadow: inset 0 0 0 1px var(--color-accent);
+  /* No accent ring on top of the fill (owner: no unnecessary highlights). */
 }
 
 /* Property input fields */
@@ -6906,10 +6906,7 @@ html, body {
 }
 
 /* ----- Keyboard Navigation Indicator ----- */
-.keyboard-mode *:focus-visible {
-  outline: 2px solid var(--color-accent) !important;
-  outline-offset: 2px !important;
-}
+/* .keyboard-mode uses the canonical thin ring from globals.css (no blue 2px override). */
 
 .mouse-mode *:focus:not(:focus-visible) {
   outline: none !important;

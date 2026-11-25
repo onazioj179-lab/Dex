@@ -22,14 +22,18 @@
  * Solid, no-glass, matches the OS-wide consistent surface.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { isReduceMotion } from '../utils/MotionController';
+
+const FOLD_MS = 200;
+const FOLD_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
 export interface CollapsibleSectionProps {
   /** Section title shown in the header. */
   label: string;
   /** Optional leading icon element. */
   icon?: React.ReactNode;
-  /** Section body — only mounted when expanded. */
+  /** Section body — mounted while expanded (and while it folds away). */
   children: React.ReactNode;
   /** Controlled collapsed state. Provide with `onToggle` for parent-owned state. */
   collapsed?: boolean;
@@ -94,6 +98,25 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
 
   const isCollapsed = controlled ? (collapsed as boolean) : internal;
 
+  // Smooth fold: the body animates its height (grid 0fr <-> 1fr, no measuring)
+  // and stays mounted until the fold finishes, so it never pops in or out.
+  const [mounted, setMounted] = useState(!isCollapsed);
+  const [open, setOpen] = useState(!isCollapsed);
+  useEffect(() => {
+    const reduce = isReduceMotion();
+    if (!isCollapsed) {
+      setMounted(true);
+      if (reduce) { setOpen(true); return; }
+      let inner = 0;
+      const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setOpen(true)); });
+      return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+    }
+    setOpen(false);
+    if (reduce) { setMounted(false); return; }
+    const t = window.setTimeout(() => setMounted(false), FOLD_MS + 20);
+    return () => window.clearTimeout(t);
+  }, [isCollapsed]);
+
   const handleToggle = useCallback(() => {
     if (controlled) { onToggle?.(); return; }
     setInternal((prev) => {
@@ -126,13 +149,17 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         <svg
           width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)"
           strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-          style={{ marginLeft: headerAccessory ? 6 : 'auto', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.16s ease' }}
+          style={{ marginLeft: headerAccessory ? 6 : 'auto', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: `transform ${FOLD_MS}ms ${FOLD_EASE}` }}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      {!isCollapsed && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>{children}</div>
+      {mounted && (
+        <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0, transition: `grid-template-rows ${FOLD_MS}ms ${FOLD_EASE}, opacity ${FOLD_MS - 60}ms ${FOLD_EASE}` }}>
+          <div style={{ minHeight: 0, overflow: 'hidden' }} aria-hidden={!open || undefined}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10 }}>{children}</div>
+          </div>
+        </div>
       )}
     </div>
   );

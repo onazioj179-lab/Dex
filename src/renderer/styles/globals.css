@@ -177,18 +177,31 @@ html[data-thermal-state="critical"] [data-decorative="true"] { display: none !im
      direction: white on dark / near-black on light, distinct from the blue
      accent which is reserved for primary actions). Outline (not box-shadow) so
      it can never be clipped by overflow:hidden / rounded ancestors. */
-  outline: 2px solid var(--dex-focus-color, #ffffff) !important;
+  /* Thin and soft (owner: no heavy highlights). Outlines follow the element's
+     own radius in Chromium, so a pill gets a pill ring; we no longer force a
+     square-ish radius onto every focused element. */
+  outline: 1.5px solid color-mix(in srgb, var(--dex-focus-color, #ffffff) 55%, transparent) !important;
   outline-offset: 2px !important;
-  border-radius: var(--radius-sm);
 }
 :focus:not(:focus-visible) {
+  outline: none !important;
+}
+/* Text fields always match :focus-visible (even on a mouse click), and their
+   ring drew a hard rectangle INSIDE pill-shaped search bars. The caret is the
+   focus cue; containers tint themselves via :focus-within. Controls that
+   already show selection (active tab, highlighted option/menu row) don't need
+   a second ring on top either. */
+:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="color"], [type="file"]), textarea, [contenteditable="true"], [contenteditable=""]):focus-visible,
+[role="tab"][aria-selected="true"]:focus-visible,
+[role="option"][aria-selected="true"]:focus-visible,
+[role="menuitem"]:focus-visible {
   outline: none !important;
 }
 /* Draw keyboard focus on the complete search field. */
 @supports selector(:has(*)) {
   .dex-search-control:has(> .dex-search-field:focus-visible) {
-    outline: 1px solid var(--dex-focus-color);
-    outline-offset: 1px;
+    outline: none;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 18%, transparent);
   }
   .dex-search-control > .dex-search-field:focus-visible {
     outline: none !important;
@@ -4120,23 +4133,10 @@ textarea {
   cursor: not-allowed !important;
 }
 
-/* Item 50: Focus-visible ring for keyboard navigation */
-.dex-app-container button:focus-visible {
-  outline: 2px solid rgba(74, 158, 255, 0.5);
-  outline-offset: 2px;
-  border-radius: inherit;
-}
-
-/* Item 51: Toggle button active state -- filled accent background */
-.dex-app-container button[aria-pressed="true"] {
-  box-shadow: inset 0 0 12px rgba(74, 158, 255, 0.08);
-}
-
-/* Item 57: Active track highlight in mixer/arrange */
-.dex-app-container [aria-selected="true"],
-.dex-app-container [data-active="true"] {
-  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.3);
-}
+/* Items 50/51/57 removed (owner: no unnecessary highlights): a blue button
+   focus ring that fought the canonical one, a glow on every pressed toggle,
+   and a blue rim around every selected/active element in every app (it drew
+   a ring inside pill tabs). Each control shows its own selected state. */
 
 /* ================================================================
    Smooth Drag & Drop Interactions
@@ -4311,14 +4311,9 @@ textarea {
    tabs/lists with their own selection styling keep it. */
 :where([aria-selected="true"], [data-selected="true"]) {
   background: var(--color-accent-muted, rgba(10, 132, 255, 0.12));
-  box-shadow: inset 0 0 0 1px var(--color-accent-light, rgba(10, 132, 255, 0.25));
 }
 
-/* Focused within containers */
-:focus-within > .dex-label,
-:focus-within > label {
-  color: var(--color-accent, #0A84FF);
-}
+/* (Labels no longer turn blue while their field has focus: the caret is enough.) */
 
 /* Navigation arrows hover (opt-in classes only) */
 .nav-arrow:hover,

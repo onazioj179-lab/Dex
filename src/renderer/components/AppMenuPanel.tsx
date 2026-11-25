@@ -337,7 +337,7 @@ const LAUNCHPAD_CSS = `
 }
 .dex-lp-tile:hover .dex-lp-icon { background: color-mix(in srgb, var(--color-text-primary) 11%, transparent); }
 .dex-lp-tile:active .dex-lp-icon { transform: scale(0.97); }
-.dex-lp-tile[data-current] .dex-lp-icon { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-text-primary) 22%, transparent); }
+.dex-lp-tile[data-current] .dex-lp-icon { background: color-mix(in srgb, var(--color-text-primary) 10%, transparent); }
 .dex-lp-tile[data-drop] .dex-lp-icon { box-shadow: 0 0 0 2px var(--color-accent); }
 .dex-lp-label {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

@@ -27,7 +27,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Terminal } from './Terminal';
+import { WindowToolbar, useUnifiedChrome } from '../shell/windowChrome';
 import {
   LAYOUT_KEY, LAYOUT_KEY_V1, MAX_PANES, addTab as addTabL, closePane as closePaneL, closeTab as closeTabL,
   cyclePane, cycleTab, focusPane, initialLayout, parseLayout, resizeDivider, splitPane, canSplit as canSplitDir, type SplitDir,
@@ -45,6 +47,8 @@ interface TerminalTabsProps {
   height?: number | string;
   /** Open a tab for each "Open in Terminal" request (the standalone Terminal app sets this). */
   acceptOpenRequests?: boolean;
+  /** The standalone Terminal app: in a unified window the tab strip moves into the window bar. */
+  chromeInWindowBar?: boolean;
 }
 
 /** The shells installed on this machine, from the native side. Empty when there is no native bridge. */
@@ -90,7 +94,7 @@ function titleFromCommand(cmd: string): string {
 }
 
 const iconBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, flexShrink: 0, borderRadius: 6,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, minHeight: 24, flexShrink: 0, borderRadius: 9999,
   background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary, #8a8a8a)',
 };
 
@@ -102,7 +106,12 @@ function focusPaneDom(root: HTMLElement | null, paneId: string) {
   }, 0);
 }
 
-export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height, acceptOpenRequests }) => {
+export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height, acceptOpenRequests, chromeInWindowBar }) => {
+  const unifiedWindow = useUnifiedChrome();
+  const inBar = !!chromeInWindowBar && unifiedWindow;
+  // The shells menu is fixed-positioned from its button, so it is never clipped by the window bar.
+  const [menuAt, setMenuAt] = useState<{ top: number; right: number } | null>(null);
+  const menuPopRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<TermLayout>(() => loadLayout());
   const [settings, setSettings] = useState<TermSettings>(() => {
     try { return parseSettings(localStorage.getItem(SETTINGS_KEY)); } catch { return parseSettings(null); }
@@ -210,7 +219,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
   // The shell menu closes on a click outside it or Escape.
   useEffect(() => {
     if (!menuOpen) return;
-    const down = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false); };
+    const down = (e: PointerEvent) => { const t = e.target as Node; if (!menuRef.current?.contains(t) && !menuPopRef.current?.contains(t)) setMenuOpen(false); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
@@ -299,8 +308,8 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
 
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: height ?? '100%', minHeight: 0, flex: 1, width: '100%', minWidth: 0 }}>
-      {/* Tab strip */}
-      <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, background: '#131417', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Tab strip (in the window bar when this is the Terminal app in a unified window) */}
+      {(() => { const strip = (<>
         <div role="tablist" aria-label="Terminal sessions" style={{ display: 'flex', alignItems: 'stretch', gap: 2, padding: '4px 6px', flex: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {layout.tabs.map((t, i) => {
             const active = t.id === layout.activeId;
@@ -320,10 +329,10 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                 }}
                 title={`${label}${t.panes.length > 1 ? ` · ${t.panes.length} panes` : ''} — double-click to rename`}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 4px 12px', borderRadius: 9999, cursor: 'pointer',
                   fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
                   color: active ? 'var(--color-text-primary, #e0e0e0)' : 'var(--color-text-tertiary, #8a8a8a)',
-                  background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  background: active ? 'color-mix(in srgb, var(--color-text-primary, #e0e0e0) 10%, transparent)' : 'transparent',
                 }}
               >
                 {editing ? (
@@ -351,7 +360,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                   aria-label={`Close ${label}`}
                   title="Close tab"
                   className="dex-hover-bg"
-                  style={{ ...iconBtn, width: 14, height: 14, padding: 0, borderRadius: 4, color: 'inherit', opacity: 0.7 }}
+                  style={{ ...iconBtn, width: 16, height: 16, padding: 0, borderRadius: 9999, color: 'inherit', opacity: 0.7 }}
                 >
                   <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
@@ -363,11 +372,11 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
           </button>
         </div>
         <div ref={menuRef} style={{ display: 'flex', gap: 2, padding: '2px 4px', flexShrink: 0, position: 'relative' }}>
-          <button type="button" onClick={() => setMenuOpen((o) => !o)} aria-label="Shells and text size" aria-haspopup="menu" aria-expanded={menuOpen} title="Shells and text size" className="dex-hover-bg" style={{ ...iconBtn, background: menuOpen ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
+          <button type="button" onClick={(e) => { const b = e.currentTarget.getBoundingClientRect(); setMenuAt({ top: b.bottom + 4, right: Math.max(4, window.innerWidth - b.right) }); setMenuOpen((o) => !o); }} aria-label="Shells and text size" aria-haspopup="menu" aria-expanded={menuOpen} title="Shells and text size" className="dex-hover-bg" style={{ ...iconBtn, background: menuOpen ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
           </button>
-          {menuOpen && (
-            <div role="menu" aria-label="Shells and text size" style={{ position: 'absolute', top: '100%', right: 4, marginTop: 2, zIndex: 20, minWidth: 236, padding: '4px', borderRadius: 10, background: '#1c1e22', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+          {menuOpen && createPortal(
+            <div ref={menuPopRef} className="dex-theme-dark" role="menu" aria-label="Shells and text size" style={{ position: 'fixed', top: menuAt?.top ?? 0, right: menuAt?.right ?? 4, zIndex: 'var(--z-dropdown, 1000)' as unknown as number, minWidth: 236, padding: '4px', borderRadius: 10, background: '#1c1e22', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <div style={{ padding: '4px 10px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary, #8a8a8a)' }}>New tab with</div>
               {shells.length === 0 && (
                 <div style={{ padding: '4px 10px 6px', fontSize: 12, color: 'var(--color-text-secondary, #b8b8bd)' }}>No shells found. New tabs use the system shell.</div>
@@ -397,7 +406,8 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                 <button type="button" aria-label="Larger text" title="Larger (Ctrl+=)" disabled={settings.fontSize >= FONT_MAX} onClick={() => stepFontSize(1)} style={{ ...stepBtn, opacity: settings.fontSize >= FONT_MAX ? 0.35 : 1 }}>+</button>
                 <button type="button" title="Default size (Ctrl+0)" disabled={settings.fontSize === FONT_DEFAULT} onClick={() => setFontSize(FONT_DEFAULT)} style={{ ...stepBtn, width: 'auto', padding: '0 6px', fontSize: 11, opacity: settings.fontSize === FONT_DEFAULT ? 0.35 : 1 }}>Reset</button>
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
           <button type="button" onClick={() => split('row')} disabled={!canRight} aria-label="Split right" title={`Split right (Ctrl+Shift+D)${axisHint('row')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canRight ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
@@ -406,7 +416,11 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="3" y1="12" x2="21" y2="12" /></svg>
           </button>
         </div>
-      </div>
+      </>);
+        return inBar
+          ? <WindowToolbar inline={(bar) => <>{bar}</>}>{strip}</WindowToolbar>
+          : <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, background: '#131417', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{strip}</div>;
+      })()}
 
       {/* Sessions: every pane of every tab stays mounted; only the active tab shows. */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
