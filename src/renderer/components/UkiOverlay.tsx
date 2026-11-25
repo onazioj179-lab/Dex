@@ -22,6 +22,7 @@ import type { UkiConversationTurn, UkiKnowledgeNode } from '../store/ukiStore';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { attachmentFromFile, handOffAttachments, type UkiAttachment } from '../uki/attachments';
 import { PanelHistory } from '../uki/chatHistory';
+import { isCreatorQuestion, creatorAnswer } from '../uki/identity';
 import { speakAsUki, readVoicePrefs, writeVoicePref, stepRate, SPEED_STEPS } from '../uki/voice';
 
 // Panel chats are kept in the UKI app's history (one conversation per panel session).
@@ -853,9 +854,12 @@ function tryFunResponse(text: string): string | null {
     return AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)];
   }
   
+  // Who made her: known, and answered only when asked.
+  if (isCreatorQuestion(text)) return creatorAnswer();
+
   // Identity questions
   if (/(?:who|what)\s*(?:are|r)\s*(?:you|u)|your\s*name|introduce\s*yourself|what(?:'s| is) your name/.test(lower)) {
-    return "I'm UKI, your DEX voice assistant. I can open apps, answer questions, do calculations, read your screen, help with accessibility, and more. Try asking me to open an app, tell you a joke, or describe what's on your screen!";
+    return "I'm UKI, the intelligence inside DEX. I open apps, find and read your files, remember our conversations, work through problems with you and do the routine parts for you.";
   }
   
   // How are you

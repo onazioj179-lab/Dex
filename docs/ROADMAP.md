@@ -1,5 +1,16 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-25, second batch) — owner list: UKI history/voice/philosophy, dock tuck, Home menu, licence, Terminal
+> macOS/Linux commands, Task Manager graphs, Notes Word features.** Done on `claude/main-ci-fix-uki`: unlimited UKI history in
+> her app + recall; British female voice + speed; philosophy + Ada Lovelace character + creator known (said only when asked);
+> Dock/orb tuck into the four walls; Home right-click menus; DEX is paid (README/PRICING/TERMS/PRIVACY, Terms v3 re-accept);
+> PowerShell sessions accept ls -la / rm -rf / grep / head / tail / which / touch / open / pbcopy (terminal_compat.rs, tested
+> in real PowerShell); Task Manager hover readout, now/avg/peak/low, collapsible rail and details; Notes export to Word
+> (.docx, no dependency) + superscript/subscript/justify/clear formatting. Store contrast fix (Pill opaque tint).
+> **Not done (owner list):** AXL / Bio / engineering / Ledger completion passes; VLC-class audio/video playback engine for
+> Gallery (all formats and sizes) and audio scrubber UI; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
+> surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.
+
 > **GOAL (2026-11-25) — Owner: "users still complain: Terminal, coding in DEX Code, UKI files in and out + indexing,
 > system-wide shortcuts with real behaviour, pill UI".** Done on `claude/main-ci-fix-uki`:
 > - **System-wide shortcuts: REAL.** `src-tauri/src/global_hotkeys.rs` registers keys with Windows (`RegisterHotKey`

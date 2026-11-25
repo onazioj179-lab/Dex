@@ -702,7 +702,6 @@ const DOCK_CSS = `
   box-shadow: 0 0 0 1px var(--color-accent), 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 :where(.dex-mdock-slit)[data-uki="working"], :where(.dex-mdock-slit)[data-uki="listening"] { background: var(--color-accent); }
-:where(.dex-mdock-slit):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   :where(.dex-mdock), :where(.dex-mdock) *, :where(.dex-mdock-slit) { transition-duration: 0ms !important; }
 }

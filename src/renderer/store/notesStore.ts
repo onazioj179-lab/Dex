@@ -19,6 +19,32 @@ import type { NoteExportFormat } from '../DEXAPPLICATIONS/notes/notesFileFormat'
 // Notes app chunk; a static import would make a chunk cycle.
 const loadNoteFormats = () => import('../DEXAPPLICATIONS/notes/notesFileFormat');
 
+/** Notes → Word: build the .docx here, then the native Save dialog + binary write. */
+async function exportNoteAsDocx(noteId: string): Promise<string | null> {
+  const note = await ipc('dexnotes:get', noteId);
+  if (!note) { notesToast('error', "Couldn't export: the note wasn't found"); return null; }
+  const [{ safeFileName }, model, { noteToDocx, bytesToBase64 }] = await Promise.all([
+    loadNoteFormats(), import('../DEXAPPLICATIONS/notes/NotesDocumentModel'), import('../DEXAPPLICATIONS/notes/docxExport'),
+  ]);
+  const title = note.title || 'Untitled note';
+  const bytes = noteToDocx(title, model.docToHTML(model.deserializeDoc(note.content || '')));
+  const name = safeFileName(note.title, 'docx');
+  const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+  if (!dex?.invoke) {
+    // Web preview: hand the file over as a download.
+    const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return null;
+  }
+  const pick = (await dex.invoke('dialog:showSaveDialog', { title: 'Export as Word', defaultPath: name, filters: [{ name: 'Word document', extensions: ['docx'] }] })) as { canceled?: boolean; filePath?: string } | null;
+  if (!pick || pick.canceled || !pick.filePath) return null;
+  const res = (await dex.invoke('fs:writeBase64', pick.filePath, bytesToBase64(bytes))) as { ok?: boolean; error?: string } | null;
+  if (!res?.ok) { notesToast('error', `Couldn't export the note${res?.error ? `: ${res.error}` : ''}`); return null; }
+  notesToast('success', `Exported "${title}" as a Word document`);
+  return pick.filePath;
+}
+
 function notesToast(type: 'success' | 'error' | 'info', message: string): void {
   try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* non-DOM */ }
 }
@@ -982,6 +1008,7 @@ const notesStoreInit: StateCreator<NotesStoreState> = (set, get) => ({
   // -- Export / Import -----------------------------------------------------
 
   exportNote: async (noteId: string, format: string) => {
+    if (format === 'docx') return exportNoteAsDocx(noteId);
     const { NOTE_EXPORT_EXT, noteToFileText, safeFileName } = await loadNoteFormats();
     const fmt = (format in NOTE_EXPORT_EXT ? format : 'markdown') as NoteExportFormat;
     const note = await ipc('dexnotes:get', noteId);

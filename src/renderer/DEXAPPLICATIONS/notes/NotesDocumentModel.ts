@@ -32,7 +32,7 @@ export type NodeType =
   | 'image'
   | 'divider';
 
-export type MarkType = 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code' | 'highlight' | 'link';
+export type MarkType = 'bold' | 'italic' | 'underline' | 'strikethrough' | 'code' | 'highlight' | 'link' | 'superscript' | 'subscript';
 
 export interface Mark {
   type: MarkType;
@@ -236,6 +236,8 @@ function wrapMark(html: string, mark: Mark): string {
     case 'italic': return `<em>${html}</em>`;
     case 'underline': return `<u>${html}</u>`;
     case 'strikethrough': return `<s>${html}</s>`;
+    case 'superscript': return `<sup>${html}</sup>`;
+    case 'subscript': return `<sub>${html}</sub>`;
     case 'code': return `<code>${html}</code>`;
     case 'highlight': return `<mark>${html}</mark>`;
     case 'link': return `<a href="${escapeAttr(mark.attrs?.href || '#')}">${html}</a>`;
@@ -463,6 +465,8 @@ function tagToMark(el: Element): Mark | null {
     case 'em': case 'i': return { type: 'italic' };
     case 'u': return { type: 'underline' };
     case 's': case 'del': case 'strike': return { type: 'strikethrough' };
+    case 'sup': return { type: 'superscript' };
+    case 'sub': return { type: 'subscript' };
     case 'code': return { type: 'code' };
     case 'mark': return { type: 'highlight' };
     case 'a': return { type: 'link', attrs: { href: el.getAttribute('href') || '' } };
@@ -552,6 +556,8 @@ function wrapMarkMd(text: string, mark: Mark): string {
     case 'italic': return `*${text}*`;
     case 'underline': return `<u>${text}</u>`;
     case 'strikethrough': return `~~${text}~~`;
+    case 'superscript': return `<sup>${text}</sup>`;
+    case 'subscript': return `<sub>${text}</sub>`;
     case 'code': return `\`${text}\``;
     case 'highlight': return `==${text}==`;
     case 'link': return `[${text}](${mark.attrs?.href || ''})`;

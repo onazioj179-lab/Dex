@@ -19,7 +19,7 @@ import {
 } from '../../uki/providers/connect';
 import { captureScreenImage, isScreenCaptureAvailable, captureCameraFrame, isCameraCaptureAvailable } from '../../uki/screenCapture';
 import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
-import { coreSystemPrompt, reasoningForTurn } from '../../uki/identity';
+import { coreSystemPrompt, reasoningForTurn, isCreatorQuestion, creatorAnswer } from '../../uki/identity';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
@@ -574,7 +574,7 @@ export default function Uki(): React.ReactElement {
     // Operator (light touch): if the message clearly describes a problem and the
     // on-device troubleshooting knowledge has a confident hit, answer locally
     // instead of falling back to the raw LLM. Guarded so normal chat is untouched.
-    const localAnswer = atts.length ? null : tryOperatorLocalAnswer(text);
+    const localAnswer = atts.length ? null : isCreatorQuestion(text) ? creatorAnswer() : tryOperatorLocalAnswer(text);
     if (localAnswer) {
       const reply: Message = { id: newId(), role: 'copilot', content: localAnswer, timestamp: Date.now() };
       setMessages((m) => [...m, reply]);

@@ -32,7 +32,7 @@ import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../uki/appActionRegistry';
 import { topApps, formatTopApps } from './taskManagerUki';
-import { LineChart, canvasColor } from '../components/telemetry/LineChart';
+import { LineChart, canvasColor, seriesStats } from '../components/telemetry/LineChart';
 import { WindowToolbar } from '../shell/windowChrome';
 
 // -- types + persisted preferences --------------------------------------------
@@ -770,6 +770,11 @@ const PerformanceView: React.FC<PerformanceViewProps> = ({ resource, onResource,
   const pctLabel = useCallback((v: number) => `${Math.round(v)}%`, []);
   const bpsLabel = useCallback((v: number) => fmtBps(v), []);
   const mbLabel = useCallback((v: number) => `${Math.round(v)} MB`, []);
+  // Collapsible resource list and details, remembered between visits.
+  const [railCollapsed, setRailCollapsed] = useState(() => { try { return localStorage.getItem('dex-tm-rail') === '1'; } catch { return false; } });
+  const [detailsOpen, setDetailsOpen] = useState(() => { try { return localStorage.getItem('dex-tm-details') !== '0'; } catch { return true; } });
+  const toggleRail = useCallback(() => setRailCollapsed((v) => { try { localStorage.setItem('dex-tm-rail', v ? '0' : '1'); } catch { /* storage */ } return !v; }), []);
+  const toggleDetails = useCallback(() => setDetailsOpen((v) => { try { localStorage.setItem('dex-tm-details', v ? '0' : '1'); } catch { /* storage */ } return !v; }), []);
 
   type Entry = { id: Resource; name: string; value: string; detail: string; series: number[]; max: number };
   const entries: Entry[] = [
@@ -804,20 +809,38 @@ const PerformanceView: React.FC<PerformanceViewProps> = ({ resource, onResource,
   })();
 
   const label = sel.id === 'network' ? bpsLabel : sel.id === 'dex' ? mbLabel : pctLabel;
+  const summary = seriesStats(sel.series);
 
   return (
     <div style={S.split}>
-      <nav aria-label="Resources" style={S.resList}>
+      <nav aria-label="Resources" style={{ ...S.resList, ...(railCollapsed ? { width: 92, minWidth: 92 } : null) }}>
+        <button
+          type="button"
+          onClick={toggleRail}
+          aria-expanded={!railCollapsed}
+          aria-label={railCollapsed ? 'Expand the resource list' : 'Collapse the resource list'}
+          style={S.railToggle}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {railCollapsed ? <polyline points="9 6 15 12 9 18" /> : <polyline points="15 6 9 12 15 18" />}
+          </svg>
+          {!railCollapsed && <span>Collapse</span>}
+        </button>
         {entries.map(e => {
           const on = e.id === sel.id;
           return (
-            <button key={e.id} type="button" aria-pressed={on} onClick={() => onResource(e.id)} style={{ ...S.resItem, ...(on ? S.resItemOn : null) }}>
-              <div style={S.resSpark}><LineChart series={e.series} max={e.max} height={30} ariaLabel={`${e.name} history`} /></div>
-              <div style={{ minWidth: 0 }}>
-                <div style={S.resName}>{e.name}</div>
-                <div style={S.resValue}>{e.value}</div>
-                {e.detail && <div style={S.resDetail}>{e.detail}</div>}
-              </div>
+            <button key={e.id} type="button" aria-pressed={on} aria-label={railCollapsed ? `${e.name}, ${e.value}` : undefined} onClick={() => onResource(e.id)}
+              style={{ ...S.resItem, ...(on ? S.resItemOn : null), ...(railCollapsed ? { gridTemplateColumns: '1fr', gap: 4, padding: '6px' } : null) }}>
+              <div style={{ ...S.resSpark, ...(railCollapsed ? { width: '100%' } : null) }}><LineChart series={e.series} max={e.max} height={30} ariaLabel={`${e.name} history`} /></div>
+              {railCollapsed ? (
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-primary)', textAlign: 'center', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.value}</div>
+              ) : (
+                <div style={{ minWidth: 0 }}>
+                  <div style={S.resName}>{e.name}</div>
+                  <div style={S.resValue}>{e.value}</div>
+                  {e.detail && <div style={S.resDetail}>{e.detail}</div>}
+                </div>
+              )}
             </button>
           );
         })}
@@ -839,17 +862,32 @@ const PerformanceView: React.FC<PerformanceViewProps> = ({ resource, onResource,
                 height={220}
                 ariaLabel={`${sel.name} over the last minute`}
                 axisLabel={label}
+                formatValue={label}
               />
               <div style={S.axisRow}><span>60 seconds</span><span>0</span></div>
             </div>
-            <dl style={S.statGrid}>
-              {stats.map(([k, v]) => (
-                <div key={k} style={S.stat}>
-                  <dt style={S.statK}>{k}</dt>
-                  <dd style={S.statV}>{v}</dd>
-                </div>
-              ))}
-            </dl>
+            {summary && (
+              <div style={S.summaryRow} aria-label="Last minute">
+                {([['Now', summary.now], ['Average', summary.avg], ['Peak', summary.peak], ['Low', summary.min]] as [string, number][]).map(([k, v]) => (
+                  <span key={k} style={S.summaryPill}><span style={S.summaryK}>{k}</span>{label(v)}</span>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={toggleDetails} aria-expanded={detailsOpen} style={S.detailsToggle}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                style={{ transform: detailsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}><polyline points="9 6 15 12 9 18" /></svg>
+              Details
+            </button>
+            {detailsOpen && (
+              <dl style={S.statGrid}>
+                {stats.map(([k, v]) => (
+                  <div key={k} style={S.stat}>
+                    <dt style={S.statK}>{k}</dt>
+                    <dd style={S.statV}>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </>
         )}
       </section>
@@ -984,6 +1022,11 @@ const S: Record<string, React.CSSProperties> = {
   perfTitle: { margin: 0, fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' },
   chartBox: { border: '1px solid var(--color-border-subtle)', borderRadius: 6, overflow: 'hidden' },
   axisRow: { display: 'flex', justifyContent: 'space-between', padding: '3px 6px', fontSize: 10, color: 'var(--color-text-tertiary)', borderTop: '1px solid var(--color-border-subtle)' },
+  railToggle: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 26, margin: '0 0 6px', padding: '0 10px', borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' },
+  summaryRow: { display: 'flex', flexWrap: 'wrap', gap: 6, margin: '10px 0 4px' },
+  summaryPill: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' },
+  summaryK: { fontWeight: 500, color: 'var(--color-text-tertiary)' },
+  detailsToggle: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', margin: '6px 0 8px', borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   statGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px 20px', margin: 0 },
   stat: { display: 'flex', flexDirection: 'column', gap: 2 },
   statK: { fontSize: 11, color: 'var(--color-text-tertiary)' },

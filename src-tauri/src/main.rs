@@ -80,6 +80,7 @@ mod containment_ctl;
 mod sandbox_ctl;
 mod gpu_priority;
 mod global_hotkeys;
+mod terminal_compat;
 mod context_ctl;
 mod controls_ctl;
 mod corepc_ctl;

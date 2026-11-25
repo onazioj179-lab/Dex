@@ -32,3 +32,17 @@ describe('UKI philosophy', () => {
     expect(core).toContain('recall_conversations');
   });
 });
+
+describe('UKI character and creator', () => {
+  it('thinks like Ada Lovelace without announcing it', async () => {
+    const { coreSystemPrompt: core } = await import('../../src/renderer/uki/identity');
+    expect(core()).toContain('Ada Lovelace');
+    expect(core()).toContain('Do not mention Ada Lovelace');
+  });
+  it('knows her creator and says so only when asked', async () => {
+    const { isCreatorQuestion, creatorAnswer } = await import('../../src/renderer/uki/identity');
+    for (const q of ['Who made you?', 'who created DEX', "What's your creator's name? who is your creator", 'who built uki']) expect(isCreatorQuestion(q)).toBe(true);
+    for (const q of ['who are you', 'make a note', 'who won the match']) expect(isCreatorQuestion(q)).toBe(false);
+    expect(creatorAnswer()).toContain('Onazi Treasure OJ');
+  });
+});

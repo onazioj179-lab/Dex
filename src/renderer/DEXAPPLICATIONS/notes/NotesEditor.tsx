@@ -88,6 +88,9 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'italic', label: 'Italic', icon: 'I', glyph: 'italic', command: 'italic', shortcut: `${_M}+I` },
     { id: 'underline', label: 'Underline', icon: 'U', glyph: 'underline', command: 'underline', shortcut: `${_M}+U` },
     { id: 'strikethrough', label: 'Strikethrough', icon: 'S', glyph: 'strikethrough', command: 'strikeThrough' },
+    { id: 'superscript', label: 'Superscript', icon: 'x²', command: 'superscript' },
+    { id: 'subscript', label: 'Subscript', icon: 'x₂', command: 'subscript' },
+    { id: 'clear-format', label: 'Clear Formatting', icon: 'T×', command: 'removeFormat' },
   ],
   [
     { id: 'h1', label: 'Heading 1', icon: 'H1', command: 'formatBlock', arg: 'h1' },
@@ -126,6 +129,7 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
     { id: 'align-left', label: 'Align Left', icon: 'AL', glyph: 'align-left', command: 'justifyLeft' },
     { id: 'align-center', label: 'Align Center', icon: 'AC', glyph: 'align-center', command: 'justifyCenter' },
     { id: 'align-right', label: 'Align Right', icon: 'AR', glyph: 'align-right', command: 'justifyRight' },
+    { id: 'align-justify', label: 'Justify', icon: 'AJ', glyph: 'align-justify', command: 'justifyFull' },
   ],
 ];
 
