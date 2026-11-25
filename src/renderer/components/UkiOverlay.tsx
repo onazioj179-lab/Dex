@@ -12,6 +12,8 @@
  * screen reading, improved TTS/STT, and accessibility tools
  */
 import { detectEmotion, isDateQuestion, isLocalTimeQuestion, type EmotionType } from '../uki/localIntents';
+import { parseNoteRequest, parseSummarizeRequest, isReasoningRequest, summarizeText, describeReasoning, sentences } from '../uki/assistive';
+import { sendToNotes } from '../services/sendTo';
 import { discoverEasterEgg } from '../services/easterEggs';
 import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { AssistedTextarea } from './AssistedTextarea';
@@ -97,6 +99,10 @@ function handleSlashCommand(text: string): SlashResult | null {
         try { window.dispatchEvent(new CustomEvent('uki:files-search', { detail: { query: arg } })); } catch { /* best effort */ }
       }
       return { intent: 'slash-find', reply: arg ? `Searching files for “${arg}”…` : 'Files opened. Type a query.' };
+    }
+    case 'summarize': case 'summarise': {
+      if (!arg) return { intent: 'slash-summarize', reply: 'Usage: /summarize <text>. Or just say "summarize this" to summarize what is open.' };
+      return { intent: 'slash-summarize', reply: `Summary:\n${summarizeText(arg)}` };
     }
     case 'run': {
       tryLaunchApp('workflows');
@@ -1382,7 +1388,8 @@ const UkiOverlay: React.FC = () => {
   const verb = useSpinnerVerb(spinnerActive, thoughtSteps[thoughtSteps.length - 1]);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [speakResponses, setSpeakResponses] = useState(() => {
-    try { return localStorage.getItem('dex-uki-speak-responses') !== 'false'; } catch { return true; }
+    // Spoken replies only when the user turns them on (speaker button).
+    try { return localStorage.getItem('dex-uki-speak-responses') === 'true'; } catch { return false; }
   });
   const [collapsed, setCollapsed] = useState(false);
 
@@ -1553,6 +1560,13 @@ const UkiOverlay: React.FC = () => {
       pushStep(`Detected tone: ${emotion}`);
     }
 
+    // UKI shows how she reached an answer ONLY when asked.
+    if (isReasoningRequest(text)) {
+      const last = useUkiStore.getState().conversationHistory.slice(-1)[0];
+      streamResponse(last ? describeReasoning(last.thoughtSteps, last.intent) : "I haven't answered anything yet.", 'reasoning', text, false);
+      return;
+    }
+
     // Slash commands take priority (no AI round-trip required)
     pushStep('Checking slash commands');
     const slash = handleSlashCommand(text);
@@ -1574,6 +1588,47 @@ const UkiOverlay: React.FC = () => {
     if (text.startsWith('/')) {
       pushStep('Unknown slash -- falling back to help message');
       streamResponse('Unknown slash command. Type /help to list commands.', 'slash-unknown', text, false);
+      return;
+    }
+
+    // Assistive: save a note, summarize (on-device, no provider needed).
+    const noteBody = parseNoteRequest(text);
+    if (noteBody) {
+      pushStep('Recognized a note request; saving it to Notes');
+      try {
+        await sendToNotes(noteBody, noteBody.split(/[.!?\n]/)[0].slice(0, 60));
+        streamResponse(`Saved to Notes: “${noteBody.length > 120 ? noteBody.slice(0, 117) + '…' : noteBody}”`, 'note', text);
+      } catch {
+        streamResponse("I couldn't save that note. Notes may still be loading; try again in a moment.", 'note', text);
+      }
+      return;
+    }
+    const sumTarget = parseSummarizeRequest(text);
+    if (sumTarget) {
+      let source = '';
+      let label = '';
+      if (sumTarget.kind === 'text') { source = sumTarget.text; }
+      else if (sumTarget.kind === 'last') {
+        const last = useUkiStore.getState().conversationHistory.slice(-1)[0];
+        source = last?.response ?? '';
+        label = 'my last answer';
+      } else if (sumTarget.kind === 'clipboard') {
+        try { source = await navigator.clipboard.readText(); } catch { source = ''; }
+        label = 'your clipboard';
+      } else {
+        const ctx = await getScreenContext();
+        source = ctx.visibleText.join('. ');
+        label = ctx.windowTitle || ctx.activeApp || 'the screen';
+      }
+      const clean = source.replace(/\s+/g, ' ').trim();
+      if (clean.length < 40) {
+        streamResponse(label ? `There isn't enough text in ${label} to summarize.` : 'Give me a bit more text to summarize.', 'summarize', text);
+      } else {
+        const count = sentences(clean).length;
+        pushStep(`Read ${count} sentence${count === 1 ? '' : 's'} from ${label || 'your text'}`);
+        pushStep(count > 3 ? 'Kept the 3 most representative sentences, in their original order (on this device)' : 'Short enough to keep as is');
+        streamResponse(`${label ? `Summary of ${label}` : 'Summary'}:\n${summarizeText(clean)}`, 'summarize', text);
+      }
       return;
     }
 
@@ -2016,29 +2071,7 @@ const UkiOverlay: React.FC = () => {
                     <span style={{ fontSize: 8, color: 'var(--color-error)', fontWeight: 400 }}>failed</span>
                   )}
                 </div>
-                {/* Claude-style thought process (collapsible) */}
-                {turn.intent && (
-                  <button
-                    type="button"
-                    onClick={() => setExpandedThinking(prev => {
-                      const next = new Set(prev);
-                      if (next.has(turn.id)) next.delete(turn.id); else next.add(turn.id);
-                      return next;
-                    })}
-                    aria-expanded={isOpen}
-                    style={{
-                      background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                      fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4,
-                      display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'inherit',
-                      transition: 'color 0.15s ease',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
-                  >
-                    <span style={{ display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }}>{'\u25B8'}</span>
-                    <span>{isOpen ? 'Hide thinking' : 'Show thinking'}</span>
-                  </button>
-                )}
+                {/* No per-answer "Show thinking": reasoning is shown only when asked. */}
                 {isOpen && (
                   <div style={{
                     fontSize: 11, color: 'var(--color-text-tertiary)', fontStyle: 'italic',
@@ -2102,19 +2135,10 @@ const UkiOverlay: React.FC = () => {
                   animation: 'ukiPulse 0.9s ease-in-out infinite',
                 }} />
                 <span style={{ transition: 'opacity 0.2s ease' }}>
-                  {verb}&hellip;{thoughtSteps.length > 0 ? ` · step ${thoughtSteps.length}` : ''}
+                  {verb}&hellip;
                 </span>
               </div>
-              {thoughtSteps.length > 0 && (
-                <ol style={{
-                  margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 1,
-                  fontSize: 10.5, color: 'var(--color-text-tertiary)', lineHeight: 1.4,
-                }}>
-                  {thoughtSteps.slice(-6).map((step, idx) => (
-                    <li key={idx}>{step}</li>
-                  ))}
-                </ol>
-              )}
+              {/* Internal steps are not shown while UKI works; ask "show your thinking" to see them. */}
             </div>
           )}
 
@@ -2305,7 +2329,7 @@ const UkiOverlay: React.FC = () => {
                 e.currentTarget.blur();
               }
             }}
-            placeholder={isThinking ? 'UKI is thinking...' : 'Ask UKI anything   (Enter to send, Shift+Enter for newline)'}
+            placeholder={isThinking ? 'Thinking…' : 'Ask UKI'}
             rows={1}
             style={{
               flex: 1, background: 'var(--color-bg-hover)',
