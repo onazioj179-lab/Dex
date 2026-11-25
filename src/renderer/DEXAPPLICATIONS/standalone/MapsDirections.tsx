@@ -10,7 +10,9 @@
  * (click a step to fly there). Routes come from OSRM (OpenStreetMap data).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
+// Types only: Maps.tsx owns the maplibre runtime import (a runtime import here
+// made a static chunk cycle Maps <-> MapsDirections and failed the build).
+import type * as maplibregl from 'maplibre-gl';
 import DexIcon from '../../components/DexIcon';
 import { SegmentedControl } from '../../components/controls';
 import { canvasColor } from '../../utils/canvasTheme';
@@ -34,6 +36,8 @@ export interface MapsDirectionsProps {
   myLocation: () => Promise<Place | null>;
   top: number;
   onClose: () => void;
+  /** Makes a map marker (supplied by Maps, which loads maplibre). */
+  createMarker: (lon: number, lat: number, color: string) => maplibregl.Marker;
 }
 
 const pill: React.CSSProperties = {
@@ -130,7 +134,7 @@ const Endpoint: React.FC<{
   );
 };
 
-export const MapsDirections: React.FC<MapsDirectionsProps> = ({ map, initialTo, pin, myLocation, top, onClose }) => {
+export const MapsDirections: React.FC<MapsDirectionsProps> = ({ map, initialTo, pin, myLocation, top, onClose, createMarker }) => {
   const [from, setFrom] = useState<Place | null>(null);
   const [to, setTo] = useState<Place | null>(initialTo);
   const [mode, setMode] = useState<TravelMode>(() => {
@@ -197,11 +201,11 @@ export const MapsDirections: React.FC<MapsDirectionsProps> = ({ map, initialTo, 
     if (!map) return;
     endMarkers.current.forEach(m => m.remove());
     endMarkers.current = [];
-    const make = (p: Place, color: string) => new maplibregl.Marker({ color, scale: 0.8 }).setLngLat([p.lon, p.lat]).addTo(map);
+    const make = (p: Place, color: string) => createMarker(p.lon, p.lat, color).addTo(map);
     if (from) endMarkers.current.push(make(from, '#30d158'));
     if (to) endMarkers.current.push(make(to, canvasColor('--color-accent')));
     return () => { endMarkers.current.forEach(m => m.remove()); endMarkers.current = []; };
-  }, [map, from, to]);
+  }, [map, from, to, createMarker]);
 
   const swap = () => { setFrom(to); setTo(from); };
   const flyTo = (lat: number, lon: number) => map?.flyTo({ center: [lon, lat], zoom: 17, duration: isReduceMotion() ? 0 : 600 });

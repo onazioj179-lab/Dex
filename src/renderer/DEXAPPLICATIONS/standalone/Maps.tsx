@@ -590,6 +590,8 @@ const DexMaps: React.FC = () => {
   const locate = useCallback(() => {
     void myLocation().then(p => { if (p) goTo(p.lat, p.lon, p.name, 14); });
   }, [goTo, myLocation]);
+  const createRouteMarker = useCallback((lon: number, lat: number, color: string) =>
+    new maplibregl.Marker({ color, scale: 0.8 }).setLngLat([lon, lat]), []);
   const openDirections = useCallback((to: Place | null) => {
     setDirTo(to);
     setMeasuring(false);
@@ -814,6 +816,7 @@ const DexMaps: React.FC = () => {
           myLocation={myLocation}
           top={unified ? 8 : 58}
           onClose={() => setDrawer(null)}
+          createMarker={createRouteMarker}
         />
       )}
 
