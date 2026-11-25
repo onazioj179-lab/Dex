@@ -22,7 +22,7 @@ import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
 import { DexSearchInput } from '../styles/components';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
-import { DexSwitch, CAPSULE_SELECTED_BG } from '../components/controls';
+import { DexSwitch, CAPSULE_SELECTED_BG, SegmentedControl } from '../components/controls';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
@@ -786,27 +786,12 @@ const TextDensityControls: React.FC<{
           <span style={settingLabel}>Density</span>
           <span style={settingDesc}>Spacing across the whole UI — compact, default, or comfortable</span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }} role="group" aria-label="UI density">
-          {DENSITY_OPTIONS.map(opt => {
-            const active = density === opt.id;
-            return (
-              <button
-                key={opt.id}
-                aria-label={`${opt.label} density`}
-                aria-pressed={active}
-                onClick={() => applyDensity(opt.id)}
-                style={{
-                  padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
-                  background: active ? 'var(--color-bg-active, #252528)' : 'transparent',
-                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          aria-label="UI density"
+          value={density}
+          onChange={applyDensity}
+          options={DENSITY_OPTIONS.map(opt => ({ value: opt.id, label: opt.label }))}
+        />
       </div>
     </>
   );
@@ -829,15 +814,7 @@ const DarkRoomToggle: React.FC<{
         <span style={settingLabel}>Pure black (OLED)</span>
         <span style={settingDesc}>True-black surfaces — eases the eyes in low light and saves power on OLED screens</span>
       </div>
-      <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={on}
-          onChange={e => toggle(e.target.checked)}
-          aria-label="Dark room mode"
-          style={{ accentColor: 'var(--color-accent)', width: 18, height: 18, cursor: 'pointer' }}
-        />
-      </label>
+      <DexSwitch checked={on} onChange={toggle} label="Pure black (OLED)" />
     </div>
   );
 };
@@ -2264,27 +2241,12 @@ export const Settings: React.FC = () => {
           <span style={styles.settingLabel}>Appearance</span>
           <span style={styles.settingDesc}>Dark, light, or follow the system appearance</span>
         </div>
-        <div role="radiogroup" aria-label="Appearance" style={{ display: 'flex', gap: 6 }}>
-          {([['dark', 'Dark'], ['light', 'Light'], ['system', 'Auto']] as const).map(([mode, label]) => {
-            const on = themePref === mode;
-            return (
-              <button
-                key={mode}
-                role="radio"
-                aria-checked={on}
-                onClick={() => setThemePreference(mode)}
-                style={{
-                  padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: on ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                  background: on ? 'var(--color-bg-active)' : 'transparent',
-                  color: on ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          aria-label="Appearance"
+          value={themePref}
+          onChange={(mode) => setThemePreference(mode)}
+          options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'Auto' }]}
+        />
       </div>
 
       <h3 style={styles.sectionTitle}>Accent Color</h3>

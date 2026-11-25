@@ -21,6 +21,9 @@ type GestureType =
   | 'three-finger-swipe-left'
   | 'three-finger-swipe-right'
   | 'three-finger-swipe-up'
+  | 'three-finger-swipe-down'
+  /** One finger from the bottom screen edge upward (iPad / phone home gesture). */
+  | 'edge-swipe-up'
   | 'touch-drag';
 
 type PressureCurvePreset = 'linear' | 'soft' | 'firm';
@@ -75,6 +78,10 @@ const TOUCH_DRAG_DELAY_MS = 200;
 const DOUBLE_TAP_MS = 300;
 const TAP_DISTANCE_THRESHOLD = 10;
 const SWIPE_THRESHOLD = 50;
+/** A bottom-edge swipe must start this close to the screen edge ... */
+const EDGE_START_PX = 24;
+/** ... and travel this far up. */
+const EDGE_SWIPE_DISTANCE = 72;
 const PINCH_THRESHOLD = 10;
 const PALM_AREA_THRESHOLD = 400;
 const STYLUS_TIMEOUT_MS = 2000;
@@ -102,6 +109,8 @@ class GestureRecognizer {
   /** One system pinch/spread or swipe-up per gesture, not one per pointermove. */
   private pinchLatched = false;
   private swipeUpLatched = false;
+  private swipeDownLatched = false;
+  private edgeUpLatched = false;
   private contactListeners: Set<(count: number) => void> = new Set();
 
   attach(element: HTMLElement): void {
@@ -184,7 +193,7 @@ class GestureRecognizer {
     if ((e.pointerType === 'touch' && e.isPrimary) || e.pointerType === 'mouse') {
       for (const [id, p] of this.pointers) if (p.type === e.pointerType) this.pointers.delete(id);
     }
-    if (this.pointers.size === 0) { this.pinchLatched = false; this.swipeUpLatched = false; }
+    if (this.pointers.size === 0) { this.pinchLatched = false; this.swipeUpLatched = false; this.swipeDownLatched = false; this.edgeUpLatched = false; }
     if (!this.pointers.has(e.pointerId) && this.pointers.size >= MAX_CONTACTS) return;
 
     const startEl = e.target as Element | null;
@@ -296,6 +305,16 @@ class GestureRecognizer {
       }
     }
 
+    // One finger dragged up from the bottom screen edge (touch only).
+    if (this.pointers.size === 1 && !this.edgeUpLatched) {
+      const p = Array.from(this.pointers.values())[0];
+      const fromEdge = typeof window !== 'undefined' && p.startY >= window.innerHeight - EDGE_START_PX;
+      if (p.type === 'touch' && fromEdge && p.startY - p.currentY > EDGE_SWIPE_DISTANCE && Math.abs(p.currentX - p.startX) < p.startY - p.currentY) {
+        this.edgeUpLatched = true;
+        this.emit({ type: 'edge-swipe-up', centerX: p.currentX, centerY: p.currentY, deltaY: p.currentY - p.startY, target: p.target, onDesktop: true });
+      }
+    }
+
     if (this.pointers.size === 3) {
       const pts = Array.from(this.pointers.values());
       const avgDeltaX = pts.reduce((s, p) => s + (p.currentX - p.startX), 0) / 3;
@@ -314,6 +333,16 @@ class GestureRecognizer {
           p.startX = p.currentX;
           p.startY = p.currentY;
         }
+      } else if (!this.swipeDownLatched && avgDeltaY > SWIPE_THRESHOLD && Math.abs(avgDeltaY) > Math.abs(avgDeltaX)) {
+        this.swipeDownLatched = true;
+        this.emit({
+          type: 'three-finger-swipe-down',
+          centerX: pts[0].currentX,
+          centerY: pts[0].currentY,
+          deltaY: avgDeltaY,
+          target: pts[0].target,
+          onDesktop: this.onDesktop(pts),
+        });
       } else if (!this.swipeUpLatched && avgDeltaY < -SWIPE_THRESHOLD && Math.abs(avgDeltaY) > Math.abs(avgDeltaX)) {
         this.swipeUpLatched = true;
         this.emit({

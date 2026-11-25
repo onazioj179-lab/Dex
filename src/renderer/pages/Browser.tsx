@@ -3591,10 +3591,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   searchInput: {
     width: '100%',
-    padding: '11px 18px',
-    background: 'var(--color-bg-hover)',
-    border: '1px solid var(--color-border-subtle)',
-    borderRadius: '10px',
+    height: 44,
+    padding: '0 20px',
+    // Same pill as the App Menu search (one search shape across DEX).
+    background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)',
+    border: '1px solid transparent',
+    borderRadius: 9999,
     color: 'var(--color-text-primary)',
     fontSize: '14px',
     outline: 'none',

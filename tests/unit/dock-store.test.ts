@@ -11,15 +11,19 @@ import { computeWorkArea } from '../../src/shared/shell/workArea';
 
 describe('Dock prefs', () => {
   it('defaults to the Morphing Dock at the bottom, folded with auto-collapse on (owner 2026-11-17), no padding', () => {
-    expect(sanitizeDockPrefs(null)).toEqual({ style: 'morphing', edge: 'bottom', align: 'center', autoCollapse: true, expanded: false, workspacePadding: 0 });
+    expect(sanitizeDockPrefs(null)).toEqual({ style: 'morphing', edge: 'bottom', align: 'center', autoCollapse: true, expanded: false, workspacePadding: 0, free: null });
   });
   it('old saved prefs take the new auto-collapse default once; marked prefs keep the user choice', () => {
     expect(sanitizeDockPrefs({ autoCollapse: false, expanded: true }).autoCollapse).toBe(true);
     expect(sanitizeDockPrefs({ autoCollapse: false, expanded: true, acV2: true })).toMatchObject({ autoCollapse: false, expanded: true });
   });
   it('rejects junk from storage', () => {
-    expect(sanitizeDockPrefs({ style: 'x', edge: 'center', align: 'middle', autoCollapse: 'yes', workspacePadding: 500, acV2: true }))
-      .toEqual({ style: 'morphing', edge: 'bottom', align: 'center', autoCollapse: false, expanded: true, workspacePadding: 48 });
+    expect(sanitizeDockPrefs({ style: 'x', edge: 'center', align: 'middle', autoCollapse: 'yes', workspacePadding: 500, free: { x: 'a', y: 2 }, acV2: true }))
+      .toEqual({ style: 'morphing', edge: 'bottom', align: 'center', autoCollapse: false, expanded: true, workspacePadding: 48, free: null });
+  });
+  it('keeps a free position inside the screen', () => {
+    expect(sanitizeDockPrefs({ free: { x: 1.7, y: -0.2 } }).free).toEqual({ x: 1, y: 0 });
+    expect(sanitizeDockPrefs({ free: { x: 0.25, y: 0.5 } }).free).toEqual({ x: 0.25, y: 0.5 });
   });
   it('saves a new position without resetting expanded and collapse preferences', () => {
     const store = useDockStore.getState();

@@ -112,7 +112,10 @@ mod native_signals {
     use serde_json::json;
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         ICoreWebView2, COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_RESOURCE_CONTEXT,
-        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH,
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER,
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_PING, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT,
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST,
     };
     use webview2_com::{
         ContainsFullScreenElementChangedEventHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
@@ -150,10 +153,29 @@ mod native_signals {
             let env = pw.environment();
             let mut token = 0i64;
 
-            // Network-level ad/tracker blocking (crate::browser_block decides).
-            // Every request passes through here; a block answers 403 locally so
-            // nothing leaves the machine, and the owning window is told.
-            let _ = core.AddWebResourceRequestedFilter(windows_core::w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+            // Network-level ad/tracker blocking (crate::browser_block decides); a
+            // block answers 403 locally so nothing leaves the machine.
+            //
+            // Speed: an intercepted request waits for this handler on DEX's UI
+            // thread, so intercepting everything ("*" + CONTEXT_ALL) made every
+            // image, video chunk, font and stylesheet queue behind the shell --
+            // the "browsing is slow" complaint. Only the kinds ads and trackers
+            // use are intercepted now (media, fonts, styles and documents load
+            // natively; documents were never blocked anyway), nothing at all is
+            // intercepted while blocking is off, and the handler rejects
+            // unlisted hosts before touching anything else.
+            if crate::browser_block::active() {
+                for ctx in [
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_PING,
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER,
+                ] {
+                    let _ = core.AddWebResourceRequestedFilter(windows_core::w!("*"), ctx);
+                }
+            }
             let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
             let _ = core.add_WebResourceRequested(
                 &WebResourceRequestedEventHandler::create(Box::new(move |sender, args| {
@@ -162,6 +184,9 @@ mod native_signals {
                     let mut uri = PWSTR::null();
                     req.Uri(&mut uri)?;
                     let uri = webview2_com::take_pwstr(uri);
+                    if !crate::browser_block::listed(&uri) {
+                        return Ok(());
+                    }
                     let mut ctx = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     let _ = args.ResourceContext(&mut ctx);
                     let mut src = PWSTR::null();

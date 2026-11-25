@@ -587,7 +587,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
               padding: '0 2px',
             }}
           >
-            {sortDirection === 'asc' ? 'ASC' : 'DESC'}
+            {sortDirection === 'asc' ? '↑' : '↓'}
           </button>
         </div>
       </div>

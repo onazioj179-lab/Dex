@@ -3206,26 +3206,13 @@ html[data-perf-tier="low"] * {
      stays on every tier. */
   text-shadow: none !important;
 }
-html[data-perf-tier="low"] *,
-html[data-perf-tier="low"] *::before,
-html[data-perf-tier="low"] *::after {
-  animation: none !important;
-  transition: none !important;
-}
+/* (Low tier used to force animation:none / transition:none on every element,
+   which froze loading spinners and status rings so the UI looked stuck.
+   Transitions are already zeroed through the motion tokens on this tier --
+   TierManager animationDurationScale 0 -- and functional animations keep
+   running.) */
 
 /* Low-end: replace all backdrop-filter with solid backgrounds */
-html[data-perf-tier="low"] * {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-/* Low-end: disable non-essential animations */
-html[data-perf-tier="low"] *,
-html[data-perf-tier="low"] *::before,
-html[data-perf-tier="low"] *::after {
-  animation-duration: 0.01ms !important;
-  transition-duration: 50ms !important;
-}
 
 /* Low-end: cards/list-items/buttons keep their depth too (cheap static shadows).
    The old rule stripped them, which read as flat/cheap on low-end hardware. */
@@ -4327,13 +4314,17 @@ button[aria-disabled="true"],
   cursor: pointer;
   transition: background 0.15s ease, outline-color 0.15s ease;
 }
-[role="listbox"] [role="option"][aria-selected="true"],
-[role="tablist"] [role="tab"][aria-selected="true"] {
-  background: rgba(var(--color-accent-rgb, 74, 158, 255), 0.15);
+/* Default selection tint only: :where() keeps it at zero specificity so a
+   component's own selected style always wins. (It used an undefined
+   --color-accent-rgb, so every selected option/tab fell back to the old
+   dark-theme blue, in light mode too, and beat components' own styles.) */
+:where([role="listbox"] [role="option"][aria-selected="true"],
+       [role="tablist"] [role="tab"][aria-selected="true"]) {
+  background: var(--color-accent-light);
 }
 /* Roving tabindex visual */
 [data-roving-focused="true"] {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-bg-hover);
   outline: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -4383,8 +4374,8 @@ button[aria-disabled="true"],
   font-size: 11px;
   font-weight: 500;
   border-radius: var(--radius-full);
-  background: rgba(var(--color-accent-rgb, 74, 158, 255), 0.15);
-  color: var(--color-accent, #4a9eff);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
   line-height: 1;
 }
 .tahoe-badge--success { background: rgba(48, 209, 88, 0.15); color: #30d158; }

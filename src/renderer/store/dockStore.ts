@@ -34,6 +34,9 @@ export interface DockPrefs {
   expanded: boolean;
   /** Extra space around the window area, px (0-48). */
   workspacePadding: number;
+  /** Free placement: the folded Dock's centre as a fraction of the screen
+   *  (0-1). null = docked to an edge (edge/align). */
+  free: { x: number; y: number } | null;
 }
 
 export const DEFAULT_DOCK_PREFS: DockPrefs = {
@@ -45,6 +48,7 @@ export const DEFAULT_DOCK_PREFS: DockPrefs = {
   autoCollapse: true,
   expanded: false,
   workspacePadding: 0,
+  free: null,
 };
 
 export function sanitizeDockPrefs(v: unknown): DockPrefs {
@@ -59,7 +63,15 @@ export function sanitizeDockPrefs(v: unknown): DockPrefs {
     autoCollapse: migrate ? true : o.autoCollapse === true,
     expanded: migrate ? false : o.expanded !== false,
     workspacePadding: Math.max(0, Math.min(48, Math.round(Number(o.workspacePadding) || 0))),
+    free: sanitizeFree(o.free),
   };
+}
+
+function sanitizeFree(v: unknown): DockPrefs['free'] {
+  if (!v || typeof v !== 'object') return null;
+  const { x, y } = v as { x?: unknown; y?: unknown };
+  if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
 }
 
 function load(): DockPrefs {
@@ -75,8 +87,8 @@ interface DockState extends DockPrefs {
 }
 
 function persist(s: DockPrefs): void {
-  const { style, edge, align, autoCollapse, expanded, workspacePadding } = s;
-  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, align, autoCollapse, expanded, workspacePadding, acV2: true })); } catch { /* storage full */ }
+  const { style, edge, align, autoCollapse, expanded, workspacePadding, free } = s;
+  try { localStorage.setItem(KEY, JSON.stringify({ style, edge, align, autoCollapse, expanded, workspacePadding, free, acV2: true })); } catch { /* storage full */ }
 }
 
 export const useDockStore = create<DockState>((set, get) => ({

@@ -443,7 +443,7 @@ const Calculator: React.FC = () => {
             placeholder="Try 5 km in mi or today + 30d"
             aria-label="Natural calculation input"
           />
-          <button type="button" className="dex-calc-key dex-calc-key--equal" onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ width: 44, minHeight: 36 }}>=</button>
+          <button type="button" className="dex-calc-key dex-calc-key--equal" onClick={runNatural} aria-label="Evaluate expression" title="Evaluate" style={{ width: 44, minHeight: 36, borderRadius: 9999 }}>=</button>
         </div>
         {/* Display */}
         <div style={styles.displayArea}>
@@ -578,25 +578,25 @@ const CALC_CSS = `
 .dex-calc-key {
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%; min-height: 40px;
-  border: 1px solid transparent; border-radius: var(--radius-lg, 14px);
-  font: 500 17px/1 var(--dex-font-ui); font-variant-numeric: tabular-nums;
+  border: 0; border-radius: 9999px;
+  font: 500 19px/1 var(--dex-font-ui); font-variant-numeric: tabular-nums;
   cursor: pointer; user-select: none;
   transition: background-color 120ms ease, transform 120ms cubic-bezier(0.2, 0, 0, 1), filter 120ms ease;
 }
-.dex-calc-key--num { background: var(--color-bg-surface); color: var(--color-text-primary); border-color: var(--color-border-subtle); }
+/* Apple-calculator layout in DEX tokens: borderless pills, digits on a soft
+   fill, functions a step stronger, operators solid accent (inverted while
+   pending), equals solid accent. */
+.dex-calc-key--num { background: color-mix(in srgb, var(--color-text-primary) 7%, transparent); color: var(--color-text-primary); }
 .dex-calc-key--func {
-  background: color-mix(in srgb, var(--color-text-primary) 9%, var(--color-bg-surface));
-  color: var(--color-text-primary); font-size: 15px;
+  background: color-mix(in srgb, var(--color-text-primary) 15%, transparent);
+  color: var(--color-text-primary); font-size: 16px;
 }
-.dex-calc-key--op {
-  background: var(--color-accent-light); color: var(--color-accent);
-  font-size: 20px;
-}
-.dex-calc-key--op.is-pressed { background: var(--color-accent-fill); color: var(--color-accent-text, #fff); }
-.dex-calc-key--equal { background: var(--color-accent-fill); color: var(--color-accent-text, #fff); font-size: 20px; }
-.dex-calc-key:hover { filter: brightness(1.06); }
-:root[data-theme="light"] .dex-calc-key:hover, .light-mode .dex-calc-key:hover { filter: brightness(0.96); }
-.dex-calc-key:active { transform: scale(0.95); }
+.dex-calc-key--op { background: var(--color-accent-fill); color: var(--color-accent-text, #fff); font-size: 22px; }
+.dex-calc-key--op.is-pressed { background: var(--color-accent-text, #fff); color: var(--color-accent-fill); box-shadow: inset 0 0 0 1.5px var(--color-accent-fill); }
+.dex-calc-key--equal { background: var(--color-accent-fill); color: var(--color-accent-text, #fff); font-size: 22px; }
+.dex-calc-key:hover { filter: brightness(1.08); }
+:root[data-theme="light"] .dex-calc-key:hover, .light-mode .dex-calc-key:hover { filter: brightness(0.94); }
+.dex-calc-key:active { transform: scale(0.97); }
 .dex-calc-seg {
   height: 26px; padding: 0 var(--space-3); border: none; border-radius: var(--radius-sm, 6px);
   background: transparent; color: var(--color-text-secondary);
@@ -610,9 +610,9 @@ const CALC_CSS = `
 }
 .dex-calc-icon:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
 .dex-calc-input {
-  flex: 1; min-width: 0; height: 36px; padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md, 10px);
-  background: var(--color-bg-surface); color: var(--color-text-primary);
+  flex: 1; min-width: 0; height: 36px; padding: 0 var(--space-4);
+  border: 0; border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); color: var(--color-text-primary);
   font: 13px var(--dex-font-ui); outline: none;
 }
 .dex-calc-link {
@@ -622,7 +622,7 @@ const CALC_CSS = `
 .dex-calc-history-item {
   display: block; width: 100%; text-align: right; padding: var(--space-3);
   margin-bottom: var(--space-2); border-radius: var(--radius-md, 10px);
-  background: var(--color-bg-surface); border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent); border: 0;
   color: inherit; cursor: pointer; font-family: var(--dex-font-ui);
 }
 .dex-calc-history-item:hover { background: var(--color-bg-hover); }
@@ -683,9 +683,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     justifyContent: 'flex-end',
     position: 'relative',
-    borderRadius: 'var(--radius-lg, 14px)',
-    background: 'var(--color-bg-surface)',
-    border: '1px solid var(--color-border-subtle)',
+    // The result floats on the window, no card around it (Apple).
+    background: 'transparent',
   },
   expression: {
     fontSize: 13,

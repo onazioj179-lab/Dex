@@ -189,3 +189,45 @@ describe('GestureRecognizer (global)', () => {
     root.remove();
   });
 });
+
+describe('GestureRecognizer: home and desktop gestures', () => {
+  const pe = (type: string, id: number, x: number, y: number, init: Partial<PointerEventInit> = {}) =>
+    new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, isPrimary: false, ...init });
+
+  it('emits edge-swipe-up once for a touch drag up from the bottom edge, not from mid-screen', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const g = new GestureRecognizer();
+    g.attach(root);
+    const seen: string[] = [];
+    g.on('edge-swipe-up', (e) => seen.push(e.type));
+    const bottom = window.innerHeight - 4;
+    root.dispatchEvent(pe('pointerdown', 21, 300, bottom, { isPrimary: true }));
+    for (let y = bottom - 20; y > bottom - 200; y -= 20) root.dispatchEvent(pe('pointermove', 21, 302, y));
+    root.dispatchEvent(pe('pointerup', 21, 302, bottom - 200));
+    // Same drag from the middle of the screen: no gesture.
+    root.dispatchEvent(pe('pointerdown', 22, 300, 300, { isPrimary: true }));
+    for (let y = 280; y > 100; y -= 20) root.dispatchEvent(pe('pointermove', 22, 300, y));
+    root.dispatchEvent(pe('pointerup', 22, 300, 100));
+    expect(seen).toEqual(['edge-swipe-up']);
+  });
+
+  it('emits three-finger-swipe-down once per gesture', () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const g = new GestureRecognizer();
+    g.attach(root);
+    const seen: string[] = [];
+    g.on('three-finger-swipe-down', (e) => seen.push(e.type));
+    root.dispatchEvent(pe('pointerdown', 31, 100, 100, { isPrimary: true }));
+    root.dispatchEvent(pe('pointerdown', 32, 140, 100));
+    root.dispatchEvent(pe('pointerdown', 33, 180, 100));
+    for (let y = 120; y <= 260; y += 20) {
+      root.dispatchEvent(pe('pointermove', 31, 100, y));
+      root.dispatchEvent(pe('pointermove', 32, 140, y));
+      root.dispatchEvent(pe('pointermove', 33, 180, y));
+    }
+    for (const id of [31, 32, 33]) root.dispatchEvent(pe('pointerup', id, 100, 260));
+    expect(seen).toEqual(['three-finger-swipe-down']);
+  });
+});

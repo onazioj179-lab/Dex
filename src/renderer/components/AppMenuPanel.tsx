@@ -4,7 +4,8 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Sections: Search · Pinned · Recent · All Apps (by category).
+// Launchpad + Spotlight: one search pill over a single app grid (pinned
+// first, then A-Z, each app once). Typing turns the grid into Spotlight results.
 // - Search covers app names, categories and registered quick actions; Enter
 //   runs only the highlighted result, never a guess.
 // - Recent is this device's own launch history (already kept by the shell);
@@ -14,7 +15,6 @@
 
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from './DexIcon';
-import { DexSearchInput } from '../styles/components';
 import { searchApps, type AppSearchHit } from '../services/appRegistry';
 import { spotlightEngine, type SpotlightResult } from '../shell/SpotlightEngine';
 import { appPinning, useMenuPinnedIds } from '../services/appPinning';
@@ -35,10 +35,6 @@ export interface AppMenuPanelProps {
   onClose: () => void;
 }
 
-const header: React.CSSProperties = {
-  gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, letterSpacing: '0.01em', textTransform: 'none',
-  color: 'var(--color-text-tertiary)', padding: 'var(--space-2) 4px 2px', display: 'flex', alignItems: 'center', gap: 6,
-};
 
 export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, currentApp, runningIds, history, renderIcon, onLaunch, onClose }) => {
   const [query, setQuery] = useState('');
@@ -90,7 +86,6 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   const changeQuery = (value: string) => { setActive(0); setQuery(value); };
 
   const pinned = pinnedIds.map(id => byId.get(id)).filter((a): a is MenuApp => !!a);
-  const recent = history.filter(id => id !== 'home' && !pinnedIds.includes(id)).map(id => byId.get(id)).filter((a): a is MenuApp => !!a).slice(0, 6);
 
   const runAt = (i: number) => {
     if (i < hits.length) { runHit(hits[i]); return; }
@@ -112,19 +107,32 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     else if (q && e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(selected - 1, 0)); }
     else if (q && e.key === 'PageDown') { e.preventDefault(); setActive(Math.max(0, Math.min(selected + 5, total - 1))); }
     else if (q && e.key === 'PageUp') { e.preventDefault(); setActive(Math.max(selected - 5, 0)); }
-    else if (q && e.key === 'Enter') { e.preventDefault(); if (total) runAt(selected); }
+    else if (q && e.key === 'Enter') { e.preventDefault(); if (total) rows[selected]?.run(); }
     else if (!q && e.key === 'ArrowDown') { e.preventDefault(); gridRef.current?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus(); }
   };
 
-  const tile = (app: MenuApp, section: 'pinned' | 'recent' | 'all', index?: number) => {
+  // One grid, each app once: pinned apps first (their own order, reorderable),
+  // then everything else A-Z. No section headers, no repeats (Launchpad).
+  const pinnedSet = new Set(pinned.map(a => a.id));
+  const rest = apps.filter(a => !pinnedSet.has(a.id)).sort((x, y) => x.label.localeCompare(y.label));
+  const gridApps: Array<{ app: MenuApp; pinnedIndex?: number }> = [
+    ...pinned.map((app, i) => ({ app, pinnedIndex: i })),
+    ...rest.map(app => ({ app })),
+  ];
+
+  const tile = (app: MenuApp, index?: number) => {
+    const isPinned = index !== undefined;
     const isActive = currentApp === app.id;
     const isRunning = runningIds.has(app.id);
     return (
       <button
-        key={`${section}:${app.id}`}
+        key={app.id}
         type="button"
+        className="dex-lp-tile"
         data-launchpad-app-id={app.id}
-        data-section={section}
+        data-section={isPinned ? 'pinned' : 'all'}
+        data-current={isActive || undefined}
+        data-drop={dragOver === app.id || undefined}
         draggable
         aria-label={`${app.label}${isRunning ? ', running' : ''}`}
         onClick={() => onLaunch(app.id)}
@@ -135,7 +143,7 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
             const r = e.currentTarget.getBoundingClientRect();
             openAppContextMenu({ appId: app.id, x: r.left + 8, y: r.bottom, source: 'menu' });
           }
-          if (section === 'pinned' && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && index !== undefined) {
+          if (isPinned && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
             e.preventDefault(); e.stopPropagation();
             const to = index + (e.key === 'ArrowLeft' ? -1 : 1);
             if (to >= 0 && to < pinned.length) {
@@ -148,36 +156,20 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
           }
         }}
         onDragStart={(e) => { e.dataTransfer.setData(DEX_APP_DRAG_TYPE, app.id); e.dataTransfer.setData('text/plain', app.label); e.dataTransfer.effectAllowed = 'copyMove'; }}
-        onDragOver={(e) => { if (section === 'pinned' && e.dataTransfer.types.includes(DEX_APP_DRAG_TYPE)) { e.preventDefault(); setDragOver(app.id); } }}
+        onDragOver={(e) => { if (isPinned && e.dataTransfer.types.includes(DEX_APP_DRAG_TYPE)) { e.preventDefault(); setDragOver(app.id); } }}
         onDragLeave={() => setDragOver(d => (d === app.id ? null : d))}
         onDrop={(e) => {
-          if (section !== 'pinned') return;
+          if (!isPinned) return;
           e.preventDefault();
           setDragOver(null);
           const dragged = e.dataTransfer.getData(DEX_APP_DRAG_TYPE);
           if (!dragged || dragged === app.id) return;
           appPinning.place('menu', dragged, app.id);
         }}
-        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'var(--color-bg-hover)' : 'transparent'; }}
-        style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-          padding: '8px 4px', borderRadius: 10, width: '100%',
-          background: isActive ? 'var(--color-bg-hover)' : 'transparent',
-          border: 'none', cursor: 'pointer', transition: 'background 0.12s ease',
-          boxShadow: dragOver === app.id ? 'inset 2px 0 0 var(--color-accent)' : 'none',
-        }}
       >
-        <div style={{
-          color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 40, height: 40, borderRadius: 10,
-          background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)',
-          overflow: 'hidden',
-        }}>
-          {renderIcon(app.id, 22)}
-        </div>
-        <span style={{ fontSize: 10, color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: isActive ? 600 : 400, textAlign: 'center', lineHeight: 1.2, letterSpacing: '-0.01em', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.label}</span>
-        <div aria-hidden="true" style={{ width: 4, height: 4, borderRadius: '50%', background: isRunning ? 'var(--color-text-secondary)' : 'transparent', marginTop: -3 }} />
+        <span className="dex-lp-icon">{renderIcon(app.id, 26)}</span>
+        <span className="dex-lp-label">{app.label}</span>
+        <span className="dex-lp-dot" aria-hidden="true" data-on={isRunning || undefined} />
       </button>
     );
   };
@@ -206,107 +198,170 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     btns[next]?.focus();
   };
 
+  // Spotlight-style results: a Top Hit, then small group labels.
+  type Row = { key: string; i: number; title: string; sub: string; icon: React.ReactNode; group: string; run: () => void; context?: (e: React.MouseEvent) => void };
+  const ranked: Row[] = [
+    ...hits.map((h, i): Row => ({
+      key: `${h.kind}:${h.appId}:${h.actionId ?? ''}`, i,
+      title: h.label,
+      sub: h.kind === 'action' ? h.detail || '' : (runningIds.has(h.appId) ? 'Running' : h.detail || ''),
+      icon: h.kind === 'app' ? renderIcon(h.appId, 18) : <DexIcon name={h.icon} size={16} color="currentColor" />,
+      group: h.kind === 'action' ? 'Actions' : 'Applications',
+      run: () => runHit(h),
+      context: (e) => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); },
+    })),
+    ...more.map((m, k): Row => {
+      const group = m.category === 'settings' || m.id.startsWith('setting-') ? 'Settings'
+        : m.id.startsWith('codeproject-') || m.category === 'projects' ? 'Projects'
+        : m.id.startsWith('uki-ask-') ? 'UKI'
+        : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'Files'
+        : m.category === 'notes' || m.id.startsWith('note-') ? 'Notes' : 'Commands';
+      return { key: m.id, i: hits.length + k, title: m.title, sub: m.subtitle || '', icon: <DexIcon name={m.icon || 'search'} size={16} color="currentColor" />, group, run: () => runAt(hits.length + k) };
+    }),
+  ];
+  // Best match first (Top Hit), then the rest grouped by kind in the order the
+  // groups first appear; the keyboard index follows this visual order.
+  const rows: Row[] = (() => {
+    if (!ranked.length) return ranked;
+    const [top, ...others] = ranked;
+    const order: string[] = [];
+    for (const r of others) if (!order.includes(r.group)) order.push(r.group);
+    return [top, ...order.flatMap(g => others.filter(r => r.group === g))].map((r, n) => ({ ...r, i: n }));
+  })();
+
   return (
     <>
-      <div style={{ flex: '0 0 auto', paddingBottom: 'var(--space-3)' }}>
-        <DexSearchInput
+      <style>{LAUNCHPAD_CSS}</style>
+      <div className="dex-lp-search">
+        <DexIcon name="search" size={17} color="currentColor" />
+        <input
           ref={inputRef}
-          size="md"
-          fullWidth
-          reserveClearSpace
           role="combobox"
           aria-expanded={!!q}
           aria-controls={q ? resultsId : undefined}
           aria-activedescendant={q && total ? `${resultsId}-${selected}` : undefined}
           aria-autocomplete="list"
           aria-label="Search apps and actions"
-          placeholder="Search apps, files, notes, and settings"
+          placeholder="Search apps, files, notes and settings"
           value={query}
           onChange={e => changeQuery(e.target.value)}
           onKeyDown={onSearchKey}
-          onClear={() => { changeQuery(''); inputRef.current?.focus(); }}
           autoComplete="off"
           spellCheck={false}
         />
+        {/* Always laid out (hidden when empty) so the field never resizes as you type. */}
+        <button type="button" className="dex-lp-clear" aria-label="Clear search" tabIndex={query ? 0 : -1} aria-hidden={!query || undefined}
+          style={{ visibility: query ? 'visible' : 'hidden' }} onClick={() => { changeQuery(''); inputRef.current?.focus(); }}>
+          <DexIcon name="close" size={11} color="currentColor" />
+        </button>
       </div>
-      <div ref={scrollRef} className="spotlight-results-scroll"
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable' }}>
+      <div ref={scrollRef} className="dex-lp-scroll">
       {q ? (
-        <div id={resultsId} role="listbox" aria-label="Results">
+        <div id={resultsId} role="listbox" aria-label="Results" className="dex-lp-results">
           {!hasMatches && (
-            <div role="status" style={{ color: 'var(--color-text-tertiary)', fontSize: 13, textAlign: 'center', padding: 'var(--space-5) 0', overflowWrap: 'anywhere' }}>Nothing matches &ldquo;{q}&rdquo;</div>
+            <div role="status" className="dex-lp-empty">Nothing matches &ldquo;{q}&rdquo;</div>
           )}
-          {hits.map((h, i) => (
-            <div
-              key={`${h.kind}:${h.appId}:${h.actionId ?? ''}`}
-              id={`${resultsId}-${i}`}
-              role="option"
-              aria-selected={i === selected}
-              onMouseMove={() => setActive(i)}
-              onClick={() => runHit(h)}
-              onContextMenu={e => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                background: i === selected ? 'var(--color-accent-light)' : 'transparent',
-              }}
-            >
-              <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)', overflow: 'hidden' }}>
-                {h.kind === 'app' ? renderIcon(h.appId, 16) : <DexIcon name={h.icon} size={14} color="currentColor" />}
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.label}</span>
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-tertiary)' }}>{h.kind === 'action' ? `Action · ${h.detail}` : h.detail || 'App'}</span>
-              </span>
-              {runningIds.has(h.appId) && h.kind === 'app' && <span style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)' }}>Running</span>}
-            </div>
-          ))}
-          {more.map((m, k) => {
-            const i = hits.length + k;
-            const kind = m.category === 'settings' || m.id.startsWith('setting-') ? 'Setting'
-              : m.id.startsWith('codeproject-') || m.category === 'projects' ? 'Project'
-              : m.id.startsWith('uki-ask-') ? 'UKI'
-              : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'File'
-              : m.category === 'notes' || m.id.startsWith('note-') ? 'Note' : 'Command';
+          {rows.map((r, n) => {
+            const top = n === 0 && hasMatches;
+            // A label above the first row of each group (the Top Hit has its own).
+            const showGroup = !top && (n === 0 || n === 1 || rows[n - 1].group !== r.group);
             return (
-              <div
-                key={m.id}
-                id={`${resultsId}-${i}`}
-                role="option"
-                aria-selected={i === selected}
-                onMouseMove={() => setActive(i)}
-                onClick={() => runAt(i)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: i === selected ? 'var(--color-accent-light)' : 'transparent' }}
-              >
-                <span style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)' }}>
-                  <DexIcon name={m.icon || 'search'} size={14} color="currentColor" />
-                </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kind}{m.subtitle ? ` · ${m.subtitle}` : ''}</span>
-                </span>
-              </div>
+              <React.Fragment key={r.key}>
+                {top && <div role="presentation" className="dex-lp-group">Top Hit</div>}
+                {showGroup && <div role="presentation" className="dex-lp-group">{r.group}</div>}
+                <div
+                  id={`${resultsId}-${r.i}`}
+                  role="option"
+                  aria-selected={r.i === selected}
+                  className={top ? 'dex-lp-row dex-lp-row-top' : 'dex-lp-row'}
+                  onMouseMove={() => setActive(r.i)}
+                  onClick={r.run}
+                  onContextMenu={r.context}
+                >
+                  <span className="dex-lp-row-icon">{r.icon}</span>
+                  <span className="dex-lp-row-text">
+                    <span className="dex-lp-row-title">{r.title}</span>
+                    {r.sub && <span className="dex-lp-row-sub">{r.sub}</span>}
+                  </span>
+                </div>
+              </React.Fragment>
             );
           })}
         </div>
       ) : (
-        <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(68px, 1fr))', columnGap: 2, rowGap: 4 }} aria-label="Applications" data-launchpad-grid="" onKeyDown={onGridKey}>
-          <div role="presentation" style={header}>Pinned</div>
-          {pinned.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 4px 8px' }}>Right-click an app and choose Pin to App Menu.</div>
-          )}
-          {pinned.map((a, i) => tile(a, 'pinned', i))}
-          {recent.length > 0 && <div role="presentation" style={header}>Recent</div>}
-          {recent.map(a => tile(a, 'recent'))}
-          <div role="presentation" style={header}>All apps</div>
-          {categories.map(cat => (
-            <React.Fragment key={cat.label}>
-              <div role="presentation" style={{ ...header, fontSize: 10, letterSpacing: '0.01em', textTransform: 'none', fontWeight: 500, padding: '6px 4px 0' }}>{cat.label}</div>
-              {cat.apps.map(a => tile(a, 'all'))}
-            </React.Fragment>
-          ))}
+        <div ref={gridRef} className="dex-lp-grid" aria-label="Applications" data-launchpad-grid="" onKeyDown={onGridKey}>
+          {gridApps.map(({ app, pinnedIndex }) => tile(app, pinnedIndex))}
         </div>
       )}
       </div>
     </>
   );
 };
+
+// Launchpad + Spotlight, one surface. Scoped to .dex-lp-* (apps stay mounted;
+// nothing here may restyle other UI). Colours are theme tokens only.
+const LAUNCHPAD_CSS = `
+.dex-lp-search {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  height: 44px; padding: 0 8px 0 16px; margin-bottom: 18px; border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  color: var(--color-text-tertiary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  transition: box-shadow 150ms var(--ease-out);
+}
+.dex-lp-search:focus-within { background: color-mix(in srgb, var(--color-text-primary) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 16%, transparent); }
+.dex-lp-search input {
+  flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 15px; letter-spacing: -0.01em; color: var(--color-text-primary);
+}
+.dex-lp-search input::placeholder { color: var(--color-text-tertiary); }
+.dex-lp-clear {
+  width: 22px; height: 22px; border-radius: 9999px; border: 0; display: grid; place-items: center; cursor: pointer;
+  background: color-mix(in srgb, var(--color-text-primary) 14%, transparent); color: var(--color-text-primary);
+}
+.dex-lp-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -8px; padding: 0 8px; }
+.dex-lp-scroll::-webkit-scrollbar { width: 6px; }
+.dex-lp-scroll::-webkit-scrollbar-button { display: none; height: 0; }
+.dex-lp-scroll::-webkit-scrollbar-thumb { border-radius: 9999px; background: color-mix(in srgb, var(--color-text-primary) 18%, transparent); }
+.dex-lp-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 14px; column-gap: 4px; padding-bottom: 8px; }
+.dex-lp-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0;
+  padding: 6px 2px 2px; border: 0; border-radius: 14px; background: transparent; box-shadow: none;
+  color: var(--color-text-primary); cursor: pointer;
+}
+.dex-lp-icon {
+  width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; overflow: hidden;
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  color: var(--color-text-primary);
+  transition: transform 160ms var(--ease-spring), background-color 120ms var(--ease-out);
+}
+.dex-lp-tile:hover .dex-lp-icon { background: color-mix(in srgb, var(--color-text-primary) 11%, transparent); }
+.dex-lp-tile:active .dex-lp-icon { transform: scale(0.97); }
+.dex-lp-tile[data-current] .dex-lp-icon { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-text-primary) 22%, transparent); }
+.dex-lp-tile[data-drop] .dex-lp-icon { box-shadow: 0 0 0 2px var(--color-accent); }
+.dex-lp-label {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11.5px; line-height: 1.2; letter-spacing: -0.005em; color: var(--color-text-primary);
+}
+.dex-lp-dot { width: 4px; height: 4px; margin-top: -3px; border-radius: 9999px; background: transparent; }
+.dex-lp-dot[data-on] { background: var(--color-text-secondary); }
+.dex-lp-results { display: flex; flex-direction: column; gap: 1px; padding-bottom: 8px; }
+.dex-lp-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
+.dex-lp-group:first-child { padding-top: 0; }
+.dex-lp-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; border-radius: 10px; cursor: default; color: var(--color-text-primary); }
+.dex-lp-row-top { min-height: 52px; }
+.dex-lp-row-icon {
+  width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; display: grid; place-items: center; overflow: hidden;
+  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent); color: var(--color-text-primary);
+}
+.dex-lp-row-top .dex-lp-row-icon { width: 36px; height: 36px; border-radius: 10px; }
+.dex-lp-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dex-lp-row-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-lp-row-top .dex-lp-row-title { font-size: 14px; font-weight: 600; }
+.dex-lp-row-sub { font-size: 11px; color: var(--color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-lp-row[aria-selected="true"] { background: var(--color-accent-fill); color: var(--color-accent-text); }
+.dex-lp-row[aria-selected="true"] .dex-lp-row-sub { color: color-mix(in srgb, var(--color-accent-text) 82%, transparent); }
+.dex-lp-row[aria-selected="true"] .dex-lp-row-icon { background: color-mix(in srgb, var(--color-accent-text) 20%, transparent); color: var(--color-accent-text); }
+.dex-lp-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--color-text-tertiary); overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .dex-lp-icon { transition: none; } .dex-lp-tile:active .dex-lp-icon { transform: none; } }
+`;
