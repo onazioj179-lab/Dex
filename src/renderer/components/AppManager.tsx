@@ -1185,7 +1185,7 @@ export const AppManager: React.FC = () => {
       const amount = e.detail.amount ?? 1;
       applyEngagement(s => incrementStat(s, key, amount));
       // Advance any daily challenge tied to this real user action.
-      recordChallengeForStat(key, amount);
+      if (readDexSetting('achievementsEnabled', true)) recordChallengeForStat(key, amount);
     };
     window.addEventListener('dex-stat-bump', handler as EventListener);
     return () => window.removeEventListener('dex-stat-bump', handler as EventListener);
@@ -1212,11 +1212,15 @@ export const AppManager: React.FC = () => {
   // double counting until that per-app call is folded into this central path.
   useEffect(() => {
     if (!currentAppId || currentAppId === 'home') return;
+    // Advance app-usage + app-launch daily challenges for the focused app. This
+    // runs for the creative apps too: their self-recorded usage only covers the
+    // trophy stats, so "Open PRISM" / "Open FLUX" challenges never moved before.
+    if (readDexSetting('achievementsEnabled', true)) {
+      recordChallengeAction('app_usage', currentAppId);
+      recordChallengeAction('action_count', 'app:launch');
+    }
     if (['videoeditor', 'prism', 'flux', 'axl'].includes(currentAppId)) return;
     applyEngagement(s => recordAppUsage(s, currentAppId));
-    // Advance app-usage + app-launch daily challenges for the focused app.
-    recordChallengeAction('app_usage', currentAppId);
-    recordChallengeAction('action_count', 'app:launch');
   }, [currentAppId, applyEngagement]);
 
   // -- App Switcher HUD (Ctrl+Tab visual overlay) --------------------------

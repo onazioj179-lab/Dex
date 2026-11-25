@@ -15,6 +15,8 @@
 import React, { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { toast } from '../../styles/components';
+import { Button } from '../../ui/Button';
+import { DexSwitch } from '../../components/controls';
 import {
   ACHIEVEMENTS, CATEGORY_META, RARITY_META,
   type Achievement, type AchievementCategory, type UserStats,
@@ -28,6 +30,7 @@ import {
 } from '../../services/dailyChallenges';
 import { ACHIEVEMENT_UNLOCKED_EVENT, CHALLENGE_UPDATED_EVENT } from '../../services/achievementEngine';
 import { useDexSetting, writeDexSetting } from '../../hooks/useDexSetting';
+import { visibleAchievements, categoryTotals } from '../../services/achievementTracking';
 import { AchievementBrowser } from './AchievementBrowser';
 
 // DEX Blue Modern tokens, so Trophies follows light/dark and the window
@@ -73,7 +76,10 @@ const Achievements: React.FC = () => {
     };
   }, []);
 
+  // Opening Trophies counts toward the "viewed" trophies -- only while tracking
+  // is on (the toggle promises DEX records no usage when it is off).
   useEffect(() => {
+    if (!tracking) return;
     const updated = { ...engagement };
     const stats = { ...updated.stats };
     stats.achievementsViewed = (stats.achievementsViewed || 0) + 1;
@@ -93,6 +99,8 @@ const Achievements: React.FC = () => {
   );
   const unlockedAt = engagement.unlockedAt || {};
   const byId = useMemo(() => new Map(ACHIEVEMENTS.map(a => [a.id, a])), []);
+  // Only trophies DEX can actually award (plus anything already earned).
+  const visible = useMemo(() => visibleAchievements(unlocked), [unlocked]);
 
   // Recently-unlocked rail (real timestamps), most recent first.
   const recentUnlocks = useMemo(() => {
@@ -108,30 +116,32 @@ const Achievements: React.FC = () => {
     if (recentUnlocks[0]) return { ach: recentUnlocks[0].ach, isUnlocked: true, ts: recentUnlocks[0].ts };
     let best: Achievement | null = null;
     let bestPct = -1;
-    for (const a of ACHIEVEMENTS) {
+    for (const a of visible) {
       if (unlocked.has(a.id) || a.secret) continue;
       const p = a.progress ? a.progress(progressStats) : null;
       const pct = p && p.target > 0 ? p.current / p.target : 0;
       if (pct > bestPct) { bestPct = pct; best = a; }
     }
     return best ? { ach: best, isUnlocked: false, ts: 0 } : null;
-  }, [recentUnlocks, unlocked, progressStats]);
+  }, [recentUnlocks, unlocked, progressStats, visible]);
 
   // Per-category progress (the core "see progress" view, replacing the award list).
   const categoryProgress = useMemo(() => {
-    return (Object.keys(CATEGORY_META) as AchievementCategory[]).map(k => {
-      const meta = CATEGORY_META[k];
-      const inCat = ACHIEVEMENTS.filter(a => a.category === k);
-      const total = inCat.length;
-      const got = inCat.reduce((n, a) => n + (unlocked.has(a.id) ? 1 : 0), 0);
-      return { key: k, title: meta.title, icon: meta.icon, color: 'var(--color-text-secondary)', total, got, pct: total ? (got / total) * 100 : 0 };
-    }).sort((a, b) => b.pct - a.pct);
+    const totals = categoryTotals(unlocked);
+    return (Object.keys(CATEGORY_META) as AchievementCategory[])
+      .map(k => {
+        const meta = CATEGORY_META[k];
+        const { got, total } = totals[k];
+        return { key: k, title: meta.title, icon: meta.icon, total, got, pct: total ? (got / total) * 100 : 0 };
+      })
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.pct - a.pct || b.total - a.total);
   }, [unlocked]);
 
   // "Almost there" — locked trophies with real in-progress measures, nearest first.
   const almostThere = useMemo(() => {
     const arr: { ach: Achievement; cur: number; tgt: number; pct: number }[] = [];
-    for (const a of ACHIEVEMENTS) {
+    for (const a of visible) {
       if (unlocked.has(a.id) || a.secret) continue;
       const p = a.progress ? a.progress(progressStats) : null;
       if (!p || p.target <= 0) continue;
@@ -141,7 +151,7 @@ const Achievements: React.FC = () => {
     }
     arr.sort((x, y) => y.pct - x.pct);
     return arr.slice(0, 4);
-  }, [unlocked, progressStats]);
+  }, [unlocked, progressStats, visible]);
 
   const shareProgress = useCallback(() => {
     const lines = [
@@ -193,7 +203,7 @@ const Achievements: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {engagement.stats.currentStreak > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 10, background: PANEL, border: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 12px', borderRadius: 9999, background: PANEL, border: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600 }}>
                 <DexIcon name="flame" size={15} color={GOLD} />
                 {engagement.stats.currentStreak}d streak
               </div>
@@ -202,25 +212,20 @@ const Achievements: React.FC = () => {
               ['Track progress', tracking, 'achievementsEnabled', 'When off, DEX records no usage for trophies and nothing new unlocks. Earned trophies stay.'],
               ['Notify me', notifyOn, 'achievementNotifications', 'Unlocks go to the Notification Center. Off keeps them quiet.'],
             ] as const).map(([label, on, key, tip]) => (
-              <label key={key} title={tip} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: TXT_DIM, cursor: 'pointer' }}>
-                <input type="checkbox" checked={on} onChange={(e) => writeDexSetting(key, e.target.checked)} aria-label={label} />
-                {label}
-              </label>
+              <div key={key} title={tip} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: TXT_DIM }}>
+                <DexSwitch size="sm" checked={on} onChange={(next) => writeDexSetting(key, next)} label={label} />
+                <span aria-hidden="true">{label}</span>
+              </div>
             ))}
-            <button onClick={shareProgress} title="Copy progress summary" style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10,
-              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
-              background: MONO_FILL, color: 'var(--color-text-primary)',
-            }}>
-              <DexIcon name="share" size={14} color="var(--color-text-primary)" />
-              Share
-            </button>
+            <Button size="sm" variant="secondary" onClick={shareProgress} leftIcon={<DexIcon name="share" size={14} />}>
+              Copy summary
+            </Button>
           </div>
         </header>
 
         {/* Hero: Spotlight + Stats ring */}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
-          <HeroSpotlight spotlight={spotlight} stats={engagement.stats} totalUnlocked={stats.totalUnlocked} />
+          <HeroSpotlight spotlight={spotlight} stats={progressStats as UserStats} totalUnlocked={stats.totalUnlocked} />
           <StatsRing
             completion={stats.completionPercent}
             totalUnlocked={stats.totalUnlocked}
@@ -266,7 +271,6 @@ const Achievements: React.FC = () => {
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 11px' }}>Almost there</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 11 }}>
               {almostThere.map(({ ach, cur, tgt, pct }) => {
-                const meta = RARITY_META[ach.rarity];
                 return (
                   <div key={ach.id} className="tr-card" title={ach.description} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, background: PANEL, border: `1px solid ${BORDER}` }}>
                     <div style={{ width: 40, height: 40, borderRadius: 14, flexShrink: 0, background: MONO_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -297,7 +301,6 @@ const Achievements: React.FC = () => {
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 11px' }}>Recently unlocked</h2>
             <div className="tr-scroll" style={{ display: 'flex', gap: 11, overflowX: 'auto', paddingBottom: 4 }}>
               {recentUnlocks.map(({ ach, ts }) => {
-                const meta = RARITY_META[ach.rarity];
                 return (
                   <div key={ach.id} className="tr-card" title={ach.description} style={{ width: 176, flexShrink: 0, padding: 14, borderRadius: 14, background: PANEL_2, border: `1px solid ${BORDER}` }}>
                     <div style={{ width: 38, height: 38, borderRadius: 10, marginBottom: 9, background: MONO_FILL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -315,7 +318,7 @@ const Achievements: React.FC = () => {
           </section>
         )}
 
-        <AchievementBrowser unlocked={unlocked} unlockedAt={unlockedAt} stats={progressStats as UserStats} />
+        <AchievementBrowser achievements={visible} unlocked={unlocked} unlockedAt={unlockedAt} stats={progressStats as UserStats} />
 
         <DailyChallengesBar challenges={challenges} />
       </div>
@@ -340,7 +343,6 @@ const HeroSpotlight: React.FC<{
     );
   }
   const { ach, isUnlocked, ts } = spotlight;
-  const meta = RARITY_META[ach.rarity];
   const prog = ach.progress ? ach.progress(stats) : null;
   const pct = prog && prog.target > 0 ? Math.min(100, (prog.current / prog.target) * 100) : (isUnlocked ? 100 : 0);
 
@@ -353,8 +355,8 @@ const HeroSpotlight: React.FC<{
     }}>
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>Spotlight</span>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 9px', borderRadius: 6 }}>{ach.rarity}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.01em', textTransform: 'none', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 10px', borderRadius: 9999 }}>Spotlight</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', color: 'var(--color-text-secondary)', background: MONO_FILL, padding: '4px 10px', borderRadius: 9999 }}>{RARITY_META[ach.rarity]?.title ?? ach.rarity}</span>
           <span style={{ fontSize: 11, color: TXT_DIM }}>{isUnlocked ? `Unlocked ${relTime(ts)}` : 'Next up'}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -476,7 +478,7 @@ const DailyChallengesBar: React.FC<{ challenges: DailyChallengeState }> = memo((
           const threshold = ch.condition?.threshold || 0;
           const pct = threshold > 0 ? Math.min(100, (ch.progress / threshold) * 100) : 0;
           return (
-            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '8px 12px', borderRadius: 10, background: PANEL_2, border: `1px solid ${BORDER}` }}>
+            <div key={ch.id} title={ch.description} style={{ flex: '1 1 0', minWidth: 150, padding: '9px 12px', borderRadius: 14, background: PANEL_2, border: `1px solid ${BORDER}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
                   <DexIcon name={ch.completed ? 'check-circle' : ch.icon} size={13} color={ch.completed ? 'var(--color-text-primary)' : GOLD} />
