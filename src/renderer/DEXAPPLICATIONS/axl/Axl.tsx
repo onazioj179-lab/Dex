@@ -90,7 +90,7 @@ import { detectInterferences } from './AxlInspect';
 import { importCadFile } from './AxlImport';
 import { useAxlSaveStatus, parseAxlProject } from './axlPersistence';
 import type { InterferencePair, NamedView } from './types';
-import { exportProject as doExport } from './utils/export';
+import { exportProject as doExport, type AxlExportFormat } from './utils/export';
 import { useProjectStore } from './stores/projectStore';
 import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import { useViewportStore } from './stores/viewportStore';
@@ -562,7 +562,7 @@ const AXL: React.FC = () => {
   }, [project, simForce, simType, pStore, ui]);
 
   // ─── Export ───────────────────────────────────────────────────────────
-  const handleExport = useCallback((format: 'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf') => {
+  const handleExport = useCallback((format: AxlExportFormat) => {
     let msg: string | undefined;
     try { msg = doExport(project, format, canvasRef.current) ?? undefined; }
     catch (err) { ui.showToast(`Export failed: ${err instanceof Error ? err.message : String(err)}`); return; }
@@ -765,7 +765,7 @@ const AXL: React.FC = () => {
         return { outcome: 'applied', note: 'Opened the 2D sketcher' };
       }
       case 'exportModel': {
-        const fmts: Array<'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf'> = ['stl', 'dxf', 'pdf', 'json', 'png', 'gltf'];
+        const fmts: AxlExportFormat[] = ['stl', 'obj', '3mf', 'dxf', 'pdf', 'json', 'png', 'gltf'];
         const fmt = fmts.find(f => req.includes(f)) || 'stl';
         handleExport(fmt);
         return { outcome: 'applied', note: `Exported ${fmt.toUpperCase()}` };

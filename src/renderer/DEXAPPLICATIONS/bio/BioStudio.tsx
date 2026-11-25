@@ -18,6 +18,7 @@ import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActio
 import { colors, radius, fontStack } from '../../styles/tokens';
 import { APP_DEFINITIONS } from '../../store/runningApps';
 import { downloadText } from '../../improvements500/downloadBlob';
+import { BioAlignPanel } from './BioAlignPanel';
 import {
   parseSequence, parseFasta, toFasta, transcribe, reverseComplement, translate, findOrfs, gcContent,
   slidingGc, baseCounts, ssDnaMolecularWeight, dsDnaMolecularWeight, meltingTemp, proteinMolecularWeight,
@@ -81,7 +82,7 @@ const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toLocaleString(undefin
 // Tabs
 // ---------------------------------------------------------------------------
 
-type Tab = 'sequence' | 'orfs' | 'digest' | 'gc' | 'composition' | 'primers' | 'bench';
+type Tab = 'sequence' | 'orfs' | 'digest' | 'gc' | 'composition' | 'primers' | 'align' | 'bench';
 /** Tabs that work without an open sequence. */
 const FREE_TABS: readonly Tab[] = ['primers', 'bench'];
 const TABS: { id: Tab; label: string; key: string }[] = [
@@ -91,7 +92,8 @@ const TABS: { id: Tab; label: string; key: string }[] = [
   { id: 'gc', label: 'GC profile', key: '4' },
   { id: 'composition', label: 'Properties', key: '5' },
   { id: 'primers', label: 'Primers', key: '6' },
-  { id: 'bench', label: 'Bench', key: '7' },
+  { id: 'align', label: 'Align', key: '7' },
+  { id: 'bench', label: 'Bench', key: '8' },
 ];
 
 const SAMPLE = 'ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAGGAATTCGGATCCATGAAAGCTAGCTTGCGGCCGCAAGCTTTAA';
@@ -558,6 +560,8 @@ const BioStudio: React.FC = () => {
                   }} />
               ) : !active ? (
                 <Empty title="Open or create a sequence" body="Import a FASTA or GenBank file (Ctrl+O), paste a new sequence, or add the sample construct from the explorer." />
+              ) : tab === 'align' ? (
+                <BioAlignPanel active={active} sequences={project.sequences} />
               ) : tab === 'sequence' ? (
                 <SequencePanel key={active.id} seq={active} frame={frame} onExtract={extractFeature}
                   onCommit={(raw) => {

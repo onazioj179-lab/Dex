@@ -106,8 +106,9 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let picked = app
                 .dialog()
                 .file()
-                .set_title("Choose a CSV file")
-                .add_filter("CSV or text", &["csv", "txt", "tsv"])
+                .set_title("Choose a bank file")
+                // OFX/QFX/QBO ("download to Quicken / Money") are converted to rows in the renderer (ofx.ts).
+                .add_filter("Bank files (CSV, OFX, QFX, QBO)", &["csv", "txt", "tsv", "ofx", "qfx", "qbo"])
                 .blocking_pick_file()
                 .and_then(fp_to_string);
             let Some(path) = picked else { return okv(json!({ "canceled": true })) };

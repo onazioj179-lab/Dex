@@ -12,7 +12,11 @@
 > <data>/media-cache (20 GB, oldest-first). Gallery, Quick Look, Files preview and Audio fall back automatically; shared
 > MediaScrubber (second-accurate, hover time, buffered, keyboard); Gallery speed control + light-mode-safe controls. Needs
 > system FFmpeg (winget install Gyan.FFmpeg); without it direct formats still stream and others say so.
-> **Not done (owner list):** AXL / Bio / engineering / Ledger completion passes; Gallery grid thumbnails for non-direct
+> **AXL / Bio / Ledger (fourth batch): DONE for this pass.** Ledger reads OFX/QFX/QBO bank files (ofx.ts -> the existing CSV
+> preview/import; engine test). Bio Studio gains an Align tab (bioAlign.ts: Gotoh affine gaps, global/local, BLOSUM62, worker,
+> text export). AXL exports OBJ and 3MF from one shared tessellation (welded vertices) and saves every export through the native
+> Save dialog in the desktop app (backlog #168 export). Engineering = AXL; no separate app.
+> **Not done (owner list):** further AXL/Bio/Ledger depth (e.g. multi-currency, MSA/BLAST-style search, B-rep solids); Gallery grid thumbnails for non-direct
 > video formats; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
 > surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.
 

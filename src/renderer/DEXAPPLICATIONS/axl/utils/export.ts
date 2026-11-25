@@ -10,27 +10,56 @@
 
 import type { AXLProject, Vec3, PrimitiveType } from '../types';
 import { vec3, calcVolume, calcWeight, formatWeight } from './math';
+import { zipStored } from '../../notes/docxExport';
 
-export function exportProject(project: AXLProject, format: 'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf', canvas?: HTMLCanvasElement | null) {
+export type AxlExportFormat = 'stl' | 'obj' | '3mf' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf';
+
+export function exportProject(project: AXLProject, format: AxlExportFormat, canvas?: HTMLCanvasElement | null) {
   const fileName = project.name.replace(/\s+/g, '_');
 
   switch (format) {
     case 'png': return exportPNG(canvas, fileName);
     case 'json': return exportJSON(project, fileName);
     case 'stl': return exportSTL(project, fileName);
+    case 'obj': return exportOBJ(project, fileName);
+    case '3mf': return export3MF(project, fileName);
     case 'dxf': return exportDXF(project, fileName);
     case 'pdf': return exportPDF(project, canvas, fileName);
     case 'gltf': return exportGLTF(project, fileName);
   }
 }
 
+/**
+ * Save an export. In the desktop app: the native Save dialog, then a binary
+ * write (a blob "download" there was unreliable, and revoking the URL right
+ * after the click could cancel it). In a browser: a download, revoked later.
+ */
 function downloadBlob(blob: Blob, filename: string) {
+  const dex = (globalThis as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+  if (dex?.invoke) { void saveNative(dex.invoke.bind(dex), blob, filename); return; }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+async function saveNative(invoke: (c: string, ...a: unknown[]) => Promise<unknown>, blob: Blob, filename: string) {
+  const toast = (type: string, message: string) => { try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* non-DOM */ } };
+  try {
+    const ext = filename.split('.').pop() || '';
+    const pick = (await invoke('dialog:showSaveDialog', { title: 'Export', defaultPath: filename, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] })) as { canceled?: boolean; filePath?: string } | null;
+    if (!pick || pick.canceled || !pick.filePath) return;
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    const r = (await invoke('fs:writeBase64', pick.filePath, btoa(bin))) as { ok?: boolean; error?: string } | null;
+    if (r?.ok) toast('success', `Exported ${pick.filePath.split(/[\\/]/).pop()}`);
+    else toast('error', `Export failed${r?.error ? `: ${r.error}` : ''}`);
+  } catch (e) {
+    toast('error', `Export failed: ${(e as Error).message}`);
+  }
 }
 
 function exportPNG(canvas: HTMLCanvasElement | null | undefined, fileName: string): string {
@@ -50,8 +79,11 @@ function exportJSON(project: AXLProject, fileName: string): string {
   return 'Exported as JSON project';
 }
 
-function exportSTL(project: AXLProject, fileName: string): string {
-  const lines: string[] = ['solid AXL_Export'];
+export interface AxlTriangle { part: string; n: Vec3; a: Vec3; b: Vec3; c: Vec3 }
+
+/** Tessellate the visible parts (positions applied). One source for STL, OBJ and 3MF. */
+export function collectTriangles(project: AXLProject): AxlTriangle[] {
+  const tris: AxlTriangle[] = [];
 
   project.assembly.parts.forEach(part => {
     if (!part.visible) return;
@@ -63,14 +95,14 @@ function exportSTL(project: AXLProject, fileName: string): string {
     const pz = part.transform.position.z;
     const primType = params.primitiveType as string;
 
+    const partName = (part as { name?: string }).name || part.id;
     const addTriangle = (n: Vec3, v1: Vec3, v2: Vec3, v3: Vec3) => {
-      lines.push(`  facet normal ${n.x.toFixed(6)} ${n.y.toFixed(6)} ${n.z.toFixed(6)}`);
-      lines.push('    outer loop');
-      lines.push(`      vertex ${(v1.x + px).toFixed(6)} ${(v1.y + py).toFixed(6)} ${(v1.z + pz).toFixed(6)}`);
-      lines.push(`      vertex ${(v2.x + px).toFixed(6)} ${(v2.y + py).toFixed(6)} ${(v2.z + pz).toFixed(6)}`);
-      lines.push(`      vertex ${(v3.x + px).toFixed(6)} ${(v3.y + py).toFixed(6)} ${(v3.z + pz).toFixed(6)}`);
-      lines.push('    endloop');
-      lines.push('  endfacet');
+      tris.push({
+        part: partName, n,
+        a: vec3(v1.x + px, v1.y + py, v1.z + pz),
+        b: vec3(v2.x + px, v2.y + py, v2.z + pz),
+        c: vec3(v3.x + px, v3.y + py, v3.z + pz),
+      });
     };
 
     if (primType === 'box') {
@@ -137,10 +169,93 @@ function exportSTL(project: AXLProject, fileName: string): string {
     }
   });
 
+  return tris;
+}
+
+export function stlText(tris: AxlTriangle[]): string {
+  const f = (v: number) => v.toFixed(6);
+  const lines: string[] = ['solid AXL_Export'];
+  for (const t of tris) {
+    lines.push(`  facet normal ${f(t.n.x)} ${f(t.n.y)} ${f(t.n.z)}`, '    outer loop',
+      `      vertex ${f(t.a.x)} ${f(t.a.y)} ${f(t.a.z)}`, `      vertex ${f(t.b.x)} ${f(t.b.y)} ${f(t.b.z)}`, `      vertex ${f(t.c.x)} ${f(t.c.y)} ${f(t.c.z)}`,
+      '    endloop', '  endfacet');
+  }
   lines.push('endsolid AXL_Export');
-  const blob = new Blob([lines.join('\n')], { type: 'model/stl' });
-  downloadBlob(blob, `${fileName}.stl`);
-  return `Exported real STL — ${project.assembly.parts.length} parts`;
+  return lines.join('\n');
+}
+
+/** Shared vertices (welded at 1 µm) so OBJ / 3MF meshes are connected, not triangle soup. */
+export function indexMesh(tris: AxlTriangle[]): { vertices: Vec3[]; faces: Array<[number, number, number]>; groups: Array<{ name: string; start: number; count: number }> } {
+  const key = (v: Vec3) => `${Math.round(v.x * 1e3)},${Math.round(v.y * 1e3)},${Math.round(v.z * 1e3)}`;
+  const map = new Map<string, number>();
+  const vertices: Vec3[] = [];
+  const faces: Array<[number, number, number]> = [];
+  const groups: Array<{ name: string; start: number; count: number }> = [];
+  const idx = (v: Vec3) => {
+    const k = key(v);
+    let i = map.get(k);
+    if (i === undefined) { i = vertices.length; vertices.push(v); map.set(k, i); }
+    return i;
+  };
+  for (const t of tris) {
+    const g = groups[groups.length - 1];
+    if (!g || g.name !== t.part) groups.push({ name: t.part, start: faces.length, count: 0 });
+    const ia = idx(t.a), ib = idx(t.b), ic = idx(t.c);
+    if (ia === ib || ib === ic || ia === ic) continue; // degenerate (cone tip caps)
+    faces.push([ia, ib, ic]);
+    groups[groups.length - 1].count++;
+  }
+  return { vertices, faces, groups };
+}
+
+/** Wavefront OBJ (one group per part). */
+export function objText(tris: AxlTriangle[], name = 'AXL'): string {
+  const m = indexMesh(tris);
+  const out: string[] = [`# ${name} exported from DEX AXL (millimetres)`, `o ${name.replace(/\s+/g, '_')}`];
+  for (const v of m.vertices) out.push(`v ${v.x.toFixed(6)} ${v.y.toFixed(6)} ${v.z.toFixed(6)}`);
+  for (const g of m.groups) {
+    if (!g.count) continue;
+    out.push(`g ${g.name.replace(/\s+/g, '_')}`);
+    for (let i = g.start; i < g.start + g.count; i++) { const [a, b, c] = m.faces[i]; out.push(`f ${a + 1} ${b + 1} ${c + 1}`); }
+  }
+  return out.join('\n') + '\n';
+}
+
+/** 3MF (the 3D-printing package): a ZIP with the model in millimetres. */
+export function threeMfBytes(tris: AxlTriangle[], name = 'AXL'): Uint8Array {
+  const m = indexMesh(tris);
+  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const verts = m.vertices.map((v) => `<vertex x="${v.x.toFixed(4)}" y="${v.y.toFixed(4)}" z="${v.z.toFixed(4)}"/>`).join('');
+  const faces = m.faces.map(([a, b, c]) => `<triangle v1="${a}" v2="${b}" v3="${c}"/>`).join('');
+  const model = '<?xml version="1.0" encoding="UTF-8"?>'
+    + '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">'
+    + `<metadata name="Title">${esc(name)}</metadata><metadata name="Application">DEX AXL</metadata>`
+    + `<resources><object id="1" type="model"><mesh><vertices>${verts}</vertices><triangles>${faces}</triangles></mesh></object></resources>`
+    + '<build><item objectid="1"/></build></model>';
+  const enc = new TextEncoder();
+  return zipStored([
+    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
+    { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
+    { name: '3D/3dmodel.model', data: enc.encode(model) },
+  ]);
+}
+
+function exportSTL(project: AXLProject, fileName: string): string {
+  const tris = collectTriangles(project);
+  downloadBlob(new Blob([stlText(tris)], { type: 'model/stl' }), `${fileName}.stl`);
+  return `Exported STL: ${project.assembly.parts.length} parts, ${tris.length.toLocaleString()} triangles`;
+}
+
+function exportOBJ(project: AXLProject, fileName: string): string {
+  const tris = collectTriangles(project);
+  downloadBlob(new Blob([objText(tris, project.name)], { type: 'model/obj' }), `${fileName}.obj`);
+  return `Exported OBJ: ${tris.length.toLocaleString()} triangles`;
+}
+
+function export3MF(project: AXLProject, fileName: string): string {
+  const tris = collectTriangles(project);
+  downloadBlob(new Blob([threeMfBytes(tris, project.name) as Uint8Array<ArrayBuffer>], { type: 'model/3mf' }), `${fileName}.3mf`);
+  return `Exported 3MF for printing: ${tris.length.toLocaleString()} triangles`;
 }
 
 function exportDXF(project: AXLProject, fileName: string): string {
