@@ -29,9 +29,16 @@ export const BottomPanel: React.FC<{
   cwd?: string;
   terminalStarted: boolean;
   height: number;
-}> = ({ tab, onTab, onClose, problems, fileName, onJump, cwd, terminalStarted, height }) => (
-  <div role="region" aria-label="Problems and terminal" style={{ height, flexShrink: 0, display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', minHeight: 0 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px' }}>
+  /** Drag the top edge to resize (the editor owns and persists the height). */
+  onResizeStart?: (e: React.MouseEvent) => void;
+}> = ({ tab, onTab, onClose, problems, fileName, onJump, cwd, terminalStarted, height, onResizeStart }) => (
+  <div role="region" aria-label="Problems and terminal" style={{ height, flexShrink: 0, display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-base)', minHeight: 0, position: 'relative' }}>
+    {onResizeStart && (
+      // A thin invisible grab strip on the hairline: no bar, no grip, just the resize cursor.
+      <div role="separator" aria-orientation="horizontal" aria-label="Resize panel" onMouseDown={onResizeStart}
+        style={{ position: 'absolute', left: 0, right: 0, top: -3, height: 6, cursor: 'row-resize', zIndex: 2 }} />
+    )}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', flexShrink: 0 }}>
       <SegmentedControl
         semantics="tabs"
         variant="subtle"

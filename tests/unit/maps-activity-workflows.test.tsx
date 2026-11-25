@@ -79,7 +79,8 @@ it('measures each segment of a map path and can undo the last point', async () =
 
 it('chooses a basemap and recalls a saved place after reopening Maps', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => ({
-    ok: true, json: async () => ({ results: [{ name: 'Lagos', latitude: 6.45, longitude: 3.39, country: 'Nigeria' }] }),
+    // Place search answers in Photon's GeoJSON (addresses + landmarks).
+    ok: true, json: async () => ({ features: [{ geometry: { coordinates: [3.39, 6.45] }, properties: { name: 'Lagos', country: 'Nigeria' } }] }),
   })));
   const first = render(<Maps />);
   const search = screen.getByRole('searchbox', { name: 'Search places' });
@@ -100,7 +101,7 @@ it('chooses a basemap and recalls a saved place after reopening Maps', async () 
 
 it('cancels an outdated place search and only shows results for the latest query', async () => {
   const place = (name: string) => ({
-    ok: true, json: async () => ({ results: [{ name, latitude: 1, longitude: 2 }] }),
+    ok: true, json: async () => ({ features: [{ geometry: { coordinates: [2, 1] }, properties: { name } }] }),
   });
   let finishOldSearch!: (response: ReturnType<typeof place>) => void;
   const fetchPlaces = vi.fn((_url: string, _options: RequestInit) => Promise.resolve(place('Lisbon')))

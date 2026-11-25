@@ -39,7 +39,7 @@ const TerminalApp: React.FC = () => {
     // Terminals stay dark in both themes: dex-theme-dark gives everything inside
     // the dark text tokens (light-theme ink was 1.1:1 on this background).
     <div className="dex-theme-dark" style={{ height: '100%', display: 'flex', background: '#0a0a0a' }}>
-      <TerminalTabs key={gen} acceptOpenRequests onClose={() => setOpen(false)} />
+      <TerminalTabs key={gen} acceptOpenRequests chromeInWindowBar onClose={() => setOpen(false)} />
     </div>
   );
 };

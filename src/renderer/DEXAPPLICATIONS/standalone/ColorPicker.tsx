@@ -203,82 +203,66 @@ const ColorPicker: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...s.hexRow, flexWrap: 'wrap', alignItems: 'center' }}>
-        <label><input type="checkbox" checked={hueLocked} onChange={event => setHueLocked(event.target.checked)} /> Lock hue</label>
-        <button type="button" style={s.valueChip} disabled={!EyeDropper || sampling} onClick={() => void sample()}
-          title={EyeDropper ? 'Sample a pixel on screen' : 'Screen sampling is unavailable in this runtime'}>Eyedropper</button>
-        <span title="Nearest reference swatch">{nearestColorName(hex)}</span>
-        {sampleError && <span role="status">{sampleError}</span>}
-      </div>
-
-      {/* Values */}
-      <div style={s.values}>
-        <button onClick={() => copy(hex)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy HEX">
-          <span style={s.valueLabel}>HEX</span>
-          <span style={s.valueText}>{hex.toUpperCase()}</span>
-        </button>
-        <button onClick={() => copy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy RGB">
-          <span style={s.valueLabel}>RGB</span>
-          <span style={s.valueText}>{rgb.r}, {rgb.g}, {rgb.b}</span>
-        </button>
-        <button onClick={() => copy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`)} className="dex-liquid-glass cp-chip" style={s.valueChip} title="Copy HSL">
-          <span style={s.valueLabel}>HSL</span>
-          <span style={s.valueText}>{hsl.h}, {hsl.s}%, {hsl.l}%</span>
-        </button>
-        <button type="button" onClick={() => copy(hsb[0] + '°, ' + hsb[1] + '%, ' + hsb[2] + '%')} className="dex-liquid-glass cp-chip"
-          style={s.valueChip} title="Copy HSB" aria-label="Copy HSB">
-          <span style={s.valueLabel}>HSB</span><span style={s.valueText}>{hsb[0]}°, {hsb[1]}%, {hsb[2]}%</span>
-        </button>
-        <button type="button" onClick={() => copy('--swatch: ' + hex + ';')} className="dex-liquid-glass cp-chip"
-          style={s.valueChip} title="Copy CSS variable" aria-label="Copy CSS variable">
-          <span style={s.valueLabel}>CSS VAR</span><span style={s.valueText}>--swatch</span>
-        </button>
-        {(['canvas', 'pixelart'] as const).map(app => <button key={app} type="button" onClick={() => {
-          if (app === 'canvas') setStudioMode('board');
-          sendCreativeInput(app, hex);
-        }}
-          className="dex-liquid-glass cp-chip" style={s.valueChip}>
-          Send to {app === 'canvas' ? 'Canvas' : 'Pixel Art'}
-        </button>)}
-        <button type="button" onClick={() => sendCreativeInput('qrcode-color', hex)}
-          className="dex-liquid-glass cp-chip" style={s.valueChip}>Use in QR Code</button>
-        <button
-          onClick={() => sendToNotes(
-            `Color ${hex.toUpperCase()}\nHEX: ${hex.toUpperCase()}\nRGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
-            `Color ${hex.toUpperCase()}`,
-          )}
-          className="dex-liquid-glass cp-chip"
-          style={s.valueChip}
-          title="Send swatch to Notes"
-        >
-          <span style={s.valueLabel}>SEND</span>
-          <span style={s.valueText}>Notes</span>
-        </button>
-        <button
-          onClick={() => (isSaved ? removeColor(hex) : saveColor(hex, 'colorpicker'))}
-          className="dex-liquid-glass cp-chip"
-          style={s.valueChip}
-          aria-pressed={isSaved}
-          title={isSaved ? 'Remove from the shared colour library' : 'Save to the shared colour library (PRISM shows it too)'}
-        >
-          <span style={s.valueLabel}>LIBRARY</span>
-          <span style={s.valueText}>{isSaved ? 'Saved' : 'Save'}</span>
-        </button>
-      </div>
-
-      {copied && <div style={s.copiedToast}>Copied</div>}
-
-      {/* HEX input */}
-      <div style={s.hexRow}>
+      {/* Tools: exact value, eyedropper, hue lock, nearest name */}
+      <div style={s.toolRow}>
         <input
           value={hexInput}
           onChange={e => handleHexInput(e.target.value)}
-          className="dex-liquid-glass"
           style={s.hexInput}
           placeholder="#000000"
           maxLength={7}
           aria-label="Hex color value"
+          spellCheck={false}
         />
+        <button type="button" style={s.toolPill} disabled={!EyeDropper || sampling} onClick={() => void sample()}
+          title={EyeDropper ? 'Sample a pixel on screen' : 'Screen sampling is unavailable in this runtime'}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+          {sampling ? 'Pick a pixel…' : 'Eyedropper'}
+        </button>
+        <button type="button" style={{ ...s.toolPill, ...(hueLocked ? s.toolPillOn : null) }} aria-pressed={hueLocked}
+          onClick={() => setHueLocked(v => !v)} title="Keep the hue while you adjust saturation and lightness">
+          Lock hue
+        </button>
+        <span style={s.colorName} title="Nearest reference swatch">{nearestColorName(hex)}</span>
+        {sampleError && <span role="status" style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>{sampleError}</span>}
+      </div>
+
+      {/* Values: click any to copy */}
+      <div style={s.values}>
+        {([
+          ['HEX', hex.toUpperCase(), hex.toUpperCase()],
+          ['RGB', `${rgb.r}, ${rgb.g}, ${rgb.b}`, `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`],
+          ['HSL', `${hsl.h}°, ${hsl.s}%, ${hsl.l}%`, `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`],
+          ['HSB', `${hsb[0]}°, ${hsb[1]}%, ${hsb[2]}%`, `${hsb[0]}°, ${hsb[1]}%, ${hsb[2]}%`],
+          ['CSS', '--swatch', `--swatch: ${hex};`],
+        ] as const).map(([label, shown, value]) => (
+          <button key={label} type="button" onClick={() => copy(value)} className="cp-chip" style={s.valueChip}
+            title={`Copy ${label}`} aria-label={`Copy ${label} ${shown}`}>
+            <span style={s.valueLabel}>{label}</span>
+            <span style={s.valueText}>{shown}</span>
+          </button>
+        ))}
+      </div>
+
+      {copied && <div style={s.copiedToast} role="status">Copied</div>}
+
+      {/* Use it elsewhere */}
+      <div style={s.actions}>
+        <button type="button" style={{ ...s.toolPill, ...(isSaved ? s.toolPillOn : null) }} aria-pressed={isSaved}
+          onClick={() => (isSaved ? removeColor(hex) : saveColor(hex, 'colorpicker'))}
+          title={isSaved ? 'Remove from the shared colour library' : 'Save to the shared colour library (PRISM shows it too)'}>
+          {isSaved ? 'Saved to library' : 'Save to library'}
+        </button>
+        <button type="button" style={s.toolPill} title="Send swatch to Notes" aria-label="Send to Notes" onClick={() => sendToNotes(
+          `Color ${hex.toUpperCase()}
+HEX: ${hex.toUpperCase()}
+RGB: rgb(${rgb.r}, ${rgb.g}, ${rgb.b})
+HSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
+          `Color ${hex.toUpperCase()}`,
+        )}>Notes</button>
+        <button type="button" style={s.toolPill} aria-label="Send to Canvas" onClick={() => { setStudioMode('board'); sendCreativeInput('canvas', hex); }}>Canvas</button>
+        <button type="button" style={s.toolPill} aria-label="Send to Pixel Art" onClick={() => sendCreativeInput('pixelart', hex)}>Pixel Art</button>
+        <button type="button" style={s.toolPill} aria-label="Use in QR Code" onClick={() => sendCreativeInput('qrcode-color', hex)}>QR code</button>
       </div>
 
       {/* Saved (shared library) */}
@@ -360,12 +344,27 @@ const s: Record<string, React.CSSProperties> = {
     width: 40, fontSize: 12, color: 'var(--color-text-secondary)',
     textAlign: 'right', fontVariantNumeric: 'tabular-nums',
   },
+  toolRow: {
+    display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '0 var(--space-5) var(--space-3)',
+  },
+  toolPill: {
+    height: 28, padding: '0 12px', borderRadius: 9999, border: 'none', cursor: 'pointer', flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
+    background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', color: 'var(--color-text-primary)',
+    fontFamily: 'var(--font-family)',
+  },
+  toolPillOn: { background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)' },
+  colorName: { marginLeft: 'auto', fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' },
+  actions: {
+    display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 var(--space-5) var(--space-4)',
+  },
   values: {
-    display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', padding: '0 var(--space-5) var(--space-3)',
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))', gap: 6, padding: '0 var(--space-5) var(--space-3)',
   },
   valueChip: {
-    flex: 1, display: 'flex', flexDirection: 'column', gap: 2,
-    padding: 'var(--space-2) 10px', borderRadius: 14,
+    display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, border: 'none',
+    padding: '8px 12px', borderRadius: 14,
+    background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)',
     cursor: 'pointer',
     transition: 'all 0.15s ease', textAlign: 'left',
     fontFamily: 'var(--font-family)',
@@ -375,8 +374,8 @@ const s: Record<string, React.CSSProperties> = {
     textTransform: 'none', letterSpacing: '0.01em',
   },
   valueText: {
-    fontSize: 13, color: 'var(--color-text-primary)',
-    fontVariantNumeric: 'tabular-nums',
+    fontSize: 12.5, color: 'var(--color-text-primary)',
+    fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   copiedToast: {
     textAlign: 'center', fontSize: 12, fontWeight: 600,
@@ -384,10 +383,10 @@ const s: Record<string, React.CSSProperties> = {
   },
   hexRow: { padding: '0 var(--space-5) var(--space-3)' },
   hexInput: {
-    width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 14,
-    color: 'var(--color-text-primary)', fontSize: 14,
-    fontFamily: 'var(--font-mono)', outline: 'none',
-    textAlign: 'center', boxSizing: 'border-box',
+    width: 96, height: 28, padding: '0 12px', borderRadius: 9999, border: 'none',
+    background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)',
+    color: 'var(--color-text-primary)', fontSize: 12.5,
+    fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
   },
   section: { padding: '0 var(--space-5) var(--space-3)' },
   sectionLabel: {
@@ -397,7 +396,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', flexWrap: 'wrap', gap: 6,
   },
   swatch: {
-    width: 28, height: 28, borderRadius: 10, border: 'none',
+    width: 26, height: 26, borderRadius: 9999, border: 'none',
     cursor: 'pointer', transition: 'all 0.15s ease',
   },
 };

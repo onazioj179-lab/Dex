@@ -213,13 +213,16 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)', overflow: 'hidden',
     width: '100%', maxWidth: 640, margin: '0 auto',
+    // Digits scale with the WINDOW (container units), not the screen: in a
+    // small window 11vw overflowed both edges.
+    containerType: 'inline-size',
   },
   displayArea: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 'var(--space-10) var(--space-5) var(--space-6)', flexShrink: 0,
   },
   time: {
-    fontSize: 'clamp(56px, 11vw, 104px)', fontWeight: 200, letterSpacing: '-0.03em',
+    fontSize: 'clamp(36px, 17cqi, 104px)', fontWeight: 200, letterSpacing: '-0.03em',
     fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-primary)',
     fontFamily: 'var(--font-family)',
   },

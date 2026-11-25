@@ -6,7 +6,7 @@
 // =============================================================================
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { ageLabel, loadActiveWeather, cacheKeyFor } from '../../src/renderer/DEXAPPLICATIONS/standalone/weatherData';
+import { ageLabel, loadActiveWeather, cacheKeyFor, hourlyFrom } from '../../src/renderer/DEXAPPLICATIONS/standalone/weatherData';
 
 const sample = (fetchedAt: number) => ({
   current: { temp: 12, feelsLike: 10, condition: 'rain', humidity: 80, wind: 5, uvIndex: 1, visibility: 10, pressure: 1010, sunrise: null, sunset: null },
@@ -68,5 +68,17 @@ describe('weatherData', () => {
     const res = await loadActiveWeather();
     expect(res?.stale).toBe(true);
     expect(res?.data.current.temp).toBe(12);
+  });
+});
+
+describe('weather hourly strip uses the city clock', () => {
+  it('starts at the city current hour, not the computer hour', () => {
+    const time = Array.from({ length: 48 }, (_, i) => `2026-11-24T${String(i % 24).padStart(2, '0')}:00`.replace('2026-11-24', i < 24 ? '2026-11-24' : '2026-11-25'));
+    const temperature_2m = time.map((_, i) => i);
+    const out = hourlyFrom({ time, temperature_2m, weather_code: [] }, '2026-11-24T22:45', 0);
+    expect(out[0]).toMatchObject({ hour: 'Now', temp: 22 });
+    expect(out[1]).toMatchObject({ hour: '23:00', temp: 23 });
+    expect(out[2]).toMatchObject({ hour: '00:00', temp: 24 });
+    expect(out).toHaveLength(12);
   });
 });

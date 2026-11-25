@@ -3817,3 +3817,14 @@ These need DSP/ML or native hosting we don't fake.
 ## Checkpoint 2026-11-14 (dead code pruned)
 
 - 254 source files nothing in DEX reaches, plus the 187 tests that covered only them, removed (54,651 lines, #254). Reachability = esbuild bundle of `src/renderer/main.tsx`; type-only imports re-checked with tsc. #47 closed.
+
+## Checkpoint 2026-11-24 (one-row chrome, no stray highlights)
+
+- Terminal tabs, Maps search/Saved/Measure and Calculator modes now sit in the DEX top bar when full-surface (`topBarModeFor`), and in the window header when floating (per-app minimum widths in `windowModeFor`).
+- Focus/selection: text fields no longer draw the hard focus rectangle (it showed inside pill search bars); selected tabs/options/menu rows and `data-active` buttons lost their blue rim; the canonical ring is thinner and follows each control's own radius.
+- DexCode: one bottom panel (the duplicate terminal dock is gone), resizable from its top edge, status bar at the very bottom.
+- Dock orb follows the pointer the whole drag and snaps to an edge only on release (28 px band); CollapsibleSection folds with a height animation; window controls are round.
+- Maps: address/landmark search (Photon, Open-Meteo fallback), dropped pins named by reverse geocoding, turn-by-turn directions (OSRM: drive/cycle/walk, route drawn + steps), Retry instead of an endless "Loading map". `mapsServices.ts` + `MapsDirections.tsx`; CSP gained photon.komoot.io + routing.openstreetmap.de. Dev-only: a rebuilt map never loads under the dev worker shim (production reopens fine).
+- Gestures: `hooks/usePinchZoom.ts` (trackpad pinch = Ctrl+wheel, touch two-finger, non-passive) used by Gallery; `[data-own-gestures]` surfaces (Maps, viewers) are never taken by the spatial workspace.
+- Utility polish: Weather hourly/day names/day-night now use the city's clock; Converter's unit suffix and precision fixed; Colors, QR Code and Noise lost their letter placeholders; Stopwatch digits fit small windows; shared `ui/Button` and `TextInput` are pills with no focus glow.
+- Not done this round: Browser tab row into the top bar (its popovers would clip), UKI pass.

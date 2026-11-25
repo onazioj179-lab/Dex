@@ -346,6 +346,7 @@ const formatDate = (date: Date): string => date.toLocaleDateString([], { month: 
 import { formatClock } from '../../shared/format/units';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { toLocalDateInput } from '../utils/localDate';
+import { usePinchZoom } from '../hooks/usePinchZoom';
 const formatDuration = (seconds?: number): string => (seconds ? formatClock(seconds) : '');
 
 const PLACEHOLDER_COLORS = ['var(--color-error)', 'var(--color-warning)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info, #64d2ff)', 'var(--color-accent)', 'var(--color-accent-alt, #5e5ce6)', 'var(--color-tag-purple, #bf5af2)'];
@@ -957,14 +958,15 @@ export const Gallery: React.FC = () => {
   }, [selectedMedia?.id]);
 
   // Throttle wheel zoom to 60ms to prevent jank
-  const handleImageWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const now = performance.now();
-    if ((handleImageWheel as any)._lastCall && now - (handleImageWheel as any)._lastCall < 60) return;
-    (handleImageWheel as any)._lastCall = now;
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setImgZoom(prev => Math.min(Math.max(prev + delta, 0.5), 8));
-  }, []);
+  // Smooth pinch / Ctrl+wheel / wheel / two-finger touch zoom on the photo
+  // (was a 60 ms-throttled fixed step on a passive React wheel handler).
+  const imgZoomRef = useRef(imgZoom);
+  imgZoomRef.current = imgZoom;
+  usePinchZoom(imageContainerRef, {
+    min: 0.5, max: 8, get: () => imgZoomRef.current, set: setImgZoom,
+    enabled: !!selectedMedia?.src && selectedMedia?.type !== 'video',
+    key: selectedMedia?.src,
+  });
 
   const handleImagePointerDown = useCallback((e: React.PointerEvent) => {
     if (imgZoom <= 1) return;
@@ -2435,7 +2437,6 @@ export const Gallery: React.FC = () => {
                       cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'zoom-in',
                       touchAction: 'none', userSelect: 'none',
                     }}
-                    onWheel={handleImageWheel}
                     onPointerDown={handleImagePointerDown}
                     onPointerMove={handleImagePointerMove}
                     onPointerUp={handleImagePointerUp}

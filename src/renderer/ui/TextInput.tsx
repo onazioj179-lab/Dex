@@ -32,17 +32,17 @@ const sharedField = (size: InputSize, invalid: boolean): React.CSSProperties => 
   color: 'var(--color-text-primary, #fff)',
   background: 'var(--color-bg-inset, #101012)',
   border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border-control, #6B6D73)'}`,
-  borderRadius: radius.md,
+  // Single-line fields are pills (one shape with buttons); Textarea overrides.
+  borderRadius: radius.full,
   outline: 'none',
   transition: FOCUS_TRANSITION,
 });
 
 const focusOn = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {
   const el = e.currentTarget;
-  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'var(--dex-focus-color, #fff)';
-  el.style.boxShadow = invalid
-    ? '0 0 0 3px rgba(255, 69, 58, 0.18)'
-    : '0 0 0 3px var(--dex-focus-glow, rgba(255, 255, 255, 0.22))';
+  // A crisp border change only: no 3 px glow halo around every focused field.
+  el.style.borderColor = invalid ? 'var(--color-error, #FF453A)' : 'color-mix(in srgb, var(--color-text-primary) 45%, transparent)';
+  el.style.boxShadow = 'none';
 };
 
 const focusOff = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>, invalid: boolean) => {
@@ -61,7 +61,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(({
           display: 'flex', alignItems: 'center',
           background: 'var(--color-bg-inset, #101012)',
           border: `1px solid ${invalid ? 'var(--color-error, #FF453A)' : 'var(--color-border-control, #6B6D73)'}`,
-          borderRadius: radius.md,
+          borderRadius: radius.full,
           height: inputTokens.height[inputSize],
           padding: '0 var(--space-2)',
           gap: 6,
@@ -119,6 +119,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
       ...sharedField(inputSize, invalid),
       height: 'auto',
       padding: 10,
+      borderRadius: radius.lg,
       lineHeight: 1.5,
       resize: 'vertical',
       ...style,

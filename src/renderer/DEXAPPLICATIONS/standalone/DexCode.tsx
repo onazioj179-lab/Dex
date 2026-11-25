@@ -12,7 +12,6 @@ import { useCreativeInput } from '../../services/creativeIntake';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
-import { TerminalTabs } from '../../components/TerminalTabs';
 import { AssistedTextarea } from '../../components/AssistedTextarea';
 import { STORAGE_KEY, FILE_KEY, DEFAULT_CODE, TEMPLATES } from './dexCode/templates';
 import { transpileDexScript, executeDexScript } from './dexCode/runtime';
@@ -175,7 +174,6 @@ const DexCode: React.FC = () => {
   // Verb for the Run button while UKI is working a plain-English request.
   const aiPhrase = useWorkingPhrase(isRunning && langMode === 'plain', plainMode === 'doit' ? 'run' : 'generic');
 
-  const [terminalOpen, setTerminalOpen] = useState(false);
   // Autosave status for the status bar. 'saving' while the debounce is pending,
   // 'saved' briefly after the write lands, then idle. Purely a UI affordance --
   // the autosave timing itself is unchanged.
@@ -773,11 +771,6 @@ const DexCode: React.FC = () => {
         e.preventDefault();
         setFontSize(s => Math.max(s - 1, 9));
       }
-      // Toggle terminal panel (Ctrl+`)
-      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
-        e.preventDefault();
-        setTerminalOpen(v => !v);
-      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -1282,11 +1275,11 @@ const DexCode: React.FC = () => {
         <button
           title="Terminal"
           aria-label="Toggle terminal"
-          aria-pressed={terminalOpen}
-          style={terminalOpen ? S.activityBtnActive : S.activityBtn}
-          onClick={() => setTerminalOpen(o => !o)}
-          onMouseEnter={e => { if (!terminalOpen) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
-          onMouseLeave={e => { if (!terminalOpen) e.currentTarget.style.background = 'transparent'; }}
+          aria-pressed={panel === 'terminal'}
+          style={panel === 'terminal' ? S.activityBtnActive : S.activityBtn}
+          onClick={() => togglePanel('terminal')}
+          onMouseEnter={e => { if (panel !== 'terminal') e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+          onMouseLeave={e => { if (panel !== 'terminal') e.currentTarget.style.background = 'transparent'; }}
         >
           <DexIcon name="terminal" size={16} />
         </button>
@@ -1972,7 +1965,8 @@ const DexCode: React.FC = () => {
             onJump={(line) => jumpToLine(line)}
             cwd={project?.root}
             terminalStarted={terminalStarted}
-            height={240}
+            height={panelHeight}
+            onResizeStart={handlePanelResizeStart}
           />
         )}
 
@@ -2019,16 +2013,17 @@ const DexCode: React.FC = () => {
           </span>
           <button
             type="button"
-            onClick={() => setTerminalOpen(v => !v)}
+            onClick={() => togglePanel('terminal')}
             aria-label="Toggle terminal"
-            aria-pressed={terminalOpen}
+            aria-pressed={panel === 'terminal'}
             style={{
               marginLeft: 'auto',
-              background: terminalOpen ? 'var(--color-accent-fill)' : 'transparent',
-              color: terminalOpen ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
+              background: panel === 'terminal' ? 'color-mix(in srgb, var(--color-text-primary) 10%, transparent)' : 'transparent',
+              color: panel === 'terminal' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               border: 'none',
               borderRadius: 9999,
-              padding: '2px 10px',
+              height: 18,
+              padding: '0 10px',
               fontSize: 10,
               fontWeight: 600,
               cursor: 'pointer',
@@ -2038,24 +2033,6 @@ const DexCode: React.FC = () => {
           </button>
         </div>
 
-        {terminalOpen && (
-          <div style={{ ...S.panelDock, height: panelHeight }}>
-            {/* Draggable divider — drag up/down to resize the panel */}
-            <div
-              style={S.panelResizer}
-              onMouseDown={handlePanelResizeStart}
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize terminal panel"
-              title="Drag to resize"
-            >
-              <div style={S.panelResizerGrip} aria-hidden="true" />
-            </div>
-            <div style={S.panelBody}>
-              <TerminalTabs onClose={() => setTerminalOpen(false)} />
-            </div>
-          </div>
-        )}
       </section>
     </div>
   );

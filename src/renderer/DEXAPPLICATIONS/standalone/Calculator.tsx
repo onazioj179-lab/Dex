@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
+import { WindowToolbar, useUnifiedChrome } from '../../shell/windowChrome';
 import { useAppTracking } from '../../services/usePatternLearning';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { evaluateCalendarMath } from '../../../shared/time/naturalCalendar';
@@ -391,12 +392,13 @@ const Calculator: React.FC = () => {
       pressed={lastOperator === op && waitingForOperand}>{OP_SYMBOL[op]}</Key>
   );
   const sci = mode === 'scientific';
+  const unified = useUnifiedChrome();
 
   return (
     <div ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown} className="dex-calc" style={styles.container}>
       <style>{CALC_CSS}</style>
-      {/* Header */}
-      <div style={styles.header}>
+      {/* Header: in a unified window it moves into the window bar (more room for the keys). */}
+      <WindowToolbar inline={(bar) => <div style={styles.header}>{bar}</div>}>
         <div role="group" aria-label="Calculator mode" style={styles.modeToggle}>
           <button
             type="button"
@@ -411,9 +413,12 @@ const Calculator: React.FC = () => {
             onClick={() => setMode('scientific')}
           >Scientific</button>
         </div>
+        <span aria-hidden="true" style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button type="button" className="dex-calc-icon" aria-pressed={showTools} onClick={() => setShowTools(value => !value)}
             aria-label="Calculator tools" title="Calculator tools">•••</button>
+          {/* In the window bar there is room for two icons; Copy / Send move into the tools. */}
+          {!unified && (<>
           <button type="button" className="dex-calc-icon" onClick={copyResult} aria-label="Copy result" title="Copy result">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -424,13 +429,14 @@ const Calculator: React.FC = () => {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
             </svg>
           </button>
+          </>)}
           <button type="button" className="dex-calc-icon" onClick={() => setShowHistory(!showHistory)} aria-label="Toggle history" aria-expanded={showHistory} title="History">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
           </button>
         </div>
-      </div>
+      </WindowToolbar>
 
       <div style={styles.main}>
         {/* Natural-language input: units, percents, functions */}
@@ -454,6 +460,12 @@ const Calculator: React.FC = () => {
 
         {/* Keypad */}
         {showTools && <div data-calculator-tools style={{ display: 'grid', gap: 8, flexShrink: 0 }}>
+          {unified && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <button type="button" className="dex-calc-seg" onClick={copyResult}>Copy result</button>
+              <button type="button" className="dex-calc-seg" onClick={sendResult}>Send to app</button>
+            </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
             <label>Decimals <select aria-label="Calculator precision" value={precision} onChange={event => setPrecision(Number(event.target.value))}>
               {Array.from({ length: 11 }, (_, digits) => <option key={digits}>{digits}</option>)}
@@ -531,7 +543,7 @@ const Calculator: React.FC = () => {
 
       {/* History Panel */}
       {showHistory && (
-        <div style={styles.historyPanel} role="region" aria-label="Calculation history">
+        <div style={unified ? { ...styles.historyPanel, top: 0 } : styles.historyPanel} role="region" aria-label="Calculation history">
           <div style={styles.historyHeader}>
             <span className="dex-label-caps">History</span>
             {history.length > 0 && (
@@ -598,14 +610,14 @@ const CALC_CSS = `
 :root[data-theme="light"] .dex-calc-key:hover, .light-mode .dex-calc-key:hover { filter: brightness(0.94); }
 .dex-calc-key:active { transform: scale(0.97); }
 .dex-calc-seg {
-  height: 26px; padding: 0 var(--space-3); border: none; border-radius: var(--radius-sm, 6px);
+  height: 26px; padding: 0 var(--space-3); border: none; border-radius: 9999px;
   background: transparent; color: var(--color-text-secondary);
   font: 600 12px/1 var(--dex-font-ui); cursor: pointer; transition: background-color 120ms ease;
 }
 .dex-calc-seg[aria-pressed="true"] { background: var(--color-bg-surface); color: var(--color-text-primary); box-shadow: var(--shadow-sm); }
 .dex-calc-icon {
   display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
-  border: none; border-radius: var(--radius-sm, 6px); background: transparent;
+  border: none; border-radius: 9999px; background: transparent;
   color: var(--color-text-secondary); cursor: pointer; transition: background-color 120ms ease;
 }
 .dex-calc-icon:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
@@ -655,7 +667,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modeToggle: {
     display: 'flex',
-    borderRadius: 'var(--radius-md, 10px)',
+    borderRadius: 9999,
     padding: 2,
     gap: 2,
     background: 'var(--color-bg-secondary)',

@@ -76,8 +76,10 @@ export interface MorphingDockProps {
   onOpenLauncher: () => void;
 }
 
-/** Within this distance of a screen edge a dragged Dock snaps to that edge. */
-const EDGE_SNAP_PX = 56;
+/** Within this distance of a screen edge a released Dock snaps to that edge.
+ *  Tight on purpose: a wider band made the orb jump between fixed edge slots
+ *  mid-drag, so sliding it along the bottom looked like it would not move. */
+const EDGE_SNAP_PX = 28;
 const clampTo = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 /** The edge position to snap to, or null to place the Dock freely here. */
 function edgeSnapAt(area: WorkArea, x: number, y: number): DockPosition | null {
@@ -237,9 +239,10 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (!pointer || pointer.id !== e.pointerId) return;
     if (!pointer.moved && Math.hypot(e.clientX - pointer.x, e.clientY - pointer.y) < DRAG_THRESHOLD) return;
     pointer.moved = true;
-    const snap = edgeSnapAt(area, e.clientX, e.clientY);
-    setPlacementPreview(snap);
-    setFreePreview(snap ? null : { x: e.clientX, y: e.clientY });
+    // Direct manipulation: the Dock follows the pointer the whole way; the
+    // edge snap is applied on release (it then glides into place).
+    setPlacementPreview(null);
+    setFreePreview({ x: e.clientX, y: e.clientY });
   };
   // Esc abandons a placement drag: the Dock returns to where it was.
   const placing = !!placementPreview || !!freePreview;

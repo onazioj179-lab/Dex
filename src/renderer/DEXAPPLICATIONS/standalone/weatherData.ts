@@ -40,6 +40,8 @@ export interface CurrentData {
   pressure: number;
   sunrise: string | null;
   sunset: string | null;
+  /** The city's own wall-clock time when fetched ("2026-11-24T22:45"). */
+  localTime?: string;
 }
 
 export interface WeatherData {
@@ -157,6 +159,30 @@ export const searchCities = async (q: string, signal?: AbortSignal): Promise<str
   }
 };
 
+/**
+ * The next 12 hours in the CITY's time. Open-Meteo (timezone=auto) returns
+ * hourly slots in the city's local time; indexing them by this computer's
+ * clock showed New York at night as "Now 5°, 20:00" from the afternoon.
+ */
+export function hourlyFrom(
+  h: { time?: string[]; temperature_2m?: number[]; weather_code?: number[] },
+  localTime: string | undefined, fallbackTemp: number,
+): HourlyData[] {
+  const times = Array.isArray(h?.time) ? h.time : [];
+  const key = (localTime ?? '').slice(0, 13); // "YYYY-MM-DDTHH"
+  let start = key ? times.findIndex(t => t.slice(0, 13) === key) : -1;
+  if (start < 0) start = new Date().getHours();
+  return Array.from({ length: 12 }, (_, i) => {
+    const idx = start + i;
+    const label = times[idx]?.slice(11, 16) ?? `${String(idx % 24).padStart(2, '0')}:00`;
+    return {
+      hour: i === 0 ? 'Now' : label,
+      temp: Math.round(h?.temperature_2m?.[idx] ?? fallbackTemp),
+      icon: wmoToCondition(h?.weather_code?.[idx] ?? 0),
+    };
+  });
+}
+
 // Fetch real weather from Open-Meteo (free, no API key)
 export const fetchWeather = async (lat: number, lon: number, signal?: AbortSignal): Promise<WeatherData | null> => {
   try {
@@ -182,10 +208,13 @@ export const fetchWeather = async (lat: number, lon: number, signal?: AbortSigna
       pressure: Math.round(data.current.surface_pressure),
       sunrise: data.daily.sunrise?.[0] ?? null,
       sunset: data.daily.sunset?.[0] ?? null,
+      localTime: typeof data.current.time === 'string' ? data.current.time : undefined,
     };
 
     const forecast: WeatherDay[] = data.daily.time.map((t: string, i: number) => {
-      const d = new Date(t);
+      // Noon local: a bare "YYYY-MM-DD" parses as UTC midnight, which named
+      // every day one day early west of Greenwich.
+      const d = new Date(`${t}T12:00:00`);
       const cond = wmoToCondition(data.daily.weather_code?.[i] ?? 0);
       return {
         day: days[d.getDay()],
@@ -201,16 +230,7 @@ export const fetchWeather = async (lat: number, lon: number, signal?: AbortSigna
       };
     });
 
-    const now = new Date();
-    const startHour = now.getHours();
-    const hourly: HourlyData[] = Array.from({ length: 12 }, (_, i) => {
-      const idx = startHour + i;
-      return {
-        hour: i === 0 ? 'Now' : `${String((startHour + i) % 24).padStart(2, '0')}:00`,
-        temp: Math.round(data.hourly.temperature_2m?.[idx] ?? current.temp),
-        icon: wmoToCondition(data.hourly.weather_code?.[idx] ?? 0),
-      };
-    });
+    const hourly = hourlyFrom(data.hourly, current.localTime, current.temp);
 
     return { current, forecast, hourly, fetchedAt: Date.now() };
   } catch {

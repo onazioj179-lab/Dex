@@ -15,6 +15,11 @@ describe('unified window chrome', () => {
     expect(windowModeFor('ledger~2', 1200)).toBe('unified');
     expect(windowModeFor('taskmanager', UNIFIED_MIN_WIDTH - 1)).toBe('standard');
     expect(windowModeFor('notes', 1600)).toBe('standard');
+    // Small bars unify in small windows: Terminal tabs, Calculator mode switch, Maps search.
+    expect(windowModeFor('terminal', 640)).toBe('unified');
+    expect(windowModeFor('calculator', 340)).toBe('unified');
+    expect(windowModeFor('calculator', 300)).toBe('standard');
+    expect(windowModeFor('maps', 900)).toBe('unified');
   });
 
   it('renders the bar inline when not in a unified window', () => {

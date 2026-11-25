@@ -24,7 +24,7 @@ describe('Color Picker workflows', () => {
     expect(hex).toHaveValue('#123456');
     fireEvent.click(screen.getByRole('button', { name: 'Send to Canvas' }));
     expect(received).toBe('#123456');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Lock hue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lock hue' }));
     expect(screen.getByRole('slider', { name: 'Hue', exact: true })).toBeDisabled();
     fireEvent.change(hex, { target: { value: '#ff0000' } });
     expect(hex).not.toHaveValue('#ff0000');

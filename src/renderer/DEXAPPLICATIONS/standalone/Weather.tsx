@@ -34,17 +34,18 @@ import {
 // ---------- condition-driven hero gradient (Apple Weather feel) ----------
 // Returns a backdrop gradient + whether it's a "night" scene, derived from the
 // current condition and whether the local clock sits between sunset and sunrise.
-const isNightNow = (sunrise: string | null, sunset: string | null): boolean => {
+const isNightNow = (sunrise: string | null, sunset: string | null, localTime?: string): boolean => {
   const toMin = (iso: string | null): number | null => {
     if (!iso) return null;
     const m = iso.match(/T(\d{2}):(\d{2})/);
     return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
   };
+  // The city's clock (from the forecast), not this computer's.
   const now = new Date();
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = toMin(localTime ?? null) ?? now.getHours() * 60 + now.getMinutes();
   const sr = toMin(sunrise);
   const ss = toMin(sunset);
-  if (sr === null || ss === null) return now.getHours() < 6 || now.getHours() >= 20;
+  if (sr === null || ss === null) return cur < 360 || cur >= 1200;
   return cur < sr || cur >= ss;
 };
 
@@ -225,7 +226,7 @@ const Weather: React.FC = () => {
   const detail = selectedDay !== null ? forecast[selectedDay] : null;
 
   // Condition-driven hero backdrop (Apple Weather feel).
-  const night = current ? isNightNow(current.sunrise, current.sunset) : false;
+  const night = current ? isNightNow(current.sunrise, current.sunset, current.localTime) : false;
   const heroGradient = current ? heroGradientFor(current.condition, night) : '';
 
   // Span of all daily highs/lows, used to render the proportional range bars.

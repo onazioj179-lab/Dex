@@ -25,18 +25,36 @@ import { createPortal } from 'react-dom';
 
 export type WindowMode = 'standard' | 'unified';
 
-/** Apps whose chrome fits one header. Others stay standard. */
-const UNIFIED_APPS = new Set([
-  'taskmanager', 'ledger', 'bio', 'health', 'security', 'dexcode', 'files',
-]);
-
 /** Below this width the app's controls would not fit beside the window controls. */
 export const UNIFIED_MIN_WIDTH = 760;
 
+/**
+ * Apps whose chrome fits one header, with the narrowest window that still
+ * holds their bar beside the window controls. Small bars (Calculator's mode
+ * switch, Terminal's tabs) unify in small windows too. Others stay standard.
+ */
+const UNIFIED_APPS: Record<string, number> = {
+  taskmanager: UNIFIED_MIN_WIDTH, ledger: UNIFIED_MIN_WIDTH, bio: UNIFIED_MIN_WIDTH, health: UNIFIED_MIN_WIDTH,
+  security: UNIFIED_MIN_WIDTH, dexcode: UNIFIED_MIN_WIDTH, files: UNIFIED_MIN_WIDTH,
+  terminal: 420, calculator: 340, maps: 560,
+};
+
 /** The mode for a window of `width` px (unified falls back to standard when narrow, so nothing is clipped). */
 export function windowModeFor(appId: string, width = Infinity): WindowMode {
-  const base = appId.split('~')[0];
-  return UNIFIED_APPS.has(base) && width >= UNIFIED_MIN_WIDTH ? 'unified' : 'standard';
+  const min = UNIFIED_APPS[appId.split('~')[0]];
+  return min !== undefined && width >= min ? 'unified' : 'standard';
+}
+
+/**
+ * Full-surface (tab) apps whose small bar moves into the DEX top bar, so the
+ * app keeps one row of chrome: nav, the app's controls, status, window
+ * controls. Big bars (DexCode, Files) keep their own row there.
+ */
+const TOPBAR_APPS = new Set(['terminal', 'maps', 'calculator']);
+
+/** The mode for an app shown full-surface (its bar in the DEX top bar, or its own). */
+export function topBarModeFor(appId: string): WindowMode {
+  return TOPBAR_APPS.has(appId.split('~')[0]) ? 'unified' : 'standard';
 }
 
 interface ChromeCtx { mode: WindowMode; slot: HTMLElement | null }
