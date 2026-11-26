@@ -5212,17 +5212,27 @@ export const AppManager: React.FC = () => {
 
   const dragRafRef = useRef<number>(0);
 
+  // A press is a tap until the pointer moves 6 px. Starting the drag on press
+  // re-rendered the whole shell twice per tap and let the slightest jitter
+  // (always, on touch) reorder tabs under the finger and swallow the tap.
+  const tabPressRef = useRef<{ id: string; x: number; y: number; pointerId: number } | null>(null);
+  const tabDraggedRef = useRef(false);
   const handleTabDragStart = useCallback((e: React.PointerEvent, appId: string) => {
-    e.preventDefault();
+    if (e.button !== 0) return;
     e.stopPropagation();
-    const target = e.currentTarget as HTMLElement;
-    try { target.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
-    draggingTabRef.current = appId;
-    setDraggingTab(appId);
+    tabPressRef.current = { id: appId, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    tabDraggedRef.current = false;
   }, []);
 
   const handleTabDragMove = useCallback((e: React.PointerEvent) => {
-    if (!draggingTabRef.current) return;
+    const press = tabPressRef.current;
+    if (!draggingTabRef.current) {
+      if (!press || press.pointerId !== e.pointerId || Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+      draggingTabRef.current = press.id;
+      tabDraggedRef.current = true;
+      setDraggingTab(press.id);
+    }
     const dragging = draggingTabRef.current;
     const pointerX = e.clientX;
     const pointerY = e.clientY;
@@ -5246,6 +5256,7 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const handleTabDragEnd = useCallback((e: React.PointerEvent) => {
+    tabPressRef.current = null;
     if (!draggingTabRef.current) return;
     const target = e.currentTarget as HTMLElement;
     try { target.releasePointerCapture(e.pointerId); } catch { /* release is best-effort */ }
@@ -5326,13 +5337,14 @@ export const AppManager: React.FC = () => {
               onPointerUp={handleTabDragEnd}
               onPointerCancel={handleTabDragEnd}
               onClick={() => {
-                if (!draggingTab) {
+                if (tabDraggedRef.current) { tabDraggedRef.current = false; return; }
+                {
                   if (minimizedApps.has(app.id)) restoreFloatingApp(app.id);
                   bringToFront(app.id as AppId);
                   setCurrentApp(app.id as AppId);
                 }
               }}
-              onDoubleClick={() => { if (!draggingTab) tileWindow(app.id as AppId, 'maximize'); }}
+              onDoubleClick={() => { if (!tabDraggedRef.current) tileWindow(app.id as AppId, 'maximize'); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 // One clean pill: a soft fill for the active app, nothing for
