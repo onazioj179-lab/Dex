@@ -52,7 +52,7 @@ describe('E2E: Navigate All 22 Apps Without Crash (item 194)', () => {
     'notes', 'tasks', 'workflows', 'gallery', 'audio',
     'vinx', 'imosion', 'prism', 'flux', 'forge',
     'calculator', 'calendar', 'password-generator', 'stopwatch',
-    'kanban', 'achievements',
+    'activity', 'achievements',
   ];
 
   beforeEach(() => {

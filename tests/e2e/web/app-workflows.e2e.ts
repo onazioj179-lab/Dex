@@ -139,7 +139,7 @@ test.describe('App workflows (web renderer)', () => {
     test.setTimeout(5 * 60_000);
     await boot(page);
     const heights: Record<string, number[]> = {};
-    for (const id of ['collabhub', 'extensions', 'kanban', 'tasks', 'workflows', 'store', 'inbox']) {
+    for (const id of ['collabhub', 'extensions', 'activity', 'tasks', 'workflows', 'store', 'inbox']) {
       await open(page, id);
       // The first app opened (CollabHub) can still be settling 300 ms after it
       // mounts on a cold CI runner; wait until its bar is laid out and on top.
@@ -159,14 +159,14 @@ test.describe('App workflows (web renderer)', () => {
           .map((e) => Math.round(e.getBoundingClientRect().height)), id);
     }
     expect(heights).toEqual({
-      collabhub: [57], extensions: [57], kanban: [57], tasks: [57], workflows: [57], store: [57], inbox: [44],
+      collabhub: [57], extensions: [57], activity: [57], tasks: [57], workflows: [57], store: [57], inbox: [44],
     });
   });
 
   test('rapid app switching leaves no error boundary and no page error', async ({ page }) => {
     test.setTimeout(5 * 60_000);
     const errors = await boot(page);
-    const ids = ['notes', 'calculator', 'tasks', 'files', 'settings', 'calendar', 'weather', 'kanban'];
+    const ids = ['notes', 'calculator', 'tasks', 'files', 'settings', 'calendar', 'weather', 'activity'];
     for (const id of ids) await open(page, id);
     // Switch between already-open apps as fast as the store accepts it.
     await page.evaluate((list) => {
