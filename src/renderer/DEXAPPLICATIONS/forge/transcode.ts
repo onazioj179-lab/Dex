@@ -190,6 +190,71 @@ function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number):
   });
 }
 
+function waitForVideoFrame(video: HTMLVideoElement, event: 'loadeddata' | 'seeked', signal: AbortSignal, start: () => void) {
+  signal.throwIfAborted();
+  return new Promise<void>((resolve, reject) => {
+    const finish = (error?: unknown) => {
+      clearTimeout(timeout);
+      video.removeEventListener(event, ready);
+      video.removeEventListener('error', failed);
+      signal.removeEventListener('abort', aborted);
+      if (error) reject(error);
+      else resolve();
+    };
+    const ready = () => finish();
+    const failed = () => finish(new Error('Could not decode a video frame.'));
+    const aborted = () => finish(signal.reason);
+    const timeout = setTimeout(() => finish(new Error('Timed out decoding a video frame.')), 15000);
+    video.addEventListener(event, ready);
+    video.addEventListener('error', failed);
+    signal.addEventListener('abort', aborted);
+    try { start(); } catch (error) { finish(error); }
+  });
+}
+
+export async function exportVideoFrames(
+  file: File,
+  format: 'png' | 'jpg' | 'webp',
+  signal: AbortSignal,
+  onFrame: (blob: Blob, index: number, total: number) => void,
+) {
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  const source = URL.createObjectURL(file);
+  try {
+    await waitForVideoFrame(video, 'loadeddata', signal, () => { video.src = source; });
+    if (!Number.isFinite(video.duration) || video.duration <= 0 || !video.videoWidth || !video.videoHeight) {
+      throw new Error('This video has no exportable frames.');
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Frame export is unavailable.');
+    const mime = format === 'jpg' ? 'image/jpeg' : `image/${format}`;
+    const fps = 30;
+    const total = Math.ceil(video.duration * fps);
+    for (let index = 0; index < total; index++) {
+      signal.throwIfAborted();
+      if (index > 0) {
+        await waitForVideoFrame(video, 'seeked', signal, () => { video.currentTime = index / fps; });
+      }
+      context.drawImage(video, 0, 0);
+      const blob = await canvasToBlob(canvas, mime, 0.92);
+      signal.throwIfAborted();
+      if (!blob || blob.type !== mime) throw new Error(`Could not encode frame ${index + 1} as ${format.toUpperCase()}.`);
+      onFrame(blob, index, total);
+    }
+    return total;
+  } finally {
+    video.removeAttribute('src');
+    video.load();
+    URL.revokeObjectURL(source);
+  }
+}
+
 // ==================== AUDIO -> WAV (REAL PCM ENCODER) ====================
 
 export interface WavEncodeOptions {

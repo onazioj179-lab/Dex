@@ -44,6 +44,15 @@ describe('meshMassProperties (closed triangle mesh)', () => {
     expect(meshMassProperties(CUBE_POS, CUBE_IDX, 2700).mass).toBeCloseTo(2700, 6);
   });
 
+  it('preserves small dimensions far from the project origin', () => {
+    const offset = 1e12;
+    const translated = CUBE_POS.map(value => offset + value);
+    const m = meshMassProperties(translated, CUBE_IDX);
+    expect(m.volume).toBeCloseTo(1, 9);
+    expect(m.surfaceArea).toBeCloseTo(6, 9);
+    expect(m.centroid).toEqual([offset + 0.5, offset + 0.5, offset + 0.5]);
+  });
+
   it('surface area is winding-independent (always positive sum)', () => {
     // Reverse every triangle's winding -> volume sign flips but |volume| + area hold.
     const flipped = [];

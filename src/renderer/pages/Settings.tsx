@@ -11,8 +11,9 @@
 
 import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion } from '../utils/appVersion';
-import { applyAccentFamily } from '../utils/accentFamily';
+import { applyIdentityTheme, DEX_IDENTITY_THEMES, type DexIdentityThemeId } from '../utils/identityTheme';
 import { setComfort, loadComfort, DENSITY_OPTIONS, type DensityPref } from '../improvements500/comfortPrefs';
+import { readReducedMotionPreference, REDUCED_MOTION_CHANGE, setReducedMotionPreference } from '../utils/useReducedMotion';
 import { useToastHelpers } from '../components/Toast';
 import { Select } from '../components/Select';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
@@ -20,7 +21,8 @@ import { APP_DEFINITIONS } from '../store/runningApps';
 import { useWallpaperStore, WALLPAPER_PRESETS, type WallpaperPreset } from '../store/wallpaperStore';
 import { useShellPreferences } from '../store/shellPreferencesStore';
 import { useFloatingLauncher } from '../store/floatingLauncherStore';
-import { SETTINGS_SECTIONS } from '../shell/settingsSections';
+import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS } from '../shell/settingsSections';
+import { sharedTick } from '../services/SharedTick';
 import type { DockEdge, DockSizePreset } from '../../shared/shell/dockGeometry';
 import {
   type DeviceTier, ALL_TIERS, getTierLabel, getTierDescription,
@@ -39,6 +41,9 @@ import {
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
 import AiProviderSettings from '../components/AiProviderSettings';
+import { ApplicationPreferences } from './ApplicationPreferences';
+import { AudioControl } from './AudioControl';
+import { UmariIndexSettings } from './UmariIndexSettings';
 import PolicyViewer from '../components/PolicyViewer';
 import { useConfirm } from '../components/ConfirmDialog';
 import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settingsPanels/AccessPanels';
@@ -215,6 +220,7 @@ const Icons = {
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   general: Icons.general,
   appearance: Icons.appearance,
+  applications: Icons.general,
   shell: Icons.shell,
   sound: Icons.sound,
   display: Icons.display,
@@ -250,20 +256,6 @@ const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
   keywords: s.keywords,
 }));
 
-const SECTION_CATEGORIES: { label: string; ids: string[] }[] = [
-  { label: 'System', ids: ['general', 'appearance', 'shell', 'sound', 'display'] },
-  { label: 'Privacy & Security', ids: ['privacy', 'permissions', 'network'] },
-  { label: 'Productivity', ids: ['notifications', 'keyboard', 'window', 'snap', 'files'] },
-  { label: 'Advanced', ids: ['performance', 'systemMonitor', 'accessibility', 'storage', 'browser'] },
-  { label: 'AI', ids: ['aiproviders', 'uki'] },
-  { label: 'Creative Suite', ids: ['creativeapps'] },
-  { label: 'Developer', ids: ['developer', 'plugins'] },
-  { label: 'Extensions', ids: ['nexus'] },
-  { label: 'Info', ids: ['updates', 'about'] },
-  { label: 'Account', ids: ['account'] },
-  { label: 'Owner', ids: ['creator'] },
-];
-
 const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
 
 // ===========================================================================
@@ -282,10 +274,9 @@ const sectionMap = new Map(SECTIONS.map(s => [s.id, s]));
 const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: string[] }> = {
   general: { defaultKeys: ['launchAtStartup', 'checkForUpdates', 'restoreLastSession', 'autoSave', 'analytics'] },
   appearance: {
-    defaultKeys: ['darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'fontScale', 'windowControls', 'stageManager', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
-    localKeys: ['darkMode', 'dex-font-scale', 'dex-window-controls'],
+    defaultKeys: ['identityTheme', 'darkMode', 'reduceMotion', 'transparency', 'reduceTransparency', 'accentColor', 'fontSize', 'fontScale', 'windowControls', 'stageManager', 'windowMaterial', 'blurIntensity', 'glassOpacity'],
+    localKeys: ['darkMode', 'dex-identity-theme', 'dex-font-scale', 'dex-window-controls'],
   },
-  sound: { defaultKeys: ['masterVolume', 'alertVolume', 'outputDevice', 'inputDevice', 'spatialAudio', 'spatialAudioProfile', 'audioBalance', 'enhancedDialogue', 'mediaAutoPlay', 'creativeAppAudioBypass'] },
   display: { defaultKeys: ['displayResolution', 'displayScaling', 'blurIntensity', 'glassOpacity', 'adaptiveBrightness', 'truetoneBrightness', 'nightShift', 'nightShiftWarmth', 'displayRefreshRate', 'hdrContent'] },
   notifications: { defaultKeys: ['enableNotifications', 'soundEnabled', 'badgeEnabled', 'doNotDisturb'] },
   privacy: { defaultKeys: ['locationServices', 'crashReports', 'antiHacker', 'firewallEnabled', 'vpnProtection', 'encryptData', 'blockMalware', 'sandboxApps', 'autoLockMinutes', 'requireAuthOnWake'] },
@@ -300,9 +291,8 @@ const SECTION_RESET_MAP: Record<string, { defaultKeys: string[]; localKeys?: str
     localKeys: ['dex-app-tab-bar'],
   },
   keyboard: { defaultKeys: ['enableGlobalShortcuts', 'cmdPaletteShortcut', 'quickSearchShortcut', 'screenshotShortcut'] },
-  files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'defaultView', 'sortBy', 'indexFolders', 'watchForChanges', 'thumbnailSize', 'maxStorageGB'] },
+  files: { defaultKeys: ['showHiddenFiles', 'confirmDelete', 'defaultView', 'sortBy', 'thumbnailSize', 'maxStorageGB'] },
   storage: { defaultKeys: ['cacheSizeGB', 'autoCleanCache', 'cacheCleanIntervalDays', 'compressOldFiles', 'encryptData'] },
-  browser: { defaultKeys: ['blockTrackers', 'blockAds', 'forceHttps', 'fingerprintProtection', 'doNotTrack', 'clearOnExit', 'blockThirdPartyCookies', 'enableTorMode', 'defaultSearchEngine', 'maxDownloadSpeed', 'parallelDownloads'] },
   uki: { defaultKeys: ['ukiEnabled', 'ukiMemoryEnabled', 'ukiWakeWordEnabled', 'ukiWakePhrase', 'ukiRecallMode', 'ukiRetentionDays', 'ukiCacheSizeGB', 'ukiAutoCleanup', 'ukiShowTranscript', 'ukiPersonality'] },
 };
 
@@ -375,7 +365,12 @@ const SystemMonitorPanel: React.FC = () => {
         dexApi.system.getProcesses().catch(() => []),
         dexApi.system.getStatus?.().catch(() => null),
       ]);
-      setProcesses(Array.isArray(procs) ? procs : []);
+      const normalized = Array.isArray(procs)
+        ? procs
+        : Array.isArray(procs?.processes)
+          ? procs.processes
+          : [];
+      setProcesses(normalized);
       if (stat) setStatus(stat);
       setError(null);
     } catch (e) {
@@ -387,9 +382,8 @@ const SystemMonitorPanel: React.FC = () => {
   }, [dexApi]);
 
   React.useEffect(() => {
-    refresh();
-    const id = window.setInterval(refresh, 3000);
-    return () => window.clearInterval(id);
+    sharedTick.subscribe('settings-system-monitor', refresh, 3000, { fireImmediately: true });
+    return () => sharedTick.unsubscribe('settings-system-monitor');
   }, [refresh]);
 
   const handleEndProcess = React.useCallback(async (pid: number, name: string) => {
@@ -976,6 +970,9 @@ const loadSettingsFromBackend = async (): Promise<Record<string, unknown> | null
 };
 
 const saveSettings = (settings: Record<string, unknown>) => {
+  if (typeof settings.reduceMotion === 'boolean' && settings.reduceMotion !== readReducedMotionPreference()) {
+    setReducedMotionPreference(settings.reduceMotion);
+  }
   localStorage.setItem('dex-settings', JSON.stringify(settings));
   // Also save to backend
   saveSettingsToBackend(settings);
@@ -1080,6 +1077,7 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.classList.remove('dark-mode');
     }
     localStorage.setItem('darkMode', String(settings.darkMode !== false));
+    applyIdentityTheme(settings.identityTheme, true);
 
     // Apply locale to document.lang and dir (RTL for Arabic/Hebrew/Persian/Urdu)
     try {
@@ -1093,16 +1091,10 @@ const applySettings = (settings: Record<string, unknown>) => {
       root.dir = isRtl ? 'rtl' : 'ltr';
     } catch { /* ignore */ }
     
-    // Apply accent color as one coherent family (base/hover/dark/light/soft) via
-    // the shared deriver, so accent tints and pressed states track the chosen
-    // colour. A non-literal sentinel like 'var(--color-accent)' means "system
-    // default": clear inline overrides so the stylesheet baseline shows through
-    // (the old path set --color-accent to a self-referential var, which broke it).
-    const accentColor = String(settings.accentColor || '').trim();
-    if (!applyAccentFamily(accentColor)) {
-      for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft']) {
-        root.style.removeProperty(prop);
-      }
+    // Monolith has no configurable accent. Clear historical inline overrides so
+    // the authoritative monochrome token family controls every app surface.
+    for (const prop of ['--color-accent', '--accent-color', '--color-accent-hover', '--color-accent-dark', '--color-accent-light', '--color-accent-soft', '--color-accent-muted']) {
+      root.style.removeProperty(prop);
     }
 
     // Apply font size (scale-based)
@@ -1228,6 +1220,7 @@ const DEFAULT_SETTINGS = {
   restoreLastSession: true,
   
   // Appearance
+  identityTheme: 'monolith' as DexIdentityThemeId,
   darkMode: true,
   reduceMotion: false,
   transparency: true,
@@ -1263,8 +1256,6 @@ const DEFAULT_SETTINGS = {
   confirmDelete: true,
   defaultView: 'list',
   sortBy: 'name',
-  indexFolders: true,
-  watchForChanges: true,
   thumbnailSize: 'medium',
   maxStorageGB: 100000,
   
@@ -1881,6 +1872,13 @@ export const Settings: React.FC = () => {
   const { confirm: confirmReset, ConfirmHost: ConfirmResetHost } = useConfirm();
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dex-settings-expanded-categories') || '[]');
+      if (Array.isArray(saved) && saved.length > 0) return new Set(saved.filter(id => typeof id === 'string'));
+    } catch { /* use defaults */ }
+    return new Set(['system', 'appearance']);
+  });
   const [settingsSearch, setSettingsSearch] = useState('');
   // Keyboard-driven cursor into the flat search results (-1 = nothing focused).
   const [searchCursor, setSearchCursor] = useState(0);
@@ -1888,7 +1886,17 @@ export const Settings: React.FC = () => {
   // When a search result jumps to a section, remember which control to scroll
   // to + flash once the new section has rendered.
   const pendingScrollRef = React.useRef<string | null>(null);
-  const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => loadSettings() || DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<typeof DEFAULT_SETTINGS>(() => ({
+    ...(loadSettings() || DEFAULT_SETTINGS), reduceMotion: readReducedMotionPreference(),
+  }));
+  useEffect(() => {
+    const syncMotion = () => {
+      const reduceMotion = readReducedMotionPreference();
+      setSettings(previous => previous.reduceMotion === reduceMotion ? previous : { ...previous, reduceMotion });
+    };
+    window.addEventListener(REDUCED_MOTION_CHANGE, syncMotion);
+    return () => window.removeEventListener(REDUCED_MOTION_CHANGE, syncMotion);
+  }, []);
   const [appVersion, setAppVersion] = useState<string>(getBundledAppVersion());
   const [policyViewerOpen, setPolicyViewerOpen] = useState(false);
   const [policyViewerInitial, setPolicyViewerInitial] = useState<PolicySlug>('terms');
@@ -1900,6 +1908,23 @@ export const Settings: React.FC = () => {
   const shellPrefs = useShellPreferences();
   const dexBarEnabled = useFloatingLauncher((s) => s.enabled);
   const setDexBarEnabled = useFloatingLauncher((s) => s.setEnabled);
+
+  const toggleCategory = useCallback((categoryId: string) => {
+    setExpandedCategories(previous => {
+      const next = new Set(previous);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      try { localStorage.setItem('dex-settings-expanded-categories', JSON.stringify(Array.from(next))); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+
+  // Deep links and search jumps always reveal the category that owns the target.
+  useEffect(() => {
+    const owner = SETTINGS_CATEGORIES.find(category => category.sectionIds.includes(activeSection));
+    if (!owner || expandedCategories.has(owner.id)) return;
+    setExpandedCategories(previous => new Set(previous).add(owner.id));
+  }, [activeSection, expandedCategories]);
 
   // =========================================================================
   // SEARCH-FIRST SETTINGS (DEX 5.5)
@@ -2367,7 +2392,7 @@ export const Settings: React.FC = () => {
       // transparency toggles are flipped from anywhere in Settings.
       if (key === 'transparency') {
         try {
-          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'liquid') : 'off');
+          shellPrefs.setGlassMode(nextVal ? (prev.reduceTransparency ? 'reduced' : 'normal') : 'off');
         } catch { /* store not ready */ }
       }
       if (key === 'reduceTransparency') {
@@ -2376,7 +2401,7 @@ export const Settings: React.FC = () => {
             // transparency disabled -- glass stays off
             shellPrefs.setGlassMode('off');
           } else {
-            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'liquid');
+            shellPrefs.setGlassMode(nextVal ? 'reduced' : 'normal');
           }
         } catch { /* store not ready */ }
       }
@@ -2529,34 +2554,33 @@ export const Settings: React.FC = () => {
           />
         </div>
 
-        <h3 style={styles.sectionTitle}>Liquid Glass</h3>
+        <h3 style={styles.sectionTitle}>Frosted Ice</h3>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Glass</span>
+            <span style={styles.settingLabel}>Material</span>
             <span style={styles.settingDesc}>
               {prefs.glassMode === 'off'
                 ? 'Off — every surface is opaque true black.'
-                : 'On — full Apple-style liquid glass across the whole shell.'}
+                : 'On — quiet diffusion and strong separation across shell surfaces.'}
             </span>
           </div>
           <input
             type="checkbox"
             checked={prefs.glassMode !== 'off'}
-            onChange={(e) => prefs.setGlassMode(e.target.checked ? 'liquid' : 'off')}
-            aria-label="Liquid Glass on or off"
+            onChange={(e) => prefs.setGlassMode(e.target.checked ? 'normal' : 'off')}
+            aria-label="Frosted Ice on or off"
           />
         </div>
         {prefs.glassMode !== 'off' && <>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Intensity</span>
-            <span style={styles.settingDesc}>How transparent the glass is. Liquid is the full Apple look.</span>
+            <span style={styles.settingDesc}>Choose readable diffusion or an accessibility-first solid treatment.</span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
               { id: 'reduced', label: 'Reduced' },
-              { id: 'normal', label: 'Normal' },
-              { id: 'liquid', label: 'Liquid' },
+              { id: 'normal', label: 'Frosted' },
             ] as const).map((mode) => (
               <button
                 key={mode.id}
@@ -2574,16 +2598,10 @@ export const Settings: React.FC = () => {
         </div>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
-            <span style={styles.settingLabel}>Tint</span>
-            <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
+            <span style={styles.settingLabel}>Material tone</span>
+            <span style={styles.settingDesc}>Neutral graphite is fixed so hierarchy never depends on color.</span>
           </div>
-          <input
-            type="color"
-            value={prefs.glassTint}
-            onChange={(e) => prefs.setGlassTint(e.target.value)}
-            style={{ width: 48, height: 28, border: 'none', background: 'transparent', cursor: 'pointer' }}
-            aria-label="Liquid Glass tint color"
-          />
+          <span className="dex-label-caps">Neutral</span>
         </div>
         <div style={styles.settingRow}>
           <div style={styles.settingInfo}>
@@ -2595,7 +2613,7 @@ export const Settings: React.FC = () => {
             value={prefs.glassOpacity}
             onChange={(e) => prefs.setGlassOpacity(parseFloat(e.target.value))}
             style={{ width: 200 }}
-            aria-label="Liquid Glass opacity"
+            aria-label="Frosted Ice opacity"
           />
         </div>
         </>}
@@ -2741,7 +2759,48 @@ export const Settings: React.FC = () => {
 
   const renderAppearanceSettings = () => (
     <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Theme</h3>
+      <h3 style={styles.sectionTitleFirst}>DEX Identity</h3>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))',
+        gap: 'var(--space-2)', marginTop: 'var(--space-2)',
+      }}>
+        {DEX_IDENTITY_THEMES.map(theme => {
+          const active = (settings.identityTheme ?? 'monolith') === theme.id;
+          return (
+            <button
+              key={theme.id}
+              type="button"
+              aria-label={`Use ${theme.name} DEX identity`}
+              aria-pressed={active}
+              onClick={() => setSettings(prev => ({
+                ...prev,
+                identityTheme: theme.id,
+                darkMode: true,
+                accentColor: 'var(--color-accent)',
+              }))}
+              style={{
+                minHeight: 112, padding: 'var(--space-3)', borderRadius: 8,
+                border: active ? '1px solid var(--dex-focus-color, #fff)' : '1px solid var(--color-border)',
+                background: active ? 'var(--color-bg-active)' : 'var(--color-bg-surface)',
+                color: 'var(--color-text-primary)', cursor: 'pointer', textAlign: 'left',
+                boxShadow: active ? 'inset 0 0 0 1px var(--color-border-subtle)' : 'none',
+              }}
+            >
+              <span aria-hidden="true" style={{ display: 'flex', height: 28, marginBottom: 10, overflow: 'hidden', borderRadius: 5, border: '1px solid var(--color-border-subtle)' }}>
+                {theme.preview.map((color, index) => (
+                  <span key={color} style={{ flex: index === 2 ? 0.5 : 1, background: color }} />
+                ))}
+              </span>
+              <span style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>{theme.name}</span>
+              <span style={{ display: 'block', marginTop: 4, fontSize: 10.5, lineHeight: 1.35, color: 'var(--color-text-tertiary)' }}>
+                {theme.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <h3 style={styles.sectionTitle}>Color Mode</h3>
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Appearance</span>
@@ -2773,20 +2832,13 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      <h3 style={styles.sectionTitle}>Accent Color</h3>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-        {['var(--color-accent)', 'var(--color-success)', 'var(--color-warning)', 'var(--color-error)', '#bf5af2', '#ff375f', '#64d2ff', '#ff9f0a'].map(color => (
-          <button
-            key={color}
-            aria-label={`Select accent color ${color}`}
-            onClick={() => setSettings(prev => ({ ...prev, accentColor: color }))}
-            style={{
-              width: '32px', height: '32px', borderRadius: '50%', background: color,
-              border: settings.accentColor === color ? '3px solid var(--color-text-primary, #fff)' : '2px solid transparent',
-              cursor: 'pointer', boxShadow: settings.accentColor === color ? '0 0 10px ' + color : 'none'
-            }}
-          />
-        ))}
+      <h3 style={styles.sectionTitle}>Interface Signal</h3>
+      <div style={styles.settingRow}>
+        <div style={styles.settingInfo}>
+          <span style={styles.settingLabel}>Monochrome</span>
+          <span style={styles.settingDesc}>State is communicated with contrast, shape, and labels—not accent color.</span>
+        </div>
+        <span className="dex-label-caps">Locked</span>
       </div>
       
       <h3 style={styles.sectionTitle}>Text Size</h3>
@@ -2829,15 +2881,14 @@ export const Settings: React.FC = () => {
           components that still read settings.transparency. */}
       <div style={styles.settingRow}>
         <div style={styles.settingInfo}>
-          <span style={styles.settingLabel}>Glass</span>
-          <span style={styles.settingDesc}>Off, Reduced (light blur), Normal, or Liquid (richest depth).</span>
+          <span style={styles.settingLabel}>Frosted Ice</span>
+          <span style={styles.settingDesc}>Off, Reduced, or Frosted. Diffusion is restrained for readability and performance.</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {([
             { id: 'off', label: 'Off' },
             { id: 'reduced', label: 'Reduced' },
-            { id: 'normal', label: 'Normal' },
-            { id: 'liquid', label: 'Liquid' },
+            { id: 'normal', label: 'Frosted' },
           ] as const).map((mode) => {
             const active = shellPrefs.glassMode === mode.id;
             return (
@@ -3733,41 +3784,6 @@ export const Settings: React.FC = () => {
   // =========================================================================
   // SOUND SETTINGS
   // =========================================================================
-  const renderSoundSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Output</h3>
-      {renderSlider('masterVolume', 'Master Volume', 'System-wide volume level', 0, 100, '%')}
-      {renderSlider('alertVolume', 'Alert Volume', 'Volume for system alerts and notifications', 0, 100, '%')}
-      {renderSlider('audioBalance', 'Balance', 'Left/Right audio balance', 0, 100, '', 1)}
-      {renderSelect('outputDevice', 'Output Device', 'Sound output device', [
-        { value: 'built-in', label: 'Built-in Speakers' },
-        { value: 'headphones', label: 'Headphones' },
-        { value: 'bluetooth', label: 'Bluetooth Audio' },
-      ])}
-
-      <h3 style={styles.sectionTitle}>Input</h3>
-      {renderSelect('inputDevice', 'Input Device', 'Sound input device', [
-        { value: 'built-in', label: 'Built-in Microphone' },
-        { value: 'external', label: 'External Microphone' },
-        { value: 'bluetooth', label: 'Bluetooth Microphone' },
-      ])}
-
-      <h3 style={styles.sectionTitle}>Spatial Audio</h3>
-      {renderToggle('spatialAudio', 'Spatial Audio', 'Enable immersive 3D audio experience')}
-      {renderSelect('spatialAudioProfile', 'Profile', 'Spatial audio tracking mode', [
-        { value: 'fixed', label: 'Fixed' },
-        { value: 'head-tracked', label: 'Head Tracked' },
-        { value: 'off', label: 'Off' },
-      ])}
-      {renderToggle('enhancedDialogue', 'Enhanced Dialogue', 'Boost voice clarity in media')}
-
-      <h3 style={styles.sectionTitle}>Creative Apps</h3>
-      {renderToggle('creativeAppAudioBypass', 'Bypass Audio Effects', 'AXL, VINX, Imosion, and Flux get raw unprocessed audio')}
-
-      <h3 style={styles.sectionTitle}>Media</h3>
-      {renderToggle('mediaAutoPlay', 'Auto-Play Media', 'Automatically play media in apps')}
-    </div>
-  );
 
   // =========================================================================
   // DISPLAY SETTINGS
@@ -4089,9 +4105,8 @@ export const Settings: React.FC = () => {
         { value: 'large', label: 'Large' },
       ])}
 
-      <h3 style={styles.sectionTitle}>Indexing</h3>
-      {renderToggle('indexFolders', 'Index Folders', 'Index folder contents for faster search')}
-      {renderToggle('watchForChanges', 'Watch for Changes', 'Automatically detect file changes on disk')}
+      <h3 style={styles.sectionTitle}>Umari indexing</h3>
+      <UmariIndexSettings />
 
       <h3 style={styles.sectionTitle}>Storage</h3>
       {renderSlider('maxStorageGB', 'Max Storage', 'Maximum storage DEX can use for cache and data', 1, 100000, ' GB', 100)}
@@ -4101,36 +4116,6 @@ export const Settings: React.FC = () => {
   // =========================================================================
   // BROWSER SETTINGS
   // =========================================================================
-  const renderBrowserSettings = () => (
-    <div style={styles.settingsContent}>
-      <h3 style={styles.sectionTitleFirst}>Privacy</h3>
-      {renderToggle('blockTrackers', 'Block Trackers', 'Block cross-site trackers and fingerprinting')}
-      {renderToggle('blockAds', 'Block Ads', 'Block advertisements and popups')}
-      {renderToggle('fingerprintProtection', 'Fingerprint Protection', 'Prevent browser fingerprint tracking')}
-      {renderToggle('doNotTrack', 'Do Not Track', 'Send Do Not Track header with requests')}
-      {renderToggle('blockThirdPartyCookies', 'Block Third-Party Cookies', 'Prevent cross-site cookie tracking')}
-
-      <h3 style={styles.sectionTitle}>Security</h3>
-      {renderToggle('forceHttps', 'Force HTTPS', 'Automatically upgrade connections to HTTPS')}
-      {renderToggle('clearOnExit', 'Clear on Exit', 'Clear browsing data when DEX closes')}
-      {renderToggle('enableTorMode', 'Tor Mode', 'Route traffic through the Tor network for privacy')}
-
-      <h3 style={styles.sectionTitle}>Search & Downloads</h3>
-      {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [
-        { value: 'duckduckgo', label: 'DuckDuckGo' },
-        { value: 'google', label: 'Google' },
-        { value: 'bing', label: 'Bing' },
-        { value: 'brave', label: 'Brave Search' },
-      ])}
-      {renderSelect('maxDownloadSpeed', 'Download Speed Limit', 'Maximum download speed', [
-        { value: 'unlimited', label: 'Unlimited' },
-        { value: '10', label: '10 MB/s' },
-        { value: '50', label: '50 MB/s' },
-        { value: '100', label: '100 MB/s' },
-      ])}
-      {renderSlider('parallelDownloads', 'Parallel Downloads', 'Maximum simultaneous download connections', 1, 16, '')}
-    </div>
-  );
 
   // ===========================================================================
   // WINDOW MANAGEMENT SETTINGS
@@ -4601,8 +4586,9 @@ export const Settings: React.FC = () => {
     switch (activeSection) {
       case 'general': return renderGeneralSettings();
       case 'appearance': return renderAppearanceSettings();
+      case 'applications': return <ApplicationPreferences />;
       case 'shell': return renderShellSettings();
-      case 'sound': return renderSoundSettings();
+      case 'sound': return <AudioControl />;
       case 'display': return renderDisplaySettings();
       case 'notifications': return renderNotificationSettings();
       case 'privacy': return renderPrivacySettings();
@@ -4617,7 +4603,7 @@ export const Settings: React.FC = () => {
       case 'keyboard': return renderKeyboardSettings();
       case 'files': return renderFilesSettings();
       case 'storage': return renderStorageSettings();
-      case 'browser': return renderBrowserSettings();
+      case 'browser': return <ApplicationPreferences key="browser" initialApp="browser" />;
       case 'uki': return renderUkiSettings();
       case 'aiproviders': return <AiProviderSettings />;
       case 'creativeapps': return renderCreativeAppsSettings();
@@ -4638,9 +4624,9 @@ export const Settings: React.FC = () => {
         .settings-nav:active { transform: scale(0.98); }
         .settings-nav[data-active="true"]::before {
           content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
-          width: 2px; background: var(--color-accent); border-radius: 2px;
-          box-shadow: 0 0 6px var(--color-accent-light, rgba(74,158,255,0.55));
+          width: 2px; background: var(--color-text-primary); border-radius: 1px;
         }
+        .settings-category:hover { background: var(--color-surface-1) !important; color: var(--color-text-primary) !important; }
         .settings-btn:hover { background: var(--color-bg-hover) !important; }
         .settings-btn:active { transform: scale(0.97); }
         .settings-toggle:hover { background: var(--color-bg-hover) !important; }
@@ -4662,7 +4648,7 @@ export const Settings: React.FC = () => {
         }
       `}</style>
       {/* Sidebar */}
-      <div style={styles.sidebar}>
+      <div className="dex-frosted-ice" style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
           <span style={styles.sidebarTitle}>Settings</span>
         </div>
@@ -4911,12 +4897,34 @@ export const Settings: React.FC = () => {
                 </React.Fragment>
               );
             }
-            return SECTION_CATEGORIES.map(cat => {
-              const items = cat.ids.map(id => sectionMap.get(id)).filter(Boolean) as SettingSection[];
+            return SETTINGS_CATEGORIES.map(cat => {
+              const items = cat.sectionIds.map(id => sectionMap.get(id)).filter(Boolean) as SettingSection[];
               if (items.length === 0) return null;
+              const expanded = expandedCategories.has(cat.id);
+              const containsActive = cat.sectionIds.includes(activeSection);
               return (
                 <React.Fragment key={cat.label}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)', padding: 'var(--space-3) 14px 4px' }}>{cat.label}</div>
+                  <button
+                    type="button"
+                    className="settings-category"
+                    aria-expanded={expanded}
+                    aria-controls={`settings-category-${cat.id}`}
+                    onClick={() => toggleCategory(cat.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', width: '100%', minHeight: 30,
+                      padding: 'var(--space-2) 14px 4px', border: 0, background: 'transparent',
+                      color: containsActive ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                      cursor: 'pointer', textAlign: 'left', fontSize: 10, fontWeight: 600,
+                      textTransform: 'uppercase' as const, letterSpacing: 'var(--dex-tracking-label, 0.08em)',
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>{cat.label}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden
+                      style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 120ms var(--dex-ease)' }}>
+                      <path d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <div id={`settings-category-${cat.id}`} hidden={!expanded}>
                   {items.map(section => (
                     <button
                       key={section.id}
@@ -4937,6 +4945,7 @@ export const Settings: React.FC = () => {
                       <span>{section.name}</span>
                     </button>
                   ))}
+                  </div>
                 </React.Fragment>
               );
             });
@@ -4945,7 +4954,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div style={styles.main}>
+      <div className="dex-frosted-ice-strong" style={styles.main}>
         <div style={styles.header}>
           <span style={styles.headerTitle}>
             {SECTIONS.find(s => s.id === activeSection)?.name}

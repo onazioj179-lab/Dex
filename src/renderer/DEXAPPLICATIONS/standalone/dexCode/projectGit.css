@@ -1,0 +1,90 @@
+.dex-project-git {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: .5rem;
+  max-height: min(34vh, 320px);
+  padding: .45rem .6rem .55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-base);
+}
+
+.dex-project-git-header,
+.dex-project-git-actions,
+.dex-project-git-diff-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .4rem;
+}
+
+.dex-project-git-actions {
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+.dex-project-git-branch {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dex-project-git button {
+  padding: .2rem .4rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: .25rem;
+  color: var(--color-text-primary);
+  background: transparent;
+  font: inherit;
+}
+
+.dex-project-git button:hover,
+.dex-project-git button[aria-pressed="true"] {
+  background: var(--color-bg-inset, rgba(128, 128, 128, .16));
+}
+
+.dex-project-git p {
+  margin: .15rem 0;
+  color: var(--color-text-secondary);
+}
+
+.dex-project-git-content {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) minmax(0, 2fr);
+  gap: .5rem;
+  min-height: 0;
+}
+
+.dex-project-git-files,
+.dex-project-git-diff {
+  min-width: 0;
+  overflow: auto;
+}
+
+.dex-project-git-files > button {
+  display: flex;
+  gap: .4rem;
+  width: 100%;
+  border-color: transparent;
+  text-align: start;
+}
+
+.dex-project-git-files code {
+  min-width: 2ch;
+  color: var(--color-text-secondary);
+  white-space: pre;
+}
+
+.dex-project-git-files button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dex-project-git-diff pre {
+  margin: .25rem 0;
+  white-space: pre;
+  font: inherit;
+  font-family: var(--dex-font-mono, monospace);
+}

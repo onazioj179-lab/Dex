@@ -11,11 +11,12 @@
  * category headings, sliding selection indicator.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useId, useRef, useCallback, useMemo, memo } from 'react';
 import { spotlightEngine, type SpotlightResult, type SpotlightCategory, type HighlightSpan } from './SpotlightEngine';
 import { SPRING_PRESETS, SpringAnimator, isReduceMotion } from '../utils/MotionController';
 import DexIcon from '../components/DexIcon';
 import { platform } from '../utils';
+import { useMotionPresence } from '../utils/useMotionPresence';
 
 // ---------------------------------------------------------------------------
 // CATEGORY LABELS & ICONS
@@ -353,6 +354,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   const [results, setResults] = useState<SpotlightResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const listId = useId();
   // Notify parent whenever the results panel toggles.
   React.useEffect(() => { onResultsOpenChange?.(showResults); }, [showResults, onResultsOpenChange]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -560,7 +562,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
       const items = resultsRef.current.querySelectorAll('[role="option"]');
       const item = items[selectedIndex] as HTMLElement;
       if (item) {
-        item.scrollIntoView({ block: 'nearest', behavior: isReduceMotion() ? 'auto' : 'smooth' });
+        item.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
       }
     }
   }, [selectedIndex, flatResults.length]);
@@ -569,6 +571,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
   // widgets (clock etc.) out of the way — otherwise the widget layer, which
   // renders after the scroll content, paints over the results dropdown.
   const homeSearchActive = variant === 'home' && showResults && flatResults.length > 0;
+  const homeResultsPresent = useMotionPresence(homeSearchActive);
   useEffect(() => {
     if (variant !== 'home') return undefined;
     window.dispatchEvent(new CustomEvent('dex-home-search-active', { detail: { active: homeSearchActive } }));
@@ -617,8 +620,8 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
             role="combobox"
             aria-expanded={showResults}
             aria-haspopup="listbox"
-            aria-controls="spotlight-results-home"
-            aria-activedescendant={showResults && flatResults.length > 0 ? `spotlight-result-home-${selectedIndex}` : undefined}
+            aria-controls={homeResultsPresent ? listId : undefined}
+            aria-activedescendant={homeSearchActive ? `${listId}-${selectedIndex}` : undefined}
             autoComplete="off"
             spellCheck={false}
             className="dex-search-field"
@@ -654,18 +657,20 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
         </div>
 
         {/* Scrollable results dropdown */}
-        {showResults && flatResults.length > 0 && (
+        {homeResultsPresent && (
           <div
             ref={resultsRef}
-            id="spotlight-results-home"
+            id={listId}
             role="listbox"
             aria-label="Search results"
-            className="spotlight-results-scroll"
+            className="spotlight-results-scroll dex-motion-surface"
+            data-open={homeSearchActive}
+            {...(!homeSearchActive ? { inert: '' } : {})}
             onMouseDown={e => e.preventDefault()}
             style={{
               position: 'absolute', left: 0, right: 0, ...dropStyle,
               maxHeight: 420, overflowY: 'auto', overflowX: 'hidden',
-              scrollBehavior: 'smooth',
+              transformOrigin: dropUp ? 'bottom center' : 'top center',
               // Liquid glass (master overhaul) -- the strong variant: translucent
               // enough to bloom the wallpaper/content behind it, opaque enough that
               // result text stays readable. Falls back to solid on weak GPUs /
@@ -677,7 +682,6 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
               borderRadius: 10,
               boxShadow: 'var(--pg-shadow-popover-strong), var(--pg-gloss-top)',
               padding: '4px',
-              animation: isReduceMotion() ? 'none' : 'spotlightResultsIn 0.12s ease-out',
             }}
           >
             {groupedResults.map(group => (
@@ -695,7 +699,7 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
                   return (
                     <ResultItem
                       key={result.id}
-                      id={`spotlight-result-home-${globalIndex}`}
+                      id={`${listId}-${globalIndex}`}
                       result={result}
                       isSelected={globalIndex === selectedIndex}
                       onClick={() => executeResult(result)}
@@ -859,13 +863,39 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
           </div>
         )}
 
-        {/* Empty state */}
+        {/* Empty state — a dead-end result set still offers a clear next action
+            (search the web) instead of just telling the user to try again. */}
         {query && flatResults.length === 0 && (
           <div style={{
-            padding: 'var(--space-8) var(--space-5)', textAlign: 'center',
+            padding: 'var(--space-6) var(--space-5) var(--space-5)', textAlign: 'center',
           }}>
             <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No results for "{query}"</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', opacity: 0.5, marginTop: 4 }}>Try a different search term.</div>
+            <button
+              type="button"
+              onClick={() => executeResult({
+                id: `web-empty-${query}`,
+                category: 'web',
+                title: `Search the web for "${query}"`,
+                highlights: [],
+                score: 0,
+                action: () => window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
+                  detail: { appId: 'browser', contextId: `https://duckduckgo.com/?q=${encodeURIComponent(query)}` },
+                })),
+              })}
+              style={{
+                marginTop: 'var(--space-3)', padding: '6px 14px',
+                fontSize: 12, fontWeight: 500,
+                color: 'var(--color-accent, #4A9EFF)',
+                background: 'var(--color-accent-soft, rgba(74,158,255,0.08))',
+                border: '1px solid var(--color-accent-light, rgba(74,158,255,0.14))',
+                borderRadius: 'var(--radius-lg, 6px)', cursor: 'pointer',
+                transition: 'background 150ms cubic-bezier(0.4,0,0.2,1)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-accent-light, rgba(74,158,255,0.14))'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-accent-soft, rgba(74,158,255,0.08))'; }}
+            >
+              Search the web for "{query}"
+            </button>
           </div>
         )}
 
@@ -904,10 +934,6 @@ export const SpotlightSearch: React.FC<SpotlightProps> = memo(({ variant, isOpen
 
       {/* Keyframe + scrollbar injection */}
       <style>{`
-        @keyframes spotlightResultsIn {
-          from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
         .spotlight-results-scroll::-webkit-scrollbar {
           width: 6px;
         }

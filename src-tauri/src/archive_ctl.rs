@@ -144,6 +144,7 @@ struct CdEntry {
     compression_method: u16,
     compressed_size: u32,
     uncompressed_size: u32,
+    crc32: u32,
     local_header_offset: u32,
     modified: i64,
     is_directory: bool,
@@ -190,6 +191,7 @@ fn read_zip_central_directory(buffer: &[u8]) -> Option<Vec<CdEntry>> {
         let dos_time = u16le(buffer, p + 12)?;
         let dos_date = u16le(buffer, p + 14)?;
         let compressed_size = u32le(buffer, p + 20)?;
+        let crc32 = u32le(buffer, p + 16)?;
         let uncompressed_size = u32le(buffer, p + 24)?;
         let file_name_len = u16le(buffer, p + 28)? as usize;
         let extra_len = u16le(buffer, p + 30)? as usize;
@@ -206,6 +208,7 @@ fn read_zip_central_directory(buffer: &[u8]) -> Option<Vec<CdEntry>> {
             compression_method,
             compressed_size,
             uncompressed_size,
+            crc32,
             local_header_offset,
             modified: dos_to_unix(dos_date, dos_time),
             is_directory,
@@ -532,18 +535,46 @@ fn inflate_entry(buffer: &[u8], entry: &CdEntry) -> Result<Vec<u8>, String> {
     let compressed = buffer
         .get(data_start..data_end)
         .ok_or("ZIP entry data out of bounds.")?;
-    match entry.compression_method {
-        0 => Ok(compressed.to_vec()), // stored
+    let data = match entry.compression_method {
+        0 => compressed.to_vec(),
         8 => {
             // deflate — raw (RFC 1951), Node `zlib.inflateRawSync`.
-            let mut dec = flate2::read::DeflateDecoder::new(compressed);
-            let mut out = Vec::with_capacity(entry.uncompressed_size as usize);
+            let mut dec = flate2::read::DeflateDecoder::new(compressed)
+                .take(u64::from(entry.uncompressed_size) + 1);
+            let mut out = Vec::new();
             dec.read_to_end(&mut out)
                 .map_err(|e| format!("inflate failed: {}", e))?;
-            Ok(out)
+            out
         }
-        m => Err(format!("Unsupported ZIP compression method: {}", m)),
+        m => return Err(format!("Unsupported ZIP compression method: {}", m)),
+    };
+    if data.len() != entry.uncompressed_size as usize || crc32(&data) != entry.crc32 {
+        return Err("ZIP entry size or checksum is invalid.".into());
     }
+    Ok(data)
+}
+
+pub(crate) fn read_zip_parts(
+    buffer: &[u8],
+    limit: usize,
+    select: impl Fn(&str) -> bool,
+) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let entries = read_zip_central_directory(buffer).ok_or("Could not open the Word document package.")?;
+    let mut total = 0usize;
+    let mut seen = std::collections::HashSet::new();
+    let mut parts = Vec::new();
+    for entry in entries.into_iter().filter(|entry| !entry.is_directory && select(&entry.name)) {
+        if !seen.insert(entry.name.clone()) {
+            return Err("The document package contains duplicate parts.".into());
+        }
+        total = total.saturating_add(entry.uncompressed_size as usize);
+        if total > limit || parts.len() >= 256 {
+            return Err("The imported document exceeds the Notes import size limit.".into());
+        }
+        let data = inflate_entry(buffer, &entry)?;
+        parts.push((entry.name, data));
+    }
+    Ok(parts)
 }
 
 fn op_result(success: bool, entry_count: i64, output_path: &str, error: Option<String>) -> Value {
@@ -836,6 +867,30 @@ fn write_u32(out: &mut Vec<u8>, v: u32) {
     out.extend_from_slice(&v.to_le_bytes());
 }
 
+impl PendingZipEntry {
+    fn new(name: String, data: Vec<u8>, modified: i64) -> Self {
+        let compressed = deflate_raw(&data);
+        let use_store = compressed.len() >= data.len();
+        let (dos_date, dos_time) = unix_to_dos(modified);
+        Self {
+            name,
+            crc32: crc32(&data),
+            uncompressed_len: data.len() as u32,
+            payload: if use_store { data } else { compressed },
+            method: if use_store { 0 } else { 8 },
+            dos_date,
+            dos_time,
+            local_offset: 0,
+        }
+    }
+}
+
+pub(crate) fn zip_parts(parts: &[(&str, &[u8])]) -> Vec<u8> {
+    encode_zip(parts.iter().map(|(name, data)| {
+        PendingZipEntry::new((*name).to_owned(), data.to_vec(), 0)
+    }).collect())
+}
+
 // buildZip(files): assemble a complete ZIP (local headers + central directory +
 // EOCD) in memory. `files[i].0` = in-archive name, `files[i].1` = on-disk path.
 fn build_zip(files: &[(String, String)]) -> Result<Vec<u8>, String> {
@@ -849,27 +904,18 @@ fn build_zip(files: &[(String, String)]) -> Result<Vec<u8>, String> {
             continue; // buildZip skips directories
         }
         let data = std::fs::read(abs_path).map_err(|e| format!("{}: {}", abs_path, e))?;
-        let compressed = deflate_raw(&data);
-        let use_store = compressed.len() >= data.len();
         let modified = meta
             .modified()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
-        let (dos_date, dos_time) = unix_to_dos(modified);
-        pending.push(PendingZipEntry {
-            name: name.replace('\\', "/"),
-            crc32: crc32(&data),
-            uncompressed_len: data.len() as u32,
-            payload: if use_store { data } else { compressed },
-            method: if use_store { 0 } else { 8 },
-            dos_date,
-            dos_time,
-            local_offset: 0,
-        });
+        pending.push(PendingZipEntry::new(name.replace('\\', "/"), data, modified));
     }
+    Ok(encode_zip(pending))
+}
 
+fn encode_zip(mut pending: Vec<PendingZipEntry>) -> Vec<u8> {
     let mut body: Vec<u8> = Vec::new();
     for e in pending.iter_mut() {
         e.local_offset = body.len() as u32;
@@ -922,7 +968,7 @@ fn build_zip(files: &[(String, String)]) -> Result<Vec<u8>, String> {
     write_u32(&mut body, cd_start);
     write_u16(&mut body, 0); // comment length
 
-    Ok(body)
+    body
 }
 
 // createZip(files, outputPath) — full mirror of ArchiveService.createZip.

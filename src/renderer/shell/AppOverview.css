@@ -1,0 +1,136 @@
+/* =============================================================================
+ * DEX Platform
+ * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+ * ============================================================================= */
+.dex-overview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dex-overview-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 244px) 30px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px 18px;
+  border-bottom: var(--dex-hairline);
+}
+
+.dex-overview-header h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.dex-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 205px), 1fr));
+  align-content: start;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 18px 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.dex-overview-card {
+  position: relative;
+  min-width: 0;
+  border: var(--dex-hairline);
+  border-radius: var(--dex-radius-md);
+  background: var(--color-bg-surface);
+}
+
+.dex-overview-card[data-current="true"] {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-surface));
+}
+
+.dex-overview-card:has(.dex-overview-app:hover) {
+  background: var(--color-bg-hover);
+}
+
+.dex-overview-app {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 66px;
+  padding: 10px 38px 10px 10px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--color-text-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.dex-overview-app:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dex-overview-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: var(--dex-radius-sm);
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--app-tint) 18%, var(--color-bg-inset));
+}
+
+.dex-overview-label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dex-overview-name {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dex-overview-status {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.dex-overview-close {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-end: 7px;
+}
+
+.dex-overview-close button:hover {
+  color: var(--color-error);
+}
+
+.dex-overview-empty {
+  margin: 0;
+  padding: 34px 18px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 430px) {
+  .dex-overview-header {
+    grid-template-columns: minmax(0, 1fr) 30px;
+    gap: var(--space-2);
+    padding: 10px;
+  }
+  .dex-overview-header h2 { grid-column: 1; grid-row: 1; }
+  .dex-overview-header > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .dex-overview-header > :last-child { grid-column: 2; grid-row: 1; }
+  .dex-overview-grid { padding: 10px; }
+}

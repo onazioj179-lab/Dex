@@ -102,7 +102,10 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
     if (!storageKey) return null;
     try {
       const stored = localStorage.getItem(`dex-resize-${storageKey}`);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Number.isFinite(parsed?.width) && Number.isFinite(parsed?.height)) return parsed;
+      }
     } catch {
       // Ignore
     }
@@ -112,13 +115,16 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
   const storedSize = useMemo(() => getStoredSize(), [getStoredSize]);
 
   const [size, setSize] = useState({
-    width: storedSize?.width ?? initialWidth ?? 300,
-    height: storedSize?.height ?? initialHeight ?? 200,
+    width: Math.max(minWidth, Math.min(maxWidth, storedSize?.width ?? initialWidth ?? 300)),
+    height: Math.max(minHeight, Math.min(maxHeight, storedSize?.height ?? initialHeight ?? 200)),
   });
 
   const [isResizing, setIsResizing] = useState(false);
   const [activeDirection, setActiveDirection] = useState<ResizeDirection | null>(null);
   const startPos = useRef({ x: 0, y: 0 });
+  const viewScale = useRef({ x: 1, y: 1 });
+  const resizeCallbacks = useRef({ onResize, onResizeEnd });
+  resizeCallbacks.current = { onResize, onResizeEnd };
   const startSize = useRef({ width: 0, height: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -152,9 +158,16 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
+    if ('touches' in e && !e.touches.length) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
+    const panel = panelRef.current;
+    const rect = panel?.getBoundingClientRect();
+    viewScale.current = {
+      x: panel?.offsetWidth && rect?.width ? rect.width / panel.offsetWidth : 1,
+      y: panel?.offsetHeight && rect?.height ? rect.height / panel.offsetHeight : 1,
+    };
     startPos.current = { x: clientX, y: clientY };
     startSize.current = { ...size };
     setActiveDirection(direction);
@@ -169,14 +182,15 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
     let rafId = 0;
     let pendingW = startSize.current.width;
     let pendingH = startSize.current.height;
-    const flush = () => { rafId = 0; setSize({ width: pendingW, height: pendingH }); onResize?.(pendingW, pendingH); };
+    const flush = () => { rafId = 0; setSize({ width: pendingW, height: pendingH }); resizeCallbacks.current.onResize?.(pendingW, pendingH); };
 
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      if ('touches' in e && !e.touches.length) return;
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-      const deltaX = clientX - startPos.current.x;
-      const deltaY = clientY - startPos.current.y;
+      const deltaX = (clientX - startPos.current.x) / viewScale.current.x;
+      const deltaY = (clientY - startPos.current.y) / viewScale.current.y;
 
       let newWidth = startSize.current.width;
       let newHeight = startSize.current.height;
@@ -213,13 +227,14 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       setIsResizing(false);
       setActiveDirection(null);
       saveSize(pendingW, pendingH);
-      onResizeEnd?.(pendingW, pendingH);
+      resizeCallbacks.current.onResizeEnd?.(pendingW, pendingH);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('touchmove', handleMouseMove);
     document.addEventListener('touchend', handleMouseUp);
+    document.addEventListener('touchcancel', handleMouseUp);
 
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
@@ -227,17 +242,19 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
+      document.removeEventListener('touchcancel', handleMouseUp);
     };
-  }, [isResizing, activeDirection, clamp, snap, minWidth, maxWidth, minHeight, maxHeight, onResize, onResizeEnd, saveSize]);
+  }, [isResizing, activeDirection, clamp, snap, minWidth, maxWidth, minHeight, maxHeight, saveSize]);
 
   // Double-click to reset
   const handleDoubleClick = useCallback(() => {
-    const newWidth = defaultWidth ?? initialWidth ?? 300;
-    const newHeight = defaultHeight ?? initialHeight ?? 200;
+    const newWidth = clamp(defaultWidth ?? initialWidth ?? 300, minWidth, maxWidth);
+    const newHeight = clamp(defaultHeight ?? initialHeight ?? 200, minHeight, maxHeight);
     setSize({ width: newWidth, height: newHeight });
     saveSize(newWidth, newHeight);
+    onResize?.(newWidth, newHeight);
     onResizeEnd?.(newWidth, newHeight);
-  }, [defaultWidth, defaultHeight, initialWidth, initialHeight, saveSize, onResizeEnd]);
+  }, [defaultWidth, defaultHeight, initialWidth, initialHeight, saveSize, onResize, onResizeEnd, clamp, minWidth, maxWidth, minHeight, maxHeight]);
 
   // Get cursor for direction
   const getCursor = (direction: ResizeDirection): string => {
@@ -341,7 +358,33 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
     return (
       <div
         key={direction}
-        style={handleStyle}
+        role={isCorner ? 'button' : 'separator'}
+        tabIndex={0}
+        aria-label={'Resize panel ' + direction}
+        aria-orientation={isCorner ? undefined : isHorizontal ? 'vertical' : 'horizontal'}
+        aria-valuenow={isCorner ? undefined : isHorizontal ? size.width : size.height}
+        aria-valuemin={isCorner ? undefined : isHorizontal ? minWidth : minHeight}
+        aria-valuemax={isCorner ? undefined : Number.isFinite(isHorizontal ? maxWidth : maxHeight) ? (isHorizontal ? maxWidth : maxHeight) : undefined}
+        onKeyDown={event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault(); event.stopPropagation();
+            handleDoubleClick();
+            return;
+          }
+          if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+          const horizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+          if (!isCorner && horizontalKey !== isHorizontal) return;
+          event.preventDefault(); event.stopPropagation();
+          const step = event.shiftKey ? 50 : 10;
+          const sign = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+          const edgeSign = horizontalKey ? (direction.includes('w') ? -1 : 1) : (direction.includes('n') ? -1 : 1);
+          const width = horizontalKey ? clamp(snap(size.width + sign * step * edgeSign), minWidth, maxWidth) : size.width;
+          const height = horizontalKey ? size.height : clamp(snap(size.height + sign * step * edgeSign), minHeight, maxHeight);
+          setSize({ width, height }); saveSize(width, height);
+          resizeCallbacks.current.onResize?.(width, height);
+          resizeCallbacks.current.onResizeEnd?.(width, height);
+        }}
+        style={{ ...handleStyle, touchAction: 'none' }}
         onMouseDown={(e) => handleResizeStart(e, direction)}
         onTouchStart={(e) => handleResizeStart(e, direction)}
         onDoubleClick={handleDoubleClick}

@@ -212,6 +212,30 @@ export const APP_REGISTRY: AppDefinition[] = [
     category: 'productivity',
   },
   {
+    id: 'ledger',
+    name: 'Ledger',
+    icon: 'book-open',
+    color: 'var(--color-success)',
+    description: 'Local income, expenses, and transaction history',
+    version: APP_VERSION,
+    permissions: ['filesystem.read', 'filesystem.write'],
+    singleton: true,
+    supportsMultiWindow: false,
+    category: 'productivity',
+  },
+  {
+    id: 'bioengineering',
+    name: 'Bioengineering',
+    icon: 'activity',
+    color: 'var(--color-accent)',
+    description: 'Local calibration and measurement worksheet',
+    version: APP_VERSION,
+    permissions: ['filesystem.read', 'filesystem.write'],
+    singleton: true,
+    supportsMultiWindow: false,
+    category: 'utility',
+  },
+  {
     id: 'browser',
     name: 'Browser',
     icon: 'globe',
@@ -1056,9 +1080,13 @@ export const useWorkSession = () => useAppSubsystem(s => s.currentWorkSession);
 // IPC BRIDGE -- Connect to main process
 // ===========================================================================
 
-export const initAppSubsystemIPC = () => {
+let appSubsystemBridgeCleanup: (() => void) | null = null;
+
+export const initAppSubsystemIPC = (): (() => void) => {
+  if (appSubsystemBridgeCleanup) return appSubsystemBridgeCleanup;
+  const cleanups: Array<() => void> = [];
   if (typeof window !== 'undefined' && window.electronAPI) {
-    window.electronAPI?.onAppEvent?.((event: string, data: unknown) => {
+    const off = window.electronAPI?.onAppEvent?.((event: string, data: unknown) => {
       const { launchApp, closeApp, focusApp } = useAppSubsystem.getState();
       const d = data as Record<string, any>;
       
@@ -1074,6 +1102,7 @@ export const initAppSubsystemIPC = () => {
           break;
       }
     });
+    if (typeof off === 'function') cleanups.push(off);
   }
   
   // ===========================================================================
@@ -1084,7 +1113,7 @@ export const initAppSubsystemIPC = () => {
   // ===========================================================================
   try {
     // When RunningApps changes, reflect into AppSubsystem
-    useRunningApps.subscribe((state: any, prev: any) => {
+    const unsubscribeRunning = useRunningApps.subscribe((state: any, prev: any) => {
       if (state.currentAppId !== prev.currentAppId) {
         const sub = useAppSubsystem.getState();
         // Find instance matching the new current app
@@ -1098,7 +1127,7 @@ export const initAppSubsystemIPC = () => {
     });
     
     // When AppSubsystem launches/closes, reflect into RunningApps
-    useAppSubsystem.subscribe((state, prev) => {
+    const unsubscribeSubsystem = useAppSubsystem.subscribe((state, prev) => {
       if (state.instances !== prev.instances) {
         const running = useRunningApps.getState();
         const alive = Array.from(state.instances.values()).filter((i: any) => i.state !== 'terminated');
@@ -1112,7 +1141,16 @@ export const initAppSubsystemIPC = () => {
         }
       }
     });
+    cleanups.push(unsubscribeRunning, unsubscribeSubsystem);
   } catch {
     // sync bridge optional — ignore if import fails
   }
+
+  appSubsystemBridgeCleanup = () => {
+    for (const cleanup of cleanups.splice(0)) {
+      try { cleanup(); } catch { /* best-effort teardown */ }
+    }
+    appSubsystemBridgeCleanup = null;
+  };
+  return appSubsystemBridgeCleanup;
 };

@@ -1661,16 +1661,17 @@ export class SpotlightEngine {
     // Try unit conversion first
     const conversion = tryConversion(query);
     if (conversion) {
+      const convValue = conversion.split('=')[1]?.trim() || conversion;
       return {
         id: 'calc-conversion',
         category: 'calculator',
         title: conversion,
-        subtitle: 'Unit Conversion',
+        subtitle: 'Unit Conversion \u00b7 Return to copy',
         icon: 'calculator',
         color: '#64d2ff',
         highlights: [],
         score: 200,
-        action: () => this._copyToClipboard(conversion.split('=')[1]?.trim() || conversion),
+        action: () => this._copyToClipboard(convValue),
       };
     }
 
@@ -1682,7 +1683,7 @@ export class SpotlightEngine {
         id: 'calc-result',
         category: 'calculator',
         title: `${query} = ${formatted}`,
-        subtitle: 'Calculator',
+        subtitle: 'Calculator \u00b7 Return to copy',
         icon: 'calculator',
         color: '#64d2ff',
         highlights: [],
@@ -2109,7 +2110,11 @@ export class SpotlightEngine {
   }
 
   private _copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text).catch((e: unknown) => { console.warn('[DEX]', e); });
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'success', message: `Copied \u201c${text}\u201d` } }));
+      })
+      .catch((e: unknown) => { console.warn('[DEX]', e); });
   }
 
   private _loadUsageFrequency(): void {

@@ -9,8 +9,8 @@
  *
  * Built on the canonical ui/Modal primitive (portal, focus trap, scroll
  * lock, Escape, responsive sizing). This component only adds:
- * - Enter triggers the primary action.
- * - Initial focus lands on the confirm button.
+ * - Initial focus lands on Cancel for destructive actions.
+ * - Neutral dialogs support Enter as a default action.
  * - The destructive variant uses the danger Button styling.
  */
 
@@ -51,17 +51,24 @@ export function ConfirmDialog({
   testIdPrefix = 'confirm',
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
-  // Enter confirms; Escape is handled by the Modal primitive (-> onCancel).
   useEffect(() => {
     if (!open) return;
-    confirmRef.current?.focus();
+    (tone === 'destructive' ? cancelRef : confirmRef).current?.focus();
+  }, [open, tone]);
+
+  useEffect(() => {
+    if (!open || tone === 'destructive') return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+      if (e.key !== 'Enter' || e.defaultPrevented) return;
+      if (e.target instanceof HTMLElement && e.target.closest('button, a, input, select, textarea, [contenteditable]')) return;
+      e.preventDefault();
+      onConfirm();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onConfirm]);
+  }, [open, tone, onConfirm]);
 
   return (
     <Modal
@@ -74,7 +81,7 @@ export function ConfirmDialog({
       testIdPrefix={testIdPrefix}
       footer={
         <>
-          <Button variant="ghost" size="md" onClick={onCancel}>{cancelLabel}</Button>
+          <Button ref={cancelRef} variant="ghost" size="md" onClick={onCancel}>{cancelLabel}</Button>
           <Button
             ref={confirmRef}
             variant={tone === 'destructive' ? 'danger' : 'primary'}

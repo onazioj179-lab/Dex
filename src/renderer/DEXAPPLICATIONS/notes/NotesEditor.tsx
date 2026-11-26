@@ -29,6 +29,7 @@ import { renderPrompt, STANDARD_TEMPLATES } from '../../../shared/uki/promptTemp
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 import { analyzeText, readingTimeMinutes } from '../../../shared/text/documentStats';
 import DexIcon from '../../components/DexIcon';
+import { loadAppPreferences, useAppPreference } from '../../store/appPreferences';
 
 // ---------------------------------------------------------------------------
 // Document statistics helpers
@@ -46,7 +47,7 @@ function countSentences(text: string): number {
 
 interface NotesEditorProps {
   content: string;
-  onChange: (content: string, plainText: string, wordCount: number) => void;
+  onChange: (content: string, plainText: string, wordCount: number, editedAt: number) => void;
   onSave: () => void;
   readOnly?: boolean;
   editorMode: 'edit' | 'preview' | 'split';
@@ -388,9 +389,12 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   onDropFiles,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const renderedEditor = useRef<HTMLDivElement | null>(null);
   const undoMgr = useRef(new UndoManager(200));
-  const lastContent = useRef(content);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastContent = useRef<string>();
+  const pendingEdit = useRef<{ timer: ReturnType<typeof setTimeout>; at: number } | null>(null);
+  const editCallbacks = useRef({ onChange, onSave });
+  editCallbacks.current = { onChange, onSave };
   const isComposing = useRef(false);
   // Set by the Ctrl/Cmd+Shift+V shortcut so the next paste lands as plain text,
   // stripping all formatting (the normal paste keeps rich HTML when available).
@@ -407,8 +411,12 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
   // Reading level (Flesch-Kincaid grade + ease band) -- shown once a note is long
   // enough for the score to be meaningful. Computed in the debounced pass below.
   const [readability, setReadability] = useState('');
+  const lineSpacing = Number(useAppPreference('notes', 'lineSpacing'));
+  useEffect(() => { void loadAppPreferences(); }, []);
   // -- Outline (document headings -> navigable table of contents) -------------
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [ribbon, setRibbon] = useState<'Write' | 'Insert' | 'Review'>('Write');
+  const [pageView, setPageView] = useState(false);
   const [headings, setHeadings] = useState<{ level: number; text: string }[]>([]);
 
   // -- Editor typography (DEX 5.7): persisted default font family + size -------
@@ -482,21 +490,26 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     return () => unregisterUkiAppContext('notes');
   }, []);
 
-  // Initial render: set editor HTML
   useEffect(() => {
-    if (editorRef.current && content !== lastContent.current) {
+    const editor = editorRef.current;
+    if (!editor) {
+      renderedEditor.current = null;
+      return;
+    }
+    if (!pendingEdit.current && (editor !== renderedEditor.current || content !== lastContent.current)) {
+      renderedEditor.current = editor;
       lastContent.current = content;
       const doc = deserializeDoc(content);
       const html = docToHTML(doc);
-      editorRef.current.innerHTML = DOMPurify.sanitize(html);
-      const text = editorRef.current.textContent || '';
+      editor.innerHTML = DOMPurify.sanitize(html);
+      const text = editor.textContent || '';
       setIsEmpty(!text.trim());
       setCharCount(text.length);
       setWdCount(countWords(text));
       setSentenceCount(countSentences(text));
       refreshHeadings();
     }
-  }, [content, refreshHeadings]);
+  }, [content, editorMode, refreshHeadings]);
 
   // Auto-focus editor so user can start typing immediately
   useEffect(() => {
@@ -519,14 +532,36 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     }
   }, [readOnly, editorMode]);
 
-  // Cleanup pending save timer on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
+  const publishEdit = useCallback((editor = editorRef.current, updateStats = true) => {
+    const pending = pendingEdit.current;
+    if (!editor || !pending) return false;
+    clearTimeout(pending.timer);
+    pendingEdit.current = null;
+    const doc = htmlToDoc(editor.innerHTML);
+    const serialized = serializeDoc(doc);
+    const plainText = docToPlainText(doc);
+    if (updateStats) {
+      const stats = analyzeText(plainText);
+      setReadability(stats.words >= 30 ? `Grade ${stats.gradeLevel} · ${stats.readability}` : '');
+    }
+    lastContent.current = serialized;
+    editCallbacks.current.onChange(serialized, plainText, countWords(plainText), pending.at);
+    return true;
   }, []);
 
-  // -- Emit Changes ------------------------------------------------------
+  const hasEditableSurface = editorMode !== 'preview';
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current;
+    return () => {
+      if (publishEdit(editor, false)) editCallbacks.current.onSave();
+    };
+  }, [hasEditableSurface, publishEdit]);
+
+  useEffect(() => {
+    const onPageHide = () => { if (publishEdit()) editCallbacks.current.onSave(); };
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [publishEdit]);
 
   const emitChange = useCallback(() => {
     if (!editorRef.current || isComposing.current) return;
@@ -541,22 +576,9 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     setSentenceCount(countSentences(liveText));
     refreshHeadings();
 
-    // Debounce the heavy work: parse HTML -> doc, serialize, extract plain text,
-    // then notify the parent (which itself persists). onChange timing is
-    // unchanged (it already only fired after this 300ms debounce).
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      if (!editorRef.current) return;
-      const doc = htmlToDoc(editorRef.current.innerHTML);
-      const serialized = serializeDoc(doc);
-      const plainText = docToPlainText(doc);
-      const words = countWords(plainText);
-      const stats = analyzeText(plainText);
-      setReadability(stats.words >= 30 ? `Grade ${stats.gradeLevel} · ${stats.readability}` : '');
-      lastContent.current = serialized;
-      onChange(serialized, plainText, words);
-    }, 300);
-  }, [onChange]);
+    if (pendingEdit.current) clearTimeout(pendingEdit.current.timer);
+    pendingEdit.current = { at: Date.now(), timer: setTimeout(publishEdit, 300) };
+  }, [publishEdit, refreshHeadings]);
 
   // -- Undo/Redo Push ----------------------------------------------------
 
@@ -750,6 +772,10 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
 
   const handleToolbarAction = useCallback((action: ToolbarAction) => {
     if (readOnly) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selection = window.getSelection();
+    if (!selection?.anchorNode || !editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) setCaretToEnd();
 
     switch (action.command) {
       case 'checklist': {
@@ -887,7 +913,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         exec(action.command, action.arg);
         break;
     }
-  }, [readOnly, exec, pushUndo, emitChange]);
+  }, [readOnly, exec, pushUndo, emitChange, setCaretToEnd]);
 
   // -- Keyboard Shortcuts ------------------------------------------------
 
@@ -931,6 +957,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     // Save
     if (ctrl && e.key === 's') {
       e.preventDefault();
+      publishEdit();
       onSave();
       return;
     }
@@ -1030,7 +1057,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
         }
       }
     }
-  }, [readOnly, exec, emitChange, onSave, wikiOpen, wikiMatches, wikiActive, insertWikiLink, closeWiki]);
+  }, [readOnly, exec, emitChange, onSave, publishEdit, wikiOpen, wikiMatches, wikiActive, insertWikiLink, closeWiki]);
 
   // -- Input Handler -----------------------------------------------------
 
@@ -1154,8 +1181,20 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
     <div style={styles.container}>
       {/* Toolbar */}
       {!readOnly && editorMode !== 'preview' && (
-        <div style={styles.toolbar}>
-          {TOOLBAR_GROUPS.map((group, gi) => (
+        <>
+        <div role="group" aria-label="Editor tools" style={{ ...styles.toolbar, paddingBlock: 4, gap: 8 }}>
+          {(['Write', 'Insert', 'Review'] as const).map(tab => (
+            <button type="button" key={tab} aria-pressed={ribbon === tab} onMouseDown={e => e.preventDefault()}
+              onClick={() => setRibbon(tab)} style={{ ...styles.toolbarBtn, width: 'auto', paddingInline: 12,
+                ...(ribbon === tab ? styles.toolbarBtnActive : {}) }}>{tab}</button>
+          ))}
+          <button type="button" aria-pressed={pageView} onClick={() => setPageView(value => !value)}
+            style={{ ...styles.toolbarBtn, marginLeft: 'auto', width: 'auto', paddingInline: 10 }}>Page view</button>
+        </div>
+        <div style={styles.toolbar} aria-label={ribbon + ' tools'}>
+          {TOOLBAR_GROUPS.map((group, gi) => ({ group, gi })).filter(({ gi }) =>
+            ribbon === 'Write' ? [0, 1, 2, 6].includes(gi) : ribbon === 'Insert' ? [3, 4, 5].includes(gi) : false,
+          ).map(({ group, gi }) => (
             <React.Fragment key={gi}>
               <div style={styles.toolbarGroup}>
                 {group.map(action => (
@@ -1166,7 +1205,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                     title={action.label + (action.shortcut ? ` (${action.shortcut})` : '')}
                     onMouseEnter={e => { e.currentTarget.style.background = styles.toolbarBtnActive.background as string; e.currentTarget.style.color = styles.toolbarBtnActive.color as string; }}
                     onMouseLeave={e => { e.currentTarget.style.background = styles.toolbarBtn.background as string; e.currentTarget.style.color = styles.toolbarBtn.color as string; }}
-                    onMouseDown={e => { e.preventDefault(); handleToolbarAction(action); }}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => handleToolbarAction(action)}
                   >
                     {action.glyph ? <DexIcon name={action.glyph} size={15} /> : action.icon}
                   </button>
@@ -1175,9 +1215,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
               {gi < TOOLBAR_GROUPS.length - 1 && <div style={styles.toolbarSep} />}
             </React.Fragment>
           ))}
-          {/* Typography: default font family + size for the editor (persisted) */}
-          <div style={styles.toolbarSep} />
-          <div style={styles.toolbarGroup}>
+          {ribbon === 'Write' && <div style={styles.toolbarGroup}>
             <select
               aria-label="Editor font"
               title="Editor font family"
@@ -1196,10 +1234,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             >
               {NOTE_SIZES.map(s => <option key={s} value={s}>{s}px</option>)}
             </select>
-          </div>
-          {/* uki AI writing actions */}
-          <div style={styles.toolbarSep} />
-          <div style={styles.toolbarGroup}>
+          </div>}
+          {ribbon === 'Review' && <div style={styles.toolbarGroup}>
             {AI_ACTIONS.map(action => (
               <button
                 key={action.id}
@@ -1209,12 +1245,13 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                 disabled={aiBusy}
                 onMouseEnter={e => { if (!aiBusy) e.currentTarget.style.background = 'var(--color-accent-soft, rgba(100,210,255,0.12))'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                onMouseDown={e => { e.preventDefault(); void runAiAction(action); }}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => void runAiAction(action)}
               >
                 {action.label}
               </button>
             ))}
-          </div>
+          </div>}
           {/* Outline toggle — opens the heading table of contents */}
           <div style={styles.toolbarSep} />
           <button
@@ -1222,7 +1259,8 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             aria-pressed={outlineOpen}
             title="Outline — jump to document headings"
             style={{ ...styles.toolbarBtn, ...(outlineOpen ? { background: 'var(--color-bg-active, rgba(255,255,255,0.12))', color: 'var(--color-accent, #4a9eff)' } : {}) }}
-            onMouseDown={e => { e.preventDefault(); setOutlineOpen(o => !o); }}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setOutlineOpen(o => !o)}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
@@ -1230,6 +1268,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
             </svg>
           </button>
         </div>
+        </>
       )}
 
       {/* Editor + Preview */}
@@ -1241,26 +1280,35 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
       >
         {showEditor && (
           <div className="dex-scroll-fade-y" style={styles.editorArea}>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', ...(pageView ? {
+              width: 'min(790px, calc(100% - 32px))', minHeight: 'min(920px, 85vh)', margin: '20px auto',
+              background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 6,
+            } : {}) }}>
               {isEmpty && !readOnly && (
                 <div style={styles.placeholder}>{placeholder}</div>
               )}
               <div
                 ref={editorRef}
+                role="textbox"
+                aria-label="Note body"
+                aria-multiline="true"
+                aria-readonly={readOnly}
                 contentEditable={!readOnly}
                 suppressContentEditableWarning
                 className="dexnotes-editable"
                 style={{
                   ...styles.editable,
                   ...(focusMode ? styles.focusModeEditable : {}),
+                  ...(pageView ? { paddingInline: 'clamp(24px, 7%, 66px)', minHeight: 'inherit' } : {}),
                   fontFamily,
                   fontSize,
+                  lineHeight: lineSpacing,
                 }}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
                 onClick={handleClick}
-                onBlur={closeWiki}
+                onBlur={() => { publishEdit(); closeWiki(); }}
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 spellCheck

@@ -25,6 +25,7 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { space, fontSize, fontWeight, zIndex } from '../styles/tokens';
+import { useAppAppearance } from '../utils/appAppearanceContext';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -44,12 +45,14 @@ export interface ModalProps {
   /** Right-aligned footer row (typically Buttons). */
   footer?: React.ReactNode;
   /** Stacking layer; defaults to the shell modal layer. */
-  zIndexOverride?: number;
+  zIndexOverride?: React.CSSProperties['zIndex'];
   /** Prefix for data-testid hooks: `${testIdPrefix}-backdrop|-panel`. */
   testIdPrefix?: string;
   children?: React.ReactNode;
   /** Extra styles for the panel (layout only; visuals come from tokens). */
   panelStyle?: React.CSSProperties;
+  /** Layout overrides for dialogs with their own scrolling region. */
+  bodyStyle?: React.CSSProperties;
 }
 
 const FOCUSABLE =
@@ -83,6 +86,7 @@ export function Modal({
   testIdPrefix = 'modal',
   children,
   panelStyle,
+  bodyStyle,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -137,10 +141,12 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [open, dismissOnEscape, onClose]);
 
+  const appearance = useAppAppearance();
   if (!open) return null;
 
   const node = (
     <div
+      {...appearance}
       className="dex-modal-backdrop"
       style={{ zIndex: zIndexOverride ?? zIndex.modal }}
       role="presentation"
@@ -177,7 +183,7 @@ export function Modal({
             {title}
           </h2>
         )}
-        <div style={{ padding: space[5], overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <div style={{ padding: space[5], overflowY: 'auto', flex: 1, minHeight: 0, ...bodyStyle }}>
           {children}
         </div>
         {footer != null && (

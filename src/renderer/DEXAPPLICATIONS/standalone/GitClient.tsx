@@ -14,6 +14,7 @@ import { glassPanel, glassButton } from '../../styles/glassMenu';
 import DexIcon from '../../components/DexIcon';
 import EmptyState from '../../components/EmptyState';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
+import { GIT_REPO_PATH_KEY, OPEN_GIT_REPOSITORY_EVENT } from '../../services/gitProjectHandoff';
 
 interface GitStatusFile {
   path: string;
@@ -51,7 +52,6 @@ const getBridge = (): GitBridge | null => {
   return (w.dex?.git ?? w.electron?.git ?? null) as GitBridge | null;
 };
 
-const LS_PATH = 'dex-git-repo-path';
 const LS_LAST_MSG = 'dex-git-last-message';
 const LS_TEMPLATES = 'dex-git-templates';
 
@@ -114,7 +114,7 @@ export default function GitClient(): React.ReactElement {
   const bridge = useMemo(getBridge, []);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [repoPath, setRepoPath] = useState<string>(() => {
-    try { return localStorage.getItem(LS_PATH) || ''; } catch { return ''; }
+    try { return localStorage.getItem(GIT_REPO_PATH_KEY) || ''; } catch { return ''; }
   });
   const [pending, setPending] = useState<string>(repoPath);
   const [status, setStatus] = useState<GitStatus | null>(null);
@@ -135,6 +135,8 @@ export default function GitClient(): React.ReactElement {
     try { return localStorage.getItem(LS_LAST_MSG) || ''; } catch { return ''; }
   });
   const noteTimer = useRef<number | null>(null);
+  const repoRef = useRef(repoPath);
+  const refreshRequest = useRef(0);
 
   const templates = useMemo(
     () => [...BUILTIN_TEMPLATES, ...userTemplates],
@@ -162,6 +164,7 @@ export default function GitClient(): React.ReactElement {
 
   const refresh = useCallback(async (path = repoPath) => {
     if (!bridge || !path) return;
+    const request = ++refreshRequest.current;
     setBusy(true);
     setCurrentOp('Refreshing');
     try {
@@ -170,40 +173,64 @@ export default function GitClient(): React.ReactElement {
         bridge.log(path, 40),
         bridge.branches(path),
       ]);
+      if (request !== refreshRequest.current) return;
       setStatus(st);
       setCommits(Array.isArray(lg) ? lg : []);
       setBranches(br && typeof br === 'object' ? br : { current: null, branches: [] });
     } catch (e) {
-      flash(`Refresh failed: ${e instanceof Error ? e.message : String(e)}`);
+      if (request === refreshRequest.current) flash(`Refresh failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setBusy(false);
-      setCurrentOp('');
+      if (request === refreshRequest.current) {
+        setBusy(false);
+        setCurrentOp('');
+      }
     }
   }, [bridge, repoPath, flash]);
 
   useEffect(() => { if (repoPath) void refresh(repoPath); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const openRepo = useCallback(() => {
-    const p = pending.trim();
+  const selectRepo = useCallback((path: string) => {
+    const p = path.trim();
     if (!p) return;
+    if (p !== repoRef.current) {
+      setStatus(null);
+      setCommits([]);
+      setBranches({ current: null, branches: [] });
+      setSelectedCommit(null);
+      repoRef.current = p;
+    }
+    setPending(p);
     setRepoPath(p);
-    try { localStorage.setItem(LS_PATH, p); } catch { /* ignore */ }
+    try { localStorage.setItem(GIT_REPO_PATH_KEY, p); } catch { /* ignore */ }
     void refresh(p);
-  }, [pending, refresh]);
+  }, [refresh]);
+
+  const openRepo = useCallback(() => selectRepo(pending), [pending, selectRepo]);
+  useEffect(() => {
+    const onOpenRepository = (event: Event) => {
+      const path = (event as CustomEvent<unknown>).detail;
+      if (typeof path === 'string') selectRepo(path);
+    };
+    window.addEventListener(OPEN_GIT_REPOSITORY_EVENT, onOpenRepository);
+    return () => window.removeEventListener(OPEN_GIT_REPOSITORY_EVENT, onOpenRepository);
+  }, [selectRepo]);
 
   const run = useCallback(async (fn: () => Promise<{ success: boolean; message: string }>, okMsg: string, op = 'Working') => {
     if (!bridge || !repoPath) return;
+    const previous = repoRef.current;
     setBusy(true);
     setCurrentOp(op);
     try {
       const r = await fn();
       flash(r?.success ? okMsg : (r?.message || 'Command failed'), r?.success ? 'success' : 'error');
-      await refresh();
+      if (repoRef.current === previous) await refresh(previous);
     } catch (e) {
       flash(e instanceof Error ? e.message : String(e), 'error');
     } finally {
-      setBusy(false);
-      setCurrentOp('');
+      if (repoRef.current === previous) {
+        setBusy(false);
+        setCurrentOp('');
+      }
     }
   }, [bridge, repoPath, flash, refresh]);
 

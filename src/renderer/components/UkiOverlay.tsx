@@ -19,6 +19,8 @@ import { zIndex } from '../styles/tokens';
 import { UkiAutoPilotBridge, runUkiSlashIfApplicable } from './UkiAutoPilotBridge';
 import { UKIPatternStore } from '../services/UKIPatternStore';
 import { buildSystemPrompt } from '../uki';
+import { answerUkiIdentity } from '../uki/identity';
+import { answerLocalSystemQuestion } from '../uki/systemAnswers';
 import { hasConfiguredProvider } from '../uki/providers/connect';
 import { runUkiAgent, webSearch } from '../uki/agentRunner';
 import { formatUkiContexts } from '../uki/appContextRegistry';
@@ -1546,6 +1548,12 @@ const UkiOverlay: React.FC = () => {
     // Reset thought trace and start a new reasoning chain.
     thoughtStepsRef.current = [];
     setThoughtSteps([]);
+    const identity = answerUkiIdentity(text);
+    const localReply = identity ?? await answerLocalSystemQuestion(text);
+    if (localReply) {
+      streamResponse(localReply, identity ? 'identity' : 'system', text);
+      return;
+    }
     const pushStep = (step: string) => {
       thoughtStepsRef.current = [...thoughtStepsRef.current, step];
       setThoughtSteps(thoughtStepsRef.current);
@@ -1692,18 +1700,16 @@ const UkiOverlay: React.FC = () => {
         openIds = (ra.runningApps ?? []).map(a => a.id);
         isOnline = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
       } catch { /* best-effort context */ }
-      const ws = getActiveWorkspace();
       const sysPrompt = buildSystemPrompt({
         foregroundAppId: fgApp,
         openAppIds: openIds,
         online: isOnline,
         localTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        activeWorkspace: ws ? { name: ws.name, kind: ws.kind } : undefined,
       });
       // Fold in live app context (what the user is looking at across Notes/Tasks/
       // Files, etc.) so the overlay's answers are grounded in the current state,
       // same as the uki chat app does.
-      const appCtx = formatUkiContexts();
+      const appCtx = await formatUkiContexts();
       const factsBlock = grounding ? `\n\n[Live facts retrieved just now -- use these, they are current]\n${grounding}` : '';
       const groundedPrompt = (appCtx ? `${sysPrompt}\n\n[What the user is looking at]\n${appCtx}` : sysPrompt) + factsBlock;
       // Give the model a little conversational context (last few turns).

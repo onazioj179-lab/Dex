@@ -8,13 +8,14 @@
  * Shared reduced-motion + reduced-transparency awareness.
  *
  * One place to ask "should this surface animate / use glass?" so every app and
- * the shell honour the user's OS accessibility preferences identically, instead
+ * the shell honour the user's accessibility preferences identically, instead
  * of each re-implementing matchMedia. `prefersReducedMotion()` is a cheap
  * one-shot read for non-React code (canvas loops, helpers); the hooks are the
  * reactive form for components (they re-render when the OS setting flips).
  */
 
 import { useEffect, useState } from 'react';
+import { useAppAppearance } from './appAppearanceContext';
 
 function mediaMatches(query: string): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
@@ -23,10 +24,45 @@ function mediaMatches(query: string): boolean {
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const REDUCED_TRANSPARENCY_QUERY = '(prefers-reduced-transparency: reduce)';
+export const REDUCED_MOTION_CHANGE = 'dex-reduced-motion-changed';
+const MOTION_KEY = 'dex-reduced-motion';
+
+export function readReducedMotionPreference(): boolean {
+  try {
+    const current = localStorage.getItem(MOTION_KEY);
+    if (current === 'on' || current === 'off') return current === 'on';
+    const settings = JSON.parse(localStorage.getItem('dex-settings') ?? 'null');
+    const legacy = localStorage.getItem('dex-reduce-motion');
+    return legacy === 'true' || settings?.reduceMotion === true;
+  } catch { return false; }
+}
+
+export function setReducedMotionPreference(reduce: boolean): void {
+  try { localStorage.setItem(MOTION_KEY, reduce ? 'on' : 'off'); } catch { /* Storage may be unavailable. */ }
+  window.dispatchEvent(new Event(REDUCED_MOTION_CHANGE));
+}
+
+export function subscribeToReducedMotion(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const media = typeof window.matchMedia === 'function' ? window.matchMedia(REDUCED_MOTION_QUERY) : null;
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || [MOTION_KEY, 'dex-reduce-motion', 'dex-settings'].includes(event.key)) onChange();
+  };
+  window.addEventListener(REDUCED_MOTION_CHANGE, onChange);
+  window.addEventListener('storage', onStorage);
+  if (media?.addEventListener) media.addEventListener('change', onChange);
+  else media?.addListener?.(onChange);
+  return () => {
+    window.removeEventListener(REDUCED_MOTION_CHANGE, onChange);
+    window.removeEventListener('storage', onStorage);
+    if (media?.removeEventListener) media.removeEventListener('change', onChange);
+    else media?.removeListener?.(onChange);
+  };
+}
 
 /** One-shot read — safe in canvas/RAF loops and module-scope. */
 export function prefersReducedMotion(): boolean {
-  return mediaMatches(REDUCED_MOTION_QUERY);
+  return mediaMatches(REDUCED_MOTION_QUERY) || readReducedMotionPreference();
 }
 
 /** One-shot read for glass/blur gating. */
@@ -53,9 +89,16 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** Reactive: true when the user asked the OS to reduce motion. */
+/** Reactive: true when motion is reduced in DEX or at OS level. */
 export function useReducedMotion(): boolean {
-  return useMediaQuery(REDUCED_MOTION_QUERY);
+  const appearance = useAppAppearance();
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+  useEffect(() => {
+    const refresh = () => setReduced(prefersReducedMotion());
+    refresh();
+    return subscribeToReducedMotion(refresh);
+  }, []);
+  return reduced || appearance['data-app-motion'] === 'reduced';
 }
 
 /** Reactive: true when the user asked the OS to reduce transparency. */

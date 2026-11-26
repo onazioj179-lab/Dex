@@ -1050,32 +1050,28 @@ export const Tasks: React.FC = () => {
     toast.success(`Applied "${template.name}" template (${newTasks.length} tasks)`);
   }, [selectedList, toast]);
 
-  const getListCount = (listId: string): number => {
+  const listCounts = useMemo(() => {
     const now = new Date();
-    return tasks.filter(t => {
-      // The Completed list counts done tasks; every other list counts open ones.
-      if (listId === 'completed') return t.completed;
-      if (t.completed) return false;
-      switch (listId) {
-        case 'today':
-          return !!t.dueDate && new Date(t.dueDate).toDateString() === now.toDateString();
-        case 'upcoming':
-          return !!t.dueDate && atStartOfDay(new Date(t.dueDate)).getTime() > atStartOfDay(now).getTime();
-        case 'overdue': {
-          const due = taskDueDateTime(t);
-          return due !== null && due.getTime() < now.getTime();
-        }
-        case 'flagged':
-          return !!t.flagged;
-        case 'scheduled':
-          return t.dueDate !== null;
-        case 'all':
-          return true;
-        default:
-          return t.list === listId;
+    const day = atStartOfDay(now).getTime();
+    const counts = new Map<string, number>();
+    const add = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
+    const smartLists = new Set(['all', 'completed', 'flagged', 'scheduled', 'today', 'upcoming', 'overdue']);
+    for (const task of tasks) {
+      if (task.completed) { add('completed'); continue; }
+      add('all');
+      if (!smartLists.has(task.list)) add(task.list);
+      if (task.flagged) add('flagged');
+      if (task.dueDate) {
+        add('scheduled');
+        const dueDay = atStartOfDay(new Date(task.dueDate)).getTime();
+        if (dueDay === day && !isSnoozed(task, now)) add('today');
+        if (dueDay > day) add('upcoming');
+        const due = taskDueDateTime(task);
+        if (due && due < now) add('overdue');
       }
-    }).length;
-  };
+    }
+    return counts;
+  }, [tasks, statusFilter, selectedList]);
 
   const getPriorityColor = (priority: Task['priority']): string => {
     switch (priority) {
@@ -1219,7 +1215,7 @@ export const Tasks: React.FC = () => {
         <div style={styles.lists}>
           {LISTS.map((list, i) => {
             const Icon = Icons[list.icon];
-            const count = getListCount(list.id);
+            const count = listCounts.get(list.id) ?? 0;
             const isActive = selectedList === list.id;
             // Section labels: smart lists first, then the concrete "My Lists".
             const showSmartLabel = i === 0;

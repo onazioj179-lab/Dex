@@ -39,6 +39,7 @@ export class AudioPlaybackService {
   private source: AudioBufferSourceNode | null = null;
   private gain: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
+  private loadRequest: AbortController | null = null;
 
   private startedAt = 0; // ctx.currentTime when playback (re)started
   private offset = 0;     // seconds into the buffer at last start
@@ -69,12 +70,33 @@ export class AudioPlaybackService {
   /** Decode audio from a URL or ArrayBuffer. Returns duration in seconds. */
   async load(src: ArrayBuffer | string): Promise<number> {
     const ctx = this.ensureContext();
-    this.setStatus('loading');
-    const data = typeof src === 'string' ? await (await fetch(src)).arrayBuffer() : src.slice(0);
-    this.buffer = await ctx.decodeAudioData(data);
+    this.loadRequest?.abort();
+    const request = new AbortController();
+    this.loadRequest = request;
+    this.stopSource();
     this.offset = 0;
-    this.setStatus('stopped');
-    return this.buffer.duration;
+    this.setStatus('loading');
+    try {
+      let data: ArrayBuffer;
+      if (typeof src === 'string') {
+        const response = await fetch(src, { signal: request.signal });
+        if (!response.ok) throw new Error('Could not read the audio source.');
+        data = await response.arrayBuffer();
+      } else {
+        data = src.slice(0);
+      }
+      request.signal.throwIfAborted();
+      const buffer = await ctx.decodeAudioData(data);
+      request.signal.throwIfAborted();
+      this.buffer = buffer;
+      this.setStatus('stopped');
+      return buffer.duration;
+    } catch (error) {
+      if (this.loadRequest === request) this.setStatus(this.buffer ? 'stopped' : 'idle');
+      throw error;
+    } finally {
+      if (this.loadRequest === request) this.loadRequest = null;
+    }
   }
 
   /**
@@ -83,6 +105,7 @@ export class AudioPlaybackService {
    * isn't abrupt — mirrors the fade-out crossfade callers apply on the way out.
    */
   play(fromSec?: number, fadeInSec = 0): void {
+    if (this.status === 'loading') return;
     const ctx = this.ensureContext();
     if (!this.buffer || !this.gain) return;
     if (this.status === 'playing') this.stopSource();
@@ -250,12 +273,16 @@ export class AudioPlaybackService {
   }
 
   dispose(): void {
+    this.loadRequest?.abort();
+    this.loadRequest = null;
     this.stopSource();
     void this.ctx?.close();
     this.ctx = null;
     this.buffer = null;
     this.gain = null;
     this.analyser = null;
+    this.status = 'idle';
+    this.offset = 0;
     this.listeners.clear();
   }
 

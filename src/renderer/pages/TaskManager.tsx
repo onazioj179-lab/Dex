@@ -4,7 +4,8 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { invokePlatformIpc } from '../services/platform/ipc';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import DexIcon from '../components/DexIcon';
 import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { useStageStore, STAGE_DEFAULT_ID } from '../store/stageStore';
@@ -12,6 +13,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useVirtualList } from '../improvements500/virtualList';
 import { DexSearchInput } from '../styles/components';
 import { sendToNotes } from '../services/sendTo';
+import { sharedTick } from '../services/SharedTick';
 
 // Progressive detail (information priority): show what matters first, reveal
 // diagnostics and advanced data only on request -- never everything at once.
@@ -52,6 +54,8 @@ interface SystemProcess {
   name: string;
   cpu?: number;
   memory?: number;
+  startedAt?: number;
+  instance?: string | null;
 }
 
 interface SystemStatusInfo {
@@ -64,6 +68,19 @@ interface SystemStatusInfo {
 }
 
 const HISTORY_LENGTH = 120;
+const PROCESS_INTERVAL = 3000;
+const PROCESS_ACTION_MAX_AGE = 2 * PROCESS_INTERVAL;
+const processKey = (process: SystemProcess) => process.pid + ':' + (process.instance || (process.startedAt || 0) + ':' + process.name);
+
+interface ProcessAction {
+  process: SystemProcess;
+  tree: boolean;
+}
+interface EndProcessResult {
+  success: boolean;
+  error?: string;
+  ended?: number;
+}
 
 const formatAge = (timestamp: number): string => {
   const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
@@ -86,10 +103,10 @@ const formatUptime = (seconds: number): string => {
 const toneFor = (percent: number): string => (percent > 80 ? 'var(--color-error)' : percent > 55 ? 'var(--color-warning)' : 'var(--color-success)');
 
 const batteryTone = (percent: number, charging: boolean): string => {
-  if (charging) return '#30D158';
-  if (percent < 15) return '#FF453A';
-  if (percent < 30) return '#FF9F0A';
-  return '#30D158';
+  if (charging) return '#d8d8d8';
+  if (percent < 15) return '#ffffff';
+  if (percent < 30) return '#a8a8a8';
+  return '#d8d8d8';
 };
 
 const formatBps = (bps: number): string => {
@@ -118,12 +135,12 @@ const groupKeyFor = (name: string): string => {
   return base.trim() || (name || 'unknown');
 };
 
-const loadPinned = (): number[] => {
+const loadPinned = (): Array<string | number> => {
   try {
     const raw = localStorage.getItem(PINNED_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter((n): n is number => typeof n === 'number');
+    if (Array.isArray(parsed)) return parsed.filter((key): key is string | number => typeof key === 'string' || Number.isSafeInteger(key));
   } catch { /* ignore */ }
   return [];
 };
@@ -146,85 +163,21 @@ interface SparklineProps {
 }
 
 const Sparkline: React.FC<SparklineProps> = ({ history, color, height = 36, max = 100, ariaLabel }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const widthPx = Math.max(60, Math.floor(rect.width));
-    const heightPx = Math.max(20, Math.floor(rect.height));
-    if (canvas.width !== widthPx * dpr || canvas.height !== heightPx * dpr) {
-      canvas.width = widthPx * dpr;
-      canvas.height = heightPx * dpr;
-    }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, widthPx, heightPx);
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    for (let gridIndex = 1; gridIndex < 4; gridIndex++) {
-      const y = (heightPx / 4) * gridIndex;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(widthPx, y);
-      ctx.stroke();
-    }
-
-    if (history.length < 2) return;
-
-    const samples = history.slice(-HISTORY_LENGTH);
-    const stepX = widthPx / (HISTORY_LENGTH - 1);
-    const startIndex = HISTORY_LENGTH - samples.length;
-    const safeMax = max <= 0 ? 1 : max;
-
-    const pointFor = (value: number, index: number): [number, number] => {
-      const clamped = Math.max(0, Math.min(safeMax, value));
-      const x = (startIndex + index) * stepX;
-      const y = heightPx - (clamped / safeMax) * (heightPx - 4) - 2;
-      return [x, y];
-    };
-
-    const gradient = ctx.createLinearGradient(0, 0, 0, heightPx);
-    gradient.addColorStop(0, color + '55');
-    gradient.addColorStop(1, color + '00');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    const [firstX, firstY] = pointFor(samples[0], 0);
-    ctx.moveTo(firstX, heightPx);
-    ctx.lineTo(firstX, firstY);
-    for (let i = 1; i < samples.length; i++) {
-      const [x, y] = pointFor(samples[i], i);
-      ctx.lineTo(x, y);
-    }
-    const lastSampleX = (startIndex + samples.length - 1) * stepX;
-    ctx.lineTo(lastSampleX, heightPx);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.6;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(firstX, firstY);
-    for (let i = 1; i < samples.length; i++) {
-      const [x, y] = pointFor(samples[i], i);
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    const [endX, endY] = pointFor(samples[samples.length - 1], samples.length - 1);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(endX, endY, 2.4, 0, Math.PI * 2);
-    ctx.fill();
-  }, [history, color, max]);
-
-  return <canvas ref={canvasRef} role="img" aria-label={ariaLabel} style={{ width: '100%', height, display: 'block' }} />;
+  const samples = history.slice(-HISTORY_LENGTH);
+  const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
+  const points = samples.map((value, index) => [
+    3 + (HISTORY_LENGTH - samples.length + index) / (HISTORY_LENGTH - 1) * 294,
+    36 - Math.max(0, Math.min(1, (Number.isFinite(value) ? value : 0) / safeMax)) * 32,
+  ]);
+  const line = points.map(point => point.join(',')).join(' ');
+  const first = points[0];
+  const last = points[points.length - 1];
+  return <svg role="img" aria-label={ariaLabel} viewBox="0 0 300 40" preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+    <path d="M0 10H300 M0 20H300 M0 30H300" fill="none" stroke="var(--color-border)" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+    {points.length > 1 && <polygon points={first[0] + ',39 ' + line + ' ' + last[0] + ',39'} fill={color} opacity=".14" />}
+    {points.length > 1 && <polyline points={line} fill="none" stroke={color} strokeWidth="1.65" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+    {last && <line x1={last[0]} x2={last[0]} y1={last[1]} y2={last[1] + .1} stroke={color} strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+  </svg>;
 };
 
 interface MetricCardProps {
@@ -247,15 +200,22 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, detail, history, 
   </div>
 );
 
-const TaskManager: React.FC = () => {
+const TaskManager: React.FC<{ observing?: boolean }> = ({ observing: windowObserving }) => {
   const runningApps = useRunningApps(state => state.runningApps);
   const currentAppId = useRunningApps(state => state.currentAppId);
+  const monitorId = useId();
+  const [graphsOpen, setGraphsOpen] = useState(true);
+  const observing = windowObserving ?? currentAppId === 'taskmanager';
   const closeApp = useRunningApps(state => state.closeApp);
   const setCurrentApp = useRunningApps(state => state.setCurrentApp);
   const [processes, setProcesses] = useState<SystemProcess[]>([]);
   const [status, setStatus] = useState<SystemStatusInfo>({});
   const [filter, setFilter] = useState('');
-  const [bridgeAvailable, setBridgeAvailable] = useState(true);
+  const [processAvailability, setProcessAvailability] = useState<'waiting' | 'ready' | 'unavailable'>('waiting');
+  const [processCount, setProcessCount] = useState(0);
+  const [statusUnavailable, setStatusUnavailable] = useState(false);
+  const statusPending = useRef(false);
+  const processesPending = useRef(false);
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
   const [memoryHistory, setMemoryHistory] = useState<number[]>([]);
   const [processHistory, setProcessHistory] = useState<number[]>([]);
@@ -266,24 +226,25 @@ const TaskManager: React.FC = () => {
   const [detailLevel, setDetailLevel] = useState<DetailLevel>(loadDetailLevel);
   // Process-table sort: local-only (no backend). Default mirrors the previous
   // hardcoded behaviour (CPU, highest first); clicking a header cycles it.
-  const [sortKey, setSortKey] = useState<'name' | 'pid' | 'cpu' | 'memory'>('cpu');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [killing, setKilling] = useState<number | null>(null);
+  const [{ key: sortKey, direction: sortDir }, setSort] = useState<{
+    key: 'name' | 'pid' | 'cpu' | 'memory'; direction: 'asc' | 'desc';
+  }>({ key: 'cpu', direction: 'desc' });
+  const [ending, setEnding] = useState<string | null>(null);
+  const endInProgress = useRef(false);
+  const [actionMessage, setActionMessage] = useState<{ error: boolean; text: string } | null>(null);
+  const [lastProcessSample, setLastProcessSample] = useState<number | null>(null);
   const [hoveredPid, setHoveredPid] = useState<number | null>(null);
-  const [killConfirm, setKillConfirm] = useState<{ pid: number; name: string; force: boolean; tree?: boolean } | null>(null);
+  const [killConfirm, setKillConfirm] = useState<ProcessAction | null>(null);
 
   // -- Feature state (all renderer-local, persisted where it makes sense) --
   // Pinned watch-list of PIDs: pinned processes are floated to the top of the
   // table and rendered in their own always-visible strip.
-  const [pinned, setPinned] = useState<number[]>(loadPinned);
+  const [pinned, setPinned] = useState<Array<string | number>>(loadPinned);
   // Group-by-application toggle + which group rows are collapsed.
   const [groupBy, setGroupBy] = useState<boolean>(loadGroupBy);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  // Selected process for the detail panel (by pid).
-  const [selectedPid, setSelectedPid] = useState<number | null>(null);
-  // First-seen timestamps so the detail panel can show how long a PID has been
-  // observed in this session (the native payload carries no start time).
-  const firstSeenRef = useRef<Map<number, number>>(new Map());
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const firstSeenRef = useRef<Map<string, number>>(new Map());
 
   // Pulse v2: workspace grouping + governance state.
   const stages = useStageStore(s => s.stages);
@@ -291,95 +252,101 @@ const TaskManager: React.FC = () => {
   const [governance, setGovernance] = useState<Record<string, GovernanceClass>>({});
   const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; steps: number; lastRun: number | null }>>([]);
 
-  const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number) => {
+  const pushSample = useCallback((setter: React.Dispatch<React.SetStateAction<number[]>>, value: number | undefined) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
     setter(prev => {
       const next = prev.length >= HISTORY_LENGTH ? prev.slice(prev.length - HISTORY_LENGTH + 1) : prev.slice();
-      next.push(Number.isFinite(value) ? value : 0);
+      next.push(value);
       return next;
     });
   }, []);
 
   const refreshStatus = useCallback(async () => {
+    if (statusPending.current) return;
     const dexApi = (window as any).dex;
-    if (!dexApi?.system?.getStatus) {
-      setBridgeAvailable(false);
-      return;
-    }
+    statusPending.current = true;
     try {
-      const systemStatus = await dexApi.system.getStatus().catch(() => null);
-      if (systemStatus) {
-        setStatus(systemStatus);
-        pushSample(setCpuHistory, systemStatus?.cpu?.usage ?? 0);
-        pushSample(setMemoryHistory, systemStatus?.memory?.percent ?? 0);
-        if (systemStatus?.battery?.hasBattery !== false) {
-          pushSample(setBatteryHistory, systemStatus?.battery?.percent ?? 0);
-        }
-        pushSample(setNetRxHistory, systemStatus?.network?.rxBps ?? 0);
-        pushSample(setNetTxHistory, systemStatus?.network?.txBps ?? 0);
-        setBridgeAvailable(true);
+      const systemStatus = await dexApi?.system?.getStatus?.();
+      if (!systemStatus || systemStatus.success === false) throw new Error('System samples unavailable');
+      setStatus(systemStatus);
+      pushSample(setCpuHistory, systemStatus.cpu?.usage);
+      pushSample(setMemoryHistory, systemStatus.memory?.percent);
+      if (systemStatus.battery?.hasBattery !== false) {
+        pushSample(setBatteryHistory, systemStatus.battery?.percent);
       }
+      pushSample(setNetRxHistory, systemStatus.network?.rxBps);
+      pushSample(setNetTxHistory, systemStatus.network?.txBps);
+      setStatusUnavailable(false);
     } catch {
-      setBridgeAvailable(false);
+      setStatusUnavailable(true);
+    } finally {
+      statusPending.current = false;
     }
   }, [pushSample]);
 
   const refreshProcesses = useCallback(async () => {
+    if (processesPending.current) return;
     const dexApi = (window as any).dex;
-    if (!dexApi?.system?.getProcesses) {
-      setBridgeAvailable(false);
-      return;
-    }
+    processesPending.current = true;
     try {
-      const processList = await dexApi.system.getProcesses().catch(() => []);
-      const list = Array.isArray(processList) ? processList : [];
-      // Record the first time each PID is observed so the detail panel can show
-      // an approximate age (the native payload has no start time).
+      const processResponse = await dexApi?.system?.getProcesses?.();
+      // Native Tauri returns { success, processes }; legacy bridges return the
+      // array directly. Normalize both contracts at the boundary.
+      const list = Array.isArray(processResponse)
+        ? processResponse
+        : processResponse?.success !== false && Array.isArray(processResponse?.processes)
+          ? processResponse.processes
+          : null;
+      if (!list) throw new Error('Process samples unavailable');
+      const rows: SystemProcess[] = list.filter((entry: SystemProcess) => Number.isSafeInteger(entry?.pid) && typeof entry.name === 'string');
+      const reportedTotal = processResponse?.total;
+      const total = Number.isSafeInteger(reportedTotal) && reportedTotal >= rows.length ? reportedTotal : rows.length;
       const seen = firstSeenRef.current;
       const now = Date.now();
-      const livePids = new Set<number>();
-      for (const proc of list) {
-        if (typeof proc?.pid === 'number') {
-          livePids.add(proc.pid);
-          if (!seen.has(proc.pid)) seen.set(proc.pid, now);
-        }
-      }
-      // Prune PIDs that are gone so the map cannot grow unbounded.
-      for (const pid of Array.from(seen.keys())) if (!livePids.has(pid)) seen.delete(pid);
-      setProcesses(list);
-      pushSample(setProcessHistory, list.length);
-      setBridgeAvailable(true);
+      const liveKeys = new Map(rows.map(process => [process.pid, processKey(process)]));
+      const retained = new Set(liveKeys.values());
+      for (const key of retained) if (!seen.has(key)) seen.set(key, now);
+      for (const key of seen.keys()) if (!retained.has(key)) seen.delete(key);
+      setPinned(current => {
+        if (!current.some(key => typeof key === 'number')) return current;
+        return current.flatMap(key => {
+          const migrated = typeof key === 'number' ? liveKeys.get(key) : key;
+          return migrated ? [migrated] : [];
+        });
+      });
+      setProcesses(rows);
+      setProcessCount(total);
+      setLastProcessSample(now);
+      pushSample(setProcessHistory, total);
+      setProcessAvailability('ready');
     } catch {
-      setBridgeAvailable(false);
+      setProcessAvailability('unavailable');
+    } finally {
+      processesPending.current = false;
     }
   }, [pushSample]);
 
   useEffect(() => {
-    refreshStatus();
-    refreshProcesses();
-    let statusTimer: number | null = window.setInterval(refreshStatus, 1000);
-    let processTimer: number | null = window.setInterval(refreshProcesses, 3000);
-    const stop = () => {
-      if (statusTimer !== null) { window.clearInterval(statusTimer); statusTimer = null; }
-      if (processTimer !== null) { window.clearInterval(processTimer); processTimer = null; }
-    };
-    const start = () => {
-      if (statusTimer === null) { refreshStatus(); statusTimer = window.setInterval(refreshStatus, 1000); }
-      if (processTimer === null) { refreshProcesses(); processTimer = window.setInterval(refreshProcesses, 3000); }
-    };
-    const onVisibility = () => { if (document.hidden) stop(); else start(); };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [refreshStatus, refreshProcesses]);
+    if (!observing) return;
+    const id = `${monitorId}-status`;
+    sharedTick.subscribe(id, refreshStatus, 1000, { fireImmediately: true });
+    return () => sharedTick.unsubscribe(id);
+  }, [monitorId, observing, refreshStatus]);
+  useEffect(() => {
+    if (!observing || detailLevel === 1) return;
+    const id = `${monitorId}-processes`;
+    sharedTick.subscribe(id, refreshProcesses, PROCESS_INTERVAL, { fireImmediately: true });
+    return () => sharedTick.unsubscribe(id);
+  }, [monitorId, observing, detailLevel, refreshProcesses]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    if (!observing) return;
+    const id = `${monitorId}-apps`;
+    sharedTick.subscribe(id, () => {
       pushSample(setAppHistory, runningApps.filter(app => app.id !== 'home').length);
     }, 1000);
-    return () => window.clearInterval(timer);
-  }, [pushSample, runningApps]);
+    return () => sharedTick.unsubscribe(id);
+  }, [monitorId, observing, pushSample, runningApps]);
 
   // Workflows section: read the saved automations (same source as the Workflows
   // app — native `workflows:getAll` with the localStorage fallback). Read-only
@@ -406,10 +373,11 @@ const TaskManager: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    refreshWorkflows();
-    const timer = window.setInterval(refreshWorkflows, 5000);
-    return () => window.clearInterval(timer);
-  }, [refreshWorkflows]);
+    if (!observing || detailLevel === 1) return;
+    const id = `${monitorId}-workflows`;
+    sharedTick.subscribe(id, refreshWorkflows, 5000, { fireImmediately: true });
+    return () => sharedTick.unsubscribe(id);
+  }, [monitorId, observing, detailLevel, refreshWorkflows]);
 
   // Persist the chosen detail level so the monitor opens where the user left it.
   useEffect(() => {
@@ -444,18 +412,20 @@ const TaskManager: React.FC = () => {
   // Header click: toggle direction on the active column, else switch column with
   // a sensible default (numbers high-first, name A->Z).
   const handleSort = useCallback((key: 'name' | 'pid' | 'cpu' | 'memory') => {
-    setSortKey(prev => {
-      if (prev === key) { setSortDir(d => (d === 'asc' ? 'desc' : 'asc')); return prev; }
-      setSortDir(key === 'name' ? 'asc' : 'desc');
-      return key;
-    });
+    setSort(previous => ({
+      key,
+      direction: previous.key === key
+        ? previous.direction === 'asc' ? 'desc' : 'asc'
+        : key === 'name' ? 'asc' : 'desc',
+    }));
   }, []);
   const sortArrow = (key: 'name' | 'pid' | 'cpu' | 'memory') => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
 
   const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
 
-  const togglePin = useCallback((pid: number) => {
-    setPinned(prev => (prev.includes(pid) ? prev.filter(p => p !== pid) : [...prev, pid]));
+  const togglePin = useCallback((process: SystemProcess) => {
+    const key = processKey(process);
+    setPinned(prev => (prev.includes(key) ? prev.filter(pin => pin !== key) : [...prev, key]));
   }, []);
 
   const toggleGroup = useCallback((key: string) => {
@@ -494,21 +464,21 @@ const TaskManager: React.FC = () => {
     | { kind: 'process'; process: SystemProcess; grouped: boolean };
   const tableRows = useMemo<TableRow[]>(() => {
     const rows: TableRow[] = [];
-    const pinnedProcs = visibleProcesses.filter(p => pinnedSet.has(p.pid));
+    const pinnedProcs = visibleProcesses.filter(p => pinnedSet.has(processKey(p)));
     for (const proc of pinnedProcs) rows.push({ kind: 'pinned', process: proc });
     if (groupBy) {
       for (const group of groups) {
         rows.push({ kind: 'group', group });
         if (!collapsedGroups[group.key]) {
           for (const proc of group.processes) {
-            if (pinnedSet.has(proc.pid)) continue;
+            if (pinnedSet.has(processKey(proc))) continue;
             rows.push({ kind: 'process', process: proc, grouped: true });
           }
         }
       }
     } else {
       for (const proc of visibleProcesses) {
-        if (pinnedSet.has(proc.pid)) continue;
+        if (pinnedSet.has(processKey(proc))) continue;
         rows.push({ kind: 'process', process: proc, grouped: false });
       }
     }
@@ -518,8 +488,8 @@ const TaskManager: React.FC = () => {
   // The detail-panel target, resolved from the live process list (so its metrics
   // update each refresh). Falls back to null once the PID disappears.
   const selectedProcess = useMemo(
-    () => (selectedPid == null ? null : processes.find(p => p.pid === selectedPid) || null),
-    [selectedPid, processes],
+    () => (selectedKey == null ? null : processes.find(process => processKey(process) === selectedKey) || null),
+    [selectedKey, processes],
   );
 
   // Windowed process table: drives padTop/visible-rows/padBottom from scrollTop.
@@ -534,8 +504,19 @@ const TaskManager: React.FC = () => {
   const cpuDetail = status.cpu
     ? `${status.cpu.cores || '?'} cores - ${cpuUsage > 80 ? 'High load' : cpuUsage > 55 ? 'Moderate' : 'Nominal'}`
     : 'Waiting for system bridge';
-  const processCount = processes.length;
-  const appsTone = shellApps.length > 12 ? '#FF9F0A' : '#0A84FF';
+  const bridgeAvailable = processAvailability === 'ready';
+  const processSnapshotStale = lastProcessSample !== null && (!observing || !bridgeAvailable ||
+    Date.now() - lastProcessSample > PROCESS_ACTION_MAX_AGE);
+  const livePinnedCount = processes.filter(process => pinnedSet.has(processKey(process))).length;
+  const reasonProcessActionDisabled = (process: SystemProcess): string | undefined => {
+    if (endInProgress.current || ending) return 'A process action is pending.';
+    if (!observing || !bridgeAvailable || lastProcessSample === null ||
+      Date.now() - lastProcessSample > PROCESS_ACTION_MAX_AGE) return 'Refresh to get a current process sample.';
+    if (!process.instance) return 'Windows could not verify this process instance.';
+    return undefined;
+  };
+  const systemDetail = statusUnavailable ? 'System samples unavailable' : 'Waiting for a system sample';
+  const appsTone = shellApps.length > 12 ? '#a8a8a8' : '#d8d8d8';
 
   const battery = status.battery;
   const hasBattery = battery && battery.hasBattery !== false;
@@ -630,66 +611,58 @@ const TaskManager: React.FC = () => {
     }
     return { level, issues, bottleneck };
   }, [cpuUsage, memoryPercent, frozenCount, topProcess]);
-  const healthTone = health.level === 'critical' ? '#FF453A' : health.level === 'elevated' ? '#FF9F0A' : '#30D158';
+  const healthTone = health.level === 'critical' ? '#ffffff' : health.level === 'elevated' ? '#a8a8a8' : '#d8d8d8';
   const healthLabel = health.level === 'critical' ? 'Critical' : health.level === 'elevated' ? 'Elevated' : 'Healthy';
-  const healthPillText = health.bottleneck ? `${healthLabel} · ${health.bottleneck}` : healthLabel;
+  const healthPillText = statusUnavailable || !status.cpu || !status.memory ? systemDetail
+    : health.bottleneck ? `${healthLabel} · ${health.bottleneck}` : healthLabel;
 
   const handleManualRefresh = () => {
     refreshStatus();
     refreshProcesses();
   };
 
-  const handleEndProcess = useCallback((pid: number, name: string) => {
-    if (typeof pid !== 'number' || pid <= 0) return;
-    const dexApi = (window as any).dex;
-    if (!dexApi?.system?.killProcess) return;
-    setKillConfirm({ pid, name, force: false });
-  }, []);
+  const requestEndProcess = (process: SystemProcess, tree = false) => {
+    if (reasonProcessActionDisabled(process)) return;
+    setActionMessage(null);
+    setKillConfirm({ process, tree });
+  };
 
-  // Kill-tree (Tier 5 / 45): terminate the process AND all of its descendants,
-  // so closing a parent never leaves orphaned/zombie children behind.
-  const handleEndTree = useCallback((pid: number, name: string) => {
-    if (typeof pid !== 'number' || pid <= 0) return;
-    const dexApi = (window as any).dex;
-    if (!dexApi?.system?.killProcessTree) return;
-    setKillConfirm({ pid, name, force: false, tree: true });
-  }, []);
-
-  const executeKill = useCallback(async () => {
-    if (!killConfirm) return;
-    const { pid, name, force, tree } = killConfirm;
+  const executeKill = async () => {
+    if (!killConfirm || endInProgress.current) return;
+    const { process, tree } = killConfirm;
     setKillConfirm(null);
-    setKilling(pid);
-    try {
-      const dexApi = (window as any).dex;
-      const result = tree
-        ? await dexApi.system.killProcessTree(pid, force)
-        : await dexApi.system.killProcess(pid, force);
-      if (result && result.success === false && !force) {
-        setKillConfirm({ pid, name, force: true, tree });
-      } else {
-        await refreshProcesses();
-      }
-    } catch (e) {
-      console.warn('[TaskManager] kill failed', e);
-    } finally {
-      setKilling(null);
+    const disabledReason = reasonProcessActionDisabled(process);
+    if (disabledReason || !processes.some(candidate => processKey(candidate) === processKey(process))) {
+      setActionMessage({ error: true, text: disabledReason ?? 'The selected process has changed. Select it again.' });
+      return;
     }
-  }, [killConfirm, refreshProcesses]);
+    endInProgress.current = true;
+    setEnding(processKey(process));
+    try {
+      const result = await invokePlatformIpc<EndProcessResult>('system:endObservedProcess', {
+        pid: process.pid, instance: process.instance, tree,
+      });
+      setActionMessage(result?.success
+        ? { error: false, text: tree ? 'Ended ' + result.ended + ' process(es).' : 'Ended ' + process.name + '.' }
+        : { error: true, text: result?.error || 'Could not end the selected process.' });
+      await refreshProcesses();
+    } finally {
+      endInProgress.current = false;
+      setEnding(null);
+    }
+  };
 
   return (
     <div style={styles.container}>
       <ConfirmDialog
         open={killConfirm !== null}
-        title={killConfirm?.force
-          ? `Force Kill "${killConfirm.name}"${killConfirm?.tree ? ' + children' : ''}?`
-          : killConfirm?.tree ? `End "${killConfirm?.name}" and all children?` : `End Process "${killConfirm?.name}"?`}
-        message={killConfirm?.force
-          ? 'Could not end gracefully. Force kill will immediately terminate the process.'
-          : killConfirm?.tree
-            ? 'This ends the process and every child process it spawned. Unsaved work in any of them will be lost.'
-            : 'Unsaved work in this process will be lost.'}
-        confirmLabel={killConfirm?.force ? 'Force Kill' : killConfirm?.tree ? 'End Tree' : 'End Process'}
+        title={killConfirm?.tree
+          ? 'End ' + killConfirm.process.name + ' and its child processes?'
+          : 'End ' + (killConfirm?.process.name ?? 'process') + '?'}
+        message={killConfirm?.tree
+          ? 'Windows will terminate the selected process and its child processes. Unsaved work will be lost.'
+          : 'Windows will terminate the selected process. Unsaved work will be lost.'}
+        confirmLabel={killConfirm?.tree ? 'End Tree' : 'End Process'}
         tone="destructive"
         onConfirm={executeKill}
         onCancel={() => setKillConfirm(null)}
@@ -739,7 +712,7 @@ const TaskManager: React.FC = () => {
         </div>
       </div>
 
-      {health.level !== 'healthy' && (
+      {!statusUnavailable && health.level !== 'healthy' && (
         <div
           data-health-banner
           role="status"
@@ -749,10 +722,10 @@ const TaskManager: React.FC = () => {
           <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--color-text-primary)' }}>
             <strong style={{ color: healthTone }}>{healthLabel}:</strong> {health.issues.join(' · ')}
           </span>
-          {topProcess && (topProcess.cpu || 0) > 80 && (
+          {topProcess && (topProcess.cpu || 0) > 80 && !reasonProcessActionDisabled(topProcess) && (
             <button
               style={styles.endButton}
-              onClick={() => handleEndProcess(topProcess.pid, topProcess.name)}
+              onClick={() => requestEndProcess(topProcess)}
               aria-label={`End ${topProcess.name}`}
             >
               End {topProcess.name}
@@ -761,7 +734,13 @@ const TaskManager: React.FC = () => {
         </div>
       )}
 
-      <div style={styles.statsGrid}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '4px 16px 8px' }}>
+        <button type="button" style={styles.refreshButton} aria-expanded={graphsOpen}
+          aria-controls={monitorId + '-graphs'} onClick={() => setGraphsOpen(open => !open)}>
+          <DexIcon name={graphsOpen ? 'chevron-down' : 'chevron-right'} size={14} /> Performance graphs
+        </button>
+      </div>
+      <div id={monitorId + '-graphs'} hidden={!graphsOpen} style={graphsOpen ? styles.statsGrid : undefined}>
         <MetricCard
           label="DEX Apps"
           value={String(shellApps.length)}
@@ -772,15 +751,15 @@ const TaskManager: React.FC = () => {
         />
         <MetricCard
           label="CPU"
-          value={`${cpuUsage}%`}
-          detail={cpuDetail}
+          value={!statusUnavailable && status.cpu ? `${cpuUsage.toFixed(1)}%` : '—'}
+          detail={!statusUnavailable && status.cpu ? cpuDetail : systemDetail}
           history={cpuHistory}
           tone={toneFor(cpuUsage)}
         />
         <MetricCard
           label="Memory"
-          value={`${memoryPercent}%`}
-          detail={memoryDetail}
+          value={!statusUnavailable && status.memory ? `${memoryPercent.toFixed(1)}%` : '—'}
+          detail={!statusUnavailable && status.memory ? memoryDetail : systemDetail}
           history={memoryHistory}
           tone={toneFor(memoryPercent)}
         />
@@ -797,10 +776,12 @@ const TaskManager: React.FC = () => {
           <>
             <MetricCard
               label="Processes"
-              value={bridgeAvailable ? String(processCount) : 'Local'}
-              detail={bridgeAvailable ? `${visibleProcesses.length} listed - sampled every 3s` : 'DEX apps only'}
+              value={lastProcessSample !== null ? String(processCount) : '—'}
+              detail={processSnapshotStale ? 'Last sample · ' + formatAge(lastProcessSample!) + ' ago'
+                : bridgeAvailable ? visibleProcesses.length + ' listed · sampled every 3s'
+                : processAvailability === 'waiting' ? 'Waiting for a process sample' : 'Process samples unavailable'}
               history={processHistory}
-              tone="#5E5CE6"
+              tone="#c8c8c8"
               max={Math.max(50, ...processHistory)}
             />
           </>
@@ -820,7 +801,7 @@ const TaskManager: React.FC = () => {
               value={formatBps(rxBps)}
               detail={networkConnected ? 'Receiving' : 'Offline'}
               history={netRxHistory}
-              tone="#5AC8FA"
+              tone="#d8d8d8"
               max={Math.max(1024, ...netRxHistory)}
             />
             <MetricCard
@@ -828,7 +809,7 @@ const TaskManager: React.FC = () => {
               value={formatBps(txBps)}
               detail={networkConnected ? 'Sending' : 'Offline'}
               history={netTxHistory}
-              tone="#FF9F0A"
+              tone="#a8a8a8"
               max={Math.max(1024, ...netTxHistory)}
             />
             {status.disk && (
@@ -958,9 +939,9 @@ const TaskManager: React.FC = () => {
           <div style={styles.panelHeader}>
             <span>System Processes</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {pinned.length > 0 && (
+              {livePinnedCount > 0 && (
                 <span style={{ ...styles.countPill, background: 'rgba(255,159,10,0.16)', color: '#FFB340' }} title="Pinned to watch list">
-                  {pinned.length} pinned
+                  {livePinnedCount} pinned
                 </span>
               )}
               <button
@@ -977,12 +958,20 @@ const TaskManager: React.FC = () => {
                 value={filter}
                 onChange={event => setFilter(event.target.value)}
                 onClear={() => setFilter('')}
-                placeholder="Filter by name"
+                placeholder="Filter by name or PID"
                 aria-label="Filter system processes"
                 style={{ width: 150 }}
               />
             </div>
           </div>
+          {processSnapshotStale && (
+            <div role="status" style={styles.processNotice}>
+              {!observing ? 'Sampling paused.' : bridgeAvailable ? 'Process sample expired.' : 'Could not refresh processes.'} Showing the last sample.
+            </div>
+          )}
+          {actionMessage && (
+            <div role={actionMessage.error ? 'alert' : 'status'} style={styles.processNotice}>{actionMessage.text}</div>
+          )}
           <div style={styles.processTableHead}>
             <button type="button" style={styles.sortHeader} onClick={() => handleSort('name')} aria-label="Sort by name">Name{sortArrow('name')}</button>
             <button type="button" style={{ ...styles.sortHeader, justifyContent: 'flex-end' }} onClick={() => handleSort('pid')} aria-label="Sort by PID">PID{sortArrow('pid')}</button>
@@ -990,15 +979,15 @@ const TaskManager: React.FC = () => {
             <button type="button" style={{ ...styles.sortHeader, justifyContent: 'flex-end' }} onClick={() => handleSort('memory')} aria-label="Sort by memory">RAM{sortArrow('memory')}</button>
             <span style={{ textAlign: 'right' }}>Action</span>
           </div>
-          <div ref={procVirtual.ref as React.RefObject<HTMLDivElement>} onScroll={procVirtual.onScroll} style={styles.processTable}>
-            {!bridgeAvailable ? (
-              <div style={styles.empty}>Native process bridge is unavailable in this build. DEX app management remains active.</div>
+          <div ref={procVirtual.ref} onScroll={procVirtual.onScroll} style={styles.processTable}>
+            {lastProcessSample === null ? (
+              <div style={styles.empty}>{processAvailability === 'waiting' ? 'Waiting for a process sample.' : 'Native process samples are unavailable.'}</div>
             ) : tableRows.length === 0 ? (
-              <div style={styles.empty}>No processes to show yet.</div>
+              <div style={styles.empty}>{filter.trim() ? 'No processes match your filter.' : 'No processes to show.'}</div>
             ) : (
               <>
                 <div style={{ height: procVirtual.slice.padTop }} aria-hidden="true" />
-                {tableRows.slice(procVirtual.slice.start, procVirtual.slice.end).map((row, sliceIndex) => {
+                {tableRows.slice(procVirtual.slice.start, procVirtual.slice.end).map(row => {
                   if (row.kind === 'group') {
                     const group = row.group;
                     const collapsed = !!collapsedGroups[group.key];
@@ -1028,14 +1017,16 @@ const TaskManager: React.FC = () => {
                   const isPinnedRow = row.kind === 'pinned';
                   const cpuValue = process.cpu || 0;
                   const cpuColor = cpuValue > 50 ? '#FF453A' : cpuValue > 20 ? '#FF9F0A' : 'var(--color-text-secondary)';
-                  const isKilling = killing === process.pid;
+                  const key = processKey(process);
+                  const isKilling = ending === key;
+                  const disabledReason = reasonProcessActionDisabled(process);
                   const hovered = hoveredPid === process.pid;
-                  const isPinned = pinnedSet.has(process.pid);
-                  const isSelected = selectedPid === process.pid;
+                  const isPinned = pinnedSet.has(processKey(process));
+                  const isSelected = selectedKey === key;
                   const grouped = row.kind === 'process' && row.grouped;
                   return (
                     <div
-                      key={`${isPinnedRow ? 'pin-' : ''}${process.pid}-${process.name}-${sliceIndex}`}
+                      key={(isPinnedRow ? 'pin-' : '') + key}
                       style={{
                         ...styles.processRow,
                         ...(grouped ? styles.processRowNested : null),
@@ -1045,7 +1036,7 @@ const TaskManager: React.FC = () => {
                       }}
                       onMouseEnter={() => setHoveredPid(process.pid)}
                       onMouseLeave={() => setHoveredPid(prev => (prev === process.pid ? null : prev))}
-                      onClick={() => setSelectedPid(prev => (prev === process.pid ? null : process.pid))}
+                      onClick={() => setSelectedKey(prev => (prev === key ? null : key))}
                     >
                       <span style={styles.processName} title={process.name}>
                         {isPinnedRow && <span style={{ color: '#FFB340', marginRight: 5 }}>★</span>}
@@ -1057,7 +1048,7 @@ const TaskManager: React.FC = () => {
                       <div style={styles.processActions} onClick={e => e.stopPropagation()}>
                         <button
                           style={{ ...styles.iconAction, color: isPinned ? '#FFB340' : 'var(--color-text-tertiary)' }}
-                          onClick={() => togglePin(process.pid)}
+                          onClick={() => togglePin(process)}
                           aria-label={isPinned ? `Unpin ${process.name}` : `Pin ${process.name} to watch list`}
                           aria-pressed={isPinned}
                           title={isPinned ? 'Unpin from watch list' : 'Pin to watch list'}
@@ -1066,7 +1057,7 @@ const TaskManager: React.FC = () => {
                         </button>
                         <button
                           style={{ ...styles.iconAction, color: isSelected ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
-                          onClick={() => setSelectedPid(prev => (prev === process.pid ? null : process.pid))}
+                          onClick={() => setSelectedKey(prev => (prev === key ? null : key))}
                           aria-label={`Details for ${process.name}`}
                           aria-pressed={isSelected}
                           title="Show process details"
@@ -1075,19 +1066,19 @@ const TaskManager: React.FC = () => {
                         </button>
                         <button
                           style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
-                          onClick={() => handleEndProcess(process.pid, process.name)}
-                          disabled={isKilling}
+                          onClick={() => requestEndProcess(process)}
+                          disabled={!!disabledReason}
                           aria-label={`End process ${process.name}`}
-                          title={`End ${process.name}`}
+                          title={disabledReason ?? 'End ' + process.name}
                         >
                           {isKilling ? '...' : 'End'}
                         </button>
                         <button
                           style={{ ...styles.endButton, height: 20, padding: '0 7px', fontSize: 10, opacity: isKilling ? 0.5 : 1 }}
-                          onClick={() => handleEndTree(process.pid, process.name)}
-                          disabled={isKilling}
+                          onClick={() => requestEndProcess(process, true)}
+                          disabled={!!disabledReason}
                           aria-label={`End process tree ${process.name}`}
-                          title={`End ${process.name} and all child processes`}
+                          title={disabledReason ?? 'End ' + process.name + ' and its child processes'}
                         >
                           Tree
                         </button>
@@ -1104,14 +1095,14 @@ const TaskManager: React.FC = () => {
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle} title={selectedProcess.name}>{selectedProcess.name}</span>
                 <button
-                  style={{ ...styles.iconAction, color: pinnedSet.has(selectedProcess.pid) ? '#FFB340' : 'var(--color-text-tertiary)' }}
-                  onClick={() => togglePin(selectedProcess.pid)}
-                  aria-label={pinnedSet.has(selectedProcess.pid) ? 'Unpin' : 'Pin to watch list'}
-                  title={pinnedSet.has(selectedProcess.pid) ? 'Unpin from watch list' : 'Pin to watch list'}
+                  style={{ ...styles.iconAction, color: pinnedSet.has(processKey(selectedProcess)) ? '#FFB340' : 'var(--color-text-tertiary)' }}
+                  onClick={() => togglePin(selectedProcess)}
+                  aria-label={pinnedSet.has(processKey(selectedProcess)) ? 'Unpin' : 'Pin to watch list'}
+                  title={pinnedSet.has(processKey(selectedProcess)) ? 'Unpin from watch list' : 'Pin to watch list'}
                 >
-                  {pinnedSet.has(selectedProcess.pid) ? '★' : '☆'}
+                  {pinnedSet.has(processKey(selectedProcess)) ? '★' : '☆'}
                 </button>
-                <button style={styles.detailClose} onClick={() => setSelectedPid(null)} aria-label="Close details" title="Close">✕</button>
+                <button style={styles.detailClose} onClick={() => setSelectedKey(null)} aria-label="Close details" title="Close">✕</button>
               </div>
               <div style={styles.detailGrid}>
                 <div style={styles.detailKey}>PID</div>
@@ -1122,16 +1113,16 @@ const TaskManager: React.FC = () => {
                 <div style={styles.detailVal}>{(selectedProcess.cpu || 0).toFixed(1)}%</div>
                 <div style={styles.detailKey}>Memory</div>
                 <div style={styles.detailVal}>{Math.round(selectedProcess.memory || 0)} MB</div>
-                <div style={styles.detailKey}>First seen</div>
+                <div style={styles.detailKey}>{selectedProcess.startedAt ? 'Started' : 'First seen'}</div>
                 <div style={styles.detailVal}>
-                  {firstSeenRef.current.has(selectedProcess.pid)
-                    ? `${formatAge(firstSeenRef.current.get(selectedProcess.pid)!)} ago (this session)`
-                    : 'just now'}
+                  {formatAge(selectedProcess.startedAt
+                    ? selectedProcess.startedAt * 1000
+                    : firstSeenRef.current.get(processKey(selectedProcess)) ?? Date.now())} ago
                 </div>
               </div>
               <div style={styles.detailActions}>
-                <button style={styles.ghostButton} onClick={() => handleEndProcess(selectedProcess.pid, selectedProcess.name)} aria-label={`End ${selectedProcess.name}`}>End Process</button>
-                <button style={styles.ghostButton} onClick={() => handleEndTree(selectedProcess.pid, selectedProcess.name)} aria-label={`End tree ${selectedProcess.name}`}>End Tree</button>
+                <button style={styles.ghostButton} onClick={() => requestEndProcess(selectedProcess)} disabled={!!reasonProcessActionDisabled(selectedProcess)} title={reasonProcessActionDisabled(selectedProcess)} aria-label={`End ${selectedProcess.name}`}>End Process</button>
+                <button style={styles.ghostButton} onClick={() => requestEndProcess(selectedProcess, true)} disabled={!!reasonProcessActionDisabled(selectedProcess)} title={reasonProcessActionDisabled(selectedProcess)} aria-label={`End tree ${selectedProcess.name}`}>End Tree</button>
               </div>
             </div>
           )}
@@ -1180,6 +1171,7 @@ const styles: Record<string, React.CSSProperties> = {
   ghostButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid var(--color-border-subtle)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' },
   endButton: { height: 28, padding: '0 9px', borderRadius: 4, border: '1px solid rgba(255,69,58,0.34)', background: 'rgba(255,69,58,0.10)', color: 'var(--color-error, #FF8A82)', cursor: 'pointer' },
   processTableHead: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 10, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  processNotice: { padding: '6px var(--space-3)', fontSize: 12, color: 'var(--color-text-secondary)' },
   sortHeader: { display: 'flex', alignItems: 'center', height: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', textTransform: 'inherit', letterSpacing: 'inherit', cursor: 'pointer' },
   processTable: { flex: 1, minHeight: 0, overflow: 'auto' },
   processRow: { display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 70px 70px 80px 86px', gap: 'var(--space-2)', height: PROCESS_ROW_H, padding: '0 var(--space-3)', borderBottom: '1px solid var(--color-border-subtle)', alignItems: 'center', fontSize: 12, boxSizing: 'border-box' },

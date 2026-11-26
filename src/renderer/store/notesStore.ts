@@ -12,6 +12,11 @@
 // ==========================================================================
 
 import { create } from 'zustand';
+import { formatNoteExport } from '../DEXAPPLICATIONS/notes/notesExport';
+import { importWordDocument, type WordImportParts } from '../DEXAPPLICATIONS/notes/wordImport';
+import { countWords, createDocFromText, docToPlainText, serializeDoc } from '../DEXAPPLICATIONS/notes/NotesDocumentModel';
+import { invokePlatformIpc } from '../services/platform/ipc';
+import { isTauri } from '../services/platform/tauriCompat';
 import { DEFAULT_NOTE_TEMPLATES, findBuiltinTemplate } from './noteTemplates';
 
 // ---------------------------------------------------------------------------
@@ -423,7 +428,7 @@ export interface NotesStoreState {
   loadAllTags: () => Promise<void>;
   loadStats: () => Promise<void>;
   createNote: (folderId?: string | null) => Promise<string | null>;
-  updateNote: (id: string, updates: { title?: string; content?: string; plain_text?: string; folder_id?: string | null; color_label?: string | null; locked?: number }) => Promise<void>;
+  updateNote: (id: string, updates: { title?: string; content?: string; plain_text?: string; folder_id?: string | null; color_label?: string | null; locked?: number }) => Promise<boolean>;
   deleteNote: (id: string) => Promise<void>;
   restoreNote: (id: string) => Promise<void>;
   permanentlyDeleteNote: (id: string) => Promise<void>;
@@ -492,6 +497,9 @@ export interface NotesStoreState {
 // Store Implementation
 // ---------------------------------------------------------------------------
 
+const noteWrites = new Map<string, Promise<boolean>>();
+let noteLoadSequence = 0;
+
 export const useNotesStore = create<NotesStoreState>((set, get) => ({
   // Initial state
   notes: [],
@@ -556,8 +564,10 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   },
 
   loadNote: async (id: string) => {
+    const request = ++noteLoadSequence;
+    await noteWrites.get(id);
     const result = await ipc('dexnotes:get', id);
-    if (result) {
+    if (result && request === noteLoadSequence) {
       set({ activeNote: applyFavorite(result as NoteFull, favLoad()), selectedNoteId: id });
     }
   },
@@ -579,21 +589,31 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
     return null;
   },
 
-  updateNote: async (id: string, updates) => {
-    set({ saving: true });
-    try {
-      await ipc('dexnotes:update', id, updates);
-      // Update local state immediately
+  updateNote: (id: string, updates) => {
+    const persist = async () => {
+      const result = await ipc('dexnotes:update', id, updates);
+      if (result !== true && result?.success !== true) return false;
       const { activeNote, notes } = get();
+      const timestamp = result?.note?.updated_at ?? Date.now();
+      const committed = { ...updates, updated_at: timestamp };
+      const changes: Partial<NotesStoreState> = {
+        notes: notes.map(n => n.id === id ? { ...n, ...committed } : n),
+      };
       if (activeNote && activeNote.id === id) {
-        set({ activeNote: { ...activeNote, ...updates, updated_at: Date.now() } });
+        changes.activeNote = { ...activeNote, ...committed };
       }
-      set({
-        notes: notes.map(n => n.id === id ? { ...n, ...updates, updated_at: Date.now() } : n),
-      });
-    } finally {
-      set({ saving: false });
-    }
+      set(changes);
+      return true;
+    };
+    const previous = noteWrites.get(id);
+    const operation = (previous ? previous.then(persist) : persist()).catch(() => false);
+    noteWrites.set(id, operation);
+    set({ saving: true });
+    void operation.then(() => {
+      if (noteWrites.get(id) === operation) noteWrites.delete(id);
+      set({ saving: noteWrites.size > 0 });
+    });
+    return operation;
   },
 
   deleteNote: async (id: string) => {
@@ -880,11 +900,61 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
   // -- Export / Import -----------------------------------------------------
 
   exportNote: async (noteId: string, format: string) => {
-    return await ipc('dexnotes:export', noteId, { format });
+    try {
+      const note = await ipc('dexnotes:get', noteId) as NoteFull | null;
+      if (!note || typeof note.content !== 'string') throw new Error('Could not load the note for export.');
+      const file = formatNoteExport(note, format);
+      if (isTauri()) {
+        const result = await invokePlatformIpc<{ success: boolean; path?: string; canceled?: boolean; error?: string }>(
+          'dexnotes:saveExport', file.extension, file.title, file.content,
+          file.relationships ?? '', file.numbering ?? '', file.images ?? [],
+        );
+        if (!result?.success) throw new Error(result?.error || 'Could not save the exported note.');
+        return result.path ?? null;
+      }
+      if (format === 'docx') throw new Error('Word export is available in the desktop app.');
+      const filename = file.title.replace(/[<>:"/\|?*]/g, '_') + '.' + file.extension;
+      const url = URL.createObjectURL(new Blob([file.content], { type: 'application/octet-stream' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return filename;
+    } catch (error) {
+      window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error',
+        message: error instanceof Error ? error.message : 'Could not export the note.' } }));
+      return null;
+    }
   },
 
   importFile: async (filePath: string, folderId?: string | null) => {
-    const _folder = folderId !== undefined ? folderId : get().selectedFolderId;
+    const folder = folderId !== undefined ? folderId : get().selectedFolderId;
+    if (isTauri()) {
+      try {
+        const result = await invokePlatformIpc<
+          | { success: false; error?: string }
+          | { success: true; title: string; kind: 'text'; text: string }
+          | ({ success: true; title: string; kind: 'word' } & WordImportParts)
+        >('dexnotes:readImport', filePath);
+        if (!result?.success) throw new Error(result?.error || 'Could not open the document.');
+        const doc = result.kind === 'word' ? importWordDocument(result) : createDocFromText(result.text);
+        const plainText = docToPlainText(doc);
+        const note = await ipc('dexnotes:create', {
+          title: result.title, folder_id: folder, content: serializeDoc(doc),
+          plain_text: plainText, word_count: countWords(plainText),
+        });
+        if (!note?.id) throw new Error('Could not save the imported note.');
+        await get().loadNotes();
+        await get().loadStats();
+        await get().loadNote(note.id);
+        return note.id;
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error',
+          message: error instanceof Error ? error.message : 'Could not import the document.' } }));
+        return null;
+      }
+    }
     const beforeIds = new Set(get().notes.map(note => note.id));
     const result = await ipc('dexnotes:import', [filePath]);
     if (result?.imported > 0) {
@@ -933,6 +1003,7 @@ export const useNotesStore = create<NotesStoreState>((set, get) => ({
     if (noteId) {
       get().loadNote(noteId);
     } else {
+      noteLoadSequence++;
       set({ activeNote: null, selectedNoteId: null });
     }
   },

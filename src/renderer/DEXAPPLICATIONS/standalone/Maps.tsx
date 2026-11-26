@@ -119,10 +119,11 @@ function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
 const fmtCoord = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 
 // Geocode a place name via Open-Meteo (free, no API key).
-const geocode = async (q: string): Promise<GeoResult[]> => {
+const geocode = async (q: string, signal?: AbortSignal): Promise<GeoResult[]> => {
   if (!q.trim()) return [];
   try {
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`);
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en`, { signal });
+    if (!res.ok) throw new Error('Place search is temporarily unavailable.');
     const data = await res.json();
     if (!Array.isArray(data.results)) return [];
     return data.results.map((r: any): GeoResult => ({
@@ -132,7 +133,7 @@ const geocode = async (q: string): Promise<GeoResult[]> => {
       detail: [r.admin1, r.country].filter(Boolean).join(', '),
     }));
   } catch (err) {
-    console.warn('[Maps] Geocode failed:', err);
+    if (signal) throw err;
     return [];
   }
 };
@@ -199,6 +200,7 @@ const DexMaps: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   // Live verb for the place-search status ("Searching / Scanning / Hunting…").
   const searchPhrase = useWorkingPhrase(searching, 'search');
   const [place, setPlace] = useState('San Francisco');
@@ -344,7 +346,15 @@ const DexMaps: React.FC = () => {
     map.on('error', (e) => {
       console.warn('[Maps] map error:', e?.error?.message || e);
     });
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; measureMarkersRef.current = []; };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.resize());
+    observer?.observe(containerRef.current);
+    return () => {
+      observer?.disconnect();
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+      measureMarkersRef.current = [];
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -443,14 +453,21 @@ const DexMaps: React.FC = () => {
 
   // Debounced search-as-you-type.
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
-    let cancelled = false;
-    setSearching(true);
-    const t = setTimeout(async () => {
-      const hits = await geocode(query);
-      if (!cancelled) { setResults(hits); setSearching(false); }
+    setResults([]);
+    setSearchFailed(false);
+    setSearching(!!query.trim());
+    if (!query.trim()) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void geocode(query, controller.signal).then(hits => {
+        if (!controller.signal.aborted) setResults(hits);
+      }).catch(() => {
+        if (!controller.signal.aborted) setSearchFailed(true);
+      }).finally(() => {
+        if (!controller.signal.aborted) setSearching(false);
+      });
     }, 320);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [query]);
 
   const pick = useCallback((r: GeoResult) => {
@@ -462,10 +479,11 @@ const DexMaps: React.FC = () => {
   }, [goTo, pushRecent]);
 
   const locate = useCallback(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) { toast('info', 'Location is unavailable.'); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => goTo(pos.coords.latitude, pos.coords.longitude, 'My location', 14),
-      (err) => console.warn('[Maps] geolocation denied:', err.message),
+      () => toast('error', 'Could not determine your location.'),
+      { timeout: 10000, maximumAge: 60000 },
     );
   }, [goTo]);
 
@@ -582,8 +600,8 @@ const DexMaps: React.FC = () => {
         {query.trim() && !searching && results.length === 0 && (
           <div role="status" className="dex-liquid-glass-strong dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
             <DexIcon name="map-pin" size={20} color="var(--color-text-tertiary)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No places found</span>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Try a city, landmark, or address.</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{searchFailed ? 'Place search unavailable' : 'No places found'}</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{searchFailed ? 'Check your connection and try again.' : 'Try a city or region.'}</span>
           </div>
         )}
       </div>

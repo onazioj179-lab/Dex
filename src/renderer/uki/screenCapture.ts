@@ -14,6 +14,9 @@
  * pixel-perfect OCR.
  */
 
+import { isTauri } from '@tauri-apps/api/core';
+import { require as requireUkiCapability } from './permissions';
+
 interface CaptureSource {
   id: string;
   name: string;
@@ -27,7 +30,7 @@ function bridge(): { invoke?: (c: string) => Promise<unknown> } | undefined {
 
 /** True when the native screen-capture bridge is present (Electron, not web). */
 export function isScreenCaptureAvailable(): boolean {
-  return !!bridge()?.invoke;
+  return !isTauri() && !!bridge()?.invoke;
 }
 
 /**
@@ -35,9 +38,11 @@ export function isScreenCaptureAvailable(): boolean {
  * is unavailable / fails. Prefers a full-screen source over an individual window.
  */
 export async function captureScreenImage(): Promise<string | null> {
+  if (!isScreenCaptureAvailable()) return null;
   const ipc = bridge();
   if (!ipc?.invoke) return null;
   try {
+    await requireUkiCapability('screen-read');
     const sources = (await ipc.invoke('screencapture:getSources')) as CaptureSource[] | undefined;
     if (!Array.isArray(sources) || sources.length === 0) return null;
     const screenSrc = sources.find((s) => /screen|entire|display/i.test(s.name)) ?? sources[0];

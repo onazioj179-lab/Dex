@@ -6,13 +6,16 @@
  */
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { WorkspacePanel } from '../../ui/WorkspacePanel';
+import { useDocumentHistory } from '../../hooks/useDocumentHistory';
+import { MAX_PROJECT_BYTES, parsePresentationProject } from './presentationProject';
 import { useWorkingPhrase } from '../../hooks/useWorkingPhrase';
-import { premiumGlassToolbar, premiumGlassSidebar } from '../../styles/glassMenu';
+import { premiumGlassToolbar } from '../../styles/glassMenu';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 type BlockType = 'text' | 'image' | 'shape';
 
-interface SlideBlock {
+export interface SlideBlock {
   id: string;
   type: BlockType;
   x: number;
@@ -31,7 +34,7 @@ interface SlideBlock {
 type Transition = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'zoom';
 type SlideLayout = 'title' | 'title-content' | 'two-column' | 'blank';
 
-interface Slide {
+export interface Slide {
   id: string;
   blocks: SlideBlock[];
   background: string;
@@ -142,7 +145,7 @@ const migrateSlide = (s: any): Slide => ({
 });
 
 const PresentationBuilder: React.FC = () => {
-  const [slides, setSlides] = useState<Slide[]>(() => {
+  const { value: slides, setValue: setSlides, undo, redo, beginEdit, endEdit, canUndo, canRedo } = useDocumentHistory<Slide[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -159,6 +162,12 @@ const PresentationBuilder: React.FC = () => {
     } catch { /* ignore */ }
     return THEMES[0].id;
   });
+  const [focusMode, setFocusMode] = useState(() => {
+    try { return localStorage.getItem('dex-present-focus') === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('dex-present-focus', String(focusMode)); } catch { /* Optional preference. */ }
+  }, [focusMode]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
@@ -170,6 +179,19 @@ const PresentationBuilder: React.FC = () => {
   const [elapsedMs, setElapsedMs] = useState(0);
   const presentStart = useRef<number>(0);
 
+  const editorViewport = useRef<HTMLDivElement>(null);
+  const [editorScale, setEditorScale] = useState(1);
+  useEffect(() => {
+    const el = editorViewport.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      setEditorScale(Math.max(0.1, Math.min(1, (el.clientWidth - 32) / CANVAS_W, (el.clientHeight - 32) / CANVAS_H)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [presenting]);
+  const projectInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   const presentRef = useRef<HTMLDivElement | null>(null);
   const dragSlideId = useRef<string | null>(null);
   const dragBlockState = useRef<{ blockId: string; startX: number; startY: number; bx: number; by: number } | null>(null);
@@ -182,10 +204,15 @@ const PresentationBuilder: React.FC = () => {
 
   const theme = getTheme(themeId);
 
+  const [saveError, setSaveError] = useState(false);
   // Persist
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slides)); } catch { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slides)); setSaveError(false); } catch { setSaveError(true); }
   }, [slides]);
+  useEffect(() => {
+    setCurrentIdx(i => Math.min(i, slides.length - 1));
+    setSelectedBlockId(null);
+  }, [slides.length]);
   useEffect(() => {
     try { localStorage.setItem(THEME_KEY, themeId); } catch { /* ignore */ }
   }, [themeId]);
@@ -217,41 +244,82 @@ const PresentationBuilder: React.FC = () => {
     return () => unregisterUkiAppContext('presentation');
   }, []);
 
+  const exportProject = useCallback(() => {
+    try {
+      const data = JSON.stringify({ format: 'dex-presentation', version: 1, themeId, slides }, null, 2);
+      // Apply the same contract in both directions: never download a project
+      // that this editor would refuse to open (including oversized image decks).
+      parsePresentationProject(data);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'presentation-' + Date.now() + '.dexslides.json';
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast('error', error instanceof Error ? `Project export failed: ${error.message}` : 'Project export failed. Your deck has not changed.');
+    }
+  }, [slides, themeId]);
+
+  const importProject = useCallback(async (file: File) => {
+    try {
+      if (file.size > MAX_PROJECT_BYTES) throw new Error('Project exceeds 16 MB.');
+      const project = parsePresentationProject(await file.text());
+      setSlides(project.slides);
+      setThemeId(getTheme(project.themeId).id);
+      setCurrentIdx(0);
+      setSelectedBlockId(null);
+      toast('success', 'Project opened. Undo restores the previous deck.');
+    } catch (error) { toast('error', error instanceof Error ? error.message : 'Project could not be opened.'); }
+  }, [setSlides]);
+
+  const importImage = useCallback(async (file: File) => {
+    const targetId = currentSlide?.id;
+    if (!targetId) return;
+    try {
+      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Choose a PNG, JPEG, WebP or GIF image.');
+      if (file.size > 8 * 1024 * 1024) throw new Error('Images must be 8 MB or smaller.');
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Image could not be read.'));
+        reader.onerror = () => reject(new Error('Image could not be read.'));
+        reader.readAsDataURL(file);
+      });
+      const image = await loadImage(data);
+      if (!image.naturalWidth || !image.naturalHeight) throw new Error('Image has no dimensions.');
+      const scale = Math.min(1, 800 / image.naturalWidth, 400 / image.naturalHeight);
+      const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
+      const block: SlideBlock = { id: newId(), type: 'image', x: (CANVAS_W - width) / 2, y: (CANVAS_H - height) / 2,
+        width, height, content: data, style: {} };
+      setSlides(prev => prev.map(slide => slide.id === targetId ? { ...slide, blocks: [...slide.blocks, block] } : slide));
+      setSelectedBlockId(block.id);
+    } catch (error) { toast('error', error instanceof Error ? error.message : 'Image import failed.'); }
+  }, [currentSlide?.id, setSlides]);
+
   // ---- Slide ops ----
   const addSlide = useCallback((layout: SlideLayout = 'title-content') => {
-    setSlides(prev => {
-      const next = [...prev, makeSlideForLayout(layout, theme)];
-      setCurrentIdx(next.length - 1);
-      return next;
-    });
+    const slide = makeSlideForLayout(layout, theme);
+    setSlides(prev => [...prev, slide]);
+    setCurrentIdx(slides.length);
     setSelectedBlockId(null);
-  }, [theme]);
+  }, [theme, slides.length, setSlides]);
 
   const duplicateSlide = useCallback((idx: number) => {
-    setSlides(prev => {
-      const src = prev[idx];
-      if (!src) return prev;
-      const copy: Slide = {
-        ...src,
-        id: newId(),
-        blocks: src.blocks.map(b => ({ ...b, id: newId(), style: { ...b.style } })),
-      };
-      const next = [...prev];
-      next.splice(idx + 1, 0, copy);
-      setCurrentIdx(idx + 1);
-      return next;
-    });
+    const src = slides[idx];
+    if (!src) return;
+    const copy: Slide = { ...src, id: newId(), blocks: src.blocks.map(b => ({ ...b, id: newId(), style: { ...b.style } })) };
+    setSlides(prev => [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)]);
+    setCurrentIdx(idx + 1);
     setSelectedBlockId(null);
-  }, []);
+  }, [slides, setSlides]);
 
   const deleteSlide = useCallback((idx: number) => {
-    setSlides(prev => {
-      if (prev.length <= 1) return [makeBlankSlide(theme)];
-      const next = prev.filter((_, i) => i !== idx);
-      setCurrentIdx(Math.max(0, Math.min(idx, next.length - 1)));
-      return next;
-    });
-  }, [theme]);
+    const replacement = makeBlankSlide(theme);
+    setSlides(prev => prev.length <= 1 ? [replacement] : prev.filter((_, i) => i !== idx));
+    setCurrentIdx(Math.max(0, Math.min(idx, slides.length - 2)));
+    setSelectedBlockId(null);
+  }, [theme, slides.length, setSlides]);
 
   const reorderSlide = useCallback((from: number, to: number) => {
     if (from === to) return;
@@ -259,10 +327,10 @@ const PresentationBuilder: React.FC = () => {
       const next = [...prev];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
-      setCurrentIdx(to);
       return next;
     });
-  }, []);
+    setCurrentIdx(to);
+  }, [setSlides]);
 
   // ---- Block ops ----
   const updateCurrentSlide = useCallback((mut: (s: Slide) => Slide) => {
@@ -288,9 +356,19 @@ const PresentationBuilder: React.FC = () => {
   }, [updateCurrentSlide, theme]);
 
   const updateBlock = useCallback((id: string, patch: Partial<SlideBlock>) => {
+    // Keep inspector edits compatible with the project-file geometry contract.
+    const bounds = { x: [0, CANVAS_W], y: [0, CANVAS_H], width: [1, CANVAS_W], height: [1, CANVAS_H] };
+    const validated = { ...patch };
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      const value = validated[key];
+      if (value !== undefined) {
+        if (!Number.isFinite(value)) delete validated[key];
+        else validated[key] = Math.max(bounds[key][0], Math.min(bounds[key][1], value));
+      }
+    }
     updateCurrentSlide(s => ({
       ...s,
-      blocks: s.blocks.map(b => (b.id === id ? { ...b, ...patch, style: { ...b.style, ...(patch.style || {}) } } : b)),
+      blocks: s.blocks.map(b => (b.id === id ? { ...b, ...validated, style: { ...b.style, ...(validated.style || {}) } } : b)),
     }));
   }, [updateCurrentSlide]);
 
@@ -367,27 +445,37 @@ const PresentationBuilder: React.FC = () => {
   }, [outlineText, theme]);
 
   // ---- Block drag (canvas) ----
-  const onBlockMouseDown = useCallback((e: React.MouseEvent, b: SlideBlock) => {
+  const onBlockPointerDown = useCallback((e: React.PointerEvent, b: SlideBlock) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
     e.stopPropagation();
+    dragCleanup.current?.();
+    beginEdit();
     setSelectedBlockId(b.id);
+    const spatialScale = e.currentTarget.parentElement!.getBoundingClientRect().width / CANVAS_W || 1;
+    const pointerId = e.pointerId;
     dragBlockState.current = { blockId: b.id, startX: e.clientX, startY: e.clientY, bx: b.x, by: b.y };
-    const move = (mv: MouseEvent) => {
+    const move = (mv: PointerEvent) => {
+      if (mv.pointerId !== pointerId) return;
       const st = dragBlockState.current;
       if (!st) return;
-      const dx = mv.clientX - st.startX;
-      const dy = mv.clientY - st.startY;
-      updateBlock(st.blockId, { x: Math.max(0, st.bx + dx), y: Math.max(0, st.by + dy) });
+      const dx = (mv.clientX - st.startX) / spatialScale;
+      const dy = (mv.clientY - st.startY) / spatialScale;
+      updateBlock(st.blockId, { x: Math.max(0, Math.min(CANVAS_W - b.width, st.bx + dx)), y: Math.max(0, Math.min(CANVAS_H - b.height, st.by + dy)) });
     };
     const up = () => {
+      endEdit();
       dragBlockState.current = null;
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       dragCleanup.current = null;
     };
     dragCleanup.current = up;
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  }, [updateBlock]);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }, [updateBlock, beginEdit, endEdit]);
 
   // Safety net: tear down any in-flight drag listeners on unmount.
   useEffect(() => () => { dragCleanup.current?.(); }, []);
@@ -447,6 +535,7 @@ const PresentationBuilder: React.FC = () => {
   // Render every slide to an offscreen canvas and download as PNG. No deps; uses
   // the native 2D context. Images on remote URLs are best-effort (CORS may taint).
   const exportImages = useCallback(async () => {
+    let exported = 0;
     setIsExporting(true);
     try {
       for (let i = 0; i < slides.length; i++) {
@@ -481,21 +570,28 @@ const PresentationBuilder: React.FC = () => {
             try {
               const img = await loadImage(b.content);
               ctx.drawImage(img, b.x, b.y, b.width, b.height);
-            } catch { /* skip broken/tainting image */ }
+            } catch { throw new Error('Image on slide ' + (i + 1) + ' could not be loaded.'); }
           }
         }
 
-        const url = canvas.toDataURL('image/png');
+        const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+          value => value ? resolve(value) : reject(new Error('Could not encode slide ' + (i + 1) + '.')),
+          'image/png',
+        ));
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `slide-${String(i + 1).padStart(2, '0')}.png`;
         document.body.appendChild(a);
         a.click();
         a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        exported++;
       }
       toast('success', `Exported ${slides.length} image${slides.length === 1 ? '' : 's'}`);
-    } catch {
-      toast('error', 'Export failed');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Export failed';
+      toast('error', exported ? reason + ' Downloaded ' + exported + ' of ' + slides.length + ' slides.' : reason);
     } finally {
       setIsExporting(false);
     }
@@ -526,6 +622,7 @@ const PresentationBuilder: React.FC = () => {
           outline: isSel ? '2px solid var(--color-accent)' : 'none',
           outlineOffset: 2,
           boxSizing: 'border-box',
+          touchAction: interactive ? 'none' : undefined,
         };
         if (b.type === 'text') {
           return (
@@ -539,7 +636,8 @@ const PresentationBuilder: React.FC = () => {
                 display: 'flex', alignItems: 'flex-start',
                 whiteSpace: 'pre-wrap', lineHeight: 1.25, overflow: 'hidden',
               }}
-              onMouseDown={interactive ? (e) => onBlockMouseDown(e, b) : undefined}
+              onPointerDown={interactive ? (e) => onBlockPointerDown(e, b) : undefined}
+              onClick={interactive ? e => e.stopPropagation() : undefined}
             >{b.content}</div>
           );
         }
@@ -548,7 +646,8 @@ const PresentationBuilder: React.FC = () => {
             <div
               key={b.id}
               style={{ ...common, background: b.style.background ?? '#5E5CE6', borderRadius: 4 * scale }}
-              onMouseDown={interactive ? (e) => onBlockMouseDown(e, b) : undefined}
+              onPointerDown={interactive ? (e) => onBlockPointerDown(e, b) : undefined}
+              onClick={interactive ? e => e.stopPropagation() : undefined}
             />
           );
         }
@@ -563,7 +662,8 @@ const PresentationBuilder: React.FC = () => {
               alignItems: 'center', justifyContent: 'center',
               color: 'var(--color-text-muted)', fontSize: 12 * scale,
             }}
-            onMouseDown={interactive ? (e) => onBlockMouseDown(e, b) : undefined}
+            onPointerDown={interactive ? (e) => onBlockPointerDown(e, b) : undefined}
+              onClick={interactive ? e => e.stopPropagation() : undefined}
           >{!b.content && 'Image URL'}</div>
         );
       })}
@@ -633,7 +733,14 @@ const PresentationBuilder: React.FC = () => {
 
   // ---- Editor UI ----
   return (
-    <div style={{
+    <div onKeyDown={e => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+      const target = e.target as HTMLElement;
+      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.shiftKey) redo(); else undo();
+    }} style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: 'var(--color-bg-base)', color: 'var(--color-text-primary)',
       fontFamily: 'var(--font-family)',
@@ -652,8 +759,20 @@ const PresentationBuilder: React.FC = () => {
         }
       `}</style>
 
+      <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden
+        onChange={e => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void importImage(file);
+        }} />
+      <input ref={projectInput} type="file" accept=".json,.dexslides.json,application/json" hidden
+        onChange={e => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void importProject(file);
+        }} />
       {/* Toolbar */}
-      <div style={{ ...premiumGlassToolbar, padding: '10px 14px', justifyContent: 'space-between' }}>
+      <div style={{ ...premiumGlassToolbar, padding: '6px 10px', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <DexIcon name="monitor" size={18} color="var(--color-text-primary)" />
           <span style={{ fontSize: 14, fontWeight: 600 }}>Presentation</span>
@@ -670,10 +789,15 @@ const PresentationBuilder: React.FC = () => {
           >
             {THEMES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
+          <button aria-pressed={focusMode} onClick={() => setFocusMode(v => !v)} style={toolbarBtn}>{focusMode ? 'Restore Panels' : 'Focus Canvas'}</button>
+          <button onClick={undo} disabled={!canUndo} style={toolbarBtn}>Undo</button>
+          <button onClick={redo} disabled={!canRedo} style={toolbarBtn}>Redo</button>
           <button onClick={() => addBlock('text')} style={toolbarBtn}>+ Text</button>
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
-          <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
+          <button onClick={() => imageInput.current?.click()} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
+          <button onClick={() => projectInput.current?.click()} style={toolbarBtn}>Open Project</button>
+          <button onClick={exportProject} style={toolbarBtn}>Save Project</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>
           <button onClick={exportImages} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>{isExporting ? `${exportPhrase}…` : 'Export Images'}</button>
           <button onClick={exportPDF} disabled={isExporting} style={{ ...toolbarBtn, opacity: isExporting ? 0.5 : 1, cursor: isExporting ? 'default' : 'pointer' }}>Export PDF</button>
@@ -681,12 +805,12 @@ const PresentationBuilder: React.FC = () => {
         </div>
       </div>
 
+      {saveError && <div role="alert" style={{ padding: 8, fontSize: 12 }}>Autosave failed. Save Project before closing this window.</div>}
       {/* Body: 3 panes */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'auto' }}>
         {/* Left sidebar — slide rail */}
-        <div style={{
-          ...premiumGlassSidebar, width: 200, padding: 'var(--space-2)', gap: 6, overflowY: 'auto',
-        }}>
+<WorkspacePanel hidden={focusMode} storageKey="dex-present-slides-layout" title="Slides" initialWidth={200}>
+        <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => addSlide('title-content')} style={{
               ...toolbarBtn, flex: 1, justifyContent: 'center',
@@ -750,10 +874,12 @@ const PresentationBuilder: React.FC = () => {
           ))}
         </div>
 
+        </WorkspacePanel>
+
         {/* Center — canvas */}
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 'var(--space-6)', overflow: 'auto', background: 'var(--color-bg-base)',
+        <div ref={editorViewport} style={{
+          flex: 1, minWidth: 180, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, overflow: 'auto', background: 'var(--color-bg-base)',
         }}>
           <div className="dex-presentation-print" style={{ display: 'flex', flexDirection: 'column' }}>
             {/* Print: render all slides */}
@@ -766,14 +892,15 @@ const PresentationBuilder: React.FC = () => {
             </div>
             {/* Editor visible canvas */}
             <div className="print-hidden" style={{ boxShadow: 'var(--pg-shadow-popover)' }}>
-              {currentSlide && renderSlide(currentSlide, 1, true)}
+              {currentSlide && renderSlide(currentSlide, editorScale, true)}
             </div>
           </div>
         </div>
 
         {/* Right panel — properties */}
-        <div className="dex-liquid-glass-strong" style={{
-          width: 240, padding: 14, gap: 'var(--space-3)', display: 'flex', flexDirection: 'column',
+        <WorkspacePanel hidden={focusMode} storageKey="dex-present-inspector-layout" title="Inspector" side="right" initialWidth={240}>
+        <div style={{
+          padding: 14, gap: 'var(--space-3)', display: 'flex', flexDirection: 'column',
           borderRadius: 0, overflowY: 'auto',
         }}>
           <div className="dex-label-caps">
@@ -916,6 +1043,7 @@ const PresentationBuilder: React.FC = () => {
             <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Select a block to edit its properties.</div>
           )}
         </div>
+        </WorkspacePanel>
       </div>
 
       {/* Outline import modal */}

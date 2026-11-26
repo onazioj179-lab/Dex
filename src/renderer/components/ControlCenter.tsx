@@ -509,25 +509,24 @@ const ControlCenter: React.FC = () => {
         ),
       },
       appearance: {
-        name: 'Appearance Liquid Glass Material Transparency',
+        name: 'Appearance Frosted Ice Material Transparency',
         node: (
           <ModuleShell
             key="appearance"
-            label="Liquid Glass"
+            label="Frosted Ice"
             reorder={reorderFor('appearance')}
             icon={
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M3 9h18M9 21V9" /></svg>
             }
           >
             <Segmented<GlassMode>
-              ariaLabel="Liquid glass mode"
+              ariaLabel="Frosted Ice mode"
               value={glassMode}
               onChange={(m) => setGlassMode(m)}
               options={[
                 { id: 'off', label: 'Off' },
                 { id: 'reduced', label: 'Low' },
                 { id: 'normal', label: 'On' },
-                { id: 'liquid', label: 'Liquid' },
               ]}
             />
           </ModuleShell>

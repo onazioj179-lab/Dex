@@ -20,6 +20,10 @@ import { useCreativeSuite } from '../services/CreativeSuiteBridge';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { getAudioPlaybackService } from '../services/media/AudioPlaybackService';
+import { MediaScrubber, bufferedThrough } from '../components/MediaScrubber';
+import { AUDIO_EXTENSIONS, localPlaybackUrl, startNativeAudioPreview } from '../services/media/localMedia';
+import { isTauri } from '../services/platform/tauriCompat';
+import { invokePlatformIpc } from '../services/platform/ipc';
 import { useNowPlaying } from '../services/nowPlaying';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
@@ -36,6 +40,7 @@ interface Track {
   duration: number;
   artwork: string;
   url: string;
+  sourcePath?: string;
   genre?: string;
   year?: string;
   composer?: string;
@@ -49,8 +54,10 @@ interface Playlist {
 }
 
 // Accepted audio MIME types and extensions
-const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.wma', '.opus', '.webm']);
-const isAudioFile = (name: string) => AUDIO_EXTENSIONS.has(name.slice(name.lastIndexOf('.')).toLowerCase());
+const isAudioFile = (name: string) => {
+  const extension = name.split('.').pop()?.toLowerCase() ?? '';
+  return extension === 'webm' || AUDIO_EXTENSIONS.includes(extension);
+};
 
 // ===========================================================================
 // ICONS
@@ -96,7 +103,6 @@ const loadTracks = async (): Promise<{ tracks: Track[]; pendingEnrich: Track[] }
       if (files && Array.isArray(files) && files.length > 0) {
         const baseTracks = files.slice(0, 100).map((f: { path?: string; name?: string; extension?: string; size?: number; modified?: string }, i: number) => {
           const rawPath = f.path || '';
-          const fileUrl = rawPath ? `file://${rawPath.replace(/\\/g, '/')}` : '';
           return {
             id: rawPath || String(i),
             title: f.name?.replace(/\.[^/.]+$/, '') || 'Unknown',
@@ -104,7 +110,8 @@ const loadTracks = async (): Promise<{ tracks: Track[]; pendingEnrich: Track[] }
             album: 'Unknown Album',
             duration: 0,
             artwork: '',
-            url: fileUrl,
+            sourcePath: rawPath || undefined,
+            url: '',
           };
         });
 
@@ -257,6 +264,10 @@ export const Audio: React.FC = () => {
   const [isBuffering, setIsBuffering] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
+  const [buffered, setBuffered] = useState(0);
+  const playbackRequest = useRef(0);
+  const nativePreview = useRef<ReturnType<typeof startNativeAudioPreview> | null>(null);
+  const retryPlayback = useRef<(() => boolean) | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
@@ -482,10 +493,11 @@ export const Audio: React.FC = () => {
   // Create audio element once
   useEffect(() => {
     const audio = new window.Audio();
-    audio.preload = 'auto';
+    audio.preload = 'metadata';
     audioRef.current = audio;
 
     const onTimeUpdate = () => {
+      setBuffered(bufferedThrough(audio));
       if (audio.duration && isFinite(audio.duration)) {
         setCurrentTime(audio.currentTime);
         setDuration(audio.duration);
@@ -501,6 +513,8 @@ export const Audio: React.FC = () => {
       // Only reset UI -- repeat/shuffle/next handled by separate effect
     };
     const onError = () => {
+      if (!audio.getAttribute('src')) return;
+      if ((audio.error?.code === 3 || audio.error?.code === 4) && retryPlayback.current?.()) return;
       console.warn('[Audio] Playback error');
       setIsPlaying(false);
       setIsBuffering(false);
@@ -518,6 +532,7 @@ export const Audio: React.FC = () => {
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('progress', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
@@ -526,7 +541,9 @@ export const Audio: React.FC = () => {
     audio.addEventListener('playing', onReady);
 
     return () => {
+      playbackRequest.current++;
       audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('progress', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
@@ -535,6 +552,12 @@ export const Audio: React.FC = () => {
       audio.removeEventListener('playing', onReady);
       audio.pause();
       audio.src = '';
+      retryPlayback.current = null;
+      nativePreview.current?.release();
+      nativePreview.current = null;
+      crossfadeAudioRef.current?.removeAttribute('src');
+      crossfadeAudioRef.current?.load();
+      crossfadeAudioRef.current = null;
     };
   }, []);
 
@@ -667,6 +690,7 @@ export const Audio: React.FC = () => {
     // Skip if both disabled
     if (crossfadeDuration === 0 && !gaplessMode) return;
     let fading = false;
+    let active = true;
     const checkTransition = () => {
       if (fading || !audio.duration || !isFinite(audio.duration)) return;
       const remaining = audio.duration - audio.currentTime;
@@ -679,12 +703,15 @@ export const Audio: React.FC = () => {
 
         if (gaplessMode) {
           // Gapless: preload next track in hidden audio element
-          if (!crossfadeAudioRef.current) {
-            crossfadeAudioRef.current = new window.Audio();
-          }
-          crossfadeAudioRef.current!.src = next.url;
-          crossfadeAudioRef.current!.preload = 'auto';
-          crossfadeAudioRef.current!.volume = audio.volume;
+          const source = next.sourcePath ? localPlaybackUrl(next.sourcePath) : Promise.resolve(next.url);
+          void source.then(url => {
+            if (!active || !url) return;
+            const preload = crossfadeAudioRef.current ?? new window.Audio();
+            crossfadeAudioRef.current = preload;
+            preload.preload = 'metadata';
+            preload.volume = audio.volume;
+            preload.src = url;
+          }).catch(() => {});
         } else {
           // Crossfade: fade out current
           const mainGain = mainGainRef.current;
@@ -697,7 +724,10 @@ export const Audio: React.FC = () => {
       }
     };
     audio.addEventListener('timeupdate', checkTransition);
-    return () => audio.removeEventListener('timeupdate', checkTransition);
+    return () => {
+      active = false;
+      audio.removeEventListener('timeupdate', checkTransition);
+    };
   }, [crossfadeDuration, gaplessMode, isPlaying, currentTrack, filteredTracks]);
 
   // Sync volume to audio element
@@ -817,6 +847,12 @@ export const Audio: React.FC = () => {
   const { menuState, show: showCtx, close: closeCtx } = useContextMenu();
 
   const playTrack = useCallback((track: Track) => {
+    const request = ++playbackRequest.current;
+    const audio = audioRef.current;
+    audio?.pause();
+    setIsPlaying(false);
+    setDuration(0);
+    setBuffered(0);
     setCurrentTrack(track);
     setProgress(0);
     setCurrentTime(0);
@@ -826,11 +862,41 @@ export const Audio: React.FC = () => {
     setAbA(null);
     setAbB(null);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'audioTracksPlayed', amount: 1 } }));
-    if (audioRef.current && (track.url || track.id)) {
-      let src = track.url || track.id;
-      if (!src.startsWith('http') && !src.startsWith('file://') && !src.startsWith('blob:') && !src.startsWith('data:')) {
-        src = `file://${src.replace(/\\/g, '/')}`;
-      }
+    if (!audio) { setIsBuffering(false); return; }
+    audio.removeAttribute('src');
+    audio.load();
+    nativePreview.current?.release();
+    nativePreview.current = null;
+    retryPlayback.current = () => {
+      if (request !== playbackRequest.current || !track.sourcePath || !isTauri()) return false;
+      const retry = ++playbackRequest.current;
+      retryPlayback.current = null;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      setIsPlaying(false);
+      setIsBuffering(true);
+      setLoadError(null);
+      const job = startNativeAudioPreview(track.sourcePath);
+      nativePreview.current = job;
+      void job.url.then(async src => {
+        if (retry !== playbackRequest.current) return;
+        audio.src = src;
+        await audio.play();
+        if (retry === playbackRequest.current) setIsPlaying(true);
+      }).catch(error => {
+        if (retry !== playbackRequest.current) return;
+        setIsBuffering(false);
+        setIsPlaying(false);
+        setLoadError(error instanceof Error && error.name !== 'NotAllowedError'
+          ? error.message : 'Press Play to continue.');
+      });
+      return true;
+    };
+    const resolveSource = track.sourcePath ? localPlaybackUrl(track.sourcePath) : Promise.resolve(track.url);
+    void resolveSource.then(async src => {
+      if (request !== playbackRequest.current) return;
+      if (!src) throw new Error('No audio source is available.');
       // Crossfade fades the master gain out to 0 near a track's end. Ramp it
       // back up so the incoming track fades IN rather than starting silent.
       const mainGain = mainGainRef.current;
@@ -849,18 +915,16 @@ export const Audio: React.FC = () => {
           mainGain.gain.setValueAtTime(target, now);
         }
       }
-      audioRef.current.src = src;
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        setIsPlaying(false);
-        setIsBuffering(false);
-        setLoadError('Could not play this track');
-      });
-    } else {
+      audio.src = src;
+      await audio.play();
+      if (request === playbackRequest.current) setIsPlaying(true);
+    }).catch(error => {
+      if (request !== playbackRequest.current) return;
+      if (error instanceof Error && error.name === 'NotSupportedError' && retryPlayback.current?.()) return;
+      setIsPlaying(false);
       setIsBuffering(false);
-      setIsPlaying(true);
-    }
+      setLoadError(error instanceof Error ? error.message : 'Could not play this track');
+    });
   }, [crossfadeDuration]);
 
   const buildTrackCtxItems = useCallback((track: Track): ContextMenuItem[] => [
@@ -888,6 +952,10 @@ export const Audio: React.FC = () => {
 
   const togglePlayPause = useCallback(() => {
     if (!audioRef.current || !currentTrack) return;
+    if (!audioRef.current.getAttribute('src')) {
+      if (!isBuffering) playTrack(currentTrack);
+      return;
+    }
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -901,12 +969,13 @@ export const Audio: React.FC = () => {
           setLoadError('Could not play this track');
         });
     }
-  }, [isPlaying, currentTrack]);
+  }, [isPlaying, currentTrack, isBuffering, playTrack]);
 
   const seekTo = useCallback((pct: number) => {
     setProgress(pct);
     if (audioRef.current && audioRef.current.duration && isFinite(audioRef.current.duration)) {
-      audioRef.current.currentTime = (pct / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = Math.min(1, Math.max(0, pct / 100)) * audioRef.current.duration;
+      setCurrentTime(audioRef.current.currentTime);
     }
   }, []);
 
@@ -1006,6 +1075,7 @@ export const Audio: React.FC = () => {
   // Keyboard shortcuts for playback control
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || useRunningApps.getState().currentAppId !== 'music' && useRunningApps.getState().currentAppId !== 'audio') return;
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       if (e.key === ' ') { e.preventDefault(); togglePlayPause(); }
@@ -1048,10 +1118,22 @@ export const Audio: React.FC = () => {
     e.stopPropagation();
   }, []);
 
+  const addTracks = useCallback((incoming: Track[]) => {
+    if (!incoming.length) return;
+    setTracks(previous => {
+      const byId = new Map(previous.map(track => [track.id, track]));
+      for (const track of incoming) {
+        if (!byId.has(track.id)) byId.set(track.id, track);
+      }
+      return Array.from(byId.values());
+    });
+    setCurrentTrack(current => current ?? incoming[0]);
+  }, []);
+
   const importFiles = useCallback((files: FileList | File[]) => {
     const audioFiles = Array.from(files).filter(f => isAudioFile(f.name));
     if (audioFiles.length === 0) return;
-    const newTracks: Track[] = audioFiles.map((f, i) => {
+    const newTracks: Track[] = audioFiles.map(f => {
       const filePath = (f as File & { path?: string }).path;
       const blobUrl = filePath ? null : URL.createObjectURL(f);
       return {
@@ -1061,18 +1143,12 @@ export const Audio: React.FC = () => {
         album: 'Unknown Album',
         duration: 0,
         artwork: '',
-        url: filePath ? `file://${filePath.replace(/\\/g, '/')}` : blobUrl!,
+        sourcePath: filePath,
+        url: blobUrl ?? '',
       };
     });
-    setTracks(prev => {
-      const existing = new Set(prev.map(t => t.title));
-      const unique = newTracks.filter(t => !existing.has(t.title));
-      return [...prev, ...unique];
-    });
-    if (!currentTrack && newTracks.length > 0) {
-      setCurrentTrack(newTracks[0]);
-    }
-  }, [currentTrack]);
+    addTracks(newTracks);
+  }, [addTracks]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -1085,15 +1161,29 @@ export const Audio: React.FC = () => {
   }, [importFiles]);
 
   const handleBrowseFiles = useCallback(() => {
+    if (isTauri()) {
+      void invokePlatformIpc<{ canceled: boolean; filePaths: string[] }>('files:openDialog', {
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'Audio files', extensions: [...AUDIO_EXTENSIONS, 'webm'] }],
+      }).then(result => {
+        if (!result || result.canceled || !Array.isArray(result.filePaths)) return;
+        addTracks(result.filePaths.filter(isAudioFile).map(path => ({
+          id: path, sourcePath: path, url: '', duration: 0, artwork: '',
+          title: (path.split(/[\\/]/).pop() ?? path).replace(/\.[^/.]+$/, ''),
+          artist: 'Unknown Artist', album: 'Unknown Album',
+        })));
+      });
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = 'audio/*';
+    input.accept = 'audio/*,' + AUDIO_EXTENSIONS.map(ext => '.' + ext).join(',');
     input.onchange = () => {
       if (input.files?.length) importFiles(input.files);
     };
     input.click();
-  }, [importFiles]);
+  }, [addTracks, importFiles]);
 
   return (
     <div
@@ -1661,23 +1751,9 @@ export const Audio: React.FC = () => {
             
             <div style={styles.progressSection}>
               <span style={styles.progressTime}>{formatTime(Math.floor(currentTime))}</span>
-              <div style={styles.progressBar}>
-                <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
-                {/* A-B loop region highlight on the track */}
-                {abA !== null && (duration || 0) > 0 && (
-                  <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', height: 6, left: `${(abA / (duration || 1)) * 100}%`, width: `${(((abB ?? abA) - abA) / (duration || 1)) * 100}%`, minWidth: abB !== null ? 0 : 2, background: 'color-mix(in srgb, var(--color-accent) 35%, transparent)', borderRadius: 2, pointerEvents: 'none' }} />
-                )}
-                <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${progress}%`, ...styles.progressFill }} />
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={progress}
-                  onChange={(e) => seekTo(parseInt(e.target.value))}
-                  aria-label="Seek track position"
-                  style={styles.progressInput}
-                />
-              </div>
+              <MediaScrubber key={currentTrack.id} position={currentTime} duration={duration} buffered={buffered}
+                label="Seek track position" loop={abA === null ? undefined : { start: abA, end: abB ?? abA }}
+                onSeek={seconds => seekTo(duration > 0 ? seconds / duration * 100 : 0)} />
               <span style={styles.progressTime}>{formatTime(Math.floor(duration || currentTrack.duration))}</span>
             </div>
 

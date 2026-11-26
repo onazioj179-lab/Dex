@@ -4,135 +4,111 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-/**
- * DEX Omni Clipboard -- Background Monitor
- * -----------------------------------------------------------------------------
- * Continuously feeds the clipboard history store so the Omni Clipboard already
- * holds what you copied while working -- not just whatever happens to be on the
- * clipboard at the instant you open the panel (the old behaviour, which made
- * the history almost always empty).
- *
- * Two capture paths funnel into the same store (deduped there):
- *   1. The `copy`/`cut` DOM events -- instant capture of in-app copies, with
- *      accurate source-app attribution.
- *   2. A SharedTick poll -- catches copies made in OTHER apps while DEX is
- *      focused (SharedTick already pauses while the window is hidden, and we
- *      additionally gate on document focus so we never spam clipboard reads).
- *
- * Capture is silent and opt-out-able; the panel itself stays user-invoked
- * (Ctrl+Shift+V), consistent with DEX's "never nag" shell philosophy.
- */
-
-import { sharedTick } from './SharedTick';
-import { useClipboardStore, migrateLegacyClipboard } from '../store/clipboardStore';
-import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { DisposableGroup, type TeardownFn } from '../../shared/disposable';
 import { contextEngine } from '../../shared/uki/contextEngine';
+import { useClipboardStore, migrateLegacyClipboard, type AddClipOptions } from '../store/clipboardStore';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { sharedTick } from './SharedTick';
+import { invokePlatformIpc } from './platform/ipc';
+import { isTauri } from './platform/tauriCompat';
 
 const TICK_ID = 'clipboard-monitor';
 const POLL_MS = 4000;
+// Leave room for the data URL header and Base64 expansion.
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024 - 256;
 
-let started = false;
-let lastSeen = '';
+let monitor: DisposableGroup | null = null;
 
-/** Current foreground DEX app, for source attribution. */
-function currentSource(): { sourceAppId?: string; sourceAppName?: string } {
-  try {
-    const id = useRunningApps.getState().currentAppId;
-    if (!id) return {};
-    const def = APP_DEFINITIONS[id];
-    return { sourceAppId: id, sourceAppName: def?.name ?? id };
-  } catch {
-    return {};
-  }
+function currentSource(): AddClipOptions {
+  const id = useRunningApps.getState().currentAppId;
+  return id ? { sourceAppId: id, sourceAppName: APP_DEFINITIONS[id]?.name ?? id } : {};
 }
 
-/** Route a candidate string into the store (the store handles dedupe/typing) and
- *  feed the Context Engine so copies surface in the "Now" activity stream. */
-function ingest(text: string | null | undefined): void {
-  if (!text) return;
-  if (text === lastSeen) return;
-  lastSeen = text;
-  const entry = useClipboardStore.getState().add(text, currentSource());
-  if (entry) { try { contextEngine.recordActivity('clip', entry.preview); } catch { /* optional */ } }
+function ingest(text: string, options?: AddClipOptions): boolean {
+  const store = useClipboardStore.getState();
+  const previous = store.entries[0];
+  const entry = store.add(text, options);
+  if (entry && entry !== previous) contextEngine.recordActivity('clip', entry.preview);
+  return entry !== null;
 }
 
-async function readClipboard(): Promise<void> {
-  // Reading requires focus + a secure context; bail quietly otherwise.
-  if (typeof document !== 'undefined' && !document.hasFocus()) return;
-  try {
-    const text = await navigator.clipboard.readText();
-    ingest(text);
-  } catch {
-    /* permission denied / not focused / unsupported -- the copy-event path still works */
-  }
+/** Read the system clipboard after an explicit request in Clipboard History. */
+export async function captureCurrentClipboard(signal?: AbortSignal): Promise<boolean> {
+  const text = isTauri()
+    ? await invokePlatformIpc<string>('clipboard:readText')
+    : await navigator.clipboard?.readText();
+  if (signal?.aborted) return false;
+  return typeof text === 'string' && ingest(text);
 }
 
-function onFocus(): void {
-  void readClipboard();
-}
+/** Record in-app copy events and poll only when browser permission is already granted. */
+export function startClipboardMonitor(): TeardownFn {
+  if (monitor || typeof window === 'undefined') return () => {};
+  const resources = new DisposableGroup();
+  monitor = resources;
+  let lastSeen = '';
+  let reading = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const readers = new Set<FileReader>();
 
-function onCopyEvent(e: ClipboardEvent): void {
-  // Images first: if the copied payload carries an image (e.g. from Gallery /
-  // Prism), capture it as a data URL so the Omni Clipboard can hold images too.
-  const items = e.clipboardData?.items;
-  if (items) {
-    for (const item of Array.from(items)) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const url = String(reader.result || '');
-            if (url) {
-              const entry = useClipboardStore.getState().add(url, { ...currentSource(), kind: 'image' });
-              if (entry) { try { contextEngine.recordActivity('clip', entry.preview); } catch { /* optional */ } }
-            }
-          };
-          reader.readAsDataURL(file);
-          return;
-        }
-      }
+  const record = (text: string, options?: AddClipOptions) => {
+    if (resources.isDisposed || !text || text === lastSeen) return;
+    lastSeen = text;
+    ingest(text, options);
+  };
+  async function poll() {
+    if (reading || resources.isDisposed || !document.hasFocus() || !navigator.clipboard?.readText) return;
+    reading = true;
+    try {
+      const permission = await navigator.permissions?.query({ name: 'clipboard-read' as PermissionName });
+      if (permission?.state !== 'granted' || resources.isDisposed || !document.hasFocus()) return;
+      const text = await navigator.clipboard.readText();
+      if (document.hasFocus()) record(text);
+    } catch {
+      // Browsers without a clipboard permission query retain the copy-event path.
+    } finally {
+      reading = false;
     }
   }
 
-  // Prefer the exact data the app placed on the clipboard; fall back to the
-  // live selection. Read on the next tick so the browser has committed the copy.
-  const fromEvent = e.clipboardData?.getData('text/plain');
-  if (fromEvent && fromEvent.trim()) {
-    ingest(fromEvent);
-    return;
+  function onCopy(event: ClipboardEvent) {
+    const source = currentSource();
+    for (const item of Array.from(event.clipboardData?.items ?? [])) {
+      if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+      const file = item.getAsFile();
+      if (!file || !file.size || file.size > MAX_IMAGE_BYTES) continue;
+      const reader = new FileReader();
+      readers.add(reader);
+      reader.onload = () => record(String(reader.result || ''), { ...source, kind: 'image' });
+      reader.onloadend = () => readers.delete(reader);
+      reader.readAsDataURL(file);
+      return;
+    }
+    const text = event.clipboardData?.getData('text/plain') || window.getSelection()?.toString();
+    if (text?.trim()) {
+      record(text, source);
+      return;
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => void poll(), 0);
   }
-  const sel = typeof window !== 'undefined' ? window.getSelection()?.toString() : '';
-  if (sel && sel.trim()) {
-    ingest(sel);
-    return;
-  }
-  // Programmatic copies expose nothing synchronously -- poll once shortly after.
-  setTimeout(() => { void readClipboard(); }, 0);
-}
-
-/** Start background clipboard capture. Idempotent. */
-export function startClipboardMonitor(): void {
-  if (started || typeof window === 'undefined') return;
-  started = true;
 
   migrateLegacyClipboard();
-
-  window.addEventListener('copy', onCopyEvent as EventListener, true);
-  window.addEventListener('cut', onCopyEvent as EventListener, true);
-  // Capture the current clipboard once on focus return (cheap, focus-gated).
-  window.addEventListener('focus', onFocus);
-
-  sharedTick.subscribe(TICK_ID, () => { void readClipboard(); }, POLL_MS);
-  void readClipboard();
+  resources.add(() => { monitor = null; });
+  resources.add(() => {
+    clearTimeout(timer);
+    for (const reader of readers) reader.abort();
+    readers.clear();
+  });
+  resources.addListener(window, 'copy', onCopy as EventListener, { capture: true });
+  resources.addListener(window, 'cut', onCopy as EventListener, { capture: true });
+  resources.addListener(window, 'focus', () => void poll());
+  sharedTick.subscribe(TICK_ID, () => void poll(), POLL_MS);
+  resources.add(() => sharedTick.unsubscribe(TICK_ID));
+  void poll();
+  return resources.cleanup;
 }
 
-/** Stop background capture (used in teardown/tests). */
 export function stopClipboardMonitor(): void {
-  if (!started) return;
-  started = false;
-  sharedTick.unsubscribe(TICK_ID);
-  window.removeEventListener('copy', onCopyEvent as EventListener, true);
-  window.removeEventListener('cut', onCopyEvent as EventListener, true);
-  window.removeEventListener('focus', onFocus);
+  monitor?.dispose();
 }

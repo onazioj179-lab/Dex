@@ -11,7 +11,7 @@ set -euo pipefail
 
 TARGET_DIR="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SYSTEM_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/system"
+SYSTEM_DIR="$(dirname "$SCRIPT_DIR")/system"
 
 echo "[dex-post-build] Applying DEX OS system configuration..."
 
@@ -35,10 +35,10 @@ EOF
 # ---------------------------------------------------------------------------
 cat > "${TARGET_DIR}/etc/os-release" << 'EOF'
 NAME="DEX OS"
-VERSION="3.6.0"
+VERSION="7.0.1"
 ID=dex
-VERSION_ID=3.6.0
-PRETTY_NAME="DEX OS 3.6.0"
+VERSION_ID=7.0.1
+PRETTY_NAME="DEX OS 7.0.1"
 HOME_URL="https://github.com/onazioj/dex"
 BUG_REPORT_URL="https://github.com/onazioj/dex/issues"
 EOF

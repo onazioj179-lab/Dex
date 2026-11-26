@@ -38,6 +38,8 @@ describe('virtualList.computeSlice', () => {
 
   it('end of list clips to itemCount', () => {
     const s = computeSlice(50, 40, 99999, 400);
+    expect(s.start).toBe(36);
+    expect(s.padTop).toBe(1440);
     expect(s.end).toBe(50);
     expect(s.padBottom).toBe(0);
   });

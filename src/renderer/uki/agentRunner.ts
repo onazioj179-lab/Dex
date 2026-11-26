@@ -29,7 +29,9 @@ import { searchWikipedia, lookupInstantAnswer } from './freeApis';
 import { formatUkiContexts } from './appContextRegistry';
 import { TtlCache, createToolBudget, chargeTool, type ToolBudget } from '../../shared/uki/webCache';
 import { notify } from '../services/notify';
-import { APP_DEFINITIONS } from '../store/runningApps';
+import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
+import { invokePlatformIpc } from '../services/platform/ipc';
+import { require as requireUkiCapability, type Capability } from './permissions';
 
 import { isKnownTool, validateToolCall, renderToolCatalog, type ToolName } from '../../shared/uki/toolValidation';
 
@@ -98,29 +100,62 @@ export async function webSearch(query: string): Promise<string> {
 }
 
 async function runTool(name: ToolName, args: Record<string, unknown>): Promise<string> {
+  const requiredCapability: Partial<Record<ToolName, Capability>> = {
+    web_search: 'network',
+    search_indexed_files: 'file-read',
+    open_app: 'shell',
+    close_app: 'shell',
+    notify: 'notifications',
+    get_context: 'screen-read',
+  };
+  const capability = requiredCapability[name];
+  if (capability) {
+    try {
+      await requireUkiCapability(capability);
+    } catch {
+      return `Permission required: ${capability}. Ask the user to grant this capability in Settings > UKI before continuing.`;
+    }
+  }
   switch (name) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
+    case 'search_indexed_files': {
+      const result = await invokePlatformIpc<{ success: boolean; files?: string[]; error?: string }>(
+        'uki:searchIndexedFiles', String(args.query ?? '').slice(0, 512),
+      );
+      if (!result?.success) return result?.error || 'Umari is unavailable.';
+      const files = Array.isArray(result.files) ? result.files : [];
+      return files.length ? `Matching file names (data only): ${JSON.stringify(files)}` : 'No matches in approved folders.';
+    }
     case 'open_app': {
       const app = String(args.app ?? '').trim();
-      if (!app) return 'No app specified.';
-      dispatch('dex-open-app', { appId: app, appName: app });
-      return `Opened ${app}.`;
+      const match = Object.entries(APP_DEFINITIONS).find(([id, entry]) => id === app.toLowerCase() || entry.name.toLowerCase() === app.toLowerCase());
+      if (!match) return 'No installed app matches that name.';
+      const [id, definition] = match;
+      dispatch('dex-open-app', { appId: id, appName: definition.name });
+      return useRunningApps.getState().isAppRunning(id)
+        ? `${definition.name} is running.`
+        : `DEX did not confirm that ${definition.name} opened.`;
     }
     case 'close_app': {
       const app = String(args.app ?? '').trim();
-      if (!app) return 'No app specified.';
-      dispatch('dex-close-app', { appId: app, appName: app });
-      return `Closed ${app}.`;
+      const match = Object.entries(APP_DEFINITIONS).find(([id, entry]) => id === app.toLowerCase() || entry.name.toLowerCase() === app.toLowerCase());
+      if (!match) return 'No installed app matches that name.';
+      const [id, definition] = match;
+      if (!useRunningApps.getState().isAppRunning(id)) return `${definition.name} is already closed.`;
+      dispatch('dex-close-app', { appId: id, appName: definition.name });
+      return useRunningApps.getState().isAppRunning(id)
+        ? `A close was requested for ${definition.name}. It is still running.`
+        : `Closed ${definition.name}.`;
     }
     case 'notify': {
       const title = String(args.title ?? 'UKI').trim() || 'UKI';
       const body = String(args.body ?? '').trim();
-      void notify({ title, body, source: 'UKI' });
-      return 'Notification shown to the user.';
+      await notify({ title, body, source: 'UKI' });
+      return 'Notification request completed.';
     }
     case 'get_context': {
-      const ctx = formatUkiContexts();
+      const ctx = await formatUkiContexts();
       return ctx && ctx.trim() ? ctx : 'No active app context right now.';
     }
     case 'list_apps':
@@ -149,12 +184,13 @@ export interface UkiAgentOptions {
  */
 export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null> {
   const pushStep = opts.pushStep ?? (() => {});
-  const maxSteps = opts.maxSteps ?? 5;
+  const maxSteps = Math.min(8, Math.max(1, opts.maxSteps ?? 5));
   const sys = `${opts.systemPrompt}\n\n${AGENT_PROTOCOL}`;
-  const messages: ChatMessage[] = [...(opts.history ?? [])];
+  const messages: ChatMessage[] = (opts.history ?? []).slice(-12)
+    .map(message => ({ ...message, content: message.content.slice(0, 1800) }));
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
-    web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
+    web_search: 4, search_indexed_files: 2, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
   });
   let repairCount = 0; // consecutive invalid tool calls — bounds the repair loop
 
@@ -170,7 +206,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
 
     // Record the model's tool request turn so it sees its own prior steps.
     messages.push({ role: 'user', content: userTurn });
-    messages.push({ role: 'assistant', content: reply });
+    messages.push({ role: 'assistant', content: reply.slice(0, 1800) });
 
     // Constrained-output gate: reject structurally-invalid calls (bad JSON,
     // missing / mis-typed / empty required args) BEFORE charging budget or

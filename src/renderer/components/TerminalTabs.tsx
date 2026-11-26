@@ -12,34 +12,36 @@
  * Terminal component is composed, not modified.
  *
  * Persistence: the open tab list + their names is saved to localStorage and
- * restored on the next mount. Sessions are recreated through the SAME path as a
- * fresh tab (each Terminal autoSpawns its own PTY on mount), so a relaunched
- * panel comes back with the same tabs and names (scrollback is not persisted —
- * the OS shell has no replay channel for that).
+ * restored on the next mount. Restored tabs start their shell when made visible.
+ * Opened sessions stay mounted across tab switches and splits.
  *
  * Auto-title: each Terminal reports the command it is currently running via
  * `onRunningCommand`; if the user hasn't manually renamed the tab, its label
  * tracks that command (truncated to the first word/argv0).
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Terminal } from './Terminal';
 
 interface TerminalTabsProps {
   onClose?: () => void;
   cwd?: string;
   height?: number | string;
+  visible?: boolean;
 }
 
 interface Tab {
   id: string;
+  cwd?: string;
+  shell?: string;
   /** User-set name; when present it overrides the auto-title. */
   name?: string;
 }
 
 const TABS_KEY = 'dex.terminal.tabs.v1';
+const MAX_TABS = 16;
 
-interface PersistedState { tabs: Tab[]; activeId: string; nextNum: number; }
+interface PersistedState { tabs: Tab[]; activeId: string; splitId?: string; nextNum: number; }
 
 function loadState(): PersistedState | null {
   try {
@@ -47,15 +49,21 @@ function loadState(): PersistedState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (!parsed || !Array.isArray(parsed.tabs)) return null;
-    const tabs = parsed.tabs
-      .filter((t): t is Tab => !!t && typeof (t as Tab).id === 'string')
-      .map((t) => ({ id: t.id, name: typeof t.name === 'string' ? t.name : undefined }));
+    const valid = parsed.tabs.filter((t): t is Tab => !!t && typeof t.id === 'string' && /^t\d{1,12}$/.test(t.id));
+    const tabs = [...new Map(valid.map(t => [t.id, t])).values()].slice(0, MAX_TABS)
+      .map(t => ({
+        id: t.id,
+        cwd: typeof t.cwd === 'string' ? t.cwd : undefined,
+        shell: typeof t.shell === 'string' ? t.shell : undefined,
+        name: typeof t.name === 'string' ? t.name.slice(0, 100) : undefined,
+      }));
     if (tabs.length === 0) return null;
     const activeId = typeof parsed.activeId === 'string' && tabs.some((t) => t.id === parsed.activeId)
       ? parsed.activeId
       : tabs[tabs.length - 1].id;
-    const nextNum = typeof parsed.nextNum === 'number' && parsed.nextNum > 0 ? parsed.nextNum : tabs.length + 1;
-    return { tabs, activeId, nextNum };
+    const splitId = parsed.splitId !== activeId && tabs.some(t => t.id === parsed.splitId) ? parsed.splitId : undefined;
+    const nextNum = Math.max(...tabs.map(t => Number(t.id.slice(1)))) + 1;
+    return { tabs, activeId, splitId, nextNum };
   } catch {
     return null;
   }
@@ -77,41 +85,104 @@ function titleFromCommand(cmd: string): string {
   return base.length > 16 ? `${base.slice(0, 15)}…` : base;
 }
 
-export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height }) => {
+export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height, visible = true }) => {
   const restored = useMemo(() => loadState(), []);
-  const [tabs, setTabs] = useState<Tab[]>(() => restored?.tabs ?? [{ id: 't1' }]);
+  const groupId = useId();
+  const [tabs, setTabs] = useState<Tab[]>(() => restored?.tabs.map(tab => ({ ...tab, cwd: tab.cwd ?? cwd })) ?? [{ id: 't1', cwd }]);
   const [activeId, setActiveId] = useState(() => restored?.activeId ?? 't1');
+  const [splitId, setSplitId] = useState(restored?.splitId);
+  const [opened, setOpened] = useState(() => {
+    const ids = new Set([restored?.activeId ?? 't1']);
+    if (restored?.splitId) ids.add(restored.splitId);
+    return ids;
+  });
   const nextNum = useRef(restored?.nextNum ?? 2);
   // Live running-command per tab id (for auto-title); not persisted.
   const [running, setRunning] = useState<Record<string, string | null>>({});
   // Inline rename editor state.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [profiles, setProfiles] = useState<Array<{ label: string; shell: string }>>([]);
+  const [newShell, setNewShell] = useState('');
+
+  useEffect(() => {
+    let disposed = false;
+    void window.electron?.invoke('pty:listProfiles').then((result: unknown) => {
+      if (disposed) return;
+      const payload = result as { profiles?: Array<{ label?: unknown; shell?: unknown }> } | null;
+      if (Array.isArray(payload?.profiles)) {
+        setProfiles(payload.profiles.filter((entry): entry is { label: string; shell: string } =>
+          typeof entry?.label === 'string' && typeof entry.shell === 'string'));
+      }
+    }).catch(() => {});
+    return () => { disposed = true; };
+  }, []);
 
   // Persist the tab list + names + active tab whenever they change.
   useEffect(() => {
-    saveState({ tabs, activeId, nextNum: nextNum.current });
-  }, [tabs, activeId]);
+    saveState({ tabs, activeId, splitId, nextNum: nextNum.current });
+  }, [tabs, activeId, splitId]);
 
-  const addTab = useCallback(() => {
-    const id = `t${nextNum.current++}`;
-    setTabs(prev => [...prev, { id }]);
+  const ensureOpened = (id: string) => setOpened(previous => previous.has(id) ? previous : new Set(previous).add(id));
+  const selectTab = (id: string) => {
+    if (id === splitId) {
+      document.getElementById(`${groupId}-panel-${id}`)?.focus();
+      return;
+    }
+    ensureOpened(id);
     setActiveId(id);
-  }, []);
+  };
 
-  const closeTab = useCallback((id: string) => {
+  const createTab = () => {
+    if (tabs.length >= MAX_TABS) return;
+    const id = `t${nextNum.current++}`;
+    setTabs(prev => [...prev, { id, cwd, shell: newShell || undefined }]);
+    ensureOpened(id);
+    return id;
+  };
+  const addTab = () => {
+    const id = createTab();
+    if (id) setActiveId(id);
+  };
+  const toggleSplit = () => {
+    if (splitId) {
+      setSplitId(undefined);
+      return;
+    }
+    const other = tabs.find(tab => tab.id !== activeId)?.id ?? createTab();
+    if (!other) return;
+    ensureOpened(other);
+    setSplitId(other);
+  };
+
+  const closeTab = (id: string) => {
+    const remaining = tabs.filter(t => t.id !== id);
+    if (!remaining.length && onClose) {
+      try { localStorage.removeItem(TABS_KEY); } catch { /* Storage may be unavailable. */ }
+      onClose();
+      return;
+    }
     setRunning(prev => { const next = { ...prev }; delete next[id]; return next; });
-    setTabs(prev => {
-      const next = prev.filter(t => t.id !== id);
-      if (next.length === 0) {
-        // Closing the final session closes the whole terminal panel.
-        onClose?.();
-        return prev;
-      }
-      if (id === activeId) setActiveId(next[next.length - 1].id);
+    setOpened(previous => {
+      const next = new Set(previous);
+      next.delete(id);
       return next;
     });
-  }, [activeId, onClose]);
+    if (!remaining.length) {
+      const next = `t${nextNum.current++}`;
+      setTabs([{ id: next, cwd, shell: newShell || undefined }]);
+      ensureOpened(next);
+      setActiveId(next);
+      return;
+    }
+    setTabs(remaining);
+    if (id === splitId || id === activeId && remaining.length === 1) setSplitId(undefined);
+    if (id === activeId) {
+      const next = remaining.find(tab => tab.id !== splitId) ?? remaining[0];
+      ensureOpened(next.id);
+      setActiveId(next.id);
+    }
+  };
 
   const commitRename = useCallback(() => {
     setTabs(prev => prev.map(t => {
@@ -141,6 +212,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
       <div
         role="tablist"
         aria-label="Terminal sessions"
+        aria-multiselectable={!!splitId}
         style={{
           display: 'flex', alignItems: 'stretch', gap: 2,
           padding: '2px 4px', flexShrink: 0,
@@ -150,19 +222,22 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
         }}
       >
         {tabs.map((t, i) => {
-          const active = t.id === activeId;
+          const active = t.id === activeId || t.id === splitId;
           const label = labelFor(t, i);
           const editing = editingId === t.id;
           return (
             <div
               key={t.id}
               role="tab"
+              id={`${groupId}-tab-${t.id}`}
               aria-selected={active}
+              aria-controls={opened.has(t.id) ? `${groupId}-panel-${t.id}` : undefined}
               tabIndex={0}
-              onClick={() => setActiveId(t.id)}
+              onClick={() => selectTab(t.id)}
               onDoubleClick={() => startRename(t, label)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(t.id); }
+                if (e.currentTarget !== e.target) return;
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTab(t.id); }
                 else if (e.key === 'F2') { e.preventDefault(); startRename(t, label); }
               }}
               title="Double-click to rename"
@@ -223,6 +298,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
         <button
           type="button"
           onClick={addTab}
+          disabled={tabs.length >= MAX_TABS}
           aria-label="New terminal session"
           title="New terminal"
           style={{
@@ -238,19 +314,34 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
+        <button type="button" aria-pressed={!!splitId} onClick={toggleSplit} aria-label="Split terminal"
+          style={{ background: 'transparent', color: 'var(--color-text-secondary)', border: 0, flexShrink: 0, cursor: 'pointer' }}>
+          Split
+        </button>
+        {profiles.length > 0 && <select aria-label="Shell for new terminals" value={newShell} onChange={event => setNewShell(event.target.value)}
+          style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-base)', border: 0, maxWidth: 140, flexShrink: 0 }}>
+          <option value="">Default shell</option>
+          {profiles.map(profile => <option key={profile.shell} value={profile.shell}>{profile.label}</option>)}
+        </select>}
       </div>
 
-      {/* Sessions: every tab stays mounted (its PTY + scrollback persist); only the
-          active one is shown. Each Terminal autoSpawns, so a restored tab list
-          recreates its sessions through the same path as a fresh tab. */}
+      {/* Switching the visible panes keeps each opened terminal mounted. */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        {tabs.map(t => (
+        {tabs.filter(tab => opened.has(tab.id)).map(t => (
           <div
             key={t.id}
-            style={{ position: 'absolute', inset: 0, display: t.id === activeId ? 'block' : 'none' }}
+            role="tabpanel"
+            id={`${groupId}-panel-${t.id}`}
+            aria-labelledby={`${groupId}-tab-${t.id}`}
+            tabIndex={-1}
+            style={{ position: 'absolute', inset: 0, left: t.id === splitId ? '50%' : 0,
+              right: splitId && t.id === activeId ? '50%' : 0,
+              display: t.id === activeId || t.id === splitId ? 'block' : 'none' }}
           >
             <Terminal
-              cwd={cwd}
+              cwd={t.cwd}
+              shell={t.shell}
+              visible={visible && (t.id === activeId || t.id === splitId)}
               onClose={() => closeTab(t.id)}
               onRunningCommand={(cmd) => setRunning(prev => (prev[t.id] === cmd ? prev : { ...prev, [t.id]: cmd }))}
             />

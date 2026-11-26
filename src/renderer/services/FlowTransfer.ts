@@ -106,8 +106,11 @@ export function getFlowTargets(payload: FlowPayload): FlowTarget[] {
 
 const intakes = new Map<string, FlowIntake>();
 
-export function registerFlowIntake(appId: string, handler: FlowIntake): void {
+export function registerFlowIntake(appId: string, handler: FlowIntake): () => void {
   intakes.set(appId, handler);
+  return () => {
+    if (intakes.get(appId) === handler) intakes.delete(appId);
+  };
 }
 export function unregisterFlowIntake(appId: string): void {
   intakes.delete(appId);

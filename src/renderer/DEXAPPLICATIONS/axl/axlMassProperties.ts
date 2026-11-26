@@ -39,14 +39,20 @@ export function meshMassProperties(
   let area = 0;
   let cx = 0, cy = 0, cz = 0;
   const triCount = Math.floor(indices.length / 3);
+  const reference = triCount ? indices[0] * 3 : 0;
+  // Measuring around a mesh vertex avoids subtracting large signed volumes
+  // when the object sits far from the project origin.
+  const ox = positions[reference] ?? 0;
+  const oy = positions[reference + 1] ?? 0;
+  const oz = positions[reference + 2] ?? 0;
 
   for (let t = 0; t < triCount; t++) {
     const i0 = indices[t * 3] * 3;
     const i1 = indices[t * 3 + 1] * 3;
     const i2 = indices[t * 3 + 2] * 3;
-    const ax = positions[i0],     ay = positions[i0 + 1], az = positions[i0 + 2];
-    const bx = positions[i1],     by = positions[i1 + 1], bz = positions[i1 + 2];
-    const cx2 = positions[i2],    cy2 = positions[i2 + 1], cz2 = positions[i2 + 2];
+    const ax = positions[i0] - ox, ay = positions[i0 + 1] - oy, az = positions[i0 + 2] - oz;
+    const bx = positions[i1] - ox, by = positions[i1 + 1] - oy, bz = positions[i1 + 2] - oz;
+    const cx2 = positions[i2] - ox, cy2 = positions[i2 + 1] - oy, cz2 = positions[i2 + 2] - oz;
 
     // Signed volume of tetra (origin, a, b, c) = a . (b x c) / 6
     const crX = by * cz2 - bz * cy2;
@@ -70,7 +76,7 @@ export function meshMassProperties(
 
   const volume = Math.abs(signedVol);
   const centroid: [number, number, number] = signedVol !== 0
-    ? [cx / signedVol, cy / signedVol, cz / signedVol]
+    ? [ox + cx / signedVol, oy + cy / signedVol, oz + cz / signedVol]
     : [0, 0, 0];
   return { volume, surfaceArea: area, centroid, mass: volume * density };
 }

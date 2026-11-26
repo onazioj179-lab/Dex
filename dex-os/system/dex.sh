@@ -89,19 +89,6 @@ if [ ! -x "$DEX_BINARY" ]; then
     exit 1
 fi
 
-echo "[dex-session] Starting DEX OS v3.6.0"
-echo "[dex-session] GPU flags: $GPU_FLAGS"
-echo "[dex-session] Display: $DISPLAY"
-
-exec "$DEX_BINARY" \
-    --kiosk \
-    --no-sandbox \
-    --disable-dev-shm-usage \
-    --disable-background-timer-throttling \
-    --disable-renderer-backgrounding \
-    --disable-backgrounding-occluded-windows \
-    --enable-features=SharedArrayBuffer \
-    --force-device-scale-factor=1 \
-    --window-position=0,0 \
-    $GPU_FLAGS \
-    2>&1 | tee /tmp/dex-session.log
+echo "[dex-session] Starting DEX OS v7.0.1"
+export DEX_KIOSK=1
+exec "$DEX_BINARY"

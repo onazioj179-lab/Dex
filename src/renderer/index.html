@@ -55,15 +55,15 @@
         --color-text-secondary: #B8B8BD;
         --color-text-muted: #A0A0A5;
         --color-text-tertiary: #8E8E93;
-        --color-accent: #4A9EFF;
-        --color-accent-text: #FFFFFF;
-        --color-accent-hover: #6CB2FF;
-        --color-accent-subtle: rgba(74, 158, 255, 0.12);
+        --color-accent: #F2F2F2;
+        --color-accent-text: #08090A;
+        --color-accent-hover: #FFFFFF;
+        --color-accent-subtle: rgba(255, 255, 255, 0.12);
         --color-border: rgba(255, 255, 255, 0.14);
         --color-border-subtle: rgba(255, 255, 255, 0.08);
-        --color-success: #34C759;
-        --color-warning: #FF9F0A;
-        --color-danger: #FF453A;
+        --color-success: #D8D8D8;
+        --color-warning: #A8A8A8;
+        --color-danger: #F2F2F2;
         --color-shadow-soft: rgba(0, 0, 0, 0.18);
         --color-shadow-strong: rgba(0, 0, 0, 0.30);
         --font-family: 'Berkeley Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', 'Monaco', 'Consolas', monospace;
@@ -112,6 +112,34 @@
         content: '';
         display: block;
       }
+      .dex-prerender-boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--color-bg-base);
+      }
+      .dex-prerender-mark {
+        position: relative;
+        width: 74px;
+        height: 74px;
+        display: grid;
+        place-items: center;
+        border: 1px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
+        border-radius: 6px;
+        color: var(--color-accent);
+        font: 600 24px/1 var(--dex-font-ui);
+        letter-spacing: 0.08em;
+        clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+      }
+      .dex-prerender-mark::after {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        inset: 7px;
+        border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+        clip-path: inherit;
+      }
     </style>
     <script>
       // Apply theme immediately to prevent flash
@@ -119,12 +147,20 @@
         var savedDarkMode = localStorage.getItem('darkMode');
         var isDark = savedDarkMode === null ? true : savedDarkMode === 'true';
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        try {
+          var settings = JSON.parse(localStorage.getItem('dex-settings') || '{}');
+          document.documentElement.setAttribute('data-dex-identity', 'monolith');
+          document.documentElement.setAttribute('data-dex-monochrome', 'true');
+        } catch (_) {
+          document.documentElement.setAttribute('data-dex-identity', 'monolith');
+          document.documentElement.setAttribute('data-dex-monochrome', 'true');
+        }
         if (document.body && isDark) document.body.classList.add('dark-mode');
       })();
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="dex-prerender-boot" role="status" aria-label="DEX is starting"><div class="dex-prerender-mark" aria-hidden="true">D</div></div></div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

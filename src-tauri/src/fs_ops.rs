@@ -31,6 +31,30 @@ pub fn read_file_head(path: &str, byte_count: u64) -> Value {
     }
 }
 
+pub fn preview_text(raw: &str) -> Value {
+    const LIMIT: usize = 256 * 1024;
+    let result = (|| -> std::io::Result<Value> {
+        let path = Path::new(raw);
+        if !path.is_absolute() || !path.metadata()?.is_file() {
+            return Err(std::io::Error::other("Choose a regular local file."));
+        }
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?.take((LIMIT + 1) as u64).read_to_end(&mut bytes)?;
+        let truncated = bytes.len() > LIMIT;
+        bytes.truncate(LIMIT);
+        let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
+        let text = match std::str::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(error) if truncated && error.error_len().is_none() => {
+                std::str::from_utf8(&bytes[..error.valid_up_to()]).map_err(std::io::Error::other)?
+            }
+            Err(error) => return Err(std::io::Error::other(error)),
+        };
+        Ok(json!({"success": true, "content": text, "truncated": truncated}))
+    })();
+    result.unwrap_or_else(|_| json!({"success": false, "error": "Could not read this file as UTF-8 text."}))
+}
+
 /// `fs:readdir(dirPath)` — Electron returned `fs.promises.readdir` (file NAMES).
 pub fn readdir(dir: &str) -> Value {
     match std::fs::read_dir(dir) {
@@ -50,18 +74,18 @@ pub fn readdir(dir: &str) -> Value {
 /// modified } per the Electron handler.
 pub fn get_media_files(media_type: &str, home: &Path) -> Value {
     let (sub, exts): (&str, &[&str]) = match media_type {
-        "music" | "audio" => ("Music", &[".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".wma"]),
+        "music" | "audio" => ("Music", crate::gallery_media::AUDIO),
         "pictures" | "images" => ("Pictures", &[".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico"]),
         "videos" => ("Videos", &[".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]),
         _ => return json!([]),
     };
-    let scan_path = home.join(sub);
+    json!(scan_media(&home.join(sub), exts))
+}
+
+pub(crate) fn scan_media(scan_path: &Path, exts: &[&str]) -> Vec<Value> {
     let mut results: Vec<Value> = Vec::new();
-    if scan_path.exists() {
-        scan_dir(&scan_path, 0, exts, &mut results);
-    }
-    results.truncate(500);
-    json!(results)
+    scan_dir(scan_path, 0, exts, &mut results);
+    results
 }
 
 fn scan_dir(dir: &Path, depth: usize, exts: &[&str], results: &mut Vec<Value>) {
@@ -92,22 +116,27 @@ fn scan_dir(dir: &Path, depth: usize, exts: &[&str], results: &mut Vec<Value>) {
                 None => String::new(),
             };
             if exts.contains(&ext.as_str()) {
-                if let Ok(meta) = entry.metadata() {
-                    let modified = meta
-                        .modified()
-                        .ok()
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| d.as_millis() as f64)
-                        .unwrap_or(0.0);
-                    results.push(json!({
-                        "path": path.to_string_lossy(),
-                        "name": name,
-                        "extension": ext,
-                        "size": meta.len(),
-                        "modified": modified,
-                    }));
+                if let Ok(record) = media_record(&path) {
+                    results.push(record);
                 }
             }
         }
     }
+}
+
+pub(crate) fn media_record(path: &Path) -> std::io::Result<Value> {
+    let meta = std::fs::metadata(path)?;
+    if !meta.is_file() {
+        return Err(std::io::Error::other("Expected a regular media file"));
+    }
+    let modified = meta.modified().ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0.0, |duration| duration.as_millis() as f64);
+    Ok(json!({
+        "path": path.to_string_lossy(),
+        "name": path.file_name().unwrap_or_default().to_string_lossy(),
+        "extension": path.extension().and_then(|ext| ext.to_str()).map(|ext| format!(".{}", ext.to_lowercase())),
+        "size": meta.len(),
+        "modified": modified,
+    }))
 }

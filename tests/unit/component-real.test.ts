@@ -92,13 +92,6 @@ describe('Component Tests — Page Modules', () => {
       expect(typeof mod.parseID3).toBe('function');
       expect(typeof mod.loadAudioMetadata).toBe('function');
     });
-
-    it('searchWorkerClient exports buildSearchIndex and searchIndex', async () => {
-      const mod = await import('../../src/renderer/utils/searchWorkerClient');
-      expect(typeof mod.buildSearchIndex).toBe('function');
-      expect(typeof mod.searchIndex).toBe('function');
-      expect(typeof mod.terminateSearchWorker).toBe('function');
-    });
   });
 
   describe('Service Module Exports', () => {

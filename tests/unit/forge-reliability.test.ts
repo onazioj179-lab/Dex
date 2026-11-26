@@ -8,7 +8,8 @@
 // DEX Forge reliability tests (2026 fixes-first)
 // =============================================================================
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { exportVideoFrames } from '../../src/renderer/DEXAPPLICATIONS/forge/transcode';
 import {
   classifyExportFailure,
   buildExportRecoveryPlan,
@@ -72,5 +73,49 @@ describe('forge reliability', () => {
   it('computes linear retry schedule', () => {
     const t = nextRetryAt(1_000, 30, 2);
     expect(t).toBe(61_000);
+  });
+});
+
+describe('Forge frame export', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('releases the source if the export is canceled before the video loads', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:frame-source');
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    const controller = new AbortController();
+    const onFrame = vi.fn();
+    const exportRun = exportVideoFrames(new File(['video'], 'clip.mp4'), 'png', controller.signal, onFrame);
+
+    controller.abort();
+
+    await expect(exportRun).rejects.toMatchObject({ name: 'AbortError' });
+    expect(onFrame).not.toHaveBeenCalled();
+    expect(revoke).toHaveBeenCalledWith('blob:frame-source');
+  });
+
+  it('exports the first frame without waiting for a seek to zero', async () => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:frame-source');
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'src', 'set').mockImplementation(function (this: HTMLVideoElement) {
+      this.dispatchEvent(new Event('loadeddata'));
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'duration', 'get').mockReturnValue(0.02);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(16);
+    vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(16);
+    const seek = vi.spyOn(HTMLMediaElement.prototype, 'currentTime', 'set');
+    const drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(callback => callback(new Blob(['frame'], { type: 'image/png' })));
+    const onFrame = vi.fn();
+
+    const count = await exportVideoFrames(new File(['video'], 'clip.mp4'), 'png', new AbortController().signal, onFrame);
+
+    expect(count).toBe(1);
+    expect(onFrame).toHaveBeenCalledWith(expect.any(Blob), 0, 1);
+    expect(drawImage).toHaveBeenCalledOnce();
+    expect(seek).not.toHaveBeenCalled();
+    expect(revoke).toHaveBeenCalledWith('blob:frame-source');
   });
 });

@@ -1319,7 +1319,11 @@ const VinxEditor: React.FC = () => {
       </div>
 
       {/* Export dialog overlay */}
-      <ExportDialog />
+      <ExportDialog
+        startPlayback={() => { setIsPlaying(true); engineRef.current?.play(0, 1); }}
+        stopPlayback={() => { setIsPlaying(false); engineRef.current?.pause(); }}
+        seek={frame => { setCurrentFrame(frame); engineRef.current?.seekToFrame(frame); }}
+      />
 
       {/* Quick Export progress indicator (elapsed / duration) */}
       {quickExport.active && (() => {

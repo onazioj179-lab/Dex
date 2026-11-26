@@ -102,26 +102,20 @@ initCompositorHealth();
 import { initTheme } from './utils/theme';
 initTheme();
 
+// DEX identity family: apply before React paints so startup, shell, and apps
+// share one palette without a late color flash.
+import { initializeIdentityTheme } from './utils/identityTheme';
+initializeIdentityTheme();
+
 import { initIdleContinuity } from './services/IdleContinuity';
 initIdleContinuity();
 
-// Reduced-motion: mirror OS preference + user override into a data-attribute
-// so any component (or CSS rule) can read the *effective* setting in one place.
-(() => {
-  try {
-    const root = document.documentElement;
-    const apply = () => {
-      const userPref = localStorage.getItem('dex-reduced-motion'); // 'on' | 'off' | null (auto)
-      const sysReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const effective = userPref === 'on' ? true : userPref === 'off' ? false : sysReduce;
-      root.setAttribute('data-reduced-motion', effective ? 'on' : 'off');
-    };
-    apply();
-    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', apply);
-    window.addEventListener('storage', e => { if (e.key === 'dex-reduced-motion') apply(); });
-    window.addEventListener('dex-reduced-motion-changed', apply);
-  } catch { /* ignore */ }
-})();
+import { prefersReducedMotion, subscribeToReducedMotion } from './utils/useReducedMotion';
+const applyMotionPreference = () => {
+  document.documentElement.dataset.reducedMotion = prefersReducedMotion() ? 'on' : 'off';
+};
+applyMotionPreference();
+subscribeToReducedMotion(applyMotionPreference);
 
 // RC8: Heap Monitor -- start memory pressure tracking
 import { startHeapMonitor } from './utils/HeapMonitor';
@@ -232,7 +226,7 @@ initTransferNotifications();
 
 // UKI: Voice assistant renderer bridge
 import { initUkiRendererBridge } from './services/ukiBridge';
-initUkiRendererBridge();
+const _cleanupUki = initUkiRendererBridge();
 
 // THERMAL: Adaptive performance monitor (rAF jank + main thermal signals)
 import { startThermalAdaptiveMonitor } from './services/ThermalAdaptiveMonitor';
@@ -241,6 +235,7 @@ startThermalAdaptiveMonitor();
 // Cleanup on window close — stop SharedTick, performance systems
 import { sharedTick } from './services/SharedTick';
 window.addEventListener('beforeunload', () => {
+  _cleanupUki();
   sharedTick.destroy();
   if (typeof _cleanupPerf === 'function') _cleanupPerf();
 });

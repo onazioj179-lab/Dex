@@ -122,6 +122,14 @@ describe('ConfirmDialog', () => {
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onConfirm).toHaveBeenCalled();
   });
+
+  it('focuses Cancel and ignores the default Enter shortcut for a destructive confirmation', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open tone="destructive" title="End process" onConfirm={onConfirm} onCancel={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });
 
 describe('RegistryCommandPalette', () => {
