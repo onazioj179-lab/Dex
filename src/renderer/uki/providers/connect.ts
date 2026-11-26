@@ -32,7 +32,7 @@ import { guardAndNotify } from './outboundGuard';
  * providers first; Ollama last because it also needs a local server running
  * (a configured key is not sufficient on its own).
  */
-export const PROVIDER_PRIORITY: ProviderId[] = ['openai', 'anthropic', 'google', 'openrouter', 'ollama'];
+export const PROVIDER_PRIORITY: ProviderId[] = ['openai', 'anthropic', 'google', 'openrouter', 'xai', 'mistral', 'deepseek', 'groq', 'ollama'];
 
 /**
  * Pick the chat model id for the first configured provider (in priority order):

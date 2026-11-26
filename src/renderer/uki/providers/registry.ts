@@ -16,6 +16,7 @@ import { anthropicProvider } from './anthropic';
 import { ollamaProvider } from './ollama';
 import { googleProvider } from './google';
 import { openrouterProvider } from './openrouter';
+import { groqProvider, mistralProvider, deepseekProvider, xaiProvider } from './compatible';
 
 const PROVIDERS: Record<string, LLMProvider> = {
   openai: openaiProvider,
@@ -23,6 +24,10 @@ const PROVIDERS: Record<string, LLMProvider> = {
   google: googleProvider,
   ollama: ollamaProvider,
   openrouter: openrouterProvider,
+  groq: groqProvider,
+  mistral: mistralProvider,
+  deepseek: deepseekProvider,
+  xai: xaiProvider,
 };
 
 export function getProvider(id: ProviderId): LLMProvider | undefined {
@@ -57,5 +62,9 @@ export function providerForModel(modelId: string): LLMProvider | undefined {
   if (modelId.startsWith('claude-')) return getProvider('anthropic');
   if (modelId.startsWith('gemini-')) return getProvider('google');
   if (/^(gpt-|o\d|chatgpt-)/.test(modelId)) return getProvider('openai');
+  if (modelId.startsWith('grok-')) return getProvider('xai');
+  if (modelId.startsWith('deepseek-')) return getProvider('deepseek');
+  if (/^(mistral|codestral|magistral|ministral|pixtral)-/.test(modelId)) return getProvider('mistral');
+  if (/^(llama-|gemma|qwen)/.test(modelId)) return getProvider('groq');
   return undefined;
 }
