@@ -69,7 +69,15 @@ import { AppOverview } from '../shell/AppOverview';
 import { NotificationBanners, NotificationCenter, useBannerNotifications } from '../shell/NotificationBanners';
 import { useNotificationCenterStore } from '../store/unifiedSystemsStore';
 import AppSwitcher from '../shell/AppSwitcher';
-import { loadEngagement, saveEngagement, incrementStat, checkAchievements, recordSessionStart, recordAppUsage, type Achievement, type EngagementState } from '../services/engagement';
+import type { Achievement, EngagementState, UserStats } from '../services/engagement';
+
+// The trophy catalog behind engagement is ~330 KB of source. A static import
+// put it in the boot chunk, parsed before Home could paint, only to record a
+// session start. It is fetched on first use instead (its own chunk).
+type EngagementModule = typeof import('../services/engagement');
+let engagementModule: Promise<EngagementModule> | null = null;
+const loadEngagementModule = (): Promise<EngagementModule> =>
+  (engagementModule ??= import('../services/engagement'));
 import { rewardUnlocks as rewardUnlocksEngine, recordChallengeAction, recordChallengeForStat } from '../services/achievementEngine';
 import { installSendToBridge } from '../services/sendTo';
 import { notify, readHubTarget } from '../services/notify';
@@ -1170,22 +1178,29 @@ export const AppManager: React.FC = () => {
     rewardUnlocksEngine(unlocked);
   }, []);
 
-  const applyEngagement = useCallback((mutate: (s: EngagementState) => EngagementState) => {
+  // Updates run in arrival order: each one chains on the previous, so two
+  // bumps that land while the module is still loading can't read the same
+  // saved state and drop one another's change.
+  const engagementQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const applyEngagement = useCallback((mutate: (s: EngagementState, m: EngagementModule) => EngagementState) => {
     // Trophies › "Track progress" off: no usage stats are recorded at all.
     if (!readDexSetting('achievementsEnabled', true)) return;
-    try {
-      const { state, newUnlocks } = checkAchievements(mutate(loadEngagement()));
-      saveEngagement(state);
-      if (newUnlocks.length) rewardUnlocks(newUnlocks);
-    } catch (err) { console.warn('[DEX] engagement apply error', err); }
+    engagementQueueRef.current = engagementQueueRef.current.then(async () => {
+      try {
+        const m = await loadEngagementModule();
+        const { state, newUnlocks } = m.checkAchievements(mutate(m.loadEngagement(), m));
+        m.saveEngagement(state);
+        if (newUnlocks.length) rewardUnlocks(newUnlocks);
+      } catch (err) { console.warn('[DEX] engagement apply error', err); }
+    });
   }, [rewardUnlocks]);
 
   // Global stat-bump bus -- sourced from every app's real user actions.
   useEffect(() => {
     const handler = (e: CustomEvent<{ key: string; amount?: number }>) => {
-      const key = e.detail.key as Parameters<typeof incrementStat>[1];
+      const key = e.detail.key as keyof UserStats;
       const amount = e.detail.amount ?? 1;
-      applyEngagement(s => incrementStat(s, key, amount));
+      applyEngagement((s, m) => m.incrementStat(s, key, amount));
       // Advance any daily challenge tied to this real user action.
       if (readDexSetting('achievementsEnabled', true)) recordChallengeForStat(key, amount);
     };
@@ -1204,7 +1219,10 @@ export const AppManager: React.FC = () => {
   useEffect(() => {
     if (sessionRecordedRef.current) return;
     sessionRecordedRef.current = true;
-    applyEngagement(recordSessionStart);
+    // After first paint: boot has more urgent work than a streak counter.
+    const run = () => applyEngagement((s, m) => m.recordSessionStart(s));
+    const ric = (window as any).requestIdleCallback as ((cb: () => void, o?: { timeout: number }) => number) | undefined;
+    if (ric) ric(run, { timeout: 4000 }); else setTimeout(run, 1500);
   }, [applyEngagement]);
 
   // App usage: record centrally when a non-home app comes to the foreground, so
@@ -1222,7 +1240,7 @@ export const AppManager: React.FC = () => {
       recordChallengeAction('action_count', 'app:launch');
     }
     if (['videoeditor', 'prism', 'flux', 'axl'].includes(currentAppId)) return;
-    applyEngagement(s => recordAppUsage(s, currentAppId));
+    applyEngagement((s, m) => m.recordAppUsage(s, currentAppId));
   }, [currentAppId, applyEngagement]);
 
   // -- App Switcher HUD (Ctrl+Tab visual overlay) --------------------------
