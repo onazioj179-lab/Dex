@@ -17,6 +17,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { useToastHelpers } from '../../components/Toast';
+import BackupsSection from './BackupsSection';
 
 interface Category { id: string; label: string; bytes: number; disposable: boolean; note: string }
 interface Usage { categories: Category[]; totals: { keep: number; disposable: number }; pendingCacheClear: boolean }
@@ -152,6 +153,7 @@ export default function StoragePanel({ styles }: StoragePanelProps) {
           disabled={!usage || usage.totals.disposable === 0 || usage.pendingCacheClear}
         >Clear caches…</button>
       </div>
+      <BackupsSection styles={styles} />
       <ConfirmHost />
     </>
   );

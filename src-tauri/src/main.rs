@@ -17,6 +17,7 @@ mod browser_block;
 mod paths;
 mod ledger_ctl;
 mod download_ctl;
+mod update_versions;
 mod onboarding;
 mod uki_terminal;
 mod xack;
@@ -2553,6 +2554,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
 
     // === Migration wiring (modules; revert-proof) ===
     if channel.starts_with("download:") { return download_ctl::dispatch(&app, &channel, &args); }
+    if channel == "update:versions" || channel == "update:installVersion" { return update_versions::dispatch(&app, &channel, &args); }
     if channel.starts_with("git:") { return git::dispatch(&channel, &args); }
     if channel.starts_with("env:") { return env_manager::dispatch(&app, &channel, &args); }
     if channel.starts_with("ssh:") { return ssh::dispatch(&app, &channel, &args); }
