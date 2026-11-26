@@ -117,23 +117,9 @@ export {
   type FrequentItem,
 } from './usePatternLearning';
 
-// Engagement System
-export {
-  loadEngagement,
-  saveEngagement,
-  recordSessionStart,
-  recordAppUsage,
-  incrementStat,
-  checkAchievements,
-  getTipOfDay,
-  getTotalPoints,
-  getUserRank,
-  ACHIEVEMENTS,
-  TIPS,
-  type Achievement,
-  type UserStats,
-  type EngagementState,
-} from './engagement';
+// Engagement System: import from './engagement' directly. It is not re-exported
+// here so the trophy catalog (~330 KB) stays out of the boot chunk; AppManager
+// loads it on demand.
 
 // Daily Challenges System
 export {

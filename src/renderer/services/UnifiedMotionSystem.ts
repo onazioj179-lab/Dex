@@ -533,20 +533,28 @@ export function initAnimationBudget(): () => void {
     updateBudgetPerformanceMode();
   };
 
+  // Each sample times two back-to-back frames. Timing one frame against the
+  // previous sample measured the 3 s gap between samples instead, so after ten
+  // samples every machine looked like 0.3 fps and the mode flipped to
+  // 'disabled'. Hidden windows are skipped: the OS throttles their frames.
   const scheduleSample = () => {
     sampleTimer = setTimeout(() => {
-      budgetFrameId = requestAnimationFrame((time) => {
-        measureFrame(time);
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         scheduleSample();
+        return;
+      }
+      budgetFrameId = requestAnimationFrame((first) => {
+        lastTime = first;
+        budgetFrameId = requestAnimationFrame((second) => {
+          budgetFrameId = null;
+          measureFrame(second);
+          scheduleSample();
+        });
       });
     }, 3000);
   };
 
-  // Kick off the first sample
-  budgetFrameId = requestAnimationFrame((time) => {
-    lastTime = time;
-    scheduleSample();
-  });
+  scheduleSample();
 
   // Cleanup function
   return () => {

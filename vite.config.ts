@@ -158,6 +158,22 @@ export default defineConfig({
           // they cache once and stay off the eager critical path.
           if (id.includes('node_modules/@tanstack')) return 'virtual-vendor';
           if (id.includes('node_modules/idb-keyval')) return 'idb-vendor';
+          // The xterm emulator and the shared Terminal / TerminalTabs components
+          // are only reached through lazy imports (Terminal app, DEX Code's
+          // bottom panel). Matched by the components/ rule below they put
+          // ~300 KB of xterm into the eager dex-app-core chunk, parsed on every
+          // boot. Nothing in core imports them statically, so no cycle.
+          if (id.includes('node_modules/@xterm')
+              || /[\\/]renderer[\\/]components[\\/]Terminal(Tabs)?\.tsx$/.test(id)) {
+            return 'app-terminal';
+          }
+          // The trophy catalog (~330 KB of source) and the two modules that read
+          // it. Core reaches them only through AppManager's dynamic import, so
+          // they load after boot; the creative apps import them statically from
+          // their own lazy chunks.
+          if (/[\\/]renderer[\\/]services[\\/](achievementsCatalog|achievementTracking|engagement)\.ts$/.test(id)) {
+            return 'dex-achievements';
+          }
           // Shared renderer INFRASTRUCTURE (stores, services, components, hooks,
           // contexts, ui) -> ONE eager chunk. Without this, Rollup scattered a
           // widely-used shared module INTO an app chunk (app-axl etc.), so the entry
