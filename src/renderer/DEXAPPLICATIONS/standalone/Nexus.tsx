@@ -15,9 +15,19 @@
  * here too. The single source of truth lives in `pages/TaskManager`; Nexus
  * renders it so both app entries stay in lockstep.
  */
-import React from 'react';
+import React, { lazy } from 'react';
 import TaskManager from '../../pages/TaskManager';
+import { TabbedAppHost } from './TabbedAppHost';
 
-const Nexus: React.FC = () => <TaskManager />;
+// UKI lives in Nexus (owner, 2026-11-26): the assistant beside the system it
+// can see and act on, instead of a separate app.
+const Uki = lazy(() => import('./Uki'));
+
+const Nexus: React.FC = () => (
+  <TabbedAppHost appId="nexus" label="Nexus" tabs={[
+    { id: 'uki', label: 'UKI', render: () => <Uki /> },
+    { id: 'system', label: 'System', render: () => <TaskManager /> },
+  ]} />
+);
 
 export default Nexus;

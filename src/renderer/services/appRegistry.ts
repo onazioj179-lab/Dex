@@ -76,6 +76,7 @@ const APP_WINDOW_SIZES_RAW: Record<string, AppWindowConfig> = {
   games: { w: 900, h: 640 },
   calendar: { w: 680, h: 480 },
   kanban: { w: 720, h: 500 },
+  activity: { w: 860, h: 580 },
   // Compact utilities: sized to their measured content (preview, 2026-11-04)
   // so nothing opens clipped; fitWindowToWorkspace shrinks them on small screens.
   calculator: { w: 360, h: 610 },

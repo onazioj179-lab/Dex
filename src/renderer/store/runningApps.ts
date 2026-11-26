@@ -14,6 +14,7 @@
 
 import { create } from 'zustand';
 import { byAppId, baseAppId, nextWindowId, supportsMultipleWindows, windowName } from '../services/appWindows';
+import { MERGED_APPS, requestAppTab } from '../services/appTabs';
 import { useShallow } from 'zustand/react/shallow';
 import { persist } from 'zustand/middleware';
 import { debouncedJsonStorage } from '../utils/debouncedStorage';
@@ -76,6 +77,13 @@ export const useRunningApps = create<RunningAppsState>()(
         if (baseAppId(app.id) === 'presentation') {
           try { localStorage.setItem('dex-creative-studio-mode', 'slides'); window.dispatchEvent(new CustomEvent('dex-creative-studio-mode', { detail: { mode: 'slides' } })); } catch { /* non-DOM */ }
           app = { ...app, id: 'canvas', name: APP_DEFINITIONS.canvas?.name ?? 'Creative Studio', icon: APP_DEFINITIONS.canvas?.icon ?? app.icon };
+        }
+        // Merged apps open as a tab of the app that holds them now.
+        const merged = MERGED_APPS[baseAppId(app.id)];
+        if (merged) {
+          requestAppTab(merged.to, merged.tab);
+          const def = APP_DEFINITIONS[merged.to];
+          app = { ...app, id: merged.to, name: def?.name ?? app.name, icon: def?.icon ?? app.icon, color: def?.color ?? app.color };
         }
         if (RETIRED_APPS[baseAppId(app.id)]) {
           try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'info', message: RETIRED_APPS[baseAppId(app.id)] } })); } catch { /* non-DOM */ }
@@ -159,7 +167,10 @@ export const useRunningApps = create<RunningAppsState>()(
         }
       },
   
-      setCurrentApp: (appId) => {
+      setCurrentApp: (requested) => {
+        const merged = MERGED_APPS[baseAppId(requested)];
+        if (merged) requestAppTab(merged.to, merged.tab);
+        const appId = merged ? merged.to : requested;
         const { runningApps, currentAppId } = get();
         set(state => ({
           currentAppId: appId,
@@ -239,7 +250,8 @@ export const useRunningApps = create<RunningAppsState>()(
       // A stored session that was on a retired app comes back on Home.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RunningAppsState>;
-        const currentAppId = p.currentAppId && !RETIRED_APPS[p.currentAppId] ? p.currentAppId : current.currentAppId;
+        const stored = p.currentAppId && MERGED_APPS[p.currentAppId] ? MERGED_APPS[p.currentAppId].to : p.currentAppId;
+        const currentAppId = stored && !RETIRED_APPS[stored] ? stored : current.currentAppId;
         const sessionHistory = Array.isArray(p.sessionHistory) ? p.sessionHistory.filter((id) => !RETIRED_APPS[id]) : current.sessionHistory;
         return { ...current, ...p, currentAppId, sessionHistory };
       },
@@ -400,6 +412,7 @@ const APP_DEFINITIONS_RAW: Record<string, { name: string; color: string; icon: s
   spaces: { name: 'Spaces', color: '#bf5af2', icon: 'layers', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Snapshot and restore your open apps and project as named workspaces' },
   projectdash: { name: 'Project', color: 'var(--color-accent)', icon: 'dashboard', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Per-project overview: tasks, notes, and recent activity' },
   backup: { name: 'Backup & Sync', color: '#30d158', icon: 'shield', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Encrypted backup, restore, and folder sync of all your DEX data' },
+  activity: { name: 'Activity', color: '#5E5CE6', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Boards, the live feed of what happens across DEX, and tips to learn it' },
   extensions: { name: 'Extensions', color: '#ff9f0a', icon: 'puzzle', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Install, enable, and permission-gate local DEX extensions' },
 
   // Productivity Apps
@@ -479,4 +492,6 @@ const APP_DEFINITIONS_RAW: Record<string, { name: string; color: string; icon: s
 };
 
 /** App definitions; a window id ('notes~2') answers with its app's entry, named "Notes 2". */
-export const APP_DEFINITIONS = byAppId(APP_DEFINITIONS_RAW, (d, id) => ({ ...d, name: windowName(d.name, id), shortcut: undefined }));
+// Merged apps (services/appTabs) are tabs now, not apps: they leave every list.
+const LISTED_APPS = Object.fromEntries(Object.entries(APP_DEFINITIONS_RAW).filter(([id]) => !MERGED_APPS[id])) as typeof APP_DEFINITIONS_RAW;
+export const APP_DEFINITIONS = byAppId(LISTED_APPS, (d, id) => ({ ...d, name: windowName(d.name, id), shortcut: undefined }));
