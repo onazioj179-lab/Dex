@@ -972,3 +972,26 @@ fn idempotency_keys_are_per_channel() {
     // The category write ran (not answered with the group's cached reply).
     assert_eq!(c["id"].as_i64(), Some(cat(&mut l, "B")));
 }
+
+/// The CSV the renderer builds from an OFX/QFX bank file (ledger/ofx.ts) must
+/// map and parse without any user help: ISO dates, signed amounts, quoted payees.
+#[test]
+fn csv_from_an_ofx_file_maps_on_its_own() {
+    let mut l = ledger("ofxcsv");
+    let a = account(&mut l, "Current", "checking", 0);
+    let csv_text = "Date,Payee,Memo,Amount\n2026-11-03,COFFEE & CO,Card 1234,-42.10\n2026-11-05,\"PAYROLL, ACME\",,1250.00\n";
+    let pv = ok(
+        &mut l,
+        "ledger:csv:preview",
+        json!({ "accountId": a, "content": csv_text }),
+    );
+    assert_eq!(pv["errorCount"], 0);
+    let rows = pv["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["date"], "2026-11-03");
+    assert_eq!(rows[0]["payee"], "COFFEE & CO");
+    assert_eq!(rows[0]["memo"], "Card 1234");
+    assert_eq!(rows[0]["amount"], -4210);
+    assert_eq!(rows[1]["payee"], "PAYROLL, ACME");
+    assert_eq!(rows[1]["amount"], 125_000);
+}

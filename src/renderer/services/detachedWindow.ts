@@ -18,7 +18,7 @@
  * a mount effect that may run after this module.
  *
  * @copyright  Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
- * @license    MIT License
+ * @license    DEX Software License Agreement v1.0 (proprietary)
  * ===========================================================================
  */
 

@@ -11,6 +11,11 @@
  */
 
 import { toMediaUrl } from '../utils/mediaUrl';
+import { PlayableVideo, PlayableAudio } from '../components/media/PlayableMedia';
+
+/** Every common audio/video type previews; formats WebView2 cannot decode are prepared first. */
+const PREVIEW_VIDEO_EXTS = ['.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.mpg', '.mpeg', '.ts', '.mts', '.m2ts', '.3gp', '.ogv', '.vob', '.asf', '.f4v'];
+const PREVIEW_AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.wma', '.aiff', '.aif', '.ape', '.alac', '.wv', '.ac3', '.dts', '.mka', '.amr'];
 import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
@@ -2087,7 +2092,7 @@ export const Files: React.FC = () => {
             <button onClick={() => handleTransferSelected('copy')} title="Copy selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copy to...</button>
             <button onClick={() => handleTransferSelected('move')} title="Move selected to a chosen folder" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Move to...</button>
             {selectedFiles.size > 1 && <button onClick={() => setShowBatchRename(true)} title="Rename the selected items with a preview" data-testid="files-batch-rename" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Rename...</button>}
-            <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 9999, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
             <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
             <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
@@ -2150,7 +2155,7 @@ export const Files: React.FC = () => {
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>No matches</span>
                     <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{filters.query ? `No files match "${filters.query}" in this folder.` : 'No files match the current filters.'}</span>
-                    <button onClick={clearFilters} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
+                    <button onClick={clearFilters} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)' }}>
@@ -2158,7 +2163,7 @@ export const Files: React.FC = () => {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={handleAddFiles} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={handleAddFiles} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
@@ -2293,7 +2298,7 @@ export const Files: React.FC = () => {
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>No matches</span>
                     <span style={{ fontSize: 11, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 240 }}>{filters.query ? `No files match "${filters.query}".` : 'No files match the current filters.'}</span>
-                    <button onClick={clearFilters} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
+                    <button onClick={clearFilters} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear filters</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px var(--space-4)', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>
@@ -2301,7 +2306,7 @@ export const Files: React.FC = () => {
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #0a84ff)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>This folder is empty</span>
-                    <button onClick={handleAddFiles} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
+                    <button onClick={handleAddFiles} style={{ marginTop: 4, padding: '6px var(--space-4)', borderRadius: 9999, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Add Files</button>
                   </div>
                 )
               ) : visibleFiles.map((file, idx) => (
@@ -2440,8 +2445,8 @@ export const Files: React.FC = () => {
               />
             )}
             {/* Video Preview */}
-            {['.mp4', '.mov', '.webm'].includes(previewFile.extension.toLowerCase()) && (
-              <video
+            {PREVIEW_VIDEO_EXTS.includes(previewFile.extension.toLowerCase()) && (
+              <PlayableVideo
                 src={toMediaUrl(previewFile.path)}
                 controls
                 autoPlay
@@ -2449,11 +2454,11 @@ export const Files: React.FC = () => {
               />
             )}
             {/* Audio Preview */}
-            {['.mp3', '.wav', '.m4a', '.ogg'].includes(previewFile.extension.toLowerCase()) && (
+            {PREVIEW_AUDIO_EXTS.includes(previewFile.extension.toLowerCase()) && (
               <div style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-8)', borderRadius: 10 }}>
                 <Icons.music size={64} />
                 <div style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-4)', color: 'var(--color-text-primary)', fontSize: 16 }}>{previewFile.name}</div>
-                <audio src={toMediaUrl(previewFile.path)} controls autoPlay style={{ width: 300 }} />
+                <PlayableAudio src={toMediaUrl(previewFile.path)} controls autoPlay style={{ width: 300 }} />
               </div>
             )}
             {/* File Name */}

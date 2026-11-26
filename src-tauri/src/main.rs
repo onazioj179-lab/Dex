@@ -80,6 +80,10 @@ mod containment_ctl;
 mod sandbox_ctl;
 mod gpu_priority;
 mod global_hotkeys;
+mod terminal_compat;
+mod media_compat;
+mod process_digest;
+mod browser_proxy;
 mod context_ctl;
 mod controls_ctl;
 mod corepc_ctl;
@@ -627,11 +631,11 @@ fn rank_processes(mut procs: Vec<ProcInfo>, limit: usize) -> Vec<ProcInfo> {
 /// Returns a bare array: every renderer caller (Task Manager, Power, Settings,
 /// UKI) and `global.d.ts` expect `any[]`; the old `{ success, processes }`
 /// wrapper made all of them show an empty list.
-fn system_processes() -> Value {
+/// One persistent process table shared by Task Manager and UKI: per-process
+/// CPU% is the delta since the previous refresh, so no second scan or sleep
+/// per call except the very first (and only processes are refreshed).
+fn with_process_table<R>(f: impl FnOnce(&sysinfo::System) -> R) -> R {
     use crate::util::LockSafe;
-    // One persistent process table: per-process CPU% is the delta since the
-    // previous refresh (the previous poll), so no second scan or sleep per call
-    // except the very first (and only processes are refreshed, not everything).
     static P: std::sync::OnceLock<std::sync::Mutex<(sysinfo::System, std::time::Instant)>> = std::sync::OnceLock::new();
     let mut guard = P.get_or_init(|| {
         let mut sys = sysinfo::System::new();
@@ -641,7 +645,39 @@ fn system_processes() -> Value {
     wait_cpu_interval(guard.1);
     guard.0.refresh_processes();
     guard.1 = std::time::Instant::now();
-    let sys = &guard.0;
+    f(&guard.0)
+}
+
+/// `system:processDigest({ query? })`: every process, summarised for UKI (process_digest.rs).
+fn system_process_digest(args: &Value) -> Value {
+    let query = args.get(0).and_then(|a| a.get("query").and_then(|q| q.as_str()).or_else(|| a.as_str())).map(|s| s.to_string());
+    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let total_mb = {
+        let mut s = sysinfo::System::new();
+        s.refresh_memory();
+        s.total_memory() / (1024 * 1024)
+    };
+    with_process_table(|sys| {
+        let parents: std::collections::HashMap<u32, u32> = sys.processes().iter()
+            .filter_map(|(pid, p)| p.parent().map(|pp| (pid.as_u32(), pp.as_u32()))).collect();
+        let pids: Vec<u32> = sys.processes().keys().map(|p| p.as_u32()).collect();
+        let kinds = proc_classify::categorize(&pids, &parents, &proc_classify::windowed_pids(), std::process::id());
+        let procs: Vec<process_digest::Proc> = sys.processes().iter().map(|(pid, p)| process_digest::Proc {
+            pid: pid.as_u32(),
+            name: p.name().to_string(),
+            cpu: p.cpu_usage(),
+            memory_mb: p.memory() / (1024 * 1024),
+            kind: kinds.get(&pid.as_u32()).copied().unwrap_or("background"),
+        }).collect();
+        process_digest::digest(&procs, cores, total_mb, query.as_deref(), 8)
+    })
+}
+
+fn system_processes() -> Value {
+    with_process_table(system_processes_from)
+}
+
+fn system_processes_from(sys: &sysinfo::System) -> Value {
     let all: Vec<ProcInfo> = sys
         .processes()
         .iter()
@@ -689,6 +725,16 @@ mod process_ranking_tests {
         assert_eq!(top.len(), 2);
         assert_eq!(top[0].pid, 2, "highest CPU first");
         assert_eq!(top[1].pid, 3, "CPU tie -> higher memory first");
+    }
+
+    /// The real machine: every running process is counted (not just the 500 Task Manager keeps).
+    #[test]
+    fn digest_sees_every_process_on_this_machine() {
+        let d = super::system_process_digest(&serde_json::json!([{ "query": "dex" }]));
+        let n = d["processes"].as_u64().unwrap();
+        eprintln!("live digest: {n} processes, {} programs, cpu {}%, {} MB", d["programs"], d["cpu"], d["memoryMb"]);
+        assert!(n > 10);
+        assert!(d["topMemory"].as_array().unwrap().len() <= 8);
     }
 
     #[test]
@@ -2578,6 +2624,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("history:") { return history_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("hotkeys:") { return hotkey_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("global-hotkeys:") { return global_hotkeys::dispatch(&app, &channel, &args); }
+    if channel.starts_with("browserProxy:") { return browser_proxy::dispatch(&app, &channel, &args); }
+    if matches!(channel.as_str(), "media:probe" | "media:prepare" | "media:cacheInfo" | "media:clearCache") { return media_compat::dispatch(&app, &channel, &args); }
     if channel.starts_with("http-transfer:") { return http_transfer_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("idle:") { return idle_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("import:") { return import_ctl::dispatch(&app, &channel, &args); }
@@ -2721,6 +2769,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "log:renderer" | "render-error:report" | "renderer:memory-critical" => renderer_log::dispatch(&channel, &args),
         "power:getStats" => system_status(),
         "system:getProcesses" => system_processes(),
+        "system:processDigest" => system_process_digest(&args),
         "system:getStartupItems" => proc_classify::startup_items(),
         "system:killProcess" | "power:closeProcess" => system_kill(arg_u64(0).unwrap_or(0) as u32),
         "system:getLaunchAtLogin" => launch_at_login_get(),

@@ -50,8 +50,36 @@ impl Risk {
 }
 
 /// Classify a command. Conservative: anything unknown is `execute`.
+/// The command as the shell will effectively read it, for the privileged check:
+/// lower case, quotes and escape characters (PowerShell ` and cmd ^) removed,
+/// runs of spaces collapsed, so `-Verb  'RunAs'`, `r^unas` and ``run`as`` cannot
+/// hide from the list.
+fn normalized(command: &str) -> String {
+    let lower = command.to_ascii_lowercase().replace(['\t', '\r', '\n'], " ");
+    let stripped: String = lower.chars().filter(|c| !matches!(c, '`' | '^' | '"' | '\'')).collect();
+    format!(" {} ", stripped.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+/// A destructive verb aimed at Windows, the program folders or a drive root.
+fn destroys_system_location(n: &str) -> bool {
+    const DESTRUCTIVE: &[&str] = &[" remove-item", " rm ", " del ", " erase ", " rmdir", " rd ", " ri ", " move-item", " mv ", " move ",
+        " set-content", " clear-content", " out-file", " copy-item", " cp ", " copy ", " icacls", " takeown", " attrib "];
+    const SYSTEM: &[&str] = &["c:\\windows", "%windir%", "$env:windir", "$env:systemroot", "%systemroot%", "c:\\program files",
+        "c:\\programdata", "c:\\boot", "c:\\recovery", "c:\\system volume information"];
+    let drive_root = n.contains(" c:\\ ") || n.contains(" c:\\* ") || n.contains(" c:\\*") || n.ends_with(" c:\\ ") || n.contains(" c: ") || n.contains(" / ");
+    DESTRUCTIVE.iter().any(|d| n.contains(d)) && (SYSTEM.iter().any(|s| n.contains(s)) || drive_root)
+}
+
 pub fn classify(command: &str) -> Risk {
     let c = format!(" {} ", command.to_ascii_lowercase().replace(['\t', '\r', '\n'], " "));
+    let n = normalized(command);
+    // Hidden or self-elevating commands are refused outright: UKI never needs to
+    // run base64-encoded PowerShell, and its contents cannot be classified.
+    const HIDDEN: &[&str] = &[" -encodedcommand", " -enc ", " -ec ", " -e ", "frombase64string", " -verb runas", "-verb:runas", " -verb run as"];
+    if HIDDEN.iter().any(|p| n.contains(p)) && (n.contains("powershell") || n.contains("pwsh") || n.contains("start-process") || n.contains("frombase64string")) {
+        return Risk::Privileged;
+    }
+    if destroys_system_location(&n) { return Risk::Privileged; }
     const PRIVILEGED: &[&str] = &[
         " runas ", " sudo ", " gsudo ", "-verb runas", "-verb:runas", "set-executionpolicy", " bcdedit", " diskpart",
         " format-volume", " clear-disk", " initialize-disk", "hklm:", "hkey_local_machine", " reg add hklm", " reg delete hklm",
@@ -61,7 +89,7 @@ pub fn classify(command: &str) -> Risk {
         "enable-windowsoptionalfeature", "disable-windowsoptionalfeature", " dism ", "set-netfirewall", "new-netfirewall",
         " format c:", " del /s /q c:\\", "rm -rf /", "remove-item c:\\windows", "remove-item -recurse -force c:\\ ",
     ];
-    if PRIVILEGED.iter().any(|p| c.contains(p)) { return Risk::Privileged; }
+    if PRIVILEGED.iter().any(|p| c.contains(p) || n.contains(p)) { return Risk::Privileged; }
     const EXTERNAL: &[&str] = &[
         " curl ", " wget ", "invoke-webrequest", "invoke-restmethod", " iwr ", " irm ", " ssh ", " scp ", " sftp ", " ftp ",
         " git push", " git clone", " git fetch", " git pull", " npm publish", " npm install", " npm i ", " pip install",
@@ -373,6 +401,45 @@ mod tests {
             "shutdown /s /t 0", "vssadmin delete shadows /all", "Remove-Item -Recurse -Force C:\\ ",
         ] {
             assert_eq!(classify(c), Risk::Privileged, "{c}");
+        }
+    }
+
+    /// Red team: ways to hide an elevated or system-destroying command must still be refused.
+    #[test]
+    fn evasions_of_the_privileged_list_are_still_refused() {
+        for c in [
+            "Start-Process powershell -Verb  RunAs",
+            "Start-Process powershell -Verb 'RunAs'",
+            "Start-Process powershell -Verb \"RunAs\"",
+            "Start-Process pwsh -verb:RUNAS",
+            "r^unas /user:Administrator cmd",
+            "run`as /user:Administrator cmd",
+            "SHUTDOWN   /s /t 0",
+            "s^hutdown /r",
+            "powershell -enc SQBFAFgAIAAoAEcAZQB0AC0ASQB0AGUAbQAgAEMAOgBcACkA",
+            "powershell -EncodedCommand ZgBvAG8A",
+            "pwsh -e ZgBvAG8A",
+            "[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('ZgBvAG8A'))",
+            "Remove-Item -Recurse -Force C:\\Windows\\System32",
+            "Remove-Item -Force -Recurse \"C:\\Program Files\\App\"",
+            "rm -r -fo $env:windir\\Temp",
+            "del /s /q C:\\ ",
+            "rd /s /q C:\\Windows",
+            "icacls C:\\Windows /grant Everyone:F",
+            "Set-Content C:\\Windows\\System32\\drivers\\etc\\hosts 'x'",
+        ] {
+            assert_eq!(classify(c), Risk::Privileged, "not refused: {c}");
+        }
+    }
+
+    /// Ordinary work must not be caught by the stricter checks.
+    #[test]
+    fn ordinary_commands_are_not_refused() {
+        for c in [
+            "Remove-Item .\\build -Recurse", "rm -r node_modules", "echo -e hello", "git status", "npm run build",
+            "Get-ChildItem C:\\Users\\me\\Documents", "copy a.txt b.txt", "cargo test",
+        ] {
+            assert_ne!(classify(c), Risk::Privileged, "wrongly refused: {c}");
         }
     }
 

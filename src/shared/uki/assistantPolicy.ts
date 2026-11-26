@@ -180,10 +180,12 @@ export const TOOL_RISK: Record<string, ToolRiskSpec> = {
   notify: { risk: 'low' },
   get_context: { risk: 'low' },
   list_apps: { risk: 'low' },
+  system_processes: { risk: 'low' },
   find_files: { risk: 'low' },
   // Umari (src-tauri/src/umari.rs): excerpts are file contents, so they need file-read.
   find_context: { risk: 'low', capability: 'file-read' },
   list_projects: { risk: 'low' },
+  recall_conversations: { risk: 'low' },
   read_file: { risk: 'low', capability: 'file-read' },
   write_file: { risk: 'medium', capability: 'file-write' },
   create_folder: { risk: 'medium', capability: 'file-write' },

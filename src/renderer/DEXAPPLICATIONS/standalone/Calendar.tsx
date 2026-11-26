@@ -1405,7 +1405,7 @@ const Calendar: React.FC = () => {
                     type="button"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+                      padding: '4px 10px', borderRadius: 9999, fontSize: 12, cursor: 'pointer',
                       border: '1px solid ' + (newEvent.category === cat.id ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
                       background: newEvent.category === cat.id ? 'var(--color-bg-hover)' : 'transparent',
                       color: 'var(--color-text-secondary)',
@@ -1425,7 +1425,7 @@ const Calendar: React.FC = () => {
                   <button
                     key={r}
                     style={{
-                      padding: '4px 10px', borderRadius: 4,
+                      padding: '4px 10px', borderRadius: 9999,
                       border: '1px solid ' + (newEvent.recurring === r ? 'var(--color-accent)' : 'var(--color-border-subtle)'),
                       fontSize: 12,
                       background: newEvent.recurring === r ? 'var(--color-accent-fill)' : 'var(--color-bg-hover)',

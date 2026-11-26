@@ -19,7 +19,7 @@ import {
 } from '../../uki/providers/connect';
 import { captureScreenImage, isScreenCaptureAvailable, captureCameraFrame, isCameraCaptureAvailable } from '../../uki/screenCapture';
 import { liveContext, ensureDeviceInfo, type DeviceInfo } from '../../uki/context';
-import { coreSystemPrompt, reasoningForTurn } from '../../uki/identity';
+import { coreSystemPrompt, reasoningForTurn, isCreatorQuestion, creatorAnswer } from '../../uki/identity';
 import { formatUkiContexts } from '../../uki/appContextRegistry';
 import { relevantSkillPacks, formatSkillPacksForPrompt } from '../../uki/skillPacks';
 import { buildChatCommand, runChatCommand, planNeedsProvider, type ChatCommand } from '../../uki/chatActions';
@@ -33,6 +33,8 @@ import {
   replyFileName, saveTextAs, MAX_ATTACHMENTS, UKI_ATTACH_EVENT, takeHandedOffAttachments, type UkiAttachment,
 } from '../../uki/attachments';
 import { summarizeText } from '../../uki/assistive';
+import { recallFromHistory, isHistoryRequest, recentWindow } from '../../uki/chatHistory';
+import { updateRelationship } from '../../uki/philosophy';
 
 function toast(type: 'success' | 'error' | 'info', message: string): void {
   try { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } })); } catch { /* noop */ }
@@ -264,6 +266,10 @@ export default function Uki(): React.ReactElement {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  // History is unlimited; draw the latest part and page back on request, so a
+  // conversation with thousands of messages opens instantly.
+  const PAGE = 200;
+  const [shownCount, setShownCount] = useState(PAGE);
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -294,12 +300,19 @@ export default function Uki(): React.ReactElement {
   const abortRef = useRef<AbortController | null>(null);
 
   const refreshConversations = useCallback(async () => {
-    const list = await dexInvoke<Conversation[]>('uki-chat:listConversations', 200);
-    if (Array.isArray(list)) setConversations(list);
+    const list = await dexInvoke<Conversation[]>('uki-chat:listConversations', 100000);
+    if (Array.isArray(list)) { setConversations(list); updateRelationship(list); }
   }, []);
+  // Chats in the floating UKI panel are saved here too; show them as they land.
+  useEffect(() => {
+    const onChange = () => { void refreshConversations(); };
+    window.addEventListener('dex-uki-history-changed', onChange);
+    return () => window.removeEventListener('dex-uki-history-changed', onChange);
+  }, [refreshConversations]);
 
   const loadMessages = useCallback(async (cid: string) => {
-    const msgs = await dexInvoke<Message[]>('uki-chat:getMessages', cid, 500);
+    setShownCount(PAGE);
+    const msgs = await dexInvoke<Message[]>('uki-chat:getMessages', cid);
     setMessages(Array.isArray(msgs) ? msgs : []);
   }, []);
 
@@ -566,7 +579,7 @@ export default function Uki(): React.ReactElement {
     // Operator (light touch): if the message clearly describes a problem and the
     // on-device troubleshooting knowledge has a confident hit, answer locally
     // instead of falling back to the raw LLM. Guarded so normal chat is untouched.
-    const localAnswer = atts.length ? null : tryOperatorLocalAnswer(text);
+    const localAnswer = atts.length ? null : isCreatorQuestion(text) ? creatorAnswer() : tryOperatorLocalAnswer(text);
     if (localAnswer) {
       const reply: Message = { id: newId(), role: 'copilot', content: localAnswer, timestamp: Date.now() };
       setMessages((m) => [...m, reply]);
@@ -574,8 +587,22 @@ export default function Uki(): React.ReactElement {
       return;
     }
 
+    // Her saved conversations: what the user asked before about this topic.
+    const bridgeInvoke = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+    const recall = bridgeInvoke?.invoke && !atts.length
+      ? await recallFromHistory(bridgeInvoke.invoke.bind(bridgeInvoke), text, { excludeConversation: cid })
+      : '';
+
     // Re-check live (the once-on-mount value can be stale if a key was just added).
     const isConfigured = hasConfiguredProvider();
+    if (!isConfigured && isHistoryRequest(text)) {
+      // No model: answer "what did we talk about…" straight from the saved history.
+      const found = recall ? recall.split('\n').slice(1).join('\n') : '';
+      const reply: Message = { id: newId(), role: 'copilot', content: found ? `Here is what I found in our earlier conversations:\n${found}` : 'I could not find that in our earlier conversations.', timestamp: Date.now() };
+      setMessages((m) => [...m, reply]);
+      if (cid) { void dexInvoke('uki-chat:appendMessage', cid, reply); void refreshConversations(); }
+      return;
+    }
     if (isConfigured !== configured) setConfigured(isConfigured);
     if (!isConfigured && atts.some((a) => a.kind === 'text')) {
       // No model: summarize the attached text on this device instead of refusing.
@@ -601,7 +628,9 @@ export default function Uki(): React.ReactElement {
     setStreamingText('');
     const controller = new AbortController();
     abortRef.current = controller;
-    const history: ChatMessage[] = messages.map((m) => ({
+    // The live prompt carries the recent part of this conversation; older turns
+    // (and other conversations) come back through recall when they are relevant.
+    const history: ChatMessage[] = recentWindow(messages, 40).map((m) => ({
       role: m.role === 'copilot' ? 'assistant' : m.role === 'system' ? 'system' : 'user',
       content: m.content,
     }));
@@ -626,7 +655,7 @@ export default function Uki(): React.ReactElement {
       const filesBlock = attachmentsPrompt(atts);
       const result = await streamConfiguredLLM(
         filesBlock ? `${text}\n\n${filesBlock}` : text,
-        buildSystemPrompt(grounding, text),
+        recall ? `${buildSystemPrompt(grounding, text)}\n\n${recall}` : buildSystemPrompt(grounding, text),
         (_token, running) => {
           full = running;
           setStreamingText(running);
@@ -776,7 +805,15 @@ export default function Uki(): React.ReactElement {
               </div>
             </div>
           )}
-          {messages.map((m) => (
+          {messages.length > shownCount && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 8px' }}>
+              <button type="button" onClick={() => setShownCount((c) => c + PAGE)}
+                style={{ height: 28, padding: '0 14px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+                Show earlier messages ({(messages.length - shownCount).toLocaleString()} more)
+              </button>
+            </div>
+          )}
+          {(messages.length > shownCount ? messages.slice(-shownCount) : messages).map((m) => (
             <div key={m.id} style={{ ...S.row, justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 4, maxWidth: '76%' }}>
                 <div style={{ ...S.bubble, maxWidth: '100%', ...(m.role === 'user' ? S.bubbleUser : m.role === 'system' ? S.bubbleSystem : S.bubbleAi) }}>

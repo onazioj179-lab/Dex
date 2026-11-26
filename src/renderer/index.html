@@ -121,9 +121,49 @@
         background: transparent !important;
         color: #FFFFFF !important;
       }
+      /* Boot splash: the DEX wordmark and a thin pill progress bar on the
+         empty #root. Pure CSS (nothing to remove: React replacing #root's
+         content ends it), and it only fades in when boot takes over 250 ms,
+         so a fast start never flashes it. */
+      #root:empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+      }
       #root:empty::before {
+        content: 'DEX';
+        display: block;
+        font: 700 34px/1 var(--dex-font-ui);
+        letter-spacing: 0.22em;
+        margin-right: -0.22em;
+        color: #F5F5F7;
+        opacity: 0;
+        animation: dexBootIn 0.4s ease 0.25s forwards;
+      }
+      #root:empty::after {
         content: '';
         display: block;
+        width: 132px;
+        height: 3px;
+        border-radius: 9999px;
+        background:
+          linear-gradient(90deg, transparent 0%, #0A84FF 50%, transparent 100%) 0 0 / 40% 100% no-repeat,
+          rgba(255, 255, 255, 0.12);
+        opacity: 0;
+        animation: dexBootIn 0.4s ease 0.25s forwards, dexBootBar 1.15s cubic-bezier(0.45, 0, 0.25, 1) 0.25s infinite;
+      }
+      html[data-theme="light"] #root:empty::before { color: #1d1d1f; }
+      html[data-theme="light"] #root:empty::after {
+        background:
+          linear-gradient(90deg, transparent 0%, #0066CC 50%, transparent 100%) 0 0 / 40% 100% no-repeat,
+          rgba(0, 0, 0, 0.10);
+      }
+      @keyframes dexBootIn { to { opacity: 1; } }
+      @keyframes dexBootBar { from { background-position: -60% 0, 0 0; } to { background-position: 160% 0, 0 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        #root:empty::before, #root:empty::after { animation: dexBootIn 0.01s linear 0.25s forwards; }
       }
     </style>
     <script>

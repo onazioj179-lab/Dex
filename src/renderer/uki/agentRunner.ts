@@ -26,6 +26,7 @@
 import { askConfiguredLLM } from './providers/connect';
 import type { ChatMessage } from './providers/types';
 import { searchWikipedia, lookupInstantAnswer } from './freeApis';
+import { redactHighConfidenceSecrets } from '../../shared/security/secretRedactor';
 import { formatUkiContexts } from './appContextRegistry';
 import { TtlCache, createToolBudget, chargeTool, type ToolBudget } from '../../shared/uki/webCache';
 import { notify } from '../services/notify';
@@ -179,6 +180,11 @@ function dispatch(event: string, detail: Record<string, unknown>): void {
 export async function webSearch(query: string): Promise<string> {
   const q = (query || '').trim();
   if (!q) return 'No query provided.';
+  // Never send a secret to a search engine. A model can be talked into putting
+  // a key it read from a file into a query (prompt injection = exfiltration).
+  if (redactHighConfidenceSecrets(q).removed.length) {
+    return 'Not searched: the query contained what looks like a password, key or token. Secrets are never sent to the web.';
+  }
   const key = q.toLowerCase();
   const cached = webSearchCache.get(key);
   if (cached) return cached;
@@ -206,6 +212,19 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
   switch (name as ToolName) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
+    case 'system_processes': {
+      const { runProcessTool } = await import('./processTools');
+      return runProcessTool(args);
+    }
+    case 'recall_conversations': {
+      const q = String(args.query ?? '').trim();
+      if (!q) return 'No topic given.';
+      const dex = (globalThis as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+      if (!dex?.invoke) return 'Conversation history is only available in the DEX desktop app.';
+      const { recallFromHistory } = await import('./chatHistory');
+      const block = await recallFromHistory(dex.invoke.bind(dex), `what did we talk about ${q}`, { max: 10 });
+      return block || `Nothing about "${q}" in the saved conversations.`;
+    }
     case 'open_app': {
       const app = String(args.app ?? '').trim();
       if (!app) return 'No app specified.';
@@ -365,8 +384,8 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   const messages: ChatMessage[] = [...(opts.history ?? [])];
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
-    web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
-    find_files: 4, find_context: 4, list_projects: 2, read_file: 6, write_file: 3, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
+    web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1, system_processes: 3,
+    find_files: 4, find_context: 4, recall_conversations: 3, list_projects: 2, read_file: 6, write_file: 3, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
     schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
     run_command: 3, command_status: 6, cancel_command: 2,
   });

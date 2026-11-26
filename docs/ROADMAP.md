@@ -1,5 +1,32 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-25, second batch) — owner list: UKI history/voice/philosophy, dock tuck, Home menu, licence, Terminal
+> macOS/Linux commands, Task Manager graphs, Notes Word features.** Done on `claude/main-ci-fix-uki`: unlimited UKI history in
+> her app + recall; British female voice + speed; philosophy + Ada Lovelace character + creator known (said only when asked);
+> Dock/orb tuck into the four walls; Home right-click menus; DEX is paid (README/PRICING/TERMS/PRIVACY, Terms v3 re-accept);
+> PowerShell sessions accept ls -la / rm -rf / grep / head / tail / which / touch / open / pbcopy (terminal_compat.rs, tested
+> in real PowerShell); Task Manager hover readout, now/avg/peak/low, collapsible rail and details; Notes export to Word
+> (.docx, no dependency) + superscript/subscript/justify/clear formatting. Store contrast fix (Pill opaque tint).
+> **Media playback (third batch): DONE.** `media_compat.rs` (media:probe/prepare/cacheInfo/clearCache): ffprobe decides
+> direct / remux / transcode; remux copies streams (seconds), transcode -> H.264+AAC or FLAC for lossless audio; cached in
+> <data>/media-cache (20 GB, oldest-first). Gallery, Quick Look, Files preview and Audio fall back automatically; shared
+> MediaScrubber (second-accurate, hover time, buffered, keyboard); Gallery speed control + light-mode-safe controls. Needs
+> system FFmpeg (winget install Gyan.FFmpeg); without it direct formats still stream and others say so.
+> **AXL / Bio / Ledger (fourth batch): DONE for this pass.** Ledger reads OFX/QFX/QBO bank files (ofx.ts -> the existing CSV
+> preview/import; engine test). Bio Studio gains an Align tab (bioAlign.ts: Gotoh affine gaps, global/local, BLOSUM62, worker,
+> text export). AXL exports OBJ and 3MF from one shared tessellation (welded vertices) and saves every export through the native
+> Save dialog in the desktop app (backlog #168 export). Engineering = AXL; no separate app.
+> **Maps + Quick Look (fifth batch): DONE.** Maps: coordinates in search (decimal or DMS, offline), open GPX/KML/GeoJSON tracks
+> (line + waypoints, fit, length), export saved places / track as GPX. Quick Look: folders list their contents, Markdown rendered
+> (sanitised), CSV/TSV as a table, big text cut at 200 KB, all media types, click-to-zoom images, Open / Show in Explorer.
+> Shared downloadText/downloadBlob now use the native Save dialog in the desktop app (Bio, Maps, Presentation, Spatial exports).
+> **Pill sweep + loading (sixth batch): DONE.** 40 square-cornered buttons/chips/toggles in 18 non-creative files are pills (list
+> rows and full-width controls left alone). Boot splash (pure CSS on the empty #root: DEX wordmark + pill bar, fades in after
+> 250 ms). Opening an app: its icon tile, "Opening <name>", milestone, sweeping pill bar, 120 ms delay (AppOpening).
+> **Not done (owner list):** further AXL/Bio/Ledger depth (e.g. multi-currency, MSA/BLAST-style search, B-rep solids); Gallery grid thumbnails for non-direct
+> video formats; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
+> surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.
+
 > **GOAL (2026-11-25) — Owner: "users still complain: Terminal, coding in DEX Code, UKI files in and out + indexing,
 > system-wide shortcuts with real behaviour, pill UI".** Done on `claude/main-ci-fix-uki`:
 > - **System-wide shortcuts: REAL.** `src-tauri/src/global_hotkeys.rs` registers keys with Windows (`RegisterHotKey`

@@ -6,6 +6,7 @@
 // import. Duplicates (already in the ledger) are detected and left unticked.
 // A backup is made automatically right before the import.
 
+import { isOfxFile, parseOfx, ofxToCsv } from './ofx';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ledger, type CsvMapping, type CsvPreview } from './ledgerApi';
 import { formatDate, localeDateOrder, localeDecimalSeparator } from './money';
@@ -40,7 +41,15 @@ export const ImportDialog: React.FC<{ initialAccountId: number | null; onClose: 
     try {
       const f = await ledger.openCsv();
       if (f.canceled || f.content === undefined) return;
-      setFile({ name: f.name || 'file.csv', content: f.content });
+      const name = f.name || 'file.csv';
+      if (isOfxFile(name, f.content)) {
+        // OFX / QFX / QBO: read the statement, then use the same CSV preview and import.
+        const st = parseOfx(f.content);
+        if (!st.transactions.length) { setError('No transactions were found in this bank file.'); return; }
+        setFile({ name, content: ofxToCsv(st) });
+      } else {
+        setFile({ name, content: f.content });
+      }
       setMapping(null);
     } catch (e) { setError(errText(e)); }
   };
@@ -94,7 +103,7 @@ export const ImportDialog: React.FC<{ initialAccountId: number | null; onClose: 
       }>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <Field label="Into account"><div style={{ width: 220 }}><AccountSelect value={accountId} onChange={setAccountId} accounts={active} ariaLabel="Account to import into" /></div></Field>
-        <Btn variant={file ? 'default' : 'primary'} icon="file-text" onClick={choose}>{file ? 'Choose another file…' : 'Choose CSV file…'}</Btn>
+        <Btn variant={file ? 'default' : 'primary'} icon="file-text" onClick={choose}>{file ? 'Choose another file…' : 'Choose CSV or OFX file…'}</Btn>
         {file && <span className="lg-muted" style={{ paddingBottom: 6 }}>{file.name}</span>}
       </div>
       {!file && <div className="lg-muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>Export a CSV from your bank's website or app, then choose it here. DEX reads the file on this computer only; nothing is sent anywhere.</div>}

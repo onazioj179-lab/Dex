@@ -1,0 +1,46 @@
+{
+  "scale": 10,
+  "at": "2026-11-26T03:03:39.502Z",
+  "sequentialRunMs": {
+    "p50": 2.098500000000058,
+    "p95": 5.29280000000017,
+    "max": 35.273699999999735
+  },
+  "modelCallsPerRun": 3,
+  "concurrent": {
+    "runs": 600,
+    "totalMs": 1378.0006999999987
+  },
+  "hostile_garbage_ms": 0,
+  "hostile_unknownTool_ms": 0,
+  "hostile_hugeArgs_ms": 25,
+  "hostile_endlessTools_ms": 0,
+  "hostile_empty_ms": 0,
+  "cancelStorm": {
+    "runs": 300,
+    "settleMs": 364
+  },
+  "rankHitsMs": {
+    "hits": 200000,
+    "ms": 520
+  },
+  "recallMs": 37,
+  "corePromptChars": 2228,
+  "corpus": {
+    "cases": 20,
+    "misses": []
+  },
+  "summarizeMs": {
+    "sentences": 20000,
+    "ms": 116
+  },
+  "pickVoiceMs": 0.076,
+  "nativeChatStore": {
+    "messages": 100000,
+    "insertMs": 16778,
+    "loadConversationMs": 11,
+    "listMs": 2,
+    "searchMs": 115,
+    "build": "debug"
+  }
+}

@@ -10,6 +10,7 @@
  * Renders centered preview panel with backdrop blur.
  */
 
+import { PlayableVideo, PlayableAudio } from '../components/media/PlayableMedia';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { isReduceMotion } from '../utils/MotionController';
 import { analyzeBeats, analyzeKey, analyzeLoudness, analyzeSilence } from '../services/media/analyzeBeats';
@@ -18,7 +19,7 @@ import { analyzeBeats, analyzeKey, analyzeLoudness, analyzeSilence } from '../se
 // TYPES
 // ---------------------------------------------------------------------------
 
-export type QuickLookItemType = 'note' | 'image' | 'video' | 'audio' | 'code' | 'folder' | 'task' | 'contact' | 'pdf' | 'unknown';
+export type QuickLookItemType = 'note' | 'image' | 'video' | 'audio' | 'code' | 'markdown' | 'table' | 'folder' | 'task' | 'contact' | 'pdf' | 'unknown';
 
 export interface QuickLookItem {
   type: QuickLookItemType;
@@ -27,7 +28,59 @@ export interface QuickLookItem {
   content: string;
   /** Source element bounding rect for animation origin */
   originRect?: DOMRect | null;
+  /** The file on disk, when there is one: enables Open and Show in Explorer. */
+  path?: string;
+  /** One line under the preview (e.g. "Showing the first 200 KB of 4.1 MB"). */
+  note?: string;
 }
+
+/** Minimal CSV/TSV reader for the table preview (quotes, escaped quotes, CRLF). */
+export function parseDelimited(text: string, delimiter = text.split('\n', 1)[0].includes('\t') ? '\t' : ',', maxRows = 500): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = '', q = false;
+  for (let i = 0; i < text.length && rows.length < maxRows; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c;
+    } else if (c === '"' && cell === '') q = true;
+    else if (c === delimiter) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  if ((cell || row.length) && rows.length < maxRows) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+const qlPill: React.CSSProperties = {
+  height: 24, padding: '0 10px', borderRadius: 9999, border: 'none', cursor: 'pointer',
+  background: 'var(--color-bg-hover)', color: 'var(--color-text-secondary)', fontSize: 11.5, fontWeight: 600,
+};
+
+function revealOrOpen(channel: 'shell:openPath' | 'shell:showItemInFolder', path: string): void {
+  const dex = (window as unknown as { dex?: { invoke?: (c: string, ...a: unknown[]) => Promise<unknown> } }).dex;
+  void dex?.invoke?.(channel, path).catch(() => { /* reported by the shell */ });
+}
+
+const ImagePreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  // Click to see actual pixels (scrolls), click again to fit.
+  const [actual, setActual] = useState(false);
+  return (
+    <div style={{ display: 'flex', alignItems: actual ? 'flex-start' : 'center', justifyContent: actual ? 'flex-start' : 'center', minHeight: 200, maxHeight: '65vh', overflow: actual ? 'auto' : 'hidden' }}>
+      <img
+        src={src}
+        alt={alt}
+        onClick={(e) => { e.stopPropagation(); setActual((v) => !v); }}
+        style={actual
+          ? { maxWidth: 'none', cursor: 'zoom-out' }
+          : { maxWidth: '100%', maxHeight: '60vh', borderRadius: 6, objectFit: 'contain', cursor: 'zoom-in' }}
+      />
+    </div>
+  );
+};
 
 interface QuickLookProps {
   item: QuickLookItem | null;
@@ -140,11 +193,18 @@ export const QuickLook: React.FC<QuickLookProps> = ({
               {currentItem.title}
             </span>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {currentItem.path && (
+            <>
+              <button type="button" onClick={() => revealOrOpen('shell:openPath', currentItem.path!)} style={qlPill}>Open</button>
+              <button type="button" onClick={() => revealOrOpen('shell:showItemInFolder', currentItem.path!)} style={qlPill}>Show in Explorer</button>
+            </>
+          )}
           <button
             onClick={onDismiss}
             aria-label="Close preview"
             style={{
-              width: 24, height: 24, borderRadius: 4,
+              width: 24, height: 24, borderRadius: 9999,
               background: 'var(--color-bg-hover)',
               border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -158,6 +218,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
               <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
             </svg>
           </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -168,6 +229,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
           minHeight: 200,
         }}>
           <QuickLookContent item={currentItem} />
+          {currentItem.note && <div style={{ marginTop: 'var(--space-2)', fontSize: 11, color: 'var(--color-text-muted)' }}>{currentItem.note}</div>}
         </div>
 
         {/* Navigation hint */}
@@ -252,19 +314,29 @@ const AudioAnalysis: React.FC<{ source: string }> = ({ source }) => {
 const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
   switch (item.type) {
     case 'image':
+      return <ImagePreview src={item.content} alt={item.title} />;
+
+    case 'markdown':
+      // Sanitised HTML from the host (Notes' Markdown parser + DOMPurify).
+      return <div className="dex-ql-markdown" style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--color-text-primary)' }} dangerouslySetInnerHTML={{ __html: item.content }} />;
+
+    case 'table': {
+      const rows = parseDelimited(item.content);
+      if (!rows.length) return <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>The file is empty.</div>;
+      const [head, ...body] = rows;
       return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-          <img
-            src={item.content}
-            alt={item.title}
-            style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 6, objectFit: 'contain' }}
-          />
+        <div style={{ overflow: 'auto', maxHeight: '62vh', borderRadius: 10, boxShadow: 'inset 0 0 0 1px var(--color-border-subtle)' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: 12, fontVariantNumeric: 'tabular-nums', width: 'max-content', minWidth: '100%' }}>
+            <thead><tr>{head.map((h, i) => <th key={i} style={{ position: 'sticky', top: 0, background: 'var(--color-bg-elevated)', textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--color-border)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
+            <tbody>{body.map((r, i) => <tr key={i}>{head.map((_, j) => <td key={j} style={{ padding: '5px 10px', borderBottom: '1px solid var(--color-border-subtle)', whiteSpace: 'nowrap', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r[j] ?? ''}</td>)}</tr>)}</tbody>
+          </table>
         </div>
       );
+    }
 
     case 'video':
       return (
-        <video
+        <PlayableVideo
           src={item.content}
           controls
           autoPlay
@@ -276,7 +348,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <audio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} />
+          <PlayableAudio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} wrapperStyle={{ width: '100%', maxWidth: 400 }} />
           <AudioAnalysis source={item.content} />
         </div>
       );
@@ -299,17 +371,24 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
         </div>
       );
 
-    case 'folder':
+    case 'folder': {
+      // The host sends the folder's entries as JSON ([{ name, isDirectory }]); plain lines still work.
+      let entries: Array<{ name: string; isDirectory?: boolean }> = [];
+      try { const v = JSON.parse(item.content); if (Array.isArray(v)) entries = v; } catch { entries = item.content.split('\n').filter(Boolean).map((name) => ({ name })); }
+      if (!entries.length) return <div style={{ color: 'var(--color-text-muted)', fontSize: 13, padding: 'var(--space-4)' }}>This folder is empty.</div>;
       return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 'var(--space-3)' }}>
-          {item.content.split('\n').filter(Boolean).map((name, i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)', maxHeight: '62vh', overflow: 'auto' }}>
+          {entries.map((e, i) => (
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 'var(--space-2)' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', wordBreak: 'break-all' }}>{name}</span>
+              {e.isDirectory
+                ? <svg width="28" height="28" viewBox="0 0 24 24" fill="color-mix(in srgb, var(--color-accent) 22%, transparent)" stroke="var(--color-accent)" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+              <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.3 }}>{e.name}</span>
             </div>
           ))}
         </div>
       );
+    }
 
     case 'task':
       return (
@@ -368,6 +447,9 @@ const TypeIcon: React.FC<{ type: QuickLookItemType }> = ({ type }) => {
       return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3V9z"/></svg>;
     case 'audio':
       return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+    case 'table':
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>;
+    case 'markdown':
     case 'note':
       return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
     case 'code':

@@ -9,6 +9,8 @@
  * Clean audio player with playlist
  */
 
+import { MediaScrubber } from '../components/media/MediaScrubber';
+import { preparePlayable, needsPreparing, localPathOf } from '../services/media/playableMedia';
 import { toMediaUrl } from '../utils/mediaUrl';
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
@@ -53,7 +55,8 @@ interface Playlist {
 }
 
 // Accepted audio MIME types and extensions
-const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.wma', '.opus', '.webm']);
+// Every common audio type; the ones WebView2 cannot decode are prepared once natively (media_compat.rs).
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.oga', '.aac', '.m4a', '.wma', '.opus', '.webm', '.aiff', '.aif', '.ape', '.alac', '.wv', '.ac3', '.dts', '.mka', '.amr', '.mp2', '.tta']);
 const isAudioFile = (name: string) => AUDIO_EXTENSIONS.has(name.slice(name.lastIndexOf('.')).toLowerCase());
 
 // ===========================================================================
@@ -260,6 +263,8 @@ export const Audio: React.FC = () => {
   // `loadError` surfaces a 404 / decode failure instead of a silent "playing".
   const [isBuffering, setIsBuffering] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Percent while a track in a format WebView2 cannot decode is being prepared, else null.
+  const [preparePct, setPreparePct] = useState<number | null>(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -872,14 +877,33 @@ export const Audio: React.FC = () => {
           mainGain.gain.setValueAtTime(target, now);
         }
       }
-      audioRef.current.src = src;
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        setIsPlaying(false);
-        setIsBuffering(false);
-        setLoadError('Could not play this track');
-      });
+      const el = audioRef.current;
+      const localPath = localPathOf(src);
+      const start = (url: string, prepared: boolean) => {
+        el.src = url;
+        el.play().then(() => { setIsPlaying(true); setPreparePct(null); }).catch(() => {
+          // A file WebView2 cannot decode (WMA, APE, ALAC, AC-3 ...): prepare it once, then play.
+          if (!prepared && localPath) { void prepareAndStart(localPath); return; }
+          setIsPlaying(false);
+          setIsBuffering(false);
+          setPreparePct(null);
+          setLoadError('Could not play this track');
+        });
+      };
+      const prepareAndStart = async (path: string) => {
+        setPreparePct(0);
+        try {
+          const url = await preparePlayable(path, (pct) => setPreparePct(pct));
+          if (audioRef.current === el) start(url, true);
+        } catch (e) {
+          setPreparePct(null);
+          setIsBuffering(false);
+          setIsPlaying(false);
+          setLoadError((e as Error).message || 'Could not play this track');
+        }
+      };
+      if (localPath && needsPreparing(localPath)) void prepareAndStart(localPath);
+      else start(src, false);
     } else {
       setIsBuffering(false);
       setIsPlaying(true);
@@ -1401,7 +1425,7 @@ export const Audio: React.FC = () => {
             { label: 'Visualizer', fn: () => setShowVisualizer(v => !v), active: showVisualizer },
             { label: 'Crossfade', fn: () => setShowCrossfadeSettings(v => !v), active: showCrossfadeSettings },
           ].map(b => (
-            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
+            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
           ))}
           {/* Sleep Timer */}
           <select
@@ -1686,24 +1710,26 @@ export const Audio: React.FC = () => {
             <div style={styles.progressSection}>
               <span style={styles.progressTime}>{formatTime(Math.floor(currentTime))}</span>
               <div style={styles.progressBar}>
-                <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', height: 4, background: 'var(--color-border)', borderRadius: 2, pointerEvents: 'none' }} />
                 {/* A-B loop region highlight on the track */}
                 {abA !== null && (duration || 0) > 0 && (
                   <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', height: 6, left: `${(abA / (duration || 1)) * 100}%`, width: `${(((abB ?? abA) - abA) / (duration || 1)) * 100}%`, minWidth: abB !== null ? 0 : 2, background: 'color-mix(in srgb, var(--color-accent) 35%, transparent)', borderRadius: 2, pointerEvents: 'none' }} />
                 )}
-                <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: `${progress}%`, ...styles.progressFill }} />
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={progress}
-                  onChange={(e) => seekTo(parseInt(e.target.value))}
-                  aria-label="Seek track position"
-                  style={styles.progressInput}
+                {/* Second-accurate scrubber (the old 0-100 slider moved 72 s per step on a 2-hour file). */}
+                <MediaScrubber
+                  label="Seek track position"
+                  current={currentTime}
+                  duration={duration || currentTrack.duration || 0}
+                  buffered={(() => { const a = audioRef.current; return a && a.buffered.length ? a.buffered.end(a.buffered.length - 1) : 0; })()}
+                  onSeek={(t) => { if (audioRef.current) audioRef.current.currentTime = t; setCurrentTime(t); }}
                 />
               </div>
               <span style={styles.progressTime}>{formatTime(Math.floor(duration || currentTrack.duration))}</span>
             </div>
+            {preparePct !== null && (
+              <div role="status" style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                Preparing this format for playback{preparePct > 0 ? ` · ${Math.round(preparePct)}%` : '…'} (once; instant next time)
+              </div>
+            )}
 
             {/* Speed + A-B repeat row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>

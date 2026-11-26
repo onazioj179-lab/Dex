@@ -967,7 +967,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
               minWidth: 120,
               zIndex: 'var(--z-max)',
             }}>
-              {['markdown', 'html', 'txt', 'json'].map(fmt => (
+              {['docx', 'markdown', 'html', 'txt', 'json'].map(fmt => (
                 <div
                   key={fmt}
                   style={{
@@ -980,7 +980,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                   onMouseEnter={e => (e.currentTarget.style.background = colors.bgHover)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  Export as .{fmt}
+                  {fmt === 'docx' ? 'Export as Word (.docx)' : `Export as .${fmt}`}
                 </div>
               ))}
               <div style={{ height: 1, background: colors.border, margin: '4px 0' }} />

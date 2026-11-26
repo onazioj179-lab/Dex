@@ -1,9 +1,9 @@
 # DEX Privacy Policy
 
-Effective date: 2026-11-04
+Effective date: 2026-11-25
 Contact: onazi75@gmail.com
 
-DEX is a desktop environment that runs on your computer. It is free, has no advertising and needs no account. This policy describes what DEX stores, what it sends and when, and the controls you have. It reflects what the software does in version 7.0.1.
+DEX is a desktop environment that runs on your computer. It has no advertising and needs no account. This policy describes what DEX stores, what it sends and when, and the controls you have. It reflects what the software does in version 7.0.1.
 
 ## 1. The short version
 

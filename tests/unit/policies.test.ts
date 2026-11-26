@@ -18,7 +18,7 @@ import { POLICY_DOCUMENTS, getPolicyDocument } from '../../src/shared/policyDocu
 describe('DEX policy metadata', () => {
   it('declares required terms and privacy policies', () => {
     expect(REQUIRED_POLICY_SLUGS).toEqual(['terms', 'privacy']);
-    expect(getRequiredPolicyVersions()).toMatchObject({ terms: '2.3.0', privacy: '3.0.0' });
+    expect(getRequiredPolicyVersions()).toMatchObject({ terms: '3.0.0', privacy: '3.0.0' });
   });
 
   it('keeps every metadata entry backed by bundled policy text', () => {

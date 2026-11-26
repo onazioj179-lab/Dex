@@ -566,7 +566,7 @@ const S: Record<string, React.CSSProperties> = {
   subtle: { fontSize: 11, color: 'var(--color-text-tertiary)', fontWeight: 400 },
   caption: { margin: 0, fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.45 },
   empty: { margin: 0, padding: '6px 0', fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 },
-  btn: { height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' },
+  btn: { height: 26, padding: '0 10px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' },
   segment: { display: 'inline-flex', padding: 2, gap: 2, borderRadius: 9999, background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border-subtle)' },
   segBtn: { height: 22, padding: '0 10px', borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
   segBtnOn: { background: 'var(--color-accent)', color: 'var(--color-text-on-accent, #fff)' },

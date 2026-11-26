@@ -21,9 +21,10 @@ import {
   type AppActionSpec,
 } from '../../shared/uki/appActions';
 import type { ToolSpec } from '../../shared/uki/toolValidation';
-import { useRunningApps } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { xackRequest, xackDecide, xackBegin, xackFinish, xackRegister, type XackClass } from './xack';
 import { requestApproval } from './approvals';
+import { announceUkiActivity, activityLabel, waitFor } from './activity';
 
 const registry = createAppActionRegistry();
 
@@ -171,6 +172,30 @@ export function unregisterUkiAppAction(id: string): void {
   unregisterAppAction(registry, id);
 }
 
+function appDisplayName(appId: string): string {
+  try { return APP_DEFINITIONS[appId as keyof typeof APP_DEFINITIONS]?.name ?? appId; } catch { return appId; }
+}
+
+/** Open an app UKI needs. False when no such app exists. */
+function openAppForUki(appId: string): boolean {
+  try {
+    const def = APP_DEFINITIONS[appId as keyof typeof APP_DEFINITIONS];
+    if (!def) return false;
+    useRunningApps.getState().launchApp({ id: appId as never, name: def.name, icon: def.icon || appId, color: def.color ?? 'var(--color-accent)' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Bring an open app to the front so the user sees UKI's change happen. */
+function bringAppForward(appId: string): void {
+  try {
+    const st = useRunningApps.getState();
+    if (st.currentAppId !== appId) st.setCurrentApp(appId as never);
+  } catch { /* store not ready */ }
+}
+
 function runningAppIds(): Set<string> {
   try {
     const ids = new Set(useRunningApps.getState().runningApps.map((a) => a.id));
@@ -225,7 +250,16 @@ export async function runUkiAction(
   /** preApproved: the user approved this exact call ahead of time (a scheduled task). */
   opts: { preApproved?: boolean } = {},
 ): Promise<string> {
-  const entry = getAppAction(registry, id);
+  let entry = getAppAction(registry, id);
+  // The app is not open: open it for her and wait until it offers the action,
+  // instead of answering "open it first".
+  if (!entry) {
+    const appId = id.split('.')[0];
+    if (appId && openAppForUki(appId)) {
+      await waitFor(() => !!getAppAction(registry, id), 6000);
+      entry = getAppAction(registry, id);
+    }
+  }
   if (!entry) return `Unknown app action "${id}".`;
   const redacted = redactArgs(args);
   if (!runningAppIds().has(entry.appId)) {
@@ -285,14 +319,22 @@ export async function runUkiAction(
     }
     execId = b.execId;
   }
+  // Work where the user can see it: a change brings the app to the front, and
+  // the activity pill says what she is doing.
+  const appName = appDisplayName(entry.appId);
+  const label = activityLabel(entry.spec.description);
+  if (entry.spec.mutates) bringAppForward(entry.appId);
+  const activityId = announceUkiActivity({ appId: entry.appId, appName, label, phase: 'start' });
   try {
     const out = await entry.handler(args);
+    announceUkiActivity({ id: activityId, appId: entry.appId, appName, label, phase: 'done' });
     const text = typeof out === 'string' && out.trim() ? out : 'Done.';
     const result = entry.spec.mutates && opts.preApproved ? `${text} (approved when scheduled)` : text;
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'ran', result });
     if (execId) void xackFinish(execId, 'ran', result);
     return result;
   } catch (e) {
+    announceUkiActivity({ id: activityId, appId: entry.appId, appName, label, phase: 'failed', detail: (e as Error)?.message });
     const result = `Action "${id}" failed: ${(e as Error)?.message || 'error'}`;
     recordAudit({ id, appId: entry.appId, mutates: entry.spec.mutates, args: redacted, outcome: 'failed', result });
     if (execId) void xackFinish(execId, 'failed', result);

@@ -830,7 +830,7 @@ export const NotificationCenter: React.FC<{
             <button
               onClick={onClose}
               style={{
-                width: 22, height: 22, borderRadius: 4, border: 'none',
+                width: 22, height: 22, borderRadius: 9999, border: 'none',
                 background: 'var(--color-bg-hover)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--color-text-tertiary)',

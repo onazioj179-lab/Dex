@@ -22,6 +22,7 @@ import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
 import { DexSearchInput } from '../styles/components';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
+import { BrowserProxyPanel } from './settingsPanels/BrowserProxyPanel';
 import { DexSwitch, CAPSULE_SELECTED_BG, SegmentedControl } from '../components/controls';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
@@ -59,6 +60,7 @@ import { PermissionsPanel, SnapLayoutsPanel, CreatorAccessPanel } from './settin
 import DeveloperSection from './settingsPanels/DeveloperSection';
 import StoragePanel from './settingsPanels/StoragePanel';
 import GlobalShortcutsPanel from './settingsPanels/GlobalShortcutsPanel';
+import { pickUkiVoice, DEFAULT_RATE } from '../uki/voice';
 import { SpatialDesktopPanel } from './settingsPanels/SpatialDesktopPanel';
 import { TouchInputPanel } from './settingsPanels/TouchInputPanel';
 import { UmariFoldersSection } from './settingsPanels/UmariFoldersSection';
@@ -361,7 +363,7 @@ const SystemMonitorPanel: React.FC = () => {
         <button
           type="button"
           onClick={open}
-          style={{ height: 28, padding: '0 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+          style={{ height: 28, padding: '0 12px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
         >Open Task Manager</button>
       </div>
     </div>
@@ -717,7 +719,7 @@ const DEFAULT_SETTINGS = {
   // UKI Voice (TTS) preferences -- default to a female voice when available
   ukiVoiceGender: 'female' as 'female' | 'male' | 'auto',
   ukiVoiceURI: '' as string,
-  ukiVoiceRate: 1.0,
+  ukiVoiceRate: DEFAULT_RATE,
   ukiVoicePitch: 1.0,
   ukiVoiceVolume: 1.0,
 
@@ -846,24 +848,8 @@ export function pickPreferredVoice(
   voices: SpeechSynthesisVoice[],
   prefs: { gender?: 'female' | 'male' | 'auto'; voiceURI?: string; locale?: string },
 ): SpeechSynthesisVoice | null {
-  if (!voices.length) return null;
-  if (prefs.voiceURI) {
-    const exact = voices.find(v => v.voiceURI === prefs.voiceURI);
-    if (exact) return exact;
-  }
-  const localePrefix = (prefs.locale && prefs.locale !== 'auto')
-    ? prefs.locale.toLowerCase()
-    : (typeof navigator !== 'undefined' ? navigator.language.toLowerCase() : 'en');
-  const localeMatches = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(localePrefix.slice(0, 2)));
-  const pool = localeMatches.length ? localeMatches : voices;
-  if (prefs.gender && prefs.gender !== 'auto') {
-    const hit = pool.find(v => classifyVoiceGender(v) === prefs.gender);
-    if (hit) return hit;
-  }
-  // Default preference: female voice if available
-  const female = pool.find(v => classifyVoiceGender(v) === 'female');
-  if (female) return female;
-  return pool[0] ?? null;
+  // Same choice UKI makes when she speaks (uki/voice.ts): a British woman by default.
+  return pickUkiVoice(voices, { gender: prefs.gender, voiceURI: prefs.voiceURI });
 }
 
 const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, setSettings, renderSelect }) => {
@@ -993,7 +979,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
           disabled={!ttsAvailable || previewing}
           aria-label="Preview UKI voice"
           style={{
-            padding: '6px 14px', borderRadius: 6, fontSize: 12,
+            padding: '6px 14px', borderRadius: 9999, fontSize: 12,
             border: '1px solid var(--color-border)',
             background: previewing ? 'var(--color-bg-active)' : 'var(--color-bg-hover)',
             color: 'var(--color-text-primary)', cursor: ttsAvailable ? 'pointer' : 'not-allowed',
@@ -1128,7 +1114,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
         onClick={handleClear}
         disabled={busy || !stats || stats.archiveCount === 0}
         style={{
-          padding: '4px 10px', borderRadius: 4, fontSize: 11,
+          padding: '4px 10px', borderRadius: 9999, fontSize: 11,
           border: '1px solid var(--color-border)',
           background: 'var(--color-bg-hover)',
           color: 'var(--color-text-secondary)',
@@ -1217,7 +1203,7 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
           onClick={handleRun}
           disabled={busy}
           style={{
-            padding: '4px 10px', borderRadius: 4, fontSize: 11,
+            padding: '4px 10px', borderRadius: 9999, fontSize: 11,
             border: '1px solid var(--color-border)',
             background: 'var(--color-bg-hover)',
             color: 'var(--color-text-secondary)',
@@ -3500,6 +3486,7 @@ export const Settings: React.FC = () => {
       {renderToggle('blockTrackers', 'Block Trackers', 'Block known cross-site trackers')}
       {renderToggle('blockAds', 'Block Ads', 'Block known ad servers')}
       {renderToggle('forceHttps', 'Force HTTPS', 'Upgrade http:// pages to https://')}
+      <BrowserProxyPanel styles={styles} />
 
       <h3 style={styles.sectionTitle}>Search</h3>
       {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [

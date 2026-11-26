@@ -41,7 +41,7 @@ import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
-import { normalizeAddress } from '../services/browserAddress';
+import { normalizeAddress, stripTrackingParams } from '../services/browserAddress';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../services/appIntents';
 import { dexConfirm, dexPrompt } from '../components/dexConfirm';
@@ -1817,7 +1817,8 @@ ${text}
       toast.error(resolved.reason);
       return;
     }
-    let finalUrl = resolved.url;
+    // Tracking tags (utm_*, fbclid, gclid …) never reach the site.
+    let finalUrl = stripTrackingParams(resolved.url);
 
     // Local dev servers and LAN devices are plain http; don't force https on them.
     if (!/^http:\/\/(localhost|127\.|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(finalUrl)) finalUrl = upgradeToHttps(finalUrl);
@@ -2334,7 +2335,7 @@ ${text}
             style={{
               background: 'transparent', border: 'none', color: 'var(--color-text-secondary)',
               cursor: currentTab?.url ? 'pointer' : 'not-allowed', fontSize: 11, minWidth: 34,
-              padding: '3px 2px', borderRadius: 4,
+              padding: '3px 2px', borderRadius: 9999,
             }}
             onClick={() => adjustZoom('reset')}
             disabled={!currentTab?.url}
@@ -3701,7 +3702,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   downloadBtn: {
     padding: '2px 8px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
-    borderRadius: 6, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
+    borderRadius: 9999, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
   },
   errorBtnAlt: {
     padding: 'var(--space-2) 18px',

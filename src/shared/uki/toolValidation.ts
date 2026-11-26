@@ -35,8 +35,10 @@ export const KNOWN_TOOLS = [
   'notify',
   'get_context',
   'list_apps',
+  'system_processes',
   'find_files',
   'find_context',
+  'recall_conversations',
   'list_projects',
   'read_file',
   'write_file',
@@ -121,6 +123,20 @@ export const CORE_TOOLS: ToolSpec[] = [
     description: "search the user's files (Documents, Desktop, Downloads) by name or content; returns full paths.",
     args: [{ name: 'query', type: 'string' }],
     example: '{"query": "budget 2026"}',
+  },
+  {
+    name: 'system_processes',
+    argline: '{"by"?: "cpu" | "memory", "name"?: string}',
+    description: "see every running process on this PC (all of them, summarised: totals, the programs using the most CPU or memory, background vs windowed). With name, check whether a program is running and get its PIDs. Read-only.",
+    args: [{ name: 'by', type: 'string', optional: true }, { name: 'name', type: 'string', optional: true }],
+    example: '{"by": "cpu"}',
+  },
+  {
+    name: 'recall_conversations',
+    argline: '{"query": string}',
+    description: "search the user's saved conversations with UKI (unlimited history, all sessions) for a topic; use it when the user mentions an earlier chat, asks what was said before, or asks you to continue earlier work.",
+    args: [{ name: 'query', type: 'string' }],
+    example: '{"query": "trip to Lagos budget"}',
   },
   {
     name: 'find_context',
@@ -249,6 +265,11 @@ export function exampleFor(name: ToolName): string {
 export type ValidationResult = { ok: true } | { ok: false; error: string };
 
 /** Core validator shared by the typed path and the catalog. */
+/** Longest string a core tool accepts (queries, paths, commands, titles). */
+export const MAX_STRING_ARG = 8_000;
+/** write_file content. */
+export const MAX_CONTENT_ARG = 2_100_000;
+
 function validateAgainstSpecs(
   name: string,
   args: Record<string, unknown>,
@@ -269,6 +290,13 @@ function validateAgainstSpecs(
       }
       if (!spec.optional && v.trim() === '') {
         return { ok: false, error: `${name} argument "${spec.name}" must not be empty.${reissue}` };
+      }
+      // A runaway model can emit megabytes in one argument; it must not reach the
+      // network (a 200 KB web_search query took 2 s) or the shell. Only a file's
+      // content may be large (write_file checks its own 2 MB limit).
+      const max = spec.name === 'content' ? MAX_CONTENT_ARG : MAX_STRING_ARG;
+      if (v.length > max) {
+        return { ok: false, error: `${name} argument "${spec.name}" is too long (${v.length.toLocaleString()} characters; the limit is ${max.toLocaleString()}). Shorten it.${reissue}` };
       }
     }
   }

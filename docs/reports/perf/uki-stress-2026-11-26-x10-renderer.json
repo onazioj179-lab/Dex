@@ -1,0 +1,38 @@
+{
+  "scale": 10,
+  "at": "2026-11-26T02:57:51.219Z",
+  "sequentialRunMs": {
+    "p50": 1.0213999999996304,
+    "p95": 2.249000000000251,
+    "max": 11.237300000000232
+  },
+  "modelCallsPerRun": 3,
+  "concurrent": {
+    "runs": 600,
+    "totalMs": 881.8550999999998
+  },
+  "hostile_garbage_ms": 0,
+  "hostile_unknownTool_ms": 0,
+  "hostile_hugeArgs_ms": 27,
+  "hostile_endlessTools_ms": 0,
+  "hostile_empty_ms": 0,
+  "cancelStorm": {
+    "runs": 300,
+    "settleMs": 301
+  },
+  "rankHitsMs": {
+    "hits": 200000,
+    "ms": 340
+  },
+  "recallMs": 32,
+  "corePromptChars": 2228,
+  "corpus": {
+    "cases": 20,
+    "misses": []
+  },
+  "summarizeMs": {
+    "sentences": 20000,
+    "ms": 117
+  },
+  "pickVoiceMs": 0.08
+}

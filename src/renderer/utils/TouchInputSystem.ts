@@ -9,6 +9,7 @@
 
 import { Z_HELP_OVERLAY_MAX } from '../../shared/zIndex';
 import { MAX_CONTACTS } from '../shell/input/touchContacts';
+import { classifyMultiTouch, type Contact, type MultiKind } from '../shell/input/multiFinger';
 import { initTouchDensity } from './touchDensity';
 
 type GestureType =
@@ -24,7 +25,9 @@ type GestureType =
   | 'three-finger-swipe-down'
   /** One finger from the bottom screen edge upward (iPad / phone home gesture). */
   | 'edge-swipe-up'
-  | 'touch-drag';
+  | 'touch-drag'
+  /** 3-10 fingers: tap, swipe or pinch, decided when the last finger lifts (shell/input/multiFinger.ts). */
+  | 'multi-finger';
 
 type PressureCurvePreset = 'linear' | 'soft' | 'firm';
 
@@ -40,6 +43,9 @@ interface GestureEvent {
    *  a touch surface that handles its own gestures. System gestures (overview,
    *  app switching) should only act when this is true. */
   onDesktop?: boolean;
+  /** multi-finger: how many fingers and what they did. */
+  fingers?: number;
+  kind?: MultiKind;
 }
 
 interface ActivePointer {
@@ -92,6 +98,9 @@ const TAP_COOLDOWN_MS = 150; // Minimum time between taps on same target
 
 class GestureRecognizer {
   private pointers: Map<number, ActivePointer> = new Map();
+  /** Every touch of the current session (first finger down to last finger up), for multi-finger gestures. */
+  private session: Map<number, Contact & { inApp: boolean }> = new Map();
+  private sessionStart = 0;
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
   private lastTapTime = 0;
   private lastTapX = 0;
@@ -196,6 +205,10 @@ class GestureRecognizer {
     if (this.pointers.size === 0) { this.pinchLatched = false; this.swipeUpLatched = false; this.swipeDownLatched = false; this.edgeUpLatched = false; }
     if (!this.pointers.has(e.pointerId) && this.pointers.size >= MAX_CONTACTS) return;
 
+    if (e.pointerType === 'touch') {
+      if (this.session.size === 0) this.sessionStart = Date.now();
+      this.session.set(e.pointerId, { sx: e.clientX, sy: e.clientY, ex: e.clientX, ey: e.clientY, inApp: false });
+    }
     const startEl = e.target as Element | null;
     const pointer: ActivePointer = {
       id: e.pointerId,
@@ -218,6 +231,8 @@ class GestureRecognizer {
     };
 
     this.pointers.set(e.pointerId, pointer);
+    const sess = this.session.get(e.pointerId);
+    if (sess) sess.inApp = pointer.inApp;
     this.notifyContacts();
 
     if (e.pointerType === 'pen') {
@@ -241,6 +256,8 @@ class GestureRecognizer {
 
     pointer.currentX = e.clientX;
     pointer.currentY = e.clientY;
+    const sc = this.session.get(e.pointerId);
+    if (sc) { sc.ex = e.clientX; sc.ey = e.clientY; sc.inApp = pointer.inApp; }
     pointer.pressure = e.pressure;
     pointer.tiltX = e.tiltX;
     pointer.tiltY = e.tiltY;
@@ -403,11 +420,37 @@ class GestureRecognizer {
 
     this.pointers.delete(e.pointerId);
     this.notifyContacts();
+    this.endTouchSession(e);
   };
+
+  /** When the last finger of a touch session lifts, decide whether it was a 3-10 finger gesture. */
+  private endTouchSession(e: PointerEvent, cancelled = false): void {
+    const sc = this.session.get(e.pointerId);
+    if (!sc) return;
+    sc.ex = e.clientX || sc.ex;
+    sc.ey = e.clientY || sc.ey;
+    const touchesLeft = Array.from(this.pointers.values()).some((p) => p.type === 'touch');
+    if (touchesLeft) return;
+    const contacts = Array.from(this.session.values());
+    this.session.clear();
+    if (cancelled || contacts.length < 3) return;
+    const g = classifyMultiTouch(contacts, Date.now() - this.sessionStart);
+    if (!g) return;
+    this.emit({
+      type: 'multi-finger',
+      fingers: g.fingers,
+      kind: g.kind,
+      centerX: contacts.reduce((sum, c) => sum + c.ex, 0) / contacts.length,
+      centerY: contacts.reduce((sum, c) => sum + c.ey, 0) / contacts.length,
+      target: e.target,
+      onDesktop: contacts.every((c) => !c.inApp),
+    });
+  }
 
   private onPointerCancel = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);
     this.notifyContacts();
+    this.endTouchSession(e, true);
     this.clearLongPress();
     if (this.dragState?.active) {
       this.endDrag();

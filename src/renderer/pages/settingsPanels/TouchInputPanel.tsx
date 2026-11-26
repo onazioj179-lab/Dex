@@ -16,6 +16,40 @@ import { DexSwitch, SegmentedControl } from '../../components/controls';
 import { ContactTracker, touchCapabilities, MAX_CONTACTS, type Contact } from '../../shell/input/touchContacts';
 import { hapticSupport, hapticsEnabled, setHapticsEnabled, subscribeHaptics, haptic } from '../../shell/input/haptics';
 import { getDensityChoice, setDensityChoice, subscribeDensity, resolveDensity, type DensityChoice } from '../../utils/touchDensity';
+import { GESTURE_SLOTS, GESTURE_ACTIONS, DEFAULT_GESTURE_MAP, readGestureMap, writeGestureMap, describeSlot, type GestureAction } from '../../shell/input/multiFinger';
+
+/** Settings › Touch & Pen › Multi-finger gestures: what 3-10 finger taps, swipes and pinches do. */
+const MultiFingerGestures: React.FC<{ row: React.CSSProperties; label: React.CSSProperties; desc: React.CSSProperties }> = ({ row, label, desc }) => {
+  const [map, setMap] = useState<Record<string, GestureAction>>(() => readGestureMap());
+  const set = (slot: string, action: GestureAction) => {
+    const next = { ...map, [slot]: action };
+    setMap(next);
+    writeGestureMap(next);
+  };
+  return (
+    <div>
+      <div style={{ ...row, borderBottom: 'none', paddingBottom: 4 }}>
+        <div>
+          <div style={label}>Multi-finger gestures</div>
+          <div style={desc}>Taps, swipes and pinches with 3 to 10 fingers on a touch screen, anywhere in DEX except inside drawing surfaces. Three-finger swipes switch apps and show all windows.</div>
+        </div>
+        <button type="button" onClick={() => { setMap({ ...DEFAULT_GESTURE_MAP }); writeGestureMap({ ...DEFAULT_GESTURE_MAP }); }}
+          style={{ height: 28, padding: '0 12px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+          Restore defaults
+        </button>
+      </div>
+      {GESTURE_SLOTS.map((slot) => (
+        <div key={slot} style={{ ...row, paddingTop: 6, paddingBottom: 6 }}>
+          <div style={{ ...label, fontWeight: 500 }}>{describeSlot(slot)}</div>
+          <select aria-label={`${describeSlot(slot)} does`} value={map[slot] ?? 'none'} onChange={(e) => set(slot, e.target.value as GestureAction)}
+            style={{ height: 28, padding: '0 10px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', fontSize: 12 }}>
+            {GESTURE_ACTIONS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const DENSITY_OPTIONS: Array<{ value: DensityChoice; label: string }> = [
   { value: 'auto', label: 'Automatic' },
@@ -191,6 +225,7 @@ export const TouchInputPanel: React.FC = () => {
           <Switch on={support === 'available' && hapticsOn} disabled={support !== 'available'} label="Haptic feedback" onChange={setHapticsEnabled} />
         </div>
       </div>
+      <MultiFingerGestures row={row} label={label} desc={desc} />
     </div>
   );
 };

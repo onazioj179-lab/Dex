@@ -44,8 +44,8 @@ DEX_REMAINING_WORK.md #201–#208.
 
 ## v7.0.1 — DEX Blue Modern (unreleased)
 
-The full notes are in [DEX_7.0.1_RELEASE_NOTES.md](../DEX_7.0.1_RELEASE_NOTES.md);
-the GitHub release uses that file. Highlights:
+The full notes are in git history (`DEX_7.0.1_RELEASE_NOTES.md`, removed 2026-11-25);
+Highlights:
 
 - System blue is the default accent again, with an Interface Transparency
   slider, blur strength and a Refined or Liquid glass style.

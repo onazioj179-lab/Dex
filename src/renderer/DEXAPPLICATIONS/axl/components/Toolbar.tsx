@@ -14,6 +14,7 @@
 // the menus where they belong.
 // ═══════════════════════════════════════════════════════════════════════════
 
+import type { AxlExportFormat } from '../utils/export';
 import React, { useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ToolMode, PrimitiveType } from '../types';
@@ -46,7 +47,7 @@ const PRIMITIVES: { type: PrimitiveType; label: string; icon: React.ReactNode }[
 const Divider = () => <div style={{ width: 1, height: 16, background: 'var(--color-border-subtle)', margin: '0 4px', flexShrink: 0 }} />;
 
 interface ToolbarProps {
-  onExport: (format: 'stl' | 'dxf' | 'pdf' | 'json' | 'png' | 'gltf') => void;
+  onExport: (format: AxlExportFormat) => void;
   onRunSimulation: () => void;
   onAddFeature: () => void;
   onImport?: () => void;
@@ -241,7 +242,7 @@ const AXLToolbar: React.FC<ToolbarProps> = ({ onExport, onRunSimulation, onAddFe
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /></svg>} />
           )}
           {([
-            ['stl', '3D Print'], ['gltf', 'PBR/Web3D'], ['dxf', 'CNC/CAD'],
+            ['stl', '3D print (mesh)'], ['3mf', '3D print (slicers)'], ['obj', 'Mesh for 3D apps'], ['gltf', 'PBR/Web3D'], ['dxf', 'CNC/CAD'],
             ['pdf', 'Drawing'], ['json', 'Project'], ['png', 'Image'],
           ] as const).map(([fmt, sub]) => (
             <MenuItem key={fmt} onClick={() => onExport(fmt)} label={fmt.toUpperCase()} sub={sub}

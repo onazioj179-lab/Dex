@@ -29,7 +29,7 @@ use crate::paths::DexPaths;
 use crate::util::LockSafe;
 
 /// Bump when docs/TERMS.md changes materially.
-pub const TERMS_VERSION: u32 = 1;
+pub const TERMS_VERSION: u32 = 2;
 /// Bump when docs/PRIVACY.md changes materially.
 pub const PRIVACY_VERSION: u32 = 1;
 /// Bump when the set of required steps changes.

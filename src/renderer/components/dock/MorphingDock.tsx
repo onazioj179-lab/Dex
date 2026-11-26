@@ -25,11 +25,20 @@ import { DEX_APP_DRAG_TYPE } from '../AppMenuPanel';
 import { useDockStore, DOCK_TILE, DOCK_PAD, DOCK_THICKNESS, DOCK_MARGIN, dockReserve } from '../../store/dockStore';
 import { computeWorkArea, isHorizontalDockEdge, placeDock, type WorkArea, type DockEdge } from '../../../shared/shell/workArea';
 import { isReduceMotion, onReduceMotionChange } from '../../utils/MotionController';
+import { slitRect, distanceToRect, SLIT_NEAR } from '../floatingLauncherGeometry';
 import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION, DOCK_POSITIONS, dockPositionAt, type DockPosition } from './dockLayout';
 
 const LONG_PRESS_MS = 500;
 const DRAG_THRESHOLD = 6;
 const AUTO_COLLAPSE_MS = 1200;
+/** Folded and left alone this long (pointer away), the button slides into its wall. */
+const TUCK_AFTER_MS = 1400;
+/** Pointer farther than this from the folded button starts the tuck timer. */
+const TUCK_AWAY_PX = 140;
+const TUCK_PREF_KEY = 'dex-dock-tuck';
+function readTuckPref(): boolean {
+  try { return localStorage.getItem(TUCK_PREF_KEY) !== '0'; } catch { return true; }
+}
 
 /** Top of the content surface = height of the top bar. */
 function measureTopBar(): number {
@@ -180,6 +189,57 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const outer: React.CSSProperties = freeOuter ?? (!vertical
     ? { left: placed.start, [edge]: edge === 'top' ? area.desktop.y + DOCK_MARGIN : DOCK_MARGIN, width: placed.length, height: DOCK_THICKNESS }
     : { top: placed.start, [edge]: DOCK_MARGIN, width: DOCK_THICKNESS, height: placed.length } as React.CSSProperties);
+
+  // --- edge tuck ---------------------------------------------------------------
+  // Folded on an edge and not in use, the button slides into its wall and leaves
+  // a slim rounded slit. The slit grows as the pointer approaches (so it is easy
+  // to find); reaching it, touching it or tabbing to it slides the button out.
+  const [tuckPref, setTuckPref] = useState(readTuckPref);
+  const [tucked, setTucked] = useState(false);
+  const [slitNear, setSlitNear] = useState(false);
+  const dockFocused = () => !!rootRef.current && rootRef.current.contains(document.activeElement);
+  const canTuck = tuckPref && !open && !freePx && !hidden && !menu && !placementPreview && !freePreview;
+  const along = placed.start + placed.length / 2;
+  const slitFor = (near: boolean) => {
+    const r = slitRect(edge, along, vp.w, vp.h, near);
+    // The top wall of the desktop is the bottom of the top bar.
+    return edge === 'top' ? { ...r, top: area.desktop.y } : r;
+  };
+  useEffect(() => { if (!canTuck) { setTucked(false); setSlitNear(false); } }, [canTuck]);
+  useEffect(() => {
+    if (!canTuck) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    const arm = () => { if (!timer) timer = setTimeout(() => { timer = null; if (!dockFocused()) setTucked(true); }, TUCK_AFTER_MS); };
+    const onMove = (e: PointerEvent) => {
+      if (tucked) {
+        const d = distanceToRect(e.clientX, e.clientY, slitFor(true));
+        setSlitNear(d < SLIT_NEAR);
+        if (d <= 4) { setTucked(false); setSlitNear(false); }
+        return;
+      }
+      const r = rootRef.current?.getBoundingClientRect();
+      const d = r ? distanceToRect(e.clientX, e.clientY, { left: r.left, top: r.top, width: r.width, height: r.height }) : 0;
+      if (d > TUCK_AWAY_PX) arm(); else clear();
+    };
+    if (!tucked) arm();
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => { clear(); window.removeEventListener('pointermove', onMove); };
+    // slitFor depends only on the values below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canTuck, tucked, edge, along, vp.w, vp.h, area.desktop.y]);
+  const untuck = (focus = false) => { setTucked(false); setSlitNear(false); if (focus) requestAnimationFrame(() => triggerRef.current?.focus()); };
+  const toggleTuckPref = () => {
+    const next = !tuckPref;
+    setTuckPref(next);
+    try { localStorage.setItem(TUCK_PREF_KEY, next ? '1' : '0'); } catch { /* storage blocked */ }
+  };
+  const isTucked = tucked && canTuck;
+  // Tucked: the folded button sits just past its wall (same left/top/edge
+  // properties the Dock already animates, so it slides rather than jumps).
+  const tuckedOuter: React.CSSProperties = !isTucked ? {} : edge === 'top'
+    ? { top: area.desktop.y - DOCK_THICKNESS - 4 }
+    : { [edge]: -DOCK_THICKNESS - 4 };
 
   // --- collapse rules ---------------------------------------------------------
   const collapse = useCallback((focusTrigger = false) => {
@@ -453,6 +513,7 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
       onClick: () => setPrefs({ edge: position.edge, align: position.align }),
     })),
     { id: 'auto', label: `${autoCollapse ? '✓ ' : ''}Collapse automatically`, onClick: () => useDockStore.getState().setPrefs({ autoCollapse: !autoCollapse }) },
+    { id: 'tuck', label: `${tuckPref ? '✓ ' : ''}Hide in the edge when not in use`, onClick: toggleTuckPref },
   ];
 
   return (
@@ -469,6 +530,8 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
         data-state={open ? 'expanded' : 'collapsed'}
         data-hidden={hidden || undefined}
         onKeyDown={onKeyDown}
+        onFocus={() => { if (tucked) untuck(); }}
+        data-tucked={isTucked || undefined}
         onPointerDown={startPlacementDrag}
         onPointerMove={movePlacementDrag}
         onPointerUp={e => endPlacementDrag(e, true)}
@@ -481,8 +544,12 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
         onDrop={onDrop}
         style={{
           ...outer,
+          ...tuckedOuter,
           borderRadius: open ? 18 : DOCK_THICKNESS / 2,
-          transition: geomTransition,
+          opacity: isTucked ? 0 : undefined,
+          pointerEvents: isTucked ? 'none' : undefined,
+          transition: geomTransition === 'none' ? 'none'
+            : `${geomTransition}, right ${ms}ms ${ease}, bottom ${ms}ms ${ease}, opacity ${reduced ? 0 : 140}ms ease ${isTucked ? Math.round(ms * 0.5) : 0}ms`,
         }}
       >
         <div
@@ -530,6 +597,32 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
           )}
         </div>
       </nav>
+      {canTuck && (() => {
+        const r = slitFor(slitNear);
+        return (
+          <button
+            type="button"
+            className="dex-mdock-slit"
+            data-edge={edge}
+            data-near={slitNear || undefined}
+            data-uki={ukiRing ?? undefined}
+            tabIndex={isTucked ? 0 : -1}
+            aria-hidden={!isTucked || undefined}
+            aria-label="Show the Dock"
+            onPointerDown={e => { e.preventDefault(); untuck(); }}
+            onClick={() => untuck(true)}
+            onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
+            style={{
+              // Anchored with the same properties the Dock uses (bottom/right for
+              // those walls), so both share one containing block.
+              ...(edge === 'bottom' ? { left: r.left, bottom: 0 } : edge === 'right' ? { right: 0, top: r.top } : { left: r.left, top: r.top }),
+              width: r.width, height: r.height,
+              opacity: isTucked ? (slitNear ? 1 : 0.75) : 0,
+              pointerEvents: isTucked ? undefined : 'none',
+            }}
+          />
+        );
+      })()}
       {menu && <ContextMenu items={triggerMenu} position={menu} onClose={() => setMenu(null)} />}
     </>
   );
@@ -596,8 +689,21 @@ const DOCK_CSS = `
 :where(.dex-mdock[data-edge="top"]) :where(.dex-mdock-dot) { top: 1px; left: calc(50% - 2px); }
 :where(.dex-mdock[data-edge="left"]) :where(.dex-mdock-dot) { left: 1px; top: calc(50% - 2px); }
 :where(.dex-mdock[data-edge="right"]) :where(.dex-mdock-dot) { right: 1px; top: calc(50% - 2px); }
+/* The slit a tucked Dock leaves in its wall: a slim, rounded glass handle. */
+:where(.dex-mdock-slit) {
+  position: fixed; z-index: 9000; padding: 0; margin: 0; border: none; border-radius: 9999px; cursor: pointer;
+  touch-action: none; box-sizing: border-box;
+  background: color-mix(in srgb, var(--color-accent) 22%, var(--glass-bg, var(--color-bg-elevated)));
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: left 180ms ease, top 180ms ease, width 180ms ease, height 180ms ease, opacity 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+:where(.dex-mdock-slit)[data-near] {
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--glass-bg, var(--color-bg-elevated)));
+  box-shadow: 0 0 0 1px var(--color-accent), 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+:where(.dex-mdock-slit)[data-uki="working"], :where(.dex-mdock-slit)[data-uki="listening"] { background: var(--color-accent); }
 @media (prefers-reduced-motion: reduce) {
-  :where(.dex-mdock), :where(.dex-mdock) * { transition-duration: 0ms !important; }
+  :where(.dex-mdock), :where(.dex-mdock) *, :where(.dex-mdock-slit) { transition-duration: 0ms !important; }
 }
 `;
 

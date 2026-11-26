@@ -13,6 +13,8 @@
 import { VideoEnhance } from '../components/media/VideoEnhance';
 import { useCreativeInput } from '../services/creativeIntake';
 import { toMediaUrl } from '../utils/mediaUrl';
+import { usePlayableMedia } from '../services/media/playableMedia';
+import { MediaScrubber, PlayableMediaStatus } from '../components/media/MediaScrubber';
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { useAsyncResource } from '../utils/useAsyncResource';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -210,10 +212,11 @@ const ALBUMS: Album[] = [
 // DATA LOADING - Load both pictures AND videos from system
 // ===========================================================================
 
-const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
+// Every common video type: the ones WebView2 cannot decode are prepared for playback (media_compat.rs).
+const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v|mpg|mpeg|ts|mts|m2ts|3gp|ogv|vob|divx|asf|f4v)$/i;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|bmp|webp|svg|tiff|heic|heif)$/i;
 const IMPORT_FILTERS = [
-  { name: 'Photos and videos', extensions: ['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp', 'avif', 'bmp', 'ico', 'mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv'] },
+  { name: 'Photos and videos', extensions: ['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp', 'avif', 'bmp', 'ico', 'mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv', 'avi', 'wmv', 'flv', 'mpg', 'mpeg', 'ts', 'mts', 'm2ts', '3gp', 'vob', 'asf'] },
 ];
 
 interface ImportedMedia {
@@ -1036,6 +1039,26 @@ export const Gallery: React.FC = () => {
   const [videoPlaying, setVideoPlaying] = useState(true);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  // Furthest buffered point and playback speed (0.5x-2x, like a desktop player).
+  const [videoBuffered, setVideoBuffered] = useState(0);
+  const [videoRate, setVideoRate] = useState(1);
+  // Any format: files WebView2 cannot play are prepared natively (media_compat.rs).
+  const playable = usePlayableMedia(selectedMedia?.type === 'video' ? selectedMedia.src : null);
+  const readBuffered = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || !v.buffered.length) return;
+    for (let i = 0; i < v.buffered.length; i++) {
+      if (v.buffered.start(i) <= v.currentTime + 0.5 && v.buffered.end(i) >= v.currentTime) { setVideoBuffered(v.buffered.end(i)); return; }
+    }
+  }, []);
+  const cycleVideoRate = useCallback(() => {
+    const steps = [0.5, 0.75, 1, 1.25, 1.5, 2];
+    setVideoRate((r) => {
+      const next = steps[(steps.indexOf(r) + 1) % steps.length] ?? 1;
+      if (videoRef.current) videoRef.current.playbackRate = next;
+      return next;
+    });
+  }, []);
   const [videoVolume, setVideoVolume] = useState(80);
   const [videoMuted, setVideoMuted] = useState(false);
   const [showVideoControls, setShowVideoControls] = useState(true);
@@ -1930,7 +1953,7 @@ export const Gallery: React.FC = () => {
             { label: 'Compare', fn: () => setShowCompareMode(v => !v), active: showCompareMode },
             { label: 'Slideshow', fn: () => setShowSlideshow(v => !v), active: showSlideshow },
           ].map(b => (
-            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
+            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
           ))}
         </div>
       </div>
@@ -2285,17 +2308,20 @@ export const Gallery: React.FC = () => {
                   >
                     <video
                       ref={videoRef}
-                      src={selectedMedia.src}
+                      src={playable.src}
                       preload="auto"
                       autoPlay
                       onClick={toggleVideoPlay}
-                      onTimeUpdate={handleVideoTimeUpdate}
-                      onLoadedMetadata={handleVideoLoadedMetadata}
+                      onTimeUpdate={() => { handleVideoTimeUpdate(); readBuffered(); }}
+                      onProgress={readBuffered}
+                      onError={playable.onMediaError}
+                      onLoadedMetadata={(e) => { handleVideoLoadedMetadata(); e.currentTarget.playbackRate = videoRate; }}
                       onEnded={() => setVideoPlaying(false)}
                       onPlay={() => setVideoPlaying(true)}
                       onPause={() => setVideoPlaying(false)}
                       style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 10 }}
                     />
+                    <PlayableMediaStatus status={playable.status} percent={playable.percent} error={playable.error} />
                     <VideoEnhance video={videoRef} enabled={enhanceVideo} onActiveChange={setEnhanceActive} />
                     {/* Center play/pause overlay */}
                     {!videoPlaying && (
@@ -2330,31 +2356,20 @@ export const Gallery: React.FC = () => {
                       transition: 'opacity 0.3s ease',
                       pointerEvents: showVideoControls ? 'auto' : 'none',
                     }}>
-                      {/* Progress bar */}
-                      <div style={{ position: 'relative', height: 4, borderRadius: 2, background: 'var(--color-border)', cursor: 'pointer' }}
-                        onClick={e => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          seekVideo(((e.clientX - rect.left) / rect.width) * 100);
-                        }}
-                      >
-                        <div style={{
-                          position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2,
-                          background: 'var(--color-accent-fill)',
-                          width: videoDuration ? `${(videoCurrentTime / videoDuration) * 100}%` : '0%',
-                          transition: 'width 0.1s linear', willChange: 'width',
-                        }} />
-                        <div style={{
-                          position: 'absolute', top: -4, width: 12, height: 12, borderRadius: '50%',
-                          background: '#fff', boxShadow: 'var(--pg-shadow-chip)',
-                          left: videoDuration ? `calc(${(videoCurrentTime / videoDuration) * 100}% - 6px)` : '-6px',
-                          transition: 'left 0.1s linear', opacity: showVideoControls ? 1 : 0,
-                        }} />
-                      </div>
+                      {/* Scrubber: drag to seek, hover for the time, arrows/Home/End */}
+                      <MediaScrubber
+                        tone="overlay"
+                        label="Seek video"
+                        current={videoCurrentTime}
+                        duration={videoDuration}
+                        buffered={videoBuffered}
+                        onSeek={(t) => { if (videoRef.current) videoRef.current.currentTime = t; setVideoCurrentTime(t); }}
+                      />
                       {/* Controls row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                         <button onClick={toggleVideoPlay} style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                          color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center',
+                          color: '#fff', display: 'flex', alignItems: 'center',
                         }} aria-label={videoPlaying ? 'Pause' : 'Play'}>
                           {videoPlaying ? (
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
@@ -2362,18 +2377,24 @@ export const Gallery: React.FC = () => {
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
                           )}
                         </button>
-                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
                           {fmtTime(videoCurrentTime)}
                         </span>
-                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>/</span>
-                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>/</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', minWidth: 36 }}>
                           {fmtTime(videoDuration)}
                         </span>
                         <div style={{ flex: 1 }} />
+                        {/* Playback speed */}
+                        <button onClick={cycleVideoRate} aria-label={`Playback speed ${videoRate}x`} style={{
+                          height: 22, minWidth: 38, padding: '0 8px', borderRadius: 9999, border: 'none', cursor: 'pointer',
+                          background: videoRate === 1 ? 'rgba(255,255,255,0.12)' : 'var(--color-accent)', color: '#fff',
+                          fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                        }}>{videoRate}x</button>
                         {/* Volume */}
                         <button onClick={toggleVideoMute} style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                          color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center',
+                          color: 'rgba(255,255,255,0.82)', display: 'flex', alignItems: 'center',
                         }} aria-label={videoMuted ? 'Unmute' : 'Mute'}>
                           {videoMuted || videoVolume === 0 ? (
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2387,8 +2408,8 @@ export const Gallery: React.FC = () => {
                             </svg>
                           )}
                         </button>
-                        <div style={{ position: 'relative', width: 60, height: 4, borderRadius: 2, background: 'var(--color-border)' }}>
-                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2, background: 'var(--color-text-secondary)', width: `${videoMuted ? 0 : videoVolume}%` }} />
+                        <div style={{ position: 'relative', width: 60, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }}>
+                          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: 2, background: '#fff', width: `${videoMuted ? 0 : videoVolume}%` }} />
                           <input
                             type="range" min="0" max="100" value={videoMuted ? 0 : videoVolume}
                             onChange={e => changeVideoVolume(parseInt(e.target.value))}
@@ -2398,12 +2419,12 @@ export const Gallery: React.FC = () => {
                         </div>
                         {/* PiP */}
                         <button onClick={() => { 
-                          openPiP(selectedMedia.src, selectedMedia.name, selectedMedia.thumbnail);
+                          openPiP(playable.src ?? selectedMedia.src, selectedMedia.name, selectedMedia.thumbnail);
                           videoRef.current?.pause();
                           setSelectedMedia(null);
                         }} style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                          color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center',
+                          color: 'rgba(255,255,255,0.82)', display: 'flex', alignItems: 'center',
                         }} aria-label="Picture in Picture">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <rect x="2" y="3" width="20" height="14" rx="2"/>
@@ -2413,7 +2434,7 @@ export const Gallery: React.FC = () => {
                         {/* Fullscreen */}
                         <button onClick={toggleVideoFullscreen} style={{
                           background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                          color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center',
+                          color: 'rgba(255,255,255,0.82)', display: 'flex', alignItems: 'center',
                         }} aria-label="Fullscreen">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
@@ -2623,8 +2644,8 @@ const styles: Record<string, React.CSSProperties> = {
   title: { fontSize: 14, fontWeight: 700 },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },
-  viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 4, padding: 2 },
-  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 4, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
+  viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 9999, padding: 2 },
+  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9999, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
 
   // Content
   content: { flex: 1, overflow: 'auto', padding: 'var(--space-5)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
@@ -2650,7 +2671,7 @@ const styles: Record<string, React.CSSProperties> = {
   listInfo: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 2 },
   listName: { fontSize: 14, color: 'var(--color-text-primary)' },
   listMeta: { fontSize: 12, color: 'var(--color-text-muted)' },
-  listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
+  listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
 
   // Recent Media Section (bottom)
   recentSection: { marginTop: 'var(--space-8)', paddingTop: 'var(--space-5)', borderTop: '1px solid var(--color-border)' },
@@ -2668,7 +2689,7 @@ const styles: Record<string, React.CSSProperties> = {
   lightboxClose: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 4, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer' },
   lightboxTitle: { flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' },
   lightboxActions: { display: 'flex', gap: 'var(--space-2)' },
-  lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
+  lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9999, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
   lightboxContent: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)', gap: 'var(--space-5)' },
   navBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'all 0.15s ease' },
   lightboxImage: { flex: 1, maxWidth: '80%', aspectRatio: '16/10', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },

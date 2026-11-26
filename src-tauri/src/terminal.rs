@@ -256,7 +256,8 @@ fn args_for(shell: &str) -> Vec<String> {
         .map(|s| s.to_string_lossy().to_lowercase())
         .unwrap_or_default();
     match base.as_str() {
-        "pwsh" | "pwsh.exe" | "powershell" | "powershell.exe" => vec!["-NoLogo".into()],
+        // Interactive PowerShell gets the macOS/Linux command layer (terminal_compat.rs).
+        "pwsh" | "pwsh.exe" | "powershell" | "powershell.exe" => crate::terminal_compat::powershell_args(),
         "cmd" | "cmd.exe" => vec![],
         // Interactive unix shells.
         "bash" | "bash.exe" | "zsh" | "sh" | "fish" | "dash" | "ksh" | "tcsh" | "csh" => {

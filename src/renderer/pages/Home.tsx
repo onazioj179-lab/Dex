@@ -29,6 +29,25 @@ import { useHomePinnedAppsStore, type HomePinnedApp } from '../store/homePinnedA
 import { useSmoothDrag } from '../hooks/useSmoothDrag';
 import { spatialMenuActions } from '../shell/spatial/SpatialHud';
 import { CreatorMark } from '../shell/CreatorMark';
+import { useUkiStore } from '../store/ukiStore';
+import { dispatchAppIntent } from '../services/appIntents';
+import { attachmentFromPath, handOffAttachments } from '../uki/attachments';
+
+/** One entry in a Home right-click menu (null = separator). */
+export type HomeMenuItem = null | { label: string; icon: React.ReactNode; action: () => void; shortcut?: string; disabled?: boolean; danger?: boolean };
+const HOME_ITEM_MENU_EVENT = 'dex-home-item-menu';
+/** Ask Home to show a menu for one of its items (pinned apps and files live in their own components). */
+function openHomeItemMenu(e: React.MouseEvent, items: HomeMenuItem[]): void {
+  e.preventDefault();
+  e.stopPropagation();
+  const p = clampEventToViewport(e, { width: 240, height: 40 + items.length * 34 });
+  window.dispatchEvent(new CustomEvent(HOME_ITEM_MENU_EVENT, { detail: { x: p.left, y: p.top, items } }));
+}
+/** Right-click opens the desktop menu everywhere except on controls that have their own behaviour. */
+export function isDesktopMenuTarget(target: Element | null): boolean {
+  if (!target || !target.closest) return true;
+  return !target.closest('button, input, textarea, select, a, [contenteditable="true"], [role="button"], [role="menu"], [role="dialog"], [data-no-desktop-menu]');
+}
 
 const SPATIAL_MENU_ICONS: Record<string, string> = {
   enter: 'maximize', fit: 'maximize', 'zoom-in': 'zoom-in', 'zoom-out': 'minus', actual: 'search',
@@ -96,7 +115,22 @@ const PinnedFileShortcut: React.FC<{ file: HomePinnedFile }> = memo(({ file }) =
           window.dispatchEvent(new CustomEvent('dex-quicklook', { detail: { path: file.path, name: file.name } }));
         }
       }}
-      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinFile(file.id); }}
+      onContextMenu={(e) => openHomeItemMenu(e, [
+        { label: 'Open', icon: <DexIcon name="external-link" size={14} />, action: () => { void openFile(); } },
+        { label: 'Quick Look', icon: <DexIcon name="eye" size={14} />, shortcut: 'Space', action: () => window.dispatchEvent(new CustomEvent('dex-quicklook', { detail: { path: file.path, name: file.name } })) },
+        { label: 'Show in Explorer', icon: <DexIcon name="folder" size={14} />, action: () => { void (window as any).dex?.invoke?.('shell:showItemInFolder', file.path); } },
+        { label: 'Ask UKI about this file', icon: <DexIcon name="sparkles" size={14} />, action: () => {
+          const inv = (window as any).dex?.invoke;
+          if (!inv) return;
+          void attachmentFromPath(inv.bind((window as any).dex), file.path).then((a) => {
+            if (typeof a === 'string') { window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'error', message: a } })); return; }
+            handOffAttachments([a]);
+            window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'uki' } }));
+          });
+        } },
+        null,
+        { label: 'Unpin from Home', icon: <DexIcon name="pin" size={14} />, danger: true, action: () => unpinFile(file.id) },
+      ])}
       style={{
         position: 'absolute',
         left: drag.x,
@@ -183,10 +217,15 @@ const PinnedAppShortcut: React.FC<{ pin: HomePinnedApp }> = memo(({ pin }) => {
     <button
       type="button"
       aria-label={`Pinned app ${def.name}`}
-      title={`${def.name}\nDouble-click to open. Drag to move. Right-click to unpin.`}
+      title={`${def.name}\nDouble-click to open. Drag to move. Right-click for options.`}
       {...drag.handlers}
       onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); launchApp(); }}
-      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); unpinApp(pin.id); }}
+      onContextMenu={(e) => openHomeItemMenu(e, [
+        { label: `Open ${def.name}`, icon: <DexIcon name="external-link" size={14} />, action: launchApp },
+        { label: 'New window', icon: <DexIcon name="plus" size={14} />, action: () => { try { useRunningApps.getState().openNewWindow?.(pin.appId); } catch { launchApp(); } } },
+        null,
+        { label: 'Unpin from Home', icon: <DexIcon name="pin" size={14} />, danger: true, action: () => unpinApp(pin.id) },
+      ])}
       style={{
         position: 'absolute',
         left: drag.x,
@@ -433,11 +472,20 @@ export const Home: React.FC = () => {
   }, [pinFile]);
 
   // Desktop right-click context menu
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items?: HomeMenuItem[] } | null>(null);
+  // Pinned apps and files ask for their own menu through this event.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ x: number; y: number; items: HomeMenuItem[] }>).detail;
+      if (d && Array.isArray(d.items)) setCtxMenu({ x: d.x, y: d.y, items: d.items });
+    };
+    window.addEventListener(HOME_ITEM_MENU_EVENT, on);
+    return () => window.removeEventListener(HOME_ITEM_MENU_EVENT, on);
+  }, []);
   const handleDesktopContext = useCallback((e: React.MouseEvent) => {
-    // Only trigger on empty desktop area, not on buttons/interactive elements
-    const tag = (e.target as HTMLElement).tagName.toLowerCase();
-    if (tag === 'button' || tag === 'input' || tag === 'a') return;
+    // Anywhere on Home except controls with their own behaviour (an icon or text
+    // inside a button used to slip past the old tag check).
+    if (!isDesktopMenuTarget(e.target as Element)) return;
     e.preventDefault();
     const p = clampEventToViewport(e, { width: 260, height: 640 });
     setCtxMenu({ x: p.left, y: p.top });
@@ -659,7 +707,8 @@ export const Home: React.FC = () => {
           <div style={{ position: 'fixed', inset: 0, zIndex: Z_CONTEXT_MENU - 1 }} onMouseDown={() => setCtxMenu(null)} />
           <div
             role="menu"
-            aria-label="Desktop context menu"
+            ref={(el) => { if (el && !el.contains(document.activeElement)) el.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true }); }}
+            aria-label={ctxMenu.items ? 'Item menu' : 'Desktop context menu'}
             onKeyDown={(e) => {
               if (e.key === 'Escape') { setCtxMenu(null); return; }
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -679,7 +728,13 @@ export const Home: React.FC = () => {
               animation: 'fadeIn 0.12s ease-out',
             } as React.CSSProperties}
           >
-            {([
+            {(ctxMenu.items ? ctxMenu.items.map((it) => (it ? { ...it, action: () => { it.action(); setCtxMenu(null); } } : null)) : [
+              { label: 'Ask UKI', icon: <DexIcon name="sparkles" size={14} />, shortcut: 'Ctrl+Alt+U', action: () => { try { useUkiStore.getState().openPanel(); } catch { /* not ready */ } setCtxMenu(null); } },
+              { label: 'Search DEX', icon: <DexIcon name="search" size={14} />, shortcut: 'Ctrl+Alt+Space', action: () => { window.dispatchEvent(new CustomEvent('dex-command', { detail: { action: 'appMenu' } })); setCtxMenu(null); } },
+              { label: 'New Note', icon: <DexIcon name="file-plus" size={14} />, action: () => { handleLaunchApp('notes'); dispatchAppIntent('notes', 'new-note'); setCtxMenu(null); } },
+              { label: 'Clipboard History', icon: <DexIcon name="clipboard" size={14} />, action: () => { window.dispatchEvent(new CustomEvent('dex-open-clipboard')); setCtxMenu(null); } },
+              { label: 'Open Terminal', icon: <DexIcon name="terminal" size={14} />, action: () => { handleLaunchApp('terminal'); setCtxMenu(null); } },
+              null,
               // Spatial desktop actions (the canvas has no toolbar of its own).
               ...spatialMenuActions().map((a) => ({ label: a.label, shortcut: a.shortcut, disabled: a.disabled, icon: <DexIcon name={SPATIAL_MENU_ICONS[a.id] ?? 'grid'} size={14} />, action: () => { a.run(); setCtxMenu(null); } })),
               null,
@@ -692,7 +747,7 @@ export const Home: React.FC = () => {
               null,
               { label: 'Settings', icon: <DexIcon name="settings" size={14} />, action: () => { handleLaunchApp('settings'); setCtxMenu(null); } },
               { label: 'Refresh', icon: <DexIcon name="refresh" size={14} />, action: () => { refreshData(); setCtxMenu(null); } },
-            ] as Array<null | { label: string; icon: React.ReactNode; action: () => void; shortcut?: string; disabled?: boolean }>).map((item, i) =>
+            ] as HomeMenuItem[]).map((item, i) =>
               item === null ? (
                 <div key={`sep-${i}`} style={{ height: 1, background: 'var(--color-border-subtle)', margin: '4px var(--space-2)' }} />
               ) : (
@@ -702,14 +757,14 @@ export const Home: React.FC = () => {
                   className="dex-hover-bg"
                   disabled={item.disabled}
                   onClick={item.action}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  onPointerDown={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.16)'; }}
-                  onPointerUp={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
+                  onPointerDown={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-active, var(--color-bg-hover))'; }}
+                  onPointerUp={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 8px)', margin: '0 4px', padding: '7px var(--space-3)',
                     background: 'transparent', border: 'none',
-                    color: 'var(--color-text-primary)', fontSize: 13,
+                    color: item.danger ? 'var(--color-error)' : 'var(--color-text-primary)', fontSize: 13,
                     textAlign: 'left', cursor: item.disabled ? 'default' : 'pointer', opacity: item.disabled ? 0.45 : 1,
                     borderRadius: 10,
                     transition: 'background 0.12s ease',

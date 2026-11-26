@@ -88,6 +88,13 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
             emit(&a3, &o3, json!({ "id": t3, "type": "new-window", "url": url.as_str() }));
             tauri::webview::NewWindowResponse::Deny
         });
+    // Through Tor / a proxy (browser_proxy.rs): the tab gets its own engine and
+    // profile launched with the proxy, because a running engine cannot switch.
+    let proxied = crate::browser_proxy::for_new_tab(app);
+    let builder = match &proxied {
+        Some((args, dir)) => builder.data_directory(dir.clone()).additional_browser_args(args),
+        None => builder,
+    };
 
     match window.add_child(builder, LogicalPosition::new(rect.x, rect.y), LogicalSize::new(rect.w, rect.h)) {
         Ok(wv) => {
@@ -96,7 +103,7 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
             }
             #[cfg(windows)]
             native_signals::attach(&wv, app.clone(), owner.clone(), tab.clone());
-            json!({ "success": true })
+            json!({ "success": true, "proxied": proxied.is_some() })
         }
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }
@@ -152,6 +159,23 @@ mod native_signals {
             let Ok(core) = pw.controller().CoreWebView2() else { return };
             let env = pw.environment();
             let mut token = 0i64;
+
+            // Edge's own tracking prevention at its strictest level: blocks
+            // known cross-site trackers' storage and requests on top of DEX's
+            // blocklist. Older runtimes without the API just keep their default.
+            {
+                use webview2_com::Microsoft::Web::WebView2::Win32::{
+                    ICoreWebView2Profile3, ICoreWebView2_13, COREWEBVIEW2_TRACKING_PREVENTION_LEVEL_STRICT,
+                };
+                use windows_core::Interface;
+                if let Ok(c13) = core.cast::<ICoreWebView2_13>() {
+                    if let Ok(profile) = c13.Profile() {
+                        if let Ok(p3) = profile.cast::<ICoreWebView2Profile3>() {
+                            let _ = p3.SetPreferredTrackingPreventionLevel(COREWEBVIEW2_TRACKING_PREVENTION_LEVEL_STRICT);
+                        }
+                    }
+                }
+            }
 
             // Network-level ad/tracker blocking (crate::browser_block decides); a
             // block answers 403 locally so nothing leaves the machine.

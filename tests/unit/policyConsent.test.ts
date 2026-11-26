@@ -30,7 +30,7 @@ describe('policyConsent', () => {
   it('stores current policy acceptance', () => {
     const record = acceptCurrentPolicies();
     expect(record.dataPolicyVersion).toBe(DATA_POLICY_VERSION);
-    expect(record.policies.terms).toBe('2.3.0');
+    expect(record.policies.terms).toBe('3.0.0');
     expect(record.policies.privacy).toBe('3.0.0');
     expect(hasAcceptedCurrentPolicies()).toBe(true);
   });
