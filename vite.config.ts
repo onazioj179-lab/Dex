@@ -12,6 +12,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.0'),
+    'import.meta.env.VITE_APP_BUILD_DATE': JSON.stringify(new Date().toISOString().slice(0, 10)),
   },
   base: './',
   root: 'src/renderer',

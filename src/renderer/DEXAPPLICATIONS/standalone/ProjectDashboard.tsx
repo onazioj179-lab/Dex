@@ -98,8 +98,11 @@ function readTaskSummary(): TaskSummary {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return EMPTY_TASKS;
     const now = Date.now();
-    const todayStart = startOfDay(new Date(now));
-    const todayEnd = todayStart + 24 * 60 * 60 * 1000;
+    const localDay = new Date(now);
+    const todayStart = startOfDay(localDay);
+    const tomorrow = new Date(localDay);
+    tomorrow.setDate(localDay.getDate() + 1);
+    const todayEnd = startOfDay(tomorrow);
     let open = 0;
     let today = 0;
     let overdue = 0;

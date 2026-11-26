@@ -537,28 +537,24 @@ fn fourcc_to_codec(fourcc: &[u8; 4]) -> String {
 // ffmpeg / ffprobe toolchain helpers (for thumbnail / process / transcode).
 // ---------------------------------------------------------------------------
 
-/// True if `program --version` (or `-version` for ffmpeg) runs successfully.
-fn tool_present(program: &str, version_flag: &str) -> bool {
+pub(crate) fn media_tool_command(program: &str) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
-    cmd.arg(version_flag);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
-    cmd.output().map(|o| o.status.success()).unwrap_or(false)
+    cmd
+}
+
+/// True if `program --version` (or `-version` for ffmpeg) runs successfully.
+fn tool_present(program: &str, version_flag: &str) -> bool {
+    media_tool_command(program).arg(version_flag).output().map(|o| o.status.success()).unwrap_or(false)
 }
 
 /// Run a tool with args, hidden console; return (success, stderr).
 fn run_tool(program: &str, args: &[String]) -> (bool, String) {
-    let mut cmd = std::process::Command::new(program);
-    cmd.args(args);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    }
-    match cmd.output() {
+    match media_tool_command(program).args(args).output() {
         Ok(o) => (
             o.status.success(),
             String::from_utf8_lossy(&o.stderr).to_string(),

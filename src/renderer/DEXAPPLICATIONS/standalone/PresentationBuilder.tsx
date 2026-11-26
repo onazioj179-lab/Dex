@@ -191,6 +191,7 @@ const PresentationBuilder: React.FC = () => {
     return () => observer.disconnect();
   }, [presenting]);
   const projectInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   const presentRef = useRef<HTMLDivElement | null>(null);
   const dragSlideId = useRef<string | null>(null);
   const dragBlockState = useRef<{ blockId: string; startX: number; startY: number; bx: number; by: number } | null>(null);
@@ -246,6 +247,9 @@ const PresentationBuilder: React.FC = () => {
   const exportProject = useCallback(() => {
     try {
       const data = JSON.stringify({ format: 'dex-presentation', version: 1, themeId, slides }, null, 2);
+      // Apply the same contract in both directions: never download a project
+      // that this editor would refuse to open (including oversized image decks).
+      parsePresentationProject(data);
       const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -253,7 +257,9 @@ const PresentationBuilder: React.FC = () => {
       anchor.download = 'presentation-' + Date.now() + '.dexslides.json';
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch { toast('error', 'Project export failed. Your deck has not changed.'); }
+    } catch (error) {
+      toast('error', error instanceof Error ? `Project export failed: ${error.message}` : 'Project export failed. Your deck has not changed.');
+    }
   }, [slides, themeId]);
 
   const importProject = useCallback(async (file: File) => {
@@ -267,6 +273,29 @@ const PresentationBuilder: React.FC = () => {
       toast('success', 'Project opened. Undo restores the previous deck.');
     } catch (error) { toast('error', error instanceof Error ? error.message : 'Project could not be opened.'); }
   }, [setSlides]);
+
+  const importImage = useCallback(async (file: File) => {
+    const targetId = currentSlide?.id;
+    if (!targetId) return;
+    try {
+      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Choose a PNG, JPEG, WebP or GIF image.');
+      if (file.size > 8 * 1024 * 1024) throw new Error('Images must be 8 MB or smaller.');
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Image could not be read.'));
+        reader.onerror = () => reject(new Error('Image could not be read.'));
+        reader.readAsDataURL(file);
+      });
+      const image = await loadImage(data);
+      if (!image.naturalWidth || !image.naturalHeight) throw new Error('Image has no dimensions.');
+      const scale = Math.min(1, 800 / image.naturalWidth, 400 / image.naturalHeight);
+      const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
+      const block: SlideBlock = { id: newId(), type: 'image', x: (CANVAS_W - width) / 2, y: (CANVAS_H - height) / 2,
+        width, height, content: data, style: {} };
+      setSlides(prev => prev.map(slide => slide.id === targetId ? { ...slide, blocks: [...slide.blocks, block] } : slide));
+      setSelectedBlockId(block.id);
+    } catch (error) { toast('error', error instanceof Error ? error.message : 'Image import failed.'); }
+  }, [currentSlide?.id, setSlides]);
 
   // ---- Slide ops ----
   const addSlide = useCallback((layout: SlideLayout = 'title-content') => {
@@ -327,9 +356,19 @@ const PresentationBuilder: React.FC = () => {
   }, [updateCurrentSlide, theme]);
 
   const updateBlock = useCallback((id: string, patch: Partial<SlideBlock>) => {
+    // Keep inspector edits compatible with the project-file geometry contract.
+    const bounds = { x: [0, CANVAS_W], y: [0, CANVAS_H], width: [1, CANVAS_W], height: [1, CANVAS_H] };
+    const validated = { ...patch };
+    for (const key of ['x', 'y', 'width', 'height'] as const) {
+      const value = validated[key];
+      if (value !== undefined) {
+        if (!Number.isFinite(value)) delete validated[key];
+        else validated[key] = Math.max(bounds[key][0], Math.min(bounds[key][1], value));
+      }
+    }
     updateCurrentSlide(s => ({
       ...s,
-      blocks: s.blocks.map(b => (b.id === id ? { ...b, ...patch, style: { ...b.style, ...(patch.style || {}) } } : b)),
+      blocks: s.blocks.map(b => (b.id === id ? { ...b, ...validated, style: { ...b.style, ...(validated.style || {}) } } : b)),
     }));
   }, [updateCurrentSlide]);
 
@@ -496,6 +535,7 @@ const PresentationBuilder: React.FC = () => {
   // Render every slide to an offscreen canvas and download as PNG. No deps; uses
   // the native 2D context. Images on remote URLs are best-effort (CORS may taint).
   const exportImages = useCallback(async () => {
+    let exported = 0;
     setIsExporting(true);
     try {
       for (let i = 0; i < slides.length; i++) {
@@ -530,21 +570,28 @@ const PresentationBuilder: React.FC = () => {
             try {
               const img = await loadImage(b.content);
               ctx.drawImage(img, b.x, b.y, b.width, b.height);
-            } catch { /* skip broken/tainting image */ }
+            } catch { throw new Error('Image on slide ' + (i + 1) + ' could not be loaded.'); }
           }
         }
 
-        const url = canvas.toDataURL('image/png');
+        const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+          value => value ? resolve(value) : reject(new Error('Could not encode slide ' + (i + 1) + '.')),
+          'image/png',
+        ));
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `slide-${String(i + 1).padStart(2, '0')}.png`;
         document.body.appendChild(a);
         a.click();
         a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        exported++;
       }
       toast('success', `Exported ${slides.length} image${slides.length === 1 ? '' : 's'}`);
-    } catch {
-      toast('error', 'Export failed');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Export failed';
+      toast('error', exported ? reason + ' Downloaded ' + exported + ' of ' + slides.length + ' slides.' : reason);
     } finally {
       setIsExporting(false);
     }
@@ -712,6 +759,12 @@ const PresentationBuilder: React.FC = () => {
         }
       `}</style>
 
+      <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden
+        onChange={e => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void importImage(file);
+        }} />
       <input ref={projectInput} type="file" accept=".json,.dexslides.json,application/json" hidden
         onChange={e => {
           const file = e.target.files?.[0];
@@ -741,7 +794,7 @@ const PresentationBuilder: React.FC = () => {
           <button onClick={redo} disabled={!canRedo} style={toolbarBtn}>Redo</button>
           <button onClick={() => addBlock('text')} style={toolbarBtn}>+ Text</button>
           <button onClick={() => addBlock('shape')} style={toolbarBtn}>+ Shape</button>
-          <button onClick={() => addBlock('image')} style={toolbarBtn}>+ Image</button>
+          <button onClick={() => imageInput.current?.click()} style={toolbarBtn}>+ Image</button>
           <span style={{ width: 8 }} />
           <button onClick={() => projectInput.current?.click()} style={toolbarBtn}>Open Project</button>
           <button onClick={exportProject} style={toolbarBtn}>Save Project</button>

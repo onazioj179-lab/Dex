@@ -9,12 +9,13 @@
  * Find/replace (literal or regex), case transforms, prefix/suffix, and an
  * auto-numbering sequence, all with a live before/after preview and collision
  * detection. Transforms are pure (powerRenameEngine); apply goes through the
- * real files:rename IPC.
+ * real files:renameBatch IPC.
  */
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { useToastHelpers } from '../../components/Toast';
+import { invokePlatformIpc } from '../../services/platform/ipc';
 import {
   computeBatch,
   DEFAULT_RENAME_CONFIG,
@@ -62,6 +63,7 @@ const PowerRename: React.FC = () => {
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,18 +72,26 @@ const PowerRename: React.FC = () => {
   const setNum = useCallback(<K extends keyof RenameConfig['numbering']>(k: K, v: RenameConfig['numbering'][K]) =>
     setCfg(c => ({ ...c, numbering: { ...c.numbering, [k]: v } })), []);
 
-  const results = useMemo(() => computeBatch(items.map(i => i.original), cfg), [items, cfg]);
+  const results = useMemo(() => computeBatch(items.map(i => i.original), cfg, items.map(item => {
+    const path = item.path?.replace(/\\/g, '/');
+    return path ? path.slice(0, path.lastIndexOf('/')).toLowerCase() : '';
+  })), [items, cfg]);
   const changeCount = results.filter(r => r.changed && !r.error).length;
   const errorCount = results.filter(r => r.error).length;
   const realCount = items.filter(i => i.path).length;
-  const canApply = changeCount > 0 && errorCount === 0 && realCount > 0 && !applying;
+  const canApply = errorCount === 0 && !applying && results.some((result, index) => result.changed && items[index].path);
 
   // ── Sources ───────────────────────────────────────────────────
   const addNames = useCallback((next: SourceItem[]) => {
     setItems(prev => {
       const seen = new Set(prev.map(p => (p.path ?? p.original)));
       const merged = [...prev];
-      for (const n of next) if (!seen.has(n.path ?? n.original)) merged.push(n);
+      for (const item of next) {
+        const key = item.path ?? item.original;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(item);
+      }
       return merged;
     });
   }, []);
@@ -89,13 +99,16 @@ const PowerRename: React.FC = () => {
   const loadFolder = useCallback(async (path: string) => {
     const p = path.trim();
     if (!p) return;
-    const electron = (window as any).electron;
-    if (!electron?.invoke) { info('Folder loading needs the desktop app'); return; }
     try {
-      const list = await electron.invoke('files:list', p);
-      const files = Array.isArray(list) ? list.filter((f: any) => !f.isDirectory) : [];
+      type Entry = { path: string; name: string; isDirectory: boolean };
+      const list = await invokePlatformIpc<Entry[] | { files?: Entry[]; error?: string }>('files:list', p);
+      const entries = Array.isArray(list) ? list : list?.files;
+      if (!Array.isArray(entries) || (!Array.isArray(list) && list?.error)) {
+        throw new Error((!Array.isArray(list) && list?.error) || 'Directory listing unavailable');
+      }
+      const files = entries.filter(file => typeof file.path === 'string' && typeof file.name === 'string' && !file.isDirectory);
       if (files.length === 0) { info('No files found in that folder'); return; }
-      addNames(files.map((f: any) => ({ path: f.path as string, original: f.name as string })));
+      addNames(files.map(file => ({ path: file.path, original: file.name })));
       success(`Loaded ${files.length} file${files.length === 1 ? '' : 's'}`);
     } catch (e) {
       toastError('Could not read that folder');
@@ -119,34 +132,36 @@ const PowerRename: React.FC = () => {
 
   // ── Apply ─────────────────────────────────────────────────────
   const apply = useCallback(async () => {
-    const electron = (window as any).electron;
-    if (!electron?.invoke) { info('Renaming needs the desktop app'); return; }
+    if (!canApply) return;
+    const plan = items.flatMap((item, index) => (
+      item.path && results[index].changed ? [{ source: item.path, name: results[index].next }] : []
+    ));
     setApplying(true);
-    let ok = 0, fail = 0;
-    const survivors: SourceItem[] = [];
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      const r = results[i];
-      if (!it.path || !r.changed || r.error) { survivors.push(it); continue; }
-      try {
-        await electron.invoke('files:rename', it.path, r.next);
-        ok++;
-        // Reflect the new name so a second pass operates on the renamed file.
-        const dir = it.path.slice(0, Math.max(it.path.lastIndexOf('/'), it.path.lastIndexOf('\\')) + 1);
-        survivors.push({ path: dir + r.next, original: r.next });
-      } catch (e) {
-        fail++; survivors.push(it);
-        console.warn('[PowerRename] rename failed', it.path, e);
+    setApplyError('');
+    try {
+      const outcome = await invokePlatformIpc<
+        { success: true; paths: string[] } | { success: false; error: string }
+      >('files:renameBatch', plan);
+      if (!outcome?.success || !Array.isArray(outcome.paths) || outcome.paths.length !== plan.length
+        || outcome.paths.some(path => typeof path !== 'string')) {
+        const error = outcome?.success === false ? outcome.error : 'Could not confirm the rename results. Reload the folder before applying again.';
+        setApplyError(error);
+        toastError('Batch rename could not be completed');
+        return;
       }
+      const updated = new Map(plan.map((entry, index): [string, SourceItem] => [
+        entry.source, { path: outcome.paths[index], original: entry.name },
+      ]));
+      setItems(previous => previous.map(item => item.path ? updated.get(item.path) ?? item : item));
+      success(`Renamed ${plan.length} file${plan.length === 1 ? '' : 's'}`);
+    } finally {
+      setApplying(false);
     }
-    setItems(survivors);
-    setApplying(false);
-    if (ok) success(`Renamed ${ok} file${ok === 1 ? '' : 's'}${fail ? `, ${fail} failed` : ''}`);
-    else if (fail) toastError(`${fail} rename${fail === 1 ? '' : 's'} failed`);
-  }, [items, results, info, success, toastError]);
+  }, [canApply, items, results, success, toastError]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--color-bg, #0a0a0c)', color: '#fff', overflow: 'hidden' }}>
+      {applyError && <div role="alert" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 12, color: 'var(--color-error)', maxHeight: 120, overflow: 'auto' }}>{applyError}</div>}
       {/* Header */}
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #FF375F, #FF6482)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

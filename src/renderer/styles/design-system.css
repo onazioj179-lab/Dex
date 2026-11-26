@@ -32,7 +32,10 @@
   /* User-adjustable scales (Settings > Appearance > Text & Density) */
   --font-scale: 1;
   --density-scale: 1;
+}
 
+:root,
+[data-app-theme="dark"] {
   /* Backgrounds -- Rich Charcoal (lifted from true black for depth) */
   --color-bg-base: #0C0C0E;
   --color-bg-surface: #161618;
@@ -288,7 +291,9 @@
   --graph-node-purple: #BF5AF2;
   --graph-node-soft: #8896B0;
   --graph-node-alert: #FF453A;
+}
 
+:root {
   /* ─────────────────────────────────────────────────────────────────────────
      Spacing — 4px Base Grid
      ───────────────────────────────────────────────────────────────────────── */
@@ -577,11 +582,6 @@
   --gradient-shimmer: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
 }
 
-/* Dark theme aliases -- :root is already Tahoe dark, these selectors just mirror it */
-[data-theme="dark"], .dark-mode, :root.dark-mode {
-  /* Tahoe dark is the default -- no overrides required */
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════
    PREMIUM UI ANIMATIONS (v3.5.0 - Items 916-921)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -799,65 +799,50 @@
   -webkit-backdrop-filter: var(--blur-lg) saturate(130%);
 }
 
-/* Liquid Glass (macOS Tahoe-grade) — the frosted base PLUS pronounced specular
-   lensing: a bright top rim that falls off down the sides, for the "lit glass"
-   look that flat frosted panels lack. Built only from existing tokens. The
-   universal low-tier rule (html[data-perf-tier="low"] *) strips the blur on weak
-   machines; reduced-transparency drops it for accessibility. */
+/* Frosted Ice — DEX's primary shell material. It is deliberately quiet:
+  high-opacity diffusion, neutral saturation, one sharp rim, and restrained
+  depth. Blur exists only to separate floating chrome from content. */
+.dex-frosted-ice,
 .dex-liquid-glass {
-  /* Apple Liquid Glass (CSS, inspired by liquid-glass-studio, MIT (c) Charles Yin
-     -- approximated in pure CSS, no WebGL dependency): genuinely SEE-THROUGH --
-     a light translucent gradient over a deep backdrop blur + saturation/brightness
-     boost (the "lensing" that makes wallpaper bloom behind it), finished with a
-     fresnel-style bright top rim and edge highlights. Far more transparent than a
-     frosted panel so the wallpaper/content reads through. */
-  background: linear-gradient(180deg, rgba(44, 44, 54, 0.28), rgba(14, 14, 20, 0.42));
-  backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
-  -webkit-backdrop-filter: blur(32px) saturate(205%) brightness(1.07);
-  /* Borderless: no hard outline. The lit fresnel rim (inset highlight below)
-     defines the edge, so the panel reads as one continuous piece of glass. */
-  border: 1px solid transparent;
+  background: var(--color-bg-glass, rgba(18, 20, 22, 0.90));
+  backdrop-filter: var(--glass-blur, blur(14px) saturate(100%));
+  -webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(100%));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.13));
   border-radius: var(--radius-xl);
-  /* Spatial depth: a tight contact shadow + a wide soft ambient shadow so the
-     panel reads as a physical object floating above the desktop, not a flat
-     overlay. Fresnel rim + edge lensing complete the lit-glass material. */
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.20),             /* contact */
-    0 10px 30px rgba(0, 0, 0, 0.30),           /* mid float */
-    0 28px 60px -12px rgba(0, 0, 0, 0.36),     /* deep ambient -- spatial lift */
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),   /* bright fresnel top rim */
-    inset 1px 0 0 rgba(255, 255, 255, 0.08),   /* left edge lens */
-    inset -1px 0 0 rgba(255, 255, 255, 0.08),  /* right edge lens */
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04);  /* faint bottom */
+   0 1px 2px rgba(0, 0, 0, 0.28),
+   0 12px 34px rgba(0, 0, 0, 0.32),
+   inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
-/* Stronger variant: more opaque for content-heavy surfaces that need text
-   contrast (panels over busy app content rather than the wallpaper). */
+/* Content-heavy Frosted Ice: nearly opaque with softer diffusion. */
+.dex-frosted-ice-strong,
 .dex-liquid-glass-strong {
-  background: linear-gradient(180deg, rgba(24, 24, 30, 0.66), rgba(11, 11, 15, 0.76));
-  backdrop-filter: blur(30px) saturate(185%);
-  -webkit-backdrop-filter: blur(30px) saturate(185%);
-  border: 1px solid transparent;
+  background: var(--color-bg-glass-strong, rgba(11, 13, 14, 0.96));
+  backdrop-filter: blur(10px) saturate(100%);
+  -webkit-backdrop-filter: blur(10px) saturate(100%);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.13));
   border-radius: var(--radius-xl);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.22),
-    0 10px 30px rgba(0, 0, 0, 0.32),
-    0 28px 60px -12px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05),
-    inset -1px 0 0 rgba(255, 255, 255, 0.05);
+   0 1px 2px rgba(0, 0, 0, 0.30),
+   0 14px 38px rgba(0, 0, 0, 0.34),
+   inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 /* Lite mode (weak GPUs, data-perf-tier="low") strips the EXPENSIVE backdrop blur
    via the universal rule -- but the glass STAYS translucent so it never goes
    solid black. We just bump the opacity a touch (it has no frost to lean on) so
    text stays readable. Result: real see-through glass on every tier; only the
    blur is dropped on weak GPUs. */
+html[data-perf-tier="low"] .dex-frosted-ice,
 html[data-perf-tier="low"] .dex-liquid-glass {
-  background: linear-gradient(180deg, rgba(26, 26, 34, 0.58), rgba(12, 12, 16, 0.70));
+  background: #121416;
 }
+html[data-perf-tier="low"] .dex-frosted-ice-strong,
 html[data-perf-tier="low"] .dex-liquid-glass-strong {
-  background: linear-gradient(180deg, rgba(20, 20, 26, 0.80), rgba(10, 10, 14, 0.88));
+  background: #0d0f11;
 }
 @media (prefers-reduced-transparency: reduce) {
+  .dex-frosted-ice,
+  .dex-frosted-ice-strong,
   .dex-liquid-glass,
   .dex-liquid-glass-strong {
     backdrop-filter: none;
@@ -963,7 +948,7 @@ html[data-perf-tier="low"] {
   60%  { opacity: 1; transform: translateY(1px); }
   100% { opacity: 1; transform: translateY(0); }
 }
-.dex-drawer-in { animation: dexDrawerIn 0.26s cubic-bezier(0.34, 1.4, 0.5, 1) both; }
+.dex-drawer-in { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .dex-drawer-in { animation: none; }
 }
@@ -3574,7 +3559,8 @@ textarea:focus-visible {
 
 /* Dark high-contrast (default + explicit dark theme) */
 :root[data-high-contrast="true"],
-[data-high-contrast="true"][data-theme="dark"] {
+[data-high-contrast="true"][data-theme="dark"],
+:root[data-high-contrast="true"] [data-app-theme="dark"] {
   --color-bg-base: #000000;
   --color-bg-surface: #000000;
   --color-bg-surface-solid: #000000;
@@ -3616,7 +3602,8 @@ textarea:focus-visible {
 }
 
 /* Light high-contrast */
-[data-high-contrast="true"][data-theme="light"] {
+[data-high-contrast="true"][data-theme="light"],
+:root[data-high-contrast="true"] [data-app-theme="light"] {
   --color-bg-base: #FFFFFF;
   --color-bg-surface: #FFFFFF;
   --color-bg-surface-solid: #FFFFFF;

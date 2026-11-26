@@ -69,54 +69,19 @@ fn utc_hour(ms: i64) -> usize {
 
 // --- file IO (electron-store JSON under appData) ----------------------------
 
-fn store_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join(name)
+fn patterns_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|dir| dir.join(PATTERNS_FILE))
 }
 
-fn read_file(app: &tauri::AppHandle, name: &str) -> Value {
-    match std::fs::read_to_string(store_path(app, name)) {
-        Ok(raw) => serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null),
-        Err(_) => Value::Null,
-    }
+fn empty_patterns(now: i64) -> Value {
+    json!({ "entries": {}, "firstSeen": now, "dayCount": 0 })
 }
 
-// electron-store writes the whole document as pretty JSON; mirror that so the
-// file stays byte-compatible with what the Electron Xenon engine would read.
-fn write_file(app: &tauri::AppHandle, name: &str, value: &Value) {
-    if let Ok(raw) = serde_json::to_string_pretty(value) {
-        let _ = std::fs::write(store_path(app, name), raw);
-    }
-}
-
-// Persist the `patterns` object back to xenon-patterns.json, preserving any
-// other top-level keys electron-store may have written.
-fn write_patterns(app: &tauri::AppHandle, patterns: Value) {
-    let mut doc = read_file(app, PATTERNS_FILE);
-    if !doc.is_object() {
-        doc = json!({});
-    }
-    if let Some(obj) = doc.as_object_mut() {
-        obj.insert("patterns".to_string(), patterns);
-    }
-    write_file(app, PATTERNS_FILE, &doc);
-}
-
-// --- patterns store ---------------------------------------------------------
-
-// Read the `patterns` object from xenon-patterns.json, applying the same
-// electron-store defaults Xenon's constructor declared.
 fn read_patterns(app: &tauri::AppHandle) -> Value {
-    let patterns = read_file(app, PATTERNS_FILE)
-        .get("patterns")
-        .cloned()
-        .unwrap_or(Value::Null);
-    if patterns.is_object() {
-        patterns
-    } else {
-        json!({ "entries": {}, "firstSeen": now_ms(), "dayCount": 0 })
-    }
+    patterns_path(app)
+        .and_then(|path| crate::kv_repository::get(&path, "patterns").ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| empty_patterns(now_ms()))
 }
 
 fn day_count(patterns: &Value) -> i64 {
@@ -164,24 +129,17 @@ fn predicted_apps(patterns: &Value) -> Vec<String> {
 fn get_status(app: &tauri::AppHandle) -> Value {
     let patterns = read_patterns(app);
 
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_memory();
-    let total = sys.total_memory();
-    let used = sys.used_memory();
-    let memory_percent = if total > 0 {
-        (used as f64 / total as f64) * 100.0
-    } else {
-        0.0
-    };
-    let native_bridge_active = total > 0;
-
+    let sample = crate::system_status();
+    let memory_percent = sample["memory"]["percent"].as_f64().unwrap_or(0.0);
+    let cpu_percent = sample["cpu"]["usage"].as_f64().unwrap_or(0.0);
+    let native_bridge_active = sample["success"].as_bool() == Some(true);
     json!({
         "running": false,
         "foregroundApp": Value::Null,
         "appCount": 0,
         "apps": Value::Object(Map::new()),
         "memoryPercent": memory_percent,
-        "cpuPercent": 0,
+        "cpuPercent": cpu_percent,
         "sampleCount": 0,
         "onBattery": false,
         "pressureMultiplier": 1.0,
@@ -221,18 +179,24 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
         _ => return Value::Null,
     };
 
-    let now = now_ms();
-    let hour = utc_hour(now);
-
-    // Load the full patterns object (with defaults applied).
-    let mut patterns = read_patterns(app);
-    if !patterns.is_object() {
-        patterns = json!({ "entries": {}, "firstSeen": now, "dayCount": 0 });
+    let Some(path) = patterns_path(app) else { return Value::Null };
+    if let Err(error) = crate::kv_repository::update(&path, |document| {
+        let now = now_ms();
+        let patterns = document.entry("patterns").or_insert_with(|| empty_patterns(now));
+        record_app(patterns, &app_id, now);
+        Ok(())
+    }) {
+        eprintln!("[Xenon] Could not update usage patterns: {error}");
     }
-    let obj = match patterns.as_object_mut() {
-        Some(o) => o,
-        None => return Value::Null,
-    };
+    Value::Null
+}
+
+fn record_app(patterns: &mut Value, app_id: &str, now: i64) {
+    let hour = utc_hour(now);
+    if !patterns.is_object() {
+        *patterns = empty_patterns(now);
+    }
+    let Some(obj) = patterns.as_object_mut() else { return };
 
     // firstSeen default if missing.
     if !obj.contains_key("firstSeen") {
@@ -255,15 +219,15 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
 
     // --- recordCoOccurrence(prev, appId): bump prev.coOccurrence[appId] ------
     if let Some(prev) = prev_foreground.as_ref() {
-        if prev != &app_id {
+        if prev != app_id {
             if let Some(entries) = obj.get_mut("entries").and_then(|v| v.as_object_mut()) {
                 if let Some(prev_entry) = entries.get_mut(prev).and_then(|v| v.as_object_mut()) {
                     let co = prev_entry
                         .entry("coOccurrence")
                         .or_insert_with(|| json!({}));
                     if let Some(co_map) = co.as_object_mut() {
-                        let cur = co_map.get(&app_id).and_then(|v| v.as_i64()).unwrap_or(0);
-                        co_map.insert(app_id.clone(), json!(cur + 1));
+                        let cur = co_map.get(app_id).and_then(|v| v.as_i64()).unwrap_or(0);
+                        co_map.insert(app_id.to_owned(), json!(cur.saturating_add(1)));
                     }
                 }
             }
@@ -273,9 +237,9 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
     // --- recordPatternUsage(appId) ------------------------------------------
     if let Some(entries) = obj.get_mut("entries").and_then(|v| v.as_object_mut()) {
         // Create the entry with the same default shape if absent.
-        if !entries.contains_key(&app_id) {
+        if !entries.get(app_id).is_some_and(Value::is_object) {
             entries.insert(
-                app_id.clone(),
+                app_id.to_owned(),
                 json!({
                     "appId": app_id,
                     "hourlyUsage": vec![0i64; 24],
@@ -286,7 +250,7 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
                 }),
             );
         }
-        if let Some(entry) = entries.get_mut(&app_id).and_then(|v| v.as_object_mut()) {
+        if let Some(entry) = entries.get_mut(app_id).and_then(|v| v.as_object_mut()) {
             // hourlyUsage[hour] += 1 (24-slot array, repaired if malformed).
             let needs_fix = entry
                 .get("hourlyUsage")
@@ -298,39 +262,60 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
             }
             if let Some(hu) = entry.get_mut("hourlyUsage").and_then(|v| v.as_array_mut()) {
                 let cur = hu.get(hour).and_then(|v| v.as_i64()).unwrap_or(0);
-                hu[hour] = json!(cur + 1);
+                hu[hour] = json!(cur.saturating_add(1));
             }
             // sessionCount++ and lastUpdated = now.
             let sc = entry.get("sessionCount").and_then(|v| v.as_i64()).unwrap_or(0);
-            entry.insert("sessionCount".to_string(), json!(sc + 1));
+            entry.insert("sessionCount".to_string(), json!(sc.saturating_add(1)));
             entry.insert("lastUpdated".to_string(), json!(now));
         }
 
         // Evict entries older than the rolling window (lastUpdated < cutoff).
         let cutoff = now - PATTERN_ROLLING_DAYS * DAY_MS;
-        let stale: Vec<String> = entries
-            .iter()
-            .filter(|(_, e)| {
-                e.get("lastUpdated").and_then(|v| v.as_i64()).unwrap_or(now) < cutoff
-            })
-            .map(|(k, _)| k.clone())
-            .collect();
-        for k in stale {
-            entries.remove(&k);
-        }
+        entries.retain(|_, entry| entry["lastUpdated"].as_i64().unwrap_or(now) >= cutoff);
     }
 
     // dayCount = floor((now - firstSeen) / DAY_MS).
     obj.insert(
         "dayCount".to_string(),
-        json!(((now - first_seen).max(0)) / DAY_MS),
+        json!(now.saturating_sub(first_seen).max(0) / DAY_MS),
     );
 
     // Persist the new foreground marker for the next call's co-occurrence edge.
     obj.insert("lastForeground".to_string(), json!(app_id));
+}
 
-    write_patterns(app, patterns);
-    Value::Null
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn concurrently_commits_counts_without_overwriting_other_data() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("xenon-patterns.json");
+        crate::kv_repository::update(&path, |document| {
+            document.insert("unrelated".to_owned(), json!({"schema": 1}));
+            Ok(())
+        }).unwrap();
+        std::thread::scope(|scope| {
+            for name in ["notes", "files"] {
+                let path = &path;
+                scope.spawn(move || {
+                    for _ in 0..4 {
+                        crate::kv_repository::update(path, |document| {
+                            let patterns = document.entry("patterns").or_insert_with(|| empty_patterns(DAY_MS));
+                            record_app(patterns, name, DAY_MS);
+                            Ok(())
+                        }).unwrap();
+                    }
+                });
+            }
+        });
+        let patterns = crate::kv_repository::get(&path, "patterns").unwrap();
+        assert_eq!(patterns["entries"]["notes"]["sessionCount"], 4);
+        assert_eq!(patterns["entries"]["files"]["sessionCount"], 4);
+        assert_eq!(crate::kv_repository::get(&path, "unrelated").unwrap()["schema"], 1);
+    }
 }
 
 // system_sample(): a live one-shot system sample with the EXACT XenonSystemSample
@@ -340,24 +325,19 @@ fn report_active_app(app: &tauri::AppHandle, args: &Value) -> Value {
 // of the sample payload (callers that previously listened for the pushed event
 // can pull an equivalent snapshot). Also emits the same event for any listeners.
 fn system_sample(app: &tauri::AppHandle) -> Value {
-    let mut sys = sysinfo::System::new();
-    sys.refresh_memory();
-    sys.refresh_cpu();
-    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-    sys.refresh_cpu();
-    sys.refresh_memory();
-
-    let total = sys.total_memory().max(1); // bytes
-    let used = sys.used_memory(); // bytes
-    let cpu_percent = sys.global_cpu_info().cpu_usage() as f64; // 0..100
-    let memory_percent = (used as f64 / total as f64) * 100.0;
+    let status = crate::system_status();
+    if status["success"] == false {
+        return status;
+    }
+    let used = status["memory"]["used"].as_u64().unwrap_or(0);
+    let total = status["memory"]["total"].as_u64().unwrap_or(0);
     let memory_used_mb = (used as f64 / (1024.0 * 1024.0)).round() as i64;
     let memory_total_mb = (total as f64 / (1024.0 * 1024.0)).round() as i64;
 
     let sample = json!({
         "timestamp": now_ms(),
-        "cpuPercent": cpu_percent,
-        "memoryPercent": memory_percent,
+        "cpuPercent": status["cpu"]["usage"],
+        "memoryPercent": status["memory"]["percent"],
         "memoryUsedMB": memory_used_mb,
         "memoryTotalMB": memory_total_mb,
     });

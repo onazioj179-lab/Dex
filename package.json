@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "7.0.1",
+  "version": "7.0.2",
   "description": "DEX - Personal Control Hub for Desktop Automation",
   "author": "Onazi Treasure OJ <onazi75@gmail.com>",
   "license": "SEE LICENSE IN LICENSE",
@@ -47,6 +47,9 @@
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.24",
     "@tauri-apps/api": "^2.0.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/xterm": "6.0.0",
     "better-sqlite3": "^11.6.0",
     "d3-force": "^3.0.0",
     "dompurify": "^3.3.1",

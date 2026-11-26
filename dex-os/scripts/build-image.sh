@@ -72,33 +72,18 @@ download_buildroot() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 3: Build DEX Electron app for Linux
+# Step 3: Stage the target-compatible Tauri executable
 # ---------------------------------------------------------------------------
 build_dex_app() {
-    log_info "Building DEX Electron app for Linux x64..."
-    cd "$DEX_ROOT"
-
-    if [ ! -d "node_modules" ]; then
-        log_info "Installing npm dependencies..."
-        npm ci
-    fi
-
-    # Build with electron-builder for Linux
-    npx electron-builder --linux --x64 --dir
-
-    # Stage the built app for Buildroot
-    local APP_STAGE="${DEX_OS_DIR}/buildroot/app/linux-unpacked"
-    mkdir -p "$(dirname "$APP_STAGE")"
-    if [ -d "release/linux-unpacked" ]; then
-        cp -a "release/linux-unpacked" "$APP_STAGE"
-    elif [ -d "dist/linux-unpacked" ]; then
-        cp -a "dist/linux-unpacked" "$APP_STAGE"
-    else
-        log_error "Electron build output not found in release/ or dist/"
-        exit 1
-    fi
-
-    log_ok "DEX app staged at $APP_STAGE"
+    : "${DEX_LINUX_APP:?Set DEX_LINUX_APP to the target-compatible Tauri Linux executable}"
+    [[ -f "$DEX_LINUX_APP" ]] || { log_error "Missing Tauri Linux executable"; exit 1; }
+    command -v readelf >/dev/null || { log_error "Missing dependency: readelf"; exit 1; }
+    readelf -h "$DEX_LINUX_APP" | grep -q 'ELF64' || { log_error "Expected an ELF64 executable"; exit 1; }
+    readelf -h "$DEX_LINUX_APP" | grep -q 'X86-64' || { log_error "Expected an x86_64 executable"; exit 1; }
+    local APP_STAGE="${DEX_OS_DIR}/buildroot/app"
+    install -D -m 755 "$DEX_LINUX_APP" "$APP_STAGE/dex"
+    cp "${DEX_ROOT}/LICENSE" "$APP_STAGE/LICENSE"
+    log_ok "Tauri executable staged; runtime ABI compatibility requires a target boot test."
 }
 
 # ---------------------------------------------------------------------------
@@ -109,10 +94,8 @@ build_image() {
     cd "$BUILDROOT_DIR"
 
     # Use DEX OS as an external tree
-    make BR2_EXTERNAL="${DEX_OS_DIR}/buildroot" dex_defconfig
+    make BR2_EXTERNAL="${DEX_OS_DIR}/buildroot" BR2_DEFCONFIG="${DEX_OS_DIR}/buildroot/defconfig" defconfig
 
-    # Apply the defconfig
-    cp "${DEX_OS_DIR}/buildroot/defconfig" .config
 
     log_info "Starting Buildroot build (this takes 30-90 minutes on first run)..."
     make -j"$(nproc)"
@@ -127,14 +110,14 @@ package_iso() {
     log_info "Packaging bootable ISO..."
     mkdir -p "$OUTPUT_DIR"
 
-    local ISO_FILE="${OUTPUT_DIR}/dex-os-3.6.0-x86_64.iso"
+    local ISO_FILE="${OUTPUT_DIR}/dex-os-7.0.1-x86_64.iso"
 
     # Buildroot generates the ISO if BR2_TARGET_ROOTFS_ISO9660=y
     if [ -f "${BUILDROOT_DIR}/output/images/rootfs.iso9660" ]; then
         cp "${BUILDROOT_DIR}/output/images/rootfs.iso9660" "$ISO_FILE"
     elif [ -f "${BUILDROOT_DIR}/output/images/disk.img" ]; then
-        cp "${BUILDROOT_DIR}/output/images/disk.img" "${OUTPUT_DIR}/dex-os-3.6.0-x86_64.img"
-        log_ok "Disk image: ${OUTPUT_DIR}/dex-os-3.6.0-x86_64.img"
+        cp "${BUILDROOT_DIR}/output/images/disk.img" "${OUTPUT_DIR}/dex-os-7.0.1-x86_64.img"
+        log_ok "Disk image: ${OUTPUT_DIR}/dex-os-7.0.1-x86_64.img"
     fi
 
     # Copy kernel and rootfs for reference
@@ -148,6 +131,9 @@ package_iso() {
         log_ok "ISO ready: $ISO_FILE ($SIZE)"
     fi
 
+    if [[ ! -s "$ISO_FILE" && ! -s "${OUTPUT_DIR}/dex-os-7.0.1-x86_64.img" ]]; then
+        log_error "No boot image was generated"; exit 1
+    fi
     log_ok "Build artifacts in: $OUTPUT_DIR"
 }
 
@@ -157,7 +143,7 @@ package_iso() {
 main() {
     echo ""
     echo "==========================================="
-    echo "  DEX OS Image Builder v3.6.0"
+    echo "  DEX OS Image Builder v7.0.1"
     echo "==========================================="
     echo ""
 
@@ -170,7 +156,7 @@ main() {
     echo ""
     log_ok "DEX OS build complete."
     echo ""
-    echo "  ISO:   ${OUTPUT_DIR}/dex-os-3.6.0-x86_64.iso"
+    echo "  ISO:   ${OUTPUT_DIR}/dex-os-7.0.1-x86_64.iso"
     echo "  Flash: sudo dd if=<iso> of=/dev/sdX bs=4M status=progress"
     echo "  Or:    ./make-usb.sh <iso> /dev/sdX"
     echo ""

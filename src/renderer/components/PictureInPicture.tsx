@@ -591,14 +591,19 @@ export interface PiPState {
 }
 
 let globalPiPState: PiPState | null = null;
+let releasePiPSource: (() => void) | undefined;
 const pipListeners = new Set<(state: PiPState | null) => void>();
 
-export function openPiP(src: string, title?: string, poster?: string): void {
+export function openPiP(src: string, title?: string, poster?: string, release?: () => void): void {
+  releasePiPSource?.();
+  releasePiPSource = release;
   globalPiPState = { active: true, src, poster, title };
   pipListeners.forEach(fn => fn(globalPiPState));
 }
 
 export function closePiP(): void {
+  releasePiPSource?.();
+  releasePiPSource = undefined;
   globalPiPState = null;
   pipListeners.forEach(fn => fn(null));
 }

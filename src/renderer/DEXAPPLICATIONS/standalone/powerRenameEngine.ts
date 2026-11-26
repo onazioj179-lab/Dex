@@ -8,7 +8,7 @@
 //
 // Kept separate from the React app so the transform rules are unit-testable and
 // can drive a live preview without any file-system access. The app applies the
-// computed names through the real `files:rename` IPC; this module only decides
+// computed names through the real `files:renameBatch` IPC; this module only decides
 // what each new name should be.
 
 export type CaseTransform = 'none' | 'lower' | 'upper' | 'title' | 'sentence';
@@ -140,19 +140,24 @@ export function computeRename(original: string, index: number, cfg: RenameConfig
 /** Compute new names for a whole batch, flagging collisions (two files mapping
  *  to the same name) and no-ops. Names are compared case-insensitively, matching
  *  Windows/macOS case-insensitive file systems. */
-export function computeBatch(originals: string[], cfg: RenameConfig): RenameItemResult[] {
-  const matcher = buildMatcher(cfg);
+export function computeBatch(originals: string[], cfg: RenameConfig, folders?: string[]): RenameItemResult[] {
+  let matcher: RegExp | null;
+  try {
+    matcher = buildMatcher(cfg);
+  } catch {
+    return originals.map(original => ({ original, next: original, changed: false, error: 'Invalid regular expression' }));
+  }
   const results = originals.map((name, i) => computeRename(name, i, cfg, matcher));
 
   // Collision detection across the produced names + the untouched originals.
+  const keys = results.map((result, index) => JSON.stringify([folders?.[index] ?? '', result.next.toLowerCase()]));
   const counts = new Map<string, number>();
-  for (const r of results) {
-    const key = r.next.toLowerCase();
+  for (const key of keys) {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return results.map(r => {
+  return results.map((r, index) => {
     if (r.error) return r;
-    if (r.changed && (counts.get(r.next.toLowerCase()) ?? 0) > 1) {
+    if (r.changed && (counts.get(keys[index]) ?? 0) > 1) {
       return { ...r, error: 'Duplicate name in batch' };
     }
     return r;

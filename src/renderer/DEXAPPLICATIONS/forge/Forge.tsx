@@ -28,6 +28,7 @@ import {
   planTarget,
   transcodeImage,
   transcodeAudioToWav,
+  exportVideoFrames,
 } from './transcode';
 import { useCreativeAppSettings } from '../../utils/creative-suite';
 
@@ -272,7 +273,10 @@ const Forge: React.FC = () => {
 
   // Mount guard — prevents setState after unmount in long async operations
   const mountedRef = useRef(true);
-  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // ===== PATTERN LEARNING =====
   useAppTracking('forge');
@@ -379,6 +383,11 @@ const Forge: React.FC = () => {
   
   // === PRO FEATURES STATE ===
   const [showImageSequence, setShowImageSequence] = useState(false);
+  const [frameProgress, setFrameProgress] = useState('');
+  const frameExport = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    if (showImageSequence) frameExport.current?.abort();
+  }, [showImageSequence]);
   // Frame formats the browser canvas can REALLY encode (canvas.toBlob). TIFF/EXR/
   // DPX were offered before but silently came out as PNG bytes with a lying file
   // extension — removed. True HDR/film formats need the native encoder.
@@ -842,13 +851,22 @@ const Forge: React.FC = () => {
   }, [selectedJobId]);
 
   const duplicateJob = useCallback((id: string) => {
+    const source = fileMapRef.current.get(id);
+    const original = jobsRef.current.find(job => job.id === id);
+    if (!original || !source) {
+      window.dispatchEvent(new CustomEvent('dex-toast', {
+        detail: { type: 'info', message: 'Add the source file again to make another encode.' },
+      }));
+      return;
+    }
+    const dup: Job = { ...original, id: 'job-' + crypto.randomUUID(), name: original.name + ' (copy)',
+      status: 'queued', progress: 0, startTime: undefined, endTime: undefined, outputBlobUrl: undefined,
+      outputSize: undefined, outputExt: undefined, outputMime: undefined, error: undefined };
+    fileMapRef.current.set(dup.id, source);
     setJobs(prev => {
-      const src = prev.find(j => j.id === id);
-      if (!src) return prev;
-      const dup = { ...src, id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: `${src.name} (copy)`, status: 'queued' as const, progress: 0, startTime: undefined, endTime: undefined };
       const idx = prev.findIndex(j => j.id === id);
       const next = [...prev];
-      next.splice(idx + 1, 0, dup);
+      next.splice(idx < 0 ? next.length : idx + 1, 0, dup);
       return next;
     });
   }, []);
@@ -878,12 +896,7 @@ const Forge: React.FC = () => {
     }
     
     // Validate all queued jobs have source files
-    const missingFiles: string[] = [];
-    for (const job of queuedJobs) {
-      if (!fileMapRef.current.has(job.id)) {
-        missingFiles.push(job.name);
-      }
-    }
+    const missingFiles = queuedJobs.filter(job => !fileMapRef.current.has(job.id));
     
     if (missingFiles.length > 0) {
       const count = missingFiles.length;
@@ -891,13 +904,14 @@ const Forge: React.FC = () => {
         detail: {
           type: 'error',
           message: count === 1
-            ? `Missing source file: ${missingFiles[0]}`
+            ? `Missing source file: ${missingFiles[0].name}`
             : `${count} jobs missing source files. Re-add the files to continue.`
         }
       }));
       // Mark missing jobs as failed
+      const missingIds = new Set(missingFiles.map(job => job.id));
       setJobs(prev => prev.map(j =>
-        missingFiles.includes(j.name) && j.status === 'queued'
+        missingIds.has(j.id) && j.status === 'queued'
           ? { ...j, status: 'failed' as const, error: 'Source file missing — re-add to queue' }
           : j
       ));
@@ -1801,36 +1815,46 @@ const Forge: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>Naming Pattern</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>frame_[####].{imgSeqFormat}</div>
             </div>
-            <button aria-label="Export image sequence" onClick={async () => {
-              if (!selectedJob || !fileMapRef.current.has(selectedJob.id)) { toast.warning('Select a video file first'); return; }
-              const file = fileMapRef.current.get(selectedJob.id)!;
-              const video = document.createElement('video');
-              video.muted = true; video.playsInline = true;
-              const objUrl = URL.createObjectURL(file);
-              video.src = objUrl;
-              await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(); });
-              const canvas = document.createElement('canvas');
-              canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-              const ctx = canvas.getContext('2d');
-              if (!ctx) { toast.error('Canvas context unavailable'); return; }
-              const fps = 30; const dur = video.duration; const totalFrames = Math.floor(dur * fps);
-              toast.info(`Exporting ${totalFrames} frames as ${imgSeqFormat.toUpperCase()}...`);
-              const frameBlobs: Blob[] = [];
-              for (let i = 0; i < totalFrames; i++) {
-                video.currentTime = i / fps;
-                await new Promise<void>(r => { video.onseeked = () => r(); });
-                ctx.drawImage(video, 0, 0);
-                const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
-                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, mimeMap[imgSeqFormat] || 'image/png', 0.92));
-                if (blob) frameBlobs.push(blob);
-                if (i % 10 === 0) toast.info(`Frame ${i + 1}/${totalFrames}...`);
+            <button aria-label={frameProgress ? 'Cancel image sequence' : 'Export image sequence'} onClick={async () => {
+              if (frameExport.current) {
+                frameExport.current.abort();
+                return;
               }
-              // Batch download all frames
-              for (let i = 0; i < frameBlobs.length; i++) {
-                const a = document.createElement('a'); a.href = URL.createObjectURL(frameBlobs[i]); a.download = `frame_${String(i).padStart(6, '0')}.${imgSeqFormat}`; a.click(); URL.revokeObjectURL(a.href);
+              const file = selectedJob && fileMapRef.current.get(selectedJob.id);
+              if (!file || detectSourceKind(file) !== 'video') { toast.warning('Select a video file first'); return; }
+              const controller = new AbortController();
+              frameExport.current = controller;
+              setFrameProgress('Opening video…');
+              let started = 0;
+              try {
+                await exportVideoFrames(file, imgSeqFormat, controller.signal, (blob, index, total) => {
+                  const download = document.createElement('a');
+                  const url = URL.createObjectURL(blob);
+                  download.href = url;
+                  download.download = `frame_${String(index).padStart(4, '0')}.${imgSeqFormat}`;
+                  download.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  started++;
+                  if (index === 0 || started % 10 === 0) setFrameProgress(`${started} / ${total} frames`);
+                });
+                if (!mountedRef.current) return;
+                toast.success(`Started downloads for ${started} frames`);
+                setShowImageSequence(false);
+              } catch (error) {
+                if (!mountedRef.current) return;
+                if (controller.signal.aborted) {
+                  toast.info(`Frame export canceled. ${started} downloads started.`);
+                } else {
+                  toast.error(error instanceof Error ? error.message : 'Could not export video frames.');
+                }
+              } finally {
+                frameExport.current = null;
+                if (mountedRef.current) setFrameProgress('');
               }
-              URL.revokeObjectURL(objUrl); toast.success(`Exported ${totalFrames} frames`); setShowImageSequence(false);
-            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Sequence</button>
+            }} style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 9999, border: 'none', background: 'var(--color-success)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              {frameProgress ? 'Cancel Export' : 'Export Sequence'}
+            </button>
+            {frameProgress && <div role="status" style={{ textAlign: 'center', marginTop: 8, fontSize: 11 }}>{frameProgress}</div>}
           </div>
         </div>
       )}

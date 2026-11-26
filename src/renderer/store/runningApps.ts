@@ -312,8 +312,8 @@ export const useRecentlyUsedApps = () => useRunningApps(useShallow(s => {
 // `version`/`buildDate` overrides are still honoured (creative-suite apps
 // historically tracked independent versions but are now aligned to platform
 // release for the 4.4.0 wave to remove user confusion).
-const PLATFORM_VERSION = '6.0.0';
-const PLATFORM_BUILD_DATE = '2026-06-18';
+const PLATFORM_VERSION = import.meta.env.VITE_APP_VERSION as string;
+const PLATFORM_BUILD_DATE = import.meta.env.VITE_APP_BUILD_DATE as string | undefined;
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
 const _O = platform.isMac ? '⌥' : 'Alt';
@@ -330,6 +330,8 @@ export const APP_DEFINITIONS: Record<string, { name: string; color: string; icon
   inbox: { name: 'Inbox', color: '#64d2ff', icon: 'bell', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Unified feed of notifications and cross-app activity' },
   spaces: { name: 'Spaces', color: '#bf5af2', icon: 'layers', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Snapshot and restore your open apps and project as named workspaces' },
   projectdash: { name: 'Project', color: 'var(--color-accent)', icon: 'dashboard', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Per-project overview: tasks, notes, and recent activity' },
+  ledger: { name: 'Ledger', color: 'var(--color-success)', icon: 'book-open', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'productivity', description: 'Local income, expenses, and transaction history' },
+  bioengineering: { name: 'Bioengineering', color: 'var(--color-accent)', icon: 'activity', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'utility', description: 'Local calibration and measurement worksheet' },
   backup: { name: 'Backup & Sync', color: '#30d158', icon: 'shield', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Encrypted backup, restore, and folder sync of all your DEX data' },
   extensions: { name: 'Extensions', color: '#ff9f0a', icon: 'puzzle', version: PLATFORM_VERSION, buildDate: PLATFORM_BUILD_DATE, category: 'system', description: 'Install, enable, and permission-gate local DEX extensions' },
 

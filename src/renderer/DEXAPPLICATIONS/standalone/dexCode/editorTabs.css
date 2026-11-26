@@ -1,0 +1,118 @@
+.dex-editor-tabs-bar {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  border-bottom: 1px solid var(--color-border, rgba(128, 128, 128, .28));
+}
+
+.dex-editor-tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.dex-editor-tab {
+  display: flex;
+  flex: 0 0 auto;
+  max-width: 13rem;
+  align-items: stretch;
+  border-bottom: 2px solid transparent;
+}
+
+.dex-editor-tab[data-active="true"] {
+  border-bottom-color: var(--color-accent, #4a9eff);
+  background: var(--color-bg-inset, rgba(128, 128, 128, .12));
+}
+
+.dex-editor-tab > button,
+.dex-editor-tab-add {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 .55rem;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dex-editor-tab > button:focus-visible,
+.dex-editor-tab-add:focus-visible,
+.dex-editor-tab > button:hover,
+.dex-editor-tab-add:hover {
+  background: var(--color-bg-inset, rgba(128, 128, 128, .16));
+}
+
+.dex-editor-tab > button.dex-editor-tab-close {
+  flex: 0 0 auto;
+  padding-inline: .3rem;
+}
+
+.dex-editor-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dex-editor-tab-dirty {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-accent, #4a9eff);
+}
+
+.dex-editor-recovery-status {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .65rem;
+  color: var(--color-text-primary);
+  background: var(--color-bg-inset, rgba(128, 128, 128, .14));
+  font-size: 12px;
+}
+
+.dex-editor-problems {
+  flex: 0 0 auto;
+  max-height: min(25vh, 12rem);
+  overflow: auto;
+  padding: .35rem .65rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-inset, rgba(128, 128, 128, .14));
+}
+
+.dex-editor-problems ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.dex-editor-problems button {
+  display: flex;
+  gap: .65rem;
+  width: 100%;
+  padding: .25rem .1rem;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+}
+
+.dex-editor-problems button:hover {
+  background: var(--color-bg-inset, rgba(128, 128, 128, .16));
+}
+
+.dex-editor-problem-location {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  color: var(--color-text-secondary);
+  font-family: var(--dex-font-mono, monospace);
+}

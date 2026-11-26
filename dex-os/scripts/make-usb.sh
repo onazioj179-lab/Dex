@@ -3,7 +3,7 @@
 # DEX OS -- Flash ISO to USB Drive
 # ===========================================================================
 # Usage: ./make-usb.sh <iso-file> <device>
-# Example: ./make-usb.sh ../output/dex-os-3.6.0-x86_64.iso /dev/sdb
+# Example: ./make-usb.sh ../output/dex-os-7.0.1-x86_64.iso /dev/sdb
 #
 # WARNING: This will ERASE all data on the target device.
 # ===========================================================================
@@ -20,7 +20,7 @@ NC='\033[0m'
 # ---------------------------------------------------------------------------
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <iso-file> <device>"
-    echo "Example: $0 ../output/dex-os-3.6.0-x86_64.iso /dev/sdb"
+    echo "Example: $0 ../output/dex-os-7.0.1-x86_64.iso /dev/sdb"
     exit 1
 fi
 

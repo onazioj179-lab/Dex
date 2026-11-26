@@ -17,7 +17,7 @@
  * ===========================================================================
  */
 
-import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import packageJson from '../../package.json';
 import { useAuthStore } from './store/useAuthStore';
 import { useWallpaperStore } from './store/wallpaperStore';
@@ -36,13 +36,13 @@ import { initializeTier } from './services/TierManager';
 import { startAdaptivePerfMonitor } from './services/AdaptivePerfMonitor';
 import { startIdlePauseCoordinator } from './utils/idlePause';
 import { initComfort } from './improvements500/comfortPrefs';
-import { applyAccentFamily } from './utils/accentFamily';
 import { startPermissionAutoDisable, stopPermissionAutoDisable } from './store/permissionStore';
 import { 
   initAppSubsystemIPC 
 } from './store/appSubsystem';
 import { ClipboardHistory, useClipboardHistory } from './components/ClipboardHistory';
 import { startClipboardMonitor } from './services/ClipboardMonitor';
+import { DisposableGroup } from '../shared/disposable';
 import FlowSendMenu from './components/FlowSendMenu';
 import { wireFlowIntakes } from './services/flowIntakes';
 import ContextNowPanel from './components/ContextNowPanel';
@@ -65,6 +65,8 @@ import MiniPulse from './components/MiniPulse';
 import { MiniShell, useCompactMode, useCompactModeShortcut } from './shell/MiniShell';
 import { useShellPreferences } from './store/shellPreferencesStore';
 import { loadManifest as loadWindowManifest, flush as flushWindowManifest } from './shell/WindowManifest';
+import DexBootScreen from './components/DexBootScreen';
+import { DexLoader } from './components/LoadingStates';
 
 // Progressive loading (item 153): Shell + nav immediate, overlays deferred
 const AppManager = lazy(() => import('./components/AppManager').then(m => ({ default: m.AppManager })));
@@ -115,41 +117,10 @@ const initializeTheme = () => {
   document.body.classList.toggle('light-mode', !isDark);
   document.documentElement.classList.toggle('dark-mode', isDark);
   document.documentElement.classList.toggle('light-mode', !isDark);
-  try {
-    const savedSettings = localStorage.getItem('dex-settings');
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      // Only apply a REAL color literal. A stored sentinel like
-      // 'var(--color-accent)' (a prior "auto/default" marker) would set
-      // --color-accent to reference itself -> circular -> the property
-      // resolves to empty app-wide, so every var(--color-accent) fell back to
-      // its hardcoded dark-blue and accent never themed to light mode.
-      if (settings.accentColor && /^#([0-9a-f]{3}|[0-9a-f]{6})$|^rgb/i.test(String(settings.accentColor).trim())) {
-        applyAccentFamily(String(settings.accentColor).trim());
-      }
-    }
-  } catch (_) {
-    // accent color load failed -- defaults are fine
-  }
 };
 
 // Theme is initialized in the main useEffect to avoid double calls
 // initializeTheme() removed from module scope (was duplicate)
-
-// Item 78: Sync system accent color from OS (async, non-blocking)
-(async () => {
-  try {
-    const hasUserAccent = localStorage.getItem('dex-accent-color');
-    if (hasUserAccent) return; // User has manually set accent -- respect it
-    const api = (window as any).electronAPI;
-    const osColor = await api?.theme?.getSystemAccentColor?.();
-    if (osColor && /^#[0-9a-f]{6}$/i.test(osColor)) {
-      applyAccentFamily(osColor);
-    }
-  } catch {
-    // OS accent detection unavailable
-  }
-})();
 
 // Item 139: DNS prefetch for common resources loaded during session
 if (typeof document !== 'undefined') {
@@ -231,6 +202,9 @@ seedFirstLaunchData();
 // ===========================================================================
 
 export const App: React.FC = () => {
+  const [bootVisible, setBootVisible] = useState(true);
+  const finishBoot = useCallback(() => setBootVisible(false), []);
+
   // Command Palette (Ctrl+K)
   const commandPalette = useCommandPalette();
   
@@ -242,11 +216,15 @@ export const App: React.FC = () => {
     window.addEventListener('dex-open-clipboard', onOpenClipboard);
     return () => window.removeEventListener('dex-open-clipboard', onOpenClipboard);
   }, [clipboardOpen]);
-  // Omni Clipboard: start continuous background capture so the history already
-  // holds what you copied while working (not just whatever is on the clipboard
-  // the moment the panel opens). Idempotent; runs once for the app's lifetime.
-  // Also register DEX Flow's built-in rich intakes (Send to Notes -> real note).
-  useEffect(() => { startClipboardMonitor(); wireFlowIntakes(); startContextEngine(); initLearningWiring(); registerBuiltinLearn(); }, []);
+  useEffect(() => {
+    const runtime = new DisposableGroup();
+    runtime.add(startClipboardMonitor());
+    runtime.add(wireFlowIntakes());
+    runtime.add(startContextEngine());
+    runtime.add(initLearningWiring());
+    registerBuiltinLearn();
+    return runtime.cleanup;
+  }, []);
   
   // Picture-in-Picture video state
   const pipState = usePiPState();
@@ -438,7 +416,7 @@ export const App: React.FC = () => {
     initScreenGuardSystems();
     
     // Initialize legacy app subsystem
-    initAppSubsystemIPC();
+    const cleanupAppSubsystemIPC = initAppSubsystemIPC();
 
     // Initialize Xenon push-model listener (replaces renderer polling for system metrics)
     const cleanupXenon = initXenonListener();
@@ -497,16 +475,23 @@ export const App: React.FC = () => {
       });
     };
 
-    if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(idleInit, { timeout: 3000 });
+    let idleInitHandle: number;
+    let idleInitKind: 'idle' | 'timeout';
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      idleInitKind = 'idle';
+      idleInitHandle = (window as any).requestIdleCallback(idleInit, { timeout: 3000 });
     } else {
-      setTimeout(idleInit, 200);
+      idleInitKind = 'timeout';
+      idleInitHandle = globalThis.setTimeout(idleInit, 200) as unknown as number;
     }
 
     // Cleanup on unmount
     return () => {
       document.removeEventListener('contextmenu', suppressNativeContext);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      if (idleInitKind === 'idle') (window as any).cancelIdleCallback?.(idleInitHandle);
+      else window.clearTimeout(idleInitHandle);
+      cleanupAppSubsystemIPC();
       try { flushWindowManifest(); } catch { /* non-fatal */ }
       cleanupXenon();
       cleanupIdleSweep();
@@ -524,6 +509,8 @@ export const App: React.FC = () => {
     <ModalProvider>
     <div style={rootStyles.container}>
       <style>{globalStyles}{GLOBAL_POLISH_CSS}{titlebarStyles}</style>
+
+      {bootVisible && <DexBootScreen onComplete={finishBoot} />}
       
       {/* Window drag region for frameless window (Windows) */}
       <div className="dex-window-titlebar" aria-hidden="true" />
@@ -630,6 +617,7 @@ export const App: React.FC = () => {
       {pipState && (
         <AppErrorBoundary instanceId="pip" appId="pip" appName="Picture in Picture" appColor="#0a84ff">
         <PictureInPicture
+          key={pipState.src}
           src={pipState.src}
           poster={pipState.poster}
           title={pipState.title}
@@ -688,13 +676,13 @@ export const App: React.FC = () => {
       )}
 
       {/* Global wallpaper layer -- sits behind everything, reacts to wallpaper store */}
-      <div aria-hidden="true" style={{
+      <div aria-hidden="true" className="dex-system-wallpaper" style={{
         position: 'fixed', inset: 0, zIndex: -2,
         ...wallpaperBg,
-        filter: wpBlur > 0 ? `blur(${wpBlur}px)` : undefined,
+        filter: `grayscale(1) contrast(1.08) brightness(0.72)${wpBlur > 0 ? ` blur(${wpBlur}px)` : ''}`,
         transform: wpBlur > 0 ? 'scale(1.05)' : undefined,
-        transition: 'background 0.5s ease, filter 0.4s ease',
-        willChange: wpBlur > 0 ? 'transform, filter' : 'auto',
+        transition: 'filter 160ms var(--dex-ease)',
+        willChange: 'auto',
       }} />
 
       {/* Global wallpaper tint scrim -- applies the stored tint at the configured
@@ -717,18 +705,11 @@ export const App: React.FC = () => {
       <div id="dex-main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, background: 'transparent' }}>
         <AppErrorBoundary instanceId="appmanager" appId="appmanager" appName="App Shell" appColor="var(--color-accent, #0a84ff)">
         <Suspense fallback={(
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(180deg, rgba(12,12,14,0.36), rgba(12,12,14,0.18))',
-            color: 'var(--color-text-secondary)',
-            fontSize: 14,
-            letterSpacing: '0.01em',
-          }}>
-            Restoring home...
-          </div>
+          <DexLoader
+            variant="screen"
+            label="Restoring workspace"
+            sublabel="Reconnecting apps and system services"
+          />
         )}>
           <AppManager />
         </Suspense>

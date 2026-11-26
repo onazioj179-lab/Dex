@@ -1,7 +1,7 @@
 [package]
 name = "dex-tauri"
 description = "DEX 6.0 Tauri shell (GOAL-6A) — hosts the existing Vite renderer"
-version = "7.0.1"
+version = "7.0.2"
 edition = "2021"
 license = "MIT"
 authors = ["Onazi Treasure OJ <onazi75@gmail.com>"]
@@ -13,7 +13,7 @@ authors = ["Onazi Treasure OJ <onazi75@gmail.com>"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dex-smart-router = { path = "../core/dex-smart-router" }
@@ -26,17 +26,34 @@ dex-rewind = { path = "../core/dex-rewind" }
 dex-ai-runtime = { path = "../core/dex-ai-runtime" }
 # Native backend ports (Electron->Tauri migration):
 sysinfo = "0.30"   # system status + process list/kill
+portable-pty = "0.9"
 open = "5"          # shell: open path / external url with the OS default
 arboard = "3"       # clipboard read/write
 trash = "5"         # move-to-recycle-bin (safe delete)
 rusqlite = { version = "0.31", features = ["bundled"] }  # native dex.db (shared by ~50 subsystems); bundled = no system sqlite needed
 flate2 = "1"        # zlib deflate/inflate (Node zlib parity for snapshot/archive BLOBs); pure-Rust miniz_oxide
 base64 = "0.22"     # Node Buffer base64 parity (session-replay states, binary-over-bridge standard)
+tempfile = "3"     # Stage Gallery exports before publishing the completed copy
+getrandom = "0.2"   # OS CSPRNG for browser-bridge session credentials
+sha2 = "0.10"       # one-way storage and constant-time verification of bridge credentials
 tauri-plugin-dialog = "2"        # native file/folder pickers (dialog:showOpenDialog, files:openDialog) — replaces Electron dialog.showOpenDialog
 tauri-plugin-notification = "2"  # OS notification toasts (notification-center:send) — replaces Electron Notification
 ureq = { version = "2", features = ["tls"] }  # tiny blocking HTTP client for link-preview metadata fetch
 notify = "6"        # live filesystem watching (file-watcher:newFile auto-import/notify) — replaces Electron fs.watch
 tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link download + upload) — replaces Electron http.createServer
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = [
+  "Win32_Devices_FunctionDiscovery", "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com_StructuredStorage", "Win32_System_Threading",
+  "Win32_Security", "Win32_System_JobObjects",
+  "Win32_UI_Shell_PropertiesSystem",
+] }
+windows-core = "0.61.2"
+webview2-com = "0.38.2"
 
 [features]
 # Tauri's default release feature for the embedded asset protocol.

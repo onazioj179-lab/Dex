@@ -64,7 +64,7 @@ export function createEmptyDoc(): DocRoot {
 }
 
 export function createDocFromText(text: string): DocRoot {
-  const lines = text.split('\n');
+  const lines = text.split(/\r\n|\r|\n/);
   const content: DocNode[] = [];
   for (const line of lines) {
     if (line.trim() === '') {
@@ -131,7 +131,7 @@ function nodesToHTML(nodes: DocNode[] | undefined): string {
 function nodeToHTML(node: DocNode): string {
   // Text node with marks
   if (node.text !== undefined) {
-    let html = renderWikiLinks(escapeHTML(node.text));
+    let html = renderWikiLinks(escapeHTML(node.text)).replace(/\r\n|\r|\n/g, '<br>');
     if (node.marks) {
       for (const mark of node.marks) {
         html = wrapMark(html, mark);
@@ -141,18 +141,20 @@ function nodeToHTML(node: DocNode): string {
   }
 
   const inner = nodesToHTML(node.content);
+  const align = node.attrs?.alignment;
+  const blockStyle = /^(left|center|right|justify)$/.test(align) ? ' style="text-align:' + align + '"' : '';
 
   switch (node.type) {
     case 'paragraph':
-      return `<p>${inner || '<br>'}</p>`;
+      return `<p${blockStyle}>${inner || '<br>'}</p>`;
     case 'heading': {
       const level = Math.min(Math.max(node.attrs?.level || 1, 1), 6);
-      return `<h${level}>${inner}</h${level}>`;
+      return `<h${level}${blockStyle}>${inner}</h${level}>`;
     }
     case 'blockquote':
       return blockquoteToHTML(node, inner);
     case 'code_block':
-      return `<pre><code>${inner}</code></pre>`;
+      return `<pre><code>${escapeHTML(nodeText(node))}</code></pre>`;
     case 'horizontal_rule':
     case 'divider':
       return '<hr>';
@@ -279,15 +281,12 @@ function parseChildren(el: Element | ChildNode): DocNode[] {
 function parseElement(el: Element): DocNode | null {
   const tag = el.tagName.toLowerCase();
 
+  const align = (el as HTMLElement).style?.textAlign || el.getAttribute('align') || '';
+  const alignment = /^(left|center|right|justify)$/.test(align) ? { alignment: align } : undefined;
+  if (/^h[1-6]$/.test(tag)) return { type: 'heading', attrs: { level: Number(tag[1]), ...alignment }, content: parseInline(el) };
   switch (tag) {
     case 'p':
-      return { type: 'paragraph', content: parseInline(el) };
-    case 'h1': return { type: 'heading', attrs: { level: 1 }, content: parseInline(el) };
-    case 'h2': return { type: 'heading', attrs: { level: 2 }, content: parseInline(el) };
-    case 'h3': return { type: 'heading', attrs: { level: 3 }, content: parseInline(el) };
-    case 'h4': return { type: 'heading', attrs: { level: 4 }, content: parseInline(el) };
-    case 'h5': return { type: 'heading', attrs: { level: 5 }, content: parseInline(el) };
-    case 'h6': return { type: 'heading', attrs: { level: 6 }, content: parseInline(el) };
+      return { type: 'paragraph', attrs: alignment, content: parseInline(el) };
     case 'blockquote': {
       // Callout blockquotes carry data-callout; reconstruct the leading
       // "[!TYPE] title" paragraph from the attribute and parse only the body,
@@ -350,7 +349,7 @@ function parseElement(el: Element): DocNode | null {
       return null;
     case 'div':
       // Divs in contenteditable usually just wrap paragraphs
-      return { type: 'paragraph', content: parseInline(el) };
+      return { type: 'paragraph', attrs: alignment, content: parseInline(el) };
     default:
       // Treat unknown block elements as paragraphs
       return { type: 'paragraph', content: parseInline(el) };
@@ -360,20 +359,26 @@ function parseElement(el: Element): DocNode | null {
 function parseListItem(el: Element): DocNode | null {
   if (!el || el.tagName.toLowerCase() !== 'li') return null;
 
-  const checkbox = el.querySelector('input[type="checkbox"]');
+  const checkbox = el.querySelector(':scope > input[type="checkbox"]');
+  const content = parseInline(el, true);
+  for (const child of Array.from(el.children)) {
+    if (child.tagName !== 'UL' && child.tagName !== 'OL') continue;
+    const nested = parseElement(child);
+    if (nested) content.push(nested);
+  }
   if (checkbox || el.classList.contains('checklist-item')) {
     const checked = (checkbox as HTMLInputElement)?.checked ||
       el.getAttribute('data-checked') === 'true';
     return {
       type: 'checklist_item',
       attrs: { checked },
-      content: parseInline(el),
+      content,
     };
   }
-  return { type: 'list_item', content: parseInline(el) };
+  return { type: 'list_item', content };
 }
 
-function parseInline(el: Element): DocNode[] {
+function parseInline(el: Element, skipLists = false): DocNode[] {
   const nodes: DocNode[] = [];
   for (let i = 0; i < el.childNodes.length; i++) {
     const child = el.childNodes[i];
@@ -388,6 +393,12 @@ function parseInline(el: Element): DocNode[] {
 
       // Skip checkbox inputs (handled by checklist_item)
       if (tag === 'input') continue;
+      if (skipLists && (tag === 'ul' || tag === 'ol')) continue;
+      if (tag === 'img') {
+        const image = parseElement(inlineEl);
+        if (image) nodes.push(image);
+        continue;
+      }
 
       // Wiki-link anchors round-trip back to "[[Title]]" plain text so the
       // stored doc keeps the portable syntax rather than a baked-in anchor.

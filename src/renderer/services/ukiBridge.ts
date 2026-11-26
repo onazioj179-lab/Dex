@@ -13,10 +13,15 @@ import { useUkiStore } from '../store/ukiStore';
 import type { UkiUIState } from '../store/ukiStore';
 import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
 import { useRunningApps } from '../store/runningApps';
+import { DisposableGroup } from '../../shared/disposable';
+import { sendPlatformIpc, subscribePlatformIpc } from './platform/ipc';
 
 let initialized = false;
+let bridgeDisposables: DisposableGroup | null = null;
+let bridgeGeneration = 0;
 let recognition: any = null;
 let shouldKeepListening = false;
+const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
 let knowledgeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingKnowledgeNodes: Array<{
   id: string;
@@ -26,6 +31,15 @@ let pendingKnowledgeNodes: Array<{
   category: string;
   timestamp: number;
 }> | null = null;
+
+function scheduleBridgeTimeout(callback: () => void, delay: number): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(() => {
+    pendingTimers.delete(timer);
+    callback();
+  }, delay);
+  pendingTimers.add(timer);
+  return timer;
+}
 
 function createSpeechRecognition(): any {
   if (typeof window === 'undefined') return null;
@@ -42,7 +56,7 @@ function createSpeechRecognition(): any {
   }
 }
 
-function startSpeechRecognition(ipc: any, dex: any): void {
+function startSpeechRecognition(dex: any, generation: number): void {
   const store = useUkiStore;
   const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
 
@@ -63,6 +77,10 @@ function startSpeechRecognition(ipc: any, dex: any): void {
 
   // Request microphone permission first (triggers browser permission prompt)
   getUserMedia({ audio: true }).then((stream) => {
+    if (!initialized || generation !== bridgeGeneration) {
+      stream.getTracks().forEach(t => t.stop());
+      return;
+    }
     // Permission granted — stop the stream (SpeechRecognition manages its own)
     stream.getTracks().forEach(t => t.stop());
 
@@ -105,7 +123,7 @@ function startSpeechRecognition(ipc: any, dex: any): void {
         store.getState().setPartialTranscript('');
         dex?.uki?.transcript?.(finalText);
         store.getState().setAudioLevel(0.85);
-        setTimeout(() => store.getState().setAudioLevel(0.2), 120);
+        scheduleBridgeTimeout(() => store.getState().setAudioLevel(0.2), 120);
       }
     };
 
@@ -121,7 +139,7 @@ function startSpeechRecognition(ipc: any, dex: any): void {
       }
       // Restart on transient errors rather than leaving the mic dead
       if (shouldKeepListening && (err === 'aborted' || err === 'network' || err === 'audio-capture')) {
-        setTimeout(() => {
+        scheduleBridgeTimeout(() => {
           if (shouldKeepListening) {
             try { sr.start(); } catch { /* onend will handle next retry */ }
           }
@@ -135,7 +153,7 @@ function startSpeechRecognition(ipc: any, dex: any): void {
         try {
           sr.start();
         } catch {
-          setTimeout(() => {
+          scheduleBridgeTimeout(() => {
             if (shouldKeepListening) {
               try {
                 sr.start();
@@ -156,6 +174,7 @@ function startSpeechRecognition(ipc: any, dex: any): void {
       recognition = null;
     }
   }).catch((err: any) => {
+    if (!initialized || generation !== bridgeGeneration) return;
     usePermissionStore.getState().setPermission('microphone', false);
     store.getState().setError(`Microphone permission denied: ${err?.message || err}`);
     shouldKeepListening = false;
@@ -188,9 +207,9 @@ function stopSpeechRecognition(): void {
  * app on startup, then on every focus change (deduped). This is what makes UKI
  * workflow-aware ("close this", "summarize it") resolve against the right app.
  */
-function syncWorkflowContext(dex: any): void {
+function syncWorkflowContext(dex: any): () => void {
   const set = dex?.uki?.setContext;
-  if (typeof set !== 'function') return;
+  if (typeof set !== 'function') return () => {};
   let last: string | null = null;
   const push = (appId: string | undefined) => {
     const id = appId || null;
@@ -200,27 +219,33 @@ function syncWorkflowContext(dex: any): void {
   };
   try {
     push(useRunningApps.getState().currentAppId);
-    useRunningApps.subscribe((state) => push(state.currentAppId));
+    return useRunningApps.subscribe((state) => push(state.currentAppId));
   } catch { /* store unavailable (non-renderer/test) */ }
+  return () => {};
 }
 
 /**
  * Call once from App.tsx or main.tsx to wire UKI IPC listeners.
  */
-export function initUkiRendererBridge(): void {
-  if (initialized) return;
+export function initUkiRendererBridge(): () => void {
+  if (initialized) return destroyUkiRendererBridge;
   initialized = true;
+  bridgeGeneration += 1;
 
   const dex = (window as any).dex;
-  const ipc = (window as any).electron?.ipcRenderer || (window as any).ipcRenderer;
-  if (!ipc) return;
+  const generation = bridgeGeneration;
+  const disposables = new DisposableGroup();
+  bridgeDisposables = disposables;
+  const on = (channel: string, listener: (...args: any[]) => void) => {
+    disposables.add(subscribePlatformIpc(channel, (...args) => listener(undefined, ...args)));
+  };
 
-  syncWorkflowContext(dex);
+  disposables.add(syncWorkflowContext(dex));
 
   const store = useUkiStore;
 
   // State sync from main process
-  ipc.on?.('uki:stateChanged', (_e: any, data: any) => {
+  on('uki:stateChanged', (_e: any, data: any) => {
     const state = typeof data === 'object' ? data?.state : data;
     const validStates: UkiUIState[] = ['dormant', 'idle', 'listening', 'processing', 'thinking', 'speaking', 'error'];
     if (typeof state === 'string' && validStates.includes(state as UkiUIState)) {
@@ -229,7 +254,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Init status from main — report partial/missing modules
-  ipc.on?.('uki:initStatus', (_e: any, data: any) => {
+  on('uki:initStatus', (_e: any, data: any) => {
     if (!data || typeof data !== 'object') return;
     const { ready, partial, missing } = data as { ready?: boolean; partial?: boolean; missing?: string[] };
     if (partial && Array.isArray(missing) && missing.length > 0) {
@@ -241,7 +266,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Response from main
-  ipc.on?.('uki:response', (_e: any, data: any) => {
+  on('uki:response', (_e: any, data: any) => {
     const response = typeof data === 'object' ? data?.text : (typeof data === 'string' ? data : '');
     if (typeof response === 'string' && response.length < 10000) {
       store.getState().setResponse(response);
@@ -249,7 +274,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // TTS speak request from main
-  ipc.on?.('uki:tts:speak', (_e: any, text: unknown) => {
+  on('uki:tts:speak', (_e: any, text: unknown) => {
     if (typeof text !== 'string' || text.length > 5000) return;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -287,33 +312,33 @@ export function initUkiRendererBridge(): void {
         }
       } catch { /* ignore voice selection failures */ }
       utterance.onend = () => {
-        ipc.send?.('uki:tts:ended');
+        sendPlatformIpc('uki:tts:ended');
       };
       utterance.onerror = () => {
-        ipc.send?.('uki:tts:ended');
+        sendPlatformIpc('uki:tts:ended');
       };
       window.speechSynthesis.speak(utterance);
     }
   });
 
-  ipc.on?.('uki:tts:stop', () => {
+  on('uki:tts:stop', () => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
   });
 
   // Start/stop renderer microphone capture for UKI ASR.
-  ipc.on?.('uki:listeningStarted', () => {
+  on('uki:listeningStarted', () => {
     store.getState().startListening();
-    startSpeechRecognition(ipc, dex);
+    startSpeechRecognition(dex, generation);
   });
 
-  ipc.on?.('uki:listeningStopped', () => {
+  on('uki:listeningStopped', () => {
     stopSpeechRecognition();
     store.getState().stopListening();
   });
 
-  ipc.on?.('uki:transcript', (_e: any, payload: any) => {
+  on('uki:transcript', (_e: any, payload: any) => {
     const text = typeof payload === 'object' ? payload?.text : payload;
     if (typeof text === 'string' && text.trim()) {
       store.getState().setTranscript(text.trim());
@@ -322,42 +347,42 @@ export function initUkiRendererBridge(): void {
   });
 
   // Navigation commands from UKI
-  ipc.on?.('uki:navigate', (_e: any, pageId: unknown) => {
+  on('uki:navigate', (_e: any, pageId: unknown) => {
     if (typeof pageId !== 'string' || pageId.length > 100) return;
     if (dex?.navigate) {
       dex.navigate(pageId);
     }
   });
 
-  ipc.on?.('uki:navigate-back', () => {
+  on('uki:navigate-back', () => {
     if (dex?.navigateBack) {
       dex.navigateBack();
     }
   });
 
   // App launch/close from UKI
-  ipc.on?.('uki:launchApp', (_e: any, appId: unknown) => {
+  on('uki:launchApp', (_e: any, appId: unknown) => {
     if (typeof appId !== 'string' || appId.length > 100) return;
     if (dex?.launchApp) {
       dex.launchApp(appId);
     }
   });
 
-  ipc.on?.('uki:closeApp', (_e: any, appId: unknown) => {
+  on('uki:closeApp', (_e: any, appId: unknown) => {
     if (typeof appId !== 'string' || appId.length > 100) return;
     if (dex?.closeApp) {
       dex.closeApp(appId);
     }
   });
 
-  ipc.on?.('uki:closeAllApps', () => {
+  on('uki:closeAllApps', () => {
     if (dex?.closeAllApps) {
       dex.closeAllApps();
     }
   });
 
   // Media commands from UKI
-  ipc.on?.('uki:media', (_e: any, cmd: unknown) => {
+  on('uki:media', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -367,7 +392,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // File commands from UKI
-  ipc.on?.('uki:files', (_e: any, cmd: unknown) => {
+  on('uki:files', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; query?: string; name?: string; target?: string; from?: string; to?: string; source?: string; dest?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -409,7 +434,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Creative commands from UKI
-  ipc.on?.('uki:creative', (_e: any, cmd: unknown) => {
+  on('uki:creative', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; app?: string; effect?: string; format?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -455,7 +480,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Knowledge/analytics commands from UKI
-  ipc.on?.('uki:knowledge', (_e: any, cmd: unknown) => {
+  on('uki:knowledge', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; period?: any; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -476,7 +501,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Cross-app intelligence commands from UKI
-  ipc.on?.('uki:cross-app', (_e: any, cmd: unknown) => {
+  on('uki:cross-app', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { 
       action?: string; 
@@ -503,7 +528,7 @@ export function initUkiRendererBridge(): void {
         if (c.appId && typeof c.appId === 'string') {
           dex?.launchApp?.(c.appId);
           // Give app time to mount, then dispatch tool command
-          setTimeout(() => {
+          scheduleBridgeTimeout(() => {
             window.dispatchEvent(new CustomEvent('uki:tool-execute', {
               detail: { appId: c.appId, toolId: c.toolId, toolAction: c.toolAction, params: c.params },
             }));
@@ -525,7 +550,7 @@ export function initUkiRendererBridge(): void {
         if (c.appId && typeof c.appId === 'string') {
           dex?.launchApp?.(c.appId);
           if (c.file && typeof c.file === 'string') {
-            setTimeout(() => {
+            scheduleBridgeTimeout(() => {
               window.dispatchEvent(new CustomEvent('uki:open-file', {
                 detail: { appId: c.appId, file: c.file },
               }));
@@ -544,7 +569,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Automation commands from UKI
-  ipc.on?.('uki:automation', (_e: any, cmd: unknown) => {
+  on('uki:automation', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; name?: string; when?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -559,7 +584,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // System commands from UKI
-  ipc.on?.('uki:system', (_e: any, cmd: unknown) => {
+  on('uki:system', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -582,7 +607,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Settings commands from UKI
-  ipc.on?.('uki:settings', (_e: any, cmd: unknown) => {
+  on('uki:settings', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { action?: string; value?: string; [k: string]: any };
     if (typeof c.action !== 'string' || c.action.length > 50) return;
@@ -596,7 +621,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Create commands from UKI (notes, tasks, reminders, workflows)
-  ipc.on?.('uki:create', (_e: any, cmd: unknown) => {
+  on('uki:create', (_e: any, cmd: unknown) => {
     if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) return;
     const c = cmd as { type?: string; title?: string; text?: string; name?: string; [k: string]: any };
     if (typeof c.type !== 'string' || c.type.length > 50) return;
@@ -617,7 +642,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Conversation turn from main -- adds to conversation history for overlay display
-  ipc.on?.('uki:turn', (_e: any, data: unknown) => {
+  on('uki:turn', (_e: any, data: unknown) => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const d = data as { id?: string; userText?: string; response?: string; intent?: string; success?: boolean; timestamp?: number; data?: unknown };
     if (typeof d.id !== 'string' || typeof d.userText !== 'string' || typeof d.response !== 'string') return;
@@ -633,7 +658,7 @@ export function initUkiRendererBridge(): void {
   });
 
   // Live knowledge graph nodes from UKI for Nexus visualization
-  ipc.on?.('uki:knowledge-update', (_e: any, data: unknown) => {
+  on('uki:knowledge-update', (_e: any, data: unknown) => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const d = data as { nodes?: unknown[] };
     if (!Array.isArray(d.nodes)) return;
@@ -650,7 +675,7 @@ export function initUkiRendererBridge(): void {
     }));
     pendingKnowledgeNodes = nodes;
     if (knowledgeUpdateTimer) clearTimeout(knowledgeUpdateTimer);
-    knowledgeUpdateTimer = setTimeout(() => {
+    knowledgeUpdateTimer = scheduleBridgeTimeout(() => {
       knowledgeUpdateTimer = null;
       if (!pendingKnowledgeNodes) return;
       store.getState().setKnowledgeNodes(pendingKnowledgeNodes);
@@ -658,13 +683,22 @@ export function initUkiRendererBridge(): void {
     }, 80);
   });
 
-  // Cleanup on window close — stop mic/speech before the page unloads
-  window.addEventListener('beforeunload', () => {
-    stopSpeechRecognition();
-    try { window.speechSynthesis?.cancel(); } catch { /* */ }
-    if (knowledgeUpdateTimer) clearTimeout(knowledgeUpdateTimer);
-    knowledgeUpdateTimer = null;
-    pendingKnowledgeNodes = null;
-    store.getState().reset();
-  });
+  return destroyUkiRendererBridge;
+}
+
+/** Fully release UKI renderer resources; safe across unload, HMR, and tests. */
+export function destroyUkiRendererBridge(): void {
+  if (!initialized && !bridgeDisposables) return;
+  initialized = false;
+  bridgeGeneration += 1;
+  stopSpeechRecognition();
+  try { window.speechSynthesis?.cancel(); } catch { /* shell already closing */ }
+  for (const timer of pendingTimers) clearTimeout(timer);
+  pendingTimers.clear();
+  knowledgeUpdateTimer = null;
+  pendingKnowledgeNodes = null;
+  const disposables = bridgeDisposables;
+  bridgeDisposables = null;
+  disposables?.dispose();
+  useUkiStore.getState().reset();
 }

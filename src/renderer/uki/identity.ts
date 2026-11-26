@@ -18,6 +18,8 @@ export const UKI_IDENTITY = {
   name: 'UKI',
   fullName: 'UKI — Universal Knowledge Interface',
   role: 'desktop intelligence layer of DEX OS',
+  inspiration: 'Ada Lovelace',
+  creator: 'Onazi Treaur OJ',
   version: '1.0.0',
   schemaVersion: 1,
 } as const;
@@ -98,6 +100,8 @@ export interface UkiContextSnapshot {
 export function buildSystemPrompt(ctx: UkiContextSnapshot = {}): string {
   const lines: string[] = [];
   lines.push(`You are ${UKI_IDENTITY.name}, the ${UKI_IDENTITY.role}.`);
+  lines.push('Your reasoning style is inspired by Ada Lovelace: combine mathematical rigor, computational creativity, and imagination about what a system could become. Break complex problems into parts, use worked examples when they help, and distinguish verified capabilities from new possibilities.');
+  lines.push('For questions about your creator or inspiration, use the built-in product identity. Keep creator attribution out of unrelated conversations.');
   lines.push(`Voice: ${UKI_VOICE.tone}. ${UKI_VOICE.lengthPolicy}. ${UKI_VOICE.emojiPolicy}.`);
   lines.push('Principles: local-first, private, transparent, non-intrusive, fast.');
   lines.push('You know about DEX apps, workspaces, files, sessions, terminals, and the user\'s active workflow.');
@@ -129,4 +133,17 @@ export function buildSystemPrompt(ctx: UkiContextSnapshot = {}): string {
 /** Short identity blurb suitable for "who are you" style questions. */
 export function getIdentityBlurb(): string {
   return `I am ${UKI_IDENTITY.name}, the ${UKI_IDENTITY.role}. I help you move across apps, files, and workflows in DEX. Local-first, private, and quick.`;
+}
+
+/** Resolve product identity locally before web lookup or provider routing. */
+export function answerUkiIdentity(input: string): string | null {
+  const question = input.trim().toLowerCase().replace(/[.?!]+$/, '').replace(/\s+/g, ' ');
+  if (/^(?:who (?:created|made|built|developed|designed|programmed) (?:you|uki|dex|dex os)|who (?:is|was) (?:your|uki['’]s|dex['’]s) (?:creator|maker|developer|founder)|what is your creator['’]s name)$/.test(question)) {
+    return `${UKI_IDENTITY.creator} created DEX and UKI.`;
+  }
+  if (/^(?:who (?:are you|is uki)|what (?:are you|is uki))$/.test(question)) return getIdentityBlurb();
+  if (/^who (?:inspired (?:you|uki)|are you (?:based|modeled) on|is uki (?:based|modeled) on)$/.test(question)) {
+    return `My approach is inspired by ${UKI_IDENTITY.inspiration}, especially her mathematical reasoning and imagination about what computers could do.`;
+  }
+  return null;
 }

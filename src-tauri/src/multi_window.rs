@@ -20,7 +20,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-const LABEL_PREFIX: &str = "dex-detached-";
+pub(crate) const LABEL_PREFIX: &str = "dex-detached-";
 
 /// Create the detached_windows table (kept verbatim so the shared `dex.db`
 /// schema stays identical to Electron's; bounds now live in KV, but the table

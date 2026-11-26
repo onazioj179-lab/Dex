@@ -751,6 +751,7 @@ interface NoteToolbarProps {
   onColorLabel?: (color: string | null) => void;
   focusMode: boolean;
   saving: boolean;
+  saveFailed?: boolean;
   /** Timestamp of the last successful save, for the autosave indicator. */
   lastSavedAt?: number | null;
 }
@@ -779,6 +780,7 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
   focusMode,
   saving,
   lastSavedAt,
+  saveFailed,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showColorMenu, setShowColorMenu] = useState(false);
@@ -799,7 +801,9 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
       minHeight: 36,
     }}>
       {/* Left: autosave status */}
-      <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />
+      {saveFailed && !saving
+        ? <span role="status" style={{ color: 'var(--color-error)', fontSize: 12 }}>Save failed. Press Ctrl+S to retry.</span>
+        : <AutosaveIndicator state={autosaveState} lastSavedAt={lastSavedAt} />}
 
       {/* Center: editor mode tabs */}
       <div style={{ display: 'flex', gap: 2, background: 'var(--color-border-subtle)', borderRadius: 4, padding: 2 }}>
@@ -899,11 +903,13 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
               minWidth: 120,
               zIndex: 'var(--z-max)',
             }}>
-              {['markdown', 'html', 'txt', 'json'].map(fmt => (
-                <div
+              {['docx', 'markdown', 'html', 'txt', 'json'].map(fmt => (
+                <button
+                  type="button"
                   key={fmt}
                   style={{
                     padding: '6px var(--space-3)',
+                    display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 0,
                     fontSize: 12,
                     color: colors.text,
                     cursor: 'pointer',
@@ -912,8 +918,8 @@ export const NoteToolbar: React.FC<NoteToolbarProps> = memo(({
                   onMouseEnter={e => (e.currentTarget.style.background = colors.bgHover)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  Export as .{fmt}
-                </div>
+                  {fmt === 'docx' ? 'Word document (.docx)' : 'Export as .' + (fmt === 'markdown' ? 'md' : fmt)}
+                </button>
               ))}
             </div>
           )}

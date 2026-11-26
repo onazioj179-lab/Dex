@@ -15,6 +15,7 @@
 //! `downsample_peaks` over the same input.
 
 use serde::Serialize;
+use std::io::{BufWriter, Seek, SeekFrom, Write};
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::errors::Error as SymphoniaError;
@@ -35,6 +36,10 @@ pub struct AudioMeta {
 
 /// Probe a file and return its format reader.
 fn open_format(path: &str) -> Result<Box<dyn FormatReader>, String> {
+    open_format_with_options(path, &FormatOptions::default())
+}
+
+fn open_format_with_options(path: &str, options: &FormatOptions) -> Result<Box<dyn FormatReader>, String> {
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
@@ -42,9 +47,100 @@ fn open_format(path: &str) -> Result<Box<dyn FormatReader>, String> {
         hint.with_extension(ext);
     }
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(&hint, mss, options, &MetadataOptions::default())
         .map_err(|e| e.to_string())?;
     Ok(probed.format)
+}
+
+/// Decode the first supported audio track to a seekable PCM WAV using packet-sized buffers.
+/// The destination must be discarded on error because its header is finalized after decoding.
+pub fn prepare_playback_wav(
+    path: &str,
+    output: impl Write + Seek,
+    canceled: impl Fn() -> bool,
+) -> Result<(), String> {
+    let io_error = |error: std::io::Error| error.to_string();
+    let options = FormatOptions { enable_gapless: true, ..FormatOptions::default() };
+    let mut format = open_format_with_options(path, &options)?;
+    let (track_id, mut decoder) = format.tracks().iter().find_map(|track| {
+        symphonia::default::get_codecs().make(&track.codec_params, &DecoderOptions::default())
+            .ok().map(|decoder| (track.id, decoder))
+    }).ok_or("No supported audio track was found.")?;
+    let mut writer = BufWriter::new(output);
+    let mut spec = None;
+    let mut samples: Option<SampleBuffer<i16>> = None;
+    let mut bytes: u32 = 0;
+    loop {
+        if canceled() { return Err("Audio preparation canceled.".into()); }
+        let packet = match format.next_packet() {
+            Ok(packet) => packet,
+            Err(SymphoniaError::IoError(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(error) => return Err(error.to_string()),
+        };
+        if packet.track_id() != track_id { continue; }
+        let decoded = match decoder.decode(&packet) {
+            Ok(decoded) => decoded,
+            Err(SymphoniaError::DecodeError(_)) => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        let current = *decoded.spec();
+        if let Some(previous) = spec {
+            if previous != current { return Err("The audio format changes within this file.".into()); }
+        } else {
+            writer.write_all(&wav_header(current, 0)?).map_err(io_error)?;
+            spec = Some(current);
+        }
+        let needed = decoded.capacity().checked_mul(current.channels.count()).ok_or("Invalid audio packet size.")?;
+        if samples.as_ref().is_none_or(|buffer| buffer.capacity() < needed) {
+            samples = Some(SampleBuffer::new(decoded.capacity() as u64, current));
+        }
+        let buffer = samples.as_mut().ok_or("Could not allocate the audio buffer.")?;
+        buffer.copy_interleaved_ref(decoded);
+        let packet_bytes = u32::try_from(buffer.samples().len()).ok().and_then(|count| count.checked_mul(2))
+            .ok_or("Audio packet exceeds the WAV size limit.")?;
+        bytes = bytes.checked_add(packet_bytes).filter(|size| *size <= u32::MAX - 60)
+            .ok_or("Decoded audio exceeds the size supported by PCM WAV playback.")?;
+        for sample in buffer.samples() {
+            writer.write_all(&sample.to_le_bytes()).map_err(io_error)?;
+        }
+    }
+    if bytes == 0 { return Err("The file contains no decodable audio samples.".into()); }
+    if canceled() { return Err("Audio preparation canceled.".into()); }
+    writer.seek(SeekFrom::Start(0)).map_err(io_error)?;
+    writer.write_all(&wav_header(spec.ok_or("Missing audio format.")?, bytes)?).map_err(io_error)?;
+    writer.flush().map_err(io_error)
+}
+
+fn wav_header(spec: symphonia::core::audio::SignalSpec, sample_bytes: u32) -> Result<Vec<u8>, String> {
+    let channels = u16::try_from(spec.channels.count()).map_err(|error| error.to_string())?;
+    let align = channels.checked_mul(2).filter(|value| *value > 0).ok_or("Invalid channel count.")?;
+    let byte_rate = spec.rate.checked_mul(u32::from(align)).filter(|value| *value > 0)
+        .ok_or("Invalid sample rate.")?;
+    let extensible = channels > 2;
+    let format_size: u32 = if extensible { 40 } else { 16 };
+    let riff_size = (format_size + 20).checked_add(sample_bytes).ok_or("Invalid WAV length.")?;
+    let mut header = Vec::with_capacity((format_size + 28) as usize);
+    header.extend_from_slice(b"RIFF");
+    header.extend_from_slice(&riff_size.to_le_bytes());
+    header.extend_from_slice(b"WAVEfmt ");
+    header.extend_from_slice(&format_size.to_le_bytes());
+    header.extend_from_slice(&(if extensible { 0xfffeu16 } else { 1u16 }).to_le_bytes());
+    header.extend_from_slice(&channels.to_le_bytes());
+    header.extend_from_slice(&spec.rate.to_le_bytes());
+    header.extend_from_slice(&byte_rate.to_le_bytes());
+    header.extend_from_slice(&align.to_le_bytes());
+    header.extend_from_slice(&16u16.to_le_bytes());
+    if extensible {
+        header.extend_from_slice(&22u16.to_le_bytes());
+        header.extend_from_slice(&16u16.to_le_bytes());
+        let mask = spec.channels.bits();
+        let wav_mask = if mask & !0x0003ffff == 0 { mask } else { 0 };
+        header.extend_from_slice(&wav_mask.to_le_bytes());
+        header.extend_from_slice(&[1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xaa, 0, 0x38, 0x9b, 0x71]);
+    }
+    header.extend_from_slice(b"data");
+    header.extend_from_slice(&sample_bytes.to_le_bytes());
+    Ok(header)
 }
 
 /// Read metadata + tags. Duration is derived from the frame count / sample rate.
@@ -218,6 +314,39 @@ fn downsample_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn prepares_seekable_pcm_from_aiff_without_loading_the_entire_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("clip.aiff");
+        let samples = [-32768i16, -27, 0, 35, 32767];
+        let data_size = (samples.len() * 2) as u32;
+        let mut aiff = Vec::new();
+        aiff.extend_from_slice(b"FORM");
+        aiff.extend_from_slice(&(46 + data_size).to_be_bytes());
+        aiff.extend_from_slice(b"AIFFCOMM");
+        aiff.extend_from_slice(&18u32.to_be_bytes());
+        aiff.extend_from_slice(&1u16.to_be_bytes());
+        aiff.extend_from_slice(&(samples.len() as u32).to_be_bytes());
+        aiff.extend_from_slice(&16u16.to_be_bytes());
+        aiff.extend_from_slice(&[0x40, 0x0b, 0xfa, 0, 0, 0, 0, 0, 0, 0]); // 8000 Hz
+        aiff.extend_from_slice(b"SSND");
+        aiff.extend_from_slice(&(8 + data_size).to_be_bytes());
+        aiff.extend_from_slice(&[0; 8]);
+        for sample in samples { aiff.extend_from_slice(&sample.to_be_bytes()); }
+        std::fs::write(&source, aiff).unwrap();
+        let mut prepared = std::io::Cursor::new(Vec::new());
+        prepare_playback_wav(source.to_str().unwrap(), &mut prepared, || false).unwrap();
+        let wav = prepared.into_inner();
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(u32::from_le_bytes(wav[24..28].try_into().unwrap()), 8000);
+        assert_eq!(u32::from_le_bytes(wav[40..44].try_into().unwrap()), data_size);
+        assert_eq!(&wav[44..], samples.into_iter().flat_map(i16::to_le_bytes).collect::<Vec<_>>());
+        let mut canceled = std::io::Cursor::new(Vec::new());
+        assert!(prepare_playback_wav(source.to_str().unwrap(), &mut canceled, || true).is_err());
+        assert!(canceled.into_inner().is_empty());
+    }
 
     /// Write a minimal 16-bit mono PCM WAV so the test exercises the real
     /// probe + decode path (no external fixture needed).

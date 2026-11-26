@@ -21,11 +21,18 @@ export interface SettingsSectionMeta {
   keywords?: string;
 }
 
+export interface SettingsCategoryMeta {
+  id: string;
+  label: string;
+  sectionIds: readonly string[];
+}
+
 export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'general', name: 'General' },
   { id: 'appearance', name: 'Appearance', keywords: 'theme dark light wallpaper accent color glass' },
+  { id: 'applications', name: 'Applications', keywords: 'app preferences browser notes defaults' },
   { id: 'shell', name: 'Shell & Dock', keywords: 'dock launcher bar taskbar menu' },
-  { id: 'sound', name: 'Sound', keywords: 'audio volume output input speaker' },
+  { id: 'sound', name: 'Audio', keywords: 'sound volume output input speaker mixer' },
   { id: 'display', name: 'Display', keywords: 'screen monitor resolution brightness scaling night shift' },
   { id: 'notifications', name: 'Notifications', keywords: 'alerts banners do not disturb dnd focus' },
   { id: 'privacy', name: 'Privacy & Security', keywords: 'security firewall encryption password pin biometric vpn malware lock' },
@@ -50,4 +57,21 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   { id: 'updates', name: 'Updates', keywords: 'update upgrade version release channel' },
   { id: 'account', name: 'Account', keywords: 'profile sign in subscription plan billing pro' },
   { id: 'about', name: 'About', keywords: 'version license credits info' },
+];
+
+/** Canonical OS-level information architecture used by Settings navigation. */
+export const SETTINGS_CATEGORIES: SettingsCategoryMeta[] = [
+  { id: 'system', label: 'System', sectionIds: ['general', 'shell', 'sound', 'display', 'window', 'snap'] },
+  { id: 'appearance', label: 'Appearance & Personalization', sectionIds: ['appearance'] },
+  { id: 'applications', label: 'Applications', sectionIds: ['applications'] },
+  { id: 'network-devices', label: 'Network & Devices', sectionIds: ['network', 'permissions'] },
+  { id: 'storage', label: 'Storage', sectionIds: ['storage', 'files', 'browser'] },
+  { id: 'security-privacy', label: 'Security & Privacy', sectionIds: ['privacy', 'nexus'] },
+  { id: 'notifications', label: 'Notifications', sectionIds: ['notifications'] },
+  { id: 'performance-power', label: 'Performance & Power', sectionIds: ['performance', 'systemMonitor'] },
+  { id: 'updates', label: 'Updates', sectionIds: ['updates'] },
+  { id: 'accessibility', label: 'Accessibility', sectionIds: ['accessibility', 'keyboard'] },
+  { id: 'uki', label: 'UKI', sectionIds: ['uki', 'aiproviders'] },
+  { id: 'developers', label: 'Developers & Labs', sectionIds: ['developer', 'plugins', 'creator', 'creativeapps'] },
+  { id: 'account', label: 'Account & Information', sectionIds: ['account', 'about'] },
 ];

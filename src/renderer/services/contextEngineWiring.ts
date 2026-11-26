@@ -21,8 +21,9 @@ import { contextEngine } from '../../shared/uki/contextEngine';
 import { ContextBus } from './ContextBus';
 import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
 import { useStageStore } from '../store/stageStore';
+import { DisposableGroup, type TeardownFn } from '../../shared/disposable';
 
-let started = false;
+let subscriptions: DisposableGroup | null = null;
 
 function appName(appId: string): string {
   return APP_DEFINITIONS[appId]?.name || appId;
@@ -43,25 +44,32 @@ function stageName(stageId: string): string {
 }
 
 /** Begin feeding the shared Context Engine from ContextBus. Idempotent. */
-export function startContextEngine(): void {
-  if (started || typeof window === 'undefined') return;
-  started = true;
-  (window as unknown as { __dexContextEngine?: typeof contextEngine }).__dexContextEngine = contextEngine;
+export function startContextEngine(): TeardownFn {
+  if (subscriptions || typeof window === 'undefined') return () => {};
+  const resources = new DisposableGroup();
+  subscriptions = resources;
+  const target = window as Window & { __dexContextEngine?: typeof contextEngine };
+  target.__dexContextEngine = contextEngine;
+  resources.add(() => {
+    if (target.__dexContextEngine === contextEngine) delete target.__dexContextEngine;
+    subscriptions = null;
+  });
 
   // Open-apps is driven by a DIRECT store subscription, not ContextBus: the bus
   // throttles to one event per channel per ~frame, so two rapid app opens would
   // drop the second event and leave the set stale. The store subscription always
   // reflects the true running set. ContextBus app:opened is used only for the
   // (best-effort) activity log.
-  useRunningApps.subscribe(() => refreshOpenApps());
-  ContextBus.on('app:opened', ({ appId }) => { contextEngine.recordActivity('app', appName(appId)); });
+  resources.add(useRunningApps.subscribe(() => refreshOpenApps()));
+  resources.add(ContextBus.on('app:opened', ({ appId }) => { contextEngine.recordActivity('app', appName(appId)); }));
   // setFile / setProject record their own activity entry on change.
-  ContextBus.on('file:opened', ({ path }) => { if (path) contextEngine.setFile(path); });
-  ContextBus.on('file:saved', ({ path }) => { if (path) contextEngine.setFile(path); });
-  ContextBus.on('note:opened', ({ id, title }) => { contextEngine.recordActivity('note', title || id); });
-  ContextBus.on('task:created', ({ title }) => { contextEngine.recordActivity('task', title); });
-  ContextBus.on('continuity:project', ({ projectId }) => { contextEngine.setProject(projectId); });
-  ContextBus.on('continuity:stage', ({ stageId }) => { contextEngine.setWorkspace(stageName(stageId)); });
+  resources.add(ContextBus.on('file:opened', ({ path }) => { if (path) contextEngine.setFile(path); }));
+  resources.add(ContextBus.on('file:saved', ({ path }) => { if (path) contextEngine.setFile(path); }));
+  resources.add(ContextBus.on('note:opened', ({ id, title }) => { contextEngine.recordActivity('note', title || id); }));
+  resources.add(ContextBus.on('task:created', ({ title }) => { contextEngine.recordActivity('task', title); }));
+  resources.add(ContextBus.on('continuity:project', ({ projectId }) => { contextEngine.setProject(projectId); }));
+  resources.add(ContextBus.on('continuity:stage', ({ stageId }) => { contextEngine.setWorkspace(stageName(stageId)); }));
 
   refreshOpenApps();
+  return resources.cleanup;
 }

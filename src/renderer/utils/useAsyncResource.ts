@@ -125,7 +125,6 @@ export function useAsyncResource<T>(
     let timer: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
-        controller.abort();
         reject(new AsyncResourceTimeoutError(timeoutMs));
       }, timeoutMs);
     });
@@ -140,6 +139,7 @@ export function useAsyncResource<T>(
       .catch((err: unknown) => {
         // An abort from unmount/deps-change/reload is expected — drop it.
         if (signal.aborted || !mountedRef.current) return;
+        if (err instanceof AsyncResourceTimeoutError) controller.abort();
         setError(err instanceof Error ? err : new Error(String(err)));
         setLoading(false);
       })

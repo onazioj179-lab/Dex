@@ -174,13 +174,6 @@ export {
   CHANGELOG_CATEGORIES,
 } from './RewindExtensions';
 
-// Intelligence Layer
-export {
-  useFocusIntelligenceStore,
-  useContextPredictionStore,
-  useSmartRecentsStore,
-} from './IntelligenceLayer';
-
 // Performance Optimization (Hardware-Aware)
 export {
   usePerformanceOptimization,

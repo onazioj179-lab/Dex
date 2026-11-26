@@ -45,4 +45,4 @@ fi
 # Hard link fails if another build created the destination in the meantime.
 ln "$work/dex.efi" "$output"
 sha256sum "$output"
-echo "[dex-uki] Artifact verified; firmware boot, recovery and rollback still require VM tests."
+echo "[dex-uki] Artifact verified; firmware boot, recovery and rollback still require separate validation."

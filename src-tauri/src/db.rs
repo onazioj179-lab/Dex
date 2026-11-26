@@ -14,7 +14,8 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// Open `dex.db` at the given path, applying the same pragmas DatabaseManager
-/// uses (WAL, foreign keys, NORMAL sync, 64 MB cache).
+/// uses (WAL, foreign keys, NORMAL sync, 64 MB cache), plus bounded lock waits
+/// and automatic WAL maintenance for stable long sessions.
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -24,7 +25,10 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
         "PRAGMA journal_mode=WAL;
          PRAGMA foreign_keys=ON;
          PRAGMA synchronous=NORMAL;
-         PRAGMA cache_size=-64000;",
+         PRAGMA cache_size=-64000;
+         PRAGMA busy_timeout=5000;
+         PRAGMA wal_autocheckpoint=1000;
+         PRAGMA optimize;",
     )?;
     Ok(conn)
 }

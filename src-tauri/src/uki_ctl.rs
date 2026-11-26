@@ -51,7 +51,6 @@ const MEMORY_FILE: &str = "uki-memory.json";
 const KV_LISTENING: &str = "uki:listening";
 const KV_COPILOT_CONFIG: &str = "uki:copilot:config";
 const KV_COPILOT_CONVO: &str = "uki:copilot:conversation";
-const KV_COPILOT_CONTEXT: &str = "uki:copilot:context";
 const KV_OPERATOR_AUDIT: &str = "uki:operator:audit";
 
 const MAX_MEMORY_RECORDS: usize = 50_000;
@@ -768,158 +767,34 @@ fn copilot_id() -> String {
     format!("{}-{}", now_ms(), &crate::util::pseudo_uuid_v4()[..7])
 }
 
-/// analyzeIntent — port of UkiCopilot.analyzeIntent.
-fn copilot_intent(content: &str) -> &'static str {
-    let lower = content.to_lowercase();
-    if lower.contains('?')
-        || lower.starts_with("what")
-        || lower.starts_with("how")
-        || lower.starts_with("why")
-        || lower.starts_with("explain")
-    {
-        "question"
-    } else if lower.starts_with("fix") || lower.contains("bug") || lower.contains("error") {
-        "fix"
-    } else if lower.starts_with("create") || lower.starts_with("make") || lower.starts_with("generate") {
-        "create"
-    } else if lower.starts_with("refactor") || lower.contains("improve") || lower.contains("optimize") {
-        "improve"
-    } else if lower.contains("help") || lower.contains("assist") {
-        "help"
-    } else {
-        "general"
-    }
+fn copilot_set_context(app: &tauri::AppHandle, context: &Value) -> bool {
+    // This legacy endpoint has no live provider. Validate consent without
+    // persisting selected text or an application snapshot.
+    crate::uki_context::filter(app, context).is_object()
 }
 
-fn copilot_action(action_type: &str, label: &str, description: &str, confidence: f64, requires_approval: bool) -> Value {
-    json!({
-        "id": copilot_id(),
-        "type": action_type,
-        "label": label,
-        "description": description,
-        "params": {},
-        "confidence": confidence,
-        "requiresApproval": requires_approval,
-    })
-}
-
-/// generateContextualResponse — port of UkiCopilot.generateContextualResponse.
-fn copilot_contextual(app_name: &str, intent: &str) -> (String, Vec<Value>) {
-    match intent {
-        "question" => (
-            format!(
-                "I can help explain that. Based on the current {} context, let me analyze what you are working with and provide clarity.",
-                app_name
-            ),
-            vec![],
-        ),
-        "fix" => (
-            "I will analyze the issue and suggest a fix. Let me examine the relevant code or content.".into(),
-            vec![copilot_action("fix-issue", "Apply Fix", "Apply the suggested fix", 0.85, true)],
-        ),
-        "create" => (
-            "I will help you create that. Here is what I suggest:".into(),
-            vec![copilot_action("generate", "Generate", "Generate the requested content", 0.9, true)],
-        ),
-        "improve" => (
-            "I will analyze and suggest improvements. Here are my recommendations:".into(),
-            vec![copilot_action("refactor", "Apply Improvements", "Apply the suggested improvements", 0.85, true)],
-        ),
-        "help" => (
-            "I can help with coding, creative work, automation, and more. What do you need?".into(),
-            vec![],
-        ),
-        _ => ("I understand. Let me help you with that.".into(), vec![]),
-    }
-}
-
-fn copilot_context(app: &tauri::AppHandle) -> Value {
-    crate::kv_get(app, KV_COPILOT_CONTEXT)
-}
-
-fn copilot_set_context(app: &tauri::AppHandle, context: &Value) {
-    let _ = crate::kv_set(app, KV_COPILOT_CONTEXT, context.clone());
-}
-
-/// uki:copilot:sendMessage — deterministic responder (no LLM in Electron either).
-/// Appends user + copilot messages to the persisted conversation and returns the
-/// copilot CopilotMessage.
+/// The legacy native endpoint records the exchange without simulating a model.
 fn copilot_send_message(app: &tauri::AppHandle, content: &str) -> Value {
     let sanitized: String = content.trim().chars().take(10000).collect();
     if sanitized.is_empty() {
         return Value::Null;
     }
-    let mut convo = copilot_get_conversation(app);
-    let arr = convo.as_array_mut();
-    let arr = match arr {
-        Some(a) => a,
-        None => return Value::Null,
-    };
-
-    arr.push(json!({
-        "id": copilot_id(),
-        "role": "user",
-        "content": sanitized,
-        "timestamp": now_ms(),
-    }));
-
-    let app_name = copilot_context(app)
-        .get("appName")
-        .and_then(|v| v.as_str())
-        .unwrap_or("DEX")
-        .to_string();
-    let intent = copilot_intent(&sanitized);
-    let (response, actions) = copilot_contextual(&app_name, intent);
-
-    let reply = json!({
-        "id": copilot_id(),
-        "role": "copilot",
-        "content": response,
-        "timestamp": now_ms(),
-        "actions": actions,
-        "codeBlocks": [],
-        "confidence": 0.9,
+    let user = json!({
+        "id": copilot_id(), "role": "user", "content": sanitized, "timestamp": now_ms(),
     });
-    arr.push(reply.clone());
-
-    let _ = crate::kv_set(app, KV_COPILOT_CONVO, convo);
-    reply
-}
-
-/// getProactiveSuggestions — port keyed off persisted context appId.
-fn copilot_suggestions(app: &tauri::AppHandle) -> Value {
-    let ctx = copilot_context(app);
-    let app_id = ctx.get("appId").and_then(|v| v.as_str()).unwrap_or("");
-    let mut out: Vec<Value> = Vec::new();
-    match app_id {
-        "forge" => {
-            let has_files = ctx
-                .get("openFiles")
-                .and_then(|v| v.as_array())
-                .map(|a| !a.is_empty())
-                .unwrap_or(false);
-            if has_files {
-                out.push(copilot_action("explain", "Explain Code", "Get an explanation of the current code", 0.7, false));
-            }
-        }
-        "prism" => out.push(json!({
-            "id": copilot_id(), "type": "apply-effect", "label": "Auto Enhance",
-            "description": "Automatically improve image quality",
-            "params": { "effect": "auto-enhance" }, "confidence": 0.8, "requiresApproval": false
-        })),
-        "vinx" => out.push(json!({
-            "id": copilot_id(), "type": "generate", "label": "Generate Subtitles",
-            "description": "Create subtitles from speech",
-            "params": { "type": "subtitles" }, "confidence": 0.75, "requiresApproval": false
-        })),
-        "imosion" => out.push(json!({
-            "id": copilot_id(), "type": "apply-effect", "label": "Clean Audio",
-            "description": "Remove noise and enhance clarity",
-            "params": { "effect": "clean" }, "confidence": 0.8, "requiresApproval": false
-        })),
-        _ => {}
-    }
-    Value::Array(out)
+    let reply = json!({
+        "id": copilot_id(), "role": "copilot", "timestamp": now_ms(),
+        "content": "Open UKI chat for a response from a configured provider.",
+        "actions": [], "codeBlocks": [],
+    });
+    let Ok(path) = crate::kv_path(app) else { return Value::Null; };
+    let saved = crate::kv_repository::update(&path, |settings| {
+        let messages = settings.entry(KV_COPILOT_CONVO).or_insert_with(|| json!([]));
+        let messages = messages.as_array_mut().ok_or_else(|| std::io::Error::other("Invalid conversation history"))?;
+        messages.extend([user, reply.clone()]);
+        Ok(())
+    });
+    if saved.is_ok() { reply } else { Value::Null }
 }
 
 /// executeAction — port of UkiCopilot.executeAction. Without a live conversation
@@ -1510,27 +1385,30 @@ fn operator_channel(app_id: &str, action_type: &str) -> Option<&'static str> {
     }
 }
 
-fn operator_record_audit(app: &tauri::AppHandle, action: &Value, result: &Value) {
-    let mut log = crate::kv_get(app, KV_OPERATOR_AUDIT);
-    if !log.is_array() {
-        log = json!([]);
-    }
-    if let Some(arr) = log.as_array_mut() {
-        let mut entry = result.clone();
-        if let Some(o) = entry.as_object_mut() {
-            o.insert("action".into(), action.clone());
-            o.insert("timestamp".into(), json!(now_ms()));
-        }
-        arr.push(entry);
-        if arr.len() > 100 {
-            let excess = arr.len() - 100;
-            arr.drain(0..excess);
-        }
-    }
-    let _ = crate::kv_set(app, KV_OPERATOR_AUDIT, log);
+fn operator_audit_entry(action: &Value, result: &Value, timestamp: i64) -> Value {
+    json!({
+        "actionId": result.get("actionId"), "ok": result.get("ok"),
+        "principal": "uki-operator", "capability": "file-write",
+        "appId": action.get("appId").and_then(Value::as_str).filter(|id| matches!(*id, "imosion" | "vinx" | "prism" | "flux" | "forge" | "axl")).unwrap_or("unsupported"),
+        "type": action.get("type").and_then(Value::as_str).filter(|kind| matches!(*kind, "apply-effect" | "transform" | "generate")).unwrap_or("unsupported"),
+        "reason": result.get("reason").and_then(Value::as_str).unwrap_or("approved"), "timestamp": timestamp,
+    })
 }
 
-/// uki:operator:dispatch — validate + whitelist + audit. The Electron handler
+fn operator_record_audit(app: &tauri::AppHandle, action: &Value, result: &Value) {
+    let entry = operator_audit_entry(action, result, now_ms());
+    if let Ok(path) = crate::kv_path(app) {
+        let _ = crate::kv_repository::update(&path, |map| {
+            let mut log = map.get(KV_OPERATOR_AUDIT).and_then(Value::as_array).cloned().unwrap_or_default();
+            log.push(entry);
+            if log.len() > 100 { log.drain(0..log.len() - 100); }
+            map.insert(KV_OPERATOR_AUDIT.into(), json!(log));
+            Ok(())
+        });
+    }
+}
+
+/// uki:operator:dispatch — validate + native grant + native consent + whitelist + redacted audit. The Electron handler
 /// passed a no-op invoker (returns undefined) and is a pure router: it returns
 /// the chosen channel for the renderer to self-invoke. We faithfully replicate
 /// that: a whitelisted, confident action records ok=true with the channel; the
@@ -1549,7 +1427,7 @@ fn operator_dispatch(app: &tauri::AppHandle, action: &Value) -> Value {
     let app_id = action.get("appId").and_then(|v| v.as_str()).unwrap_or("");
     let valid_app = matches!(app_id, "imosion" | "vinx" | "prism" | "flux" | "forge" | "axl");
     if !valid_app {
-        let r = reject(format!("unsupported-app:{}", app_id));
+        let r = reject("unsupported-app".into());
         operator_record_audit(app, action, &r);
         return r;
     }
@@ -1560,15 +1438,15 @@ fn operator_dispatch(app: &tauri::AppHandle, action: &Value) -> Value {
             | "refactor" | "navigate" | "run-command"
     );
     if !valid_type {
-        let r = reject(format!("unsupported-type:{}", action_type));
+        let r = reject("unsupported-type".into());
         operator_record_audit(app, action, &r);
         return r;
     }
     let confidence = action.get("confidence").and_then(|v| v.as_f64());
     match confidence {
-        Some(c) if c >= 0.65 => {}
+        Some(c) if c.is_finite() && (0.65..=1.0).contains(&c) => {}
         _ => {
-            let r = reject(format!("low-confidence:{}", confidence.map(|c| c.to_string()).unwrap_or_default()));
+            let r = reject("low-confidence".into());
             operator_record_audit(app, action, &r);
             return r;
         }
@@ -1591,6 +1469,22 @@ fn operator_dispatch(app: &tauri::AppHandle, action: &Value) -> Value {
         }
     };
 
+    if !crate::uki_permissions::granted(app, "file-write") {
+        let result = reject("permission-denied:file-write".into());
+        operator_record_audit(app, action, &result);
+        return result;
+    }
+    // Confidence and renderer approval flags cannot authorize project changes.
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let preview = serde_json::to_string(action.get("payload").unwrap_or(&Value::Null)).unwrap_or_default();
+    let preview: String = preview.chars().take(2000).collect();
+    let approved = app.dialog().message(format!("Allow UKI to {action_type} in {app_id}?\n\nRequested changes:\n{preview}"))
+        .title("DEX — Approve project changes").buttons(MessageDialogButtons::OkCancel).blocking_show();
+    if !approved || !crate::uki_permissions::granted(app, "file-write") {
+        let result = reject(if approved { "permission-revoked" } else { "approval-denied" }.into());
+        operator_record_audit(app, action, &result);
+        return result;
+    }
     let result = json!({ "ok": true, "actionId": action_id, "channel": channel });
     operator_record_audit(app, action, &result);
     result
@@ -1691,8 +1585,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             if !ctx.is_object() {
                 return json!(false);
             }
-            copilot_set_context(app, &ctx);
-            json!(true)
+            json!(copilot_set_context(app, &ctx))
         }
         "uki:copilot:sendMessage" => copilot_send_message(app, &s(0).unwrap_or_default()),
         "uki:copilot:getConversation" => copilot_get_conversation(app),
@@ -1700,7 +1593,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             copilot_clear_conversation(app);
             json!(true)
         }
-        "uki:copilot:getSuggestions" => copilot_suggestions(app),
+        "uki:copilot:getSuggestions" => json!([]),
         "uki:copilot:executeAction" => {
             match s(0) {
                 Some(id) => copilot_execute_action(app, &id),
@@ -1752,5 +1645,26 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
         "uki:operator:audit" => operator_audit(app, limit_arg(0, 20)),
 
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod operator_security_tests {
+    use super::*;
+    #[test]
+    fn audit_entries_do_not_include_project_payloads_or_prompts() {
+        let action = json!({"appId":"prism", "type":"transform", "payload":{"password":"sensitive-project-data"}, "prompt":"private prompt"});
+        let entry = operator_audit_entry(&action, &json!({"ok":false,"reason":"permission-denied:file-write","actionId":"act-1"}), 100);
+        let serialized = entry.to_string();
+        assert!(!serialized.contains("sensitive-project-data"));
+        assert!(!serialized.contains("private prompt"));
+        assert_eq!(entry["principal"], "uki-operator");
+        assert_eq!(entry["capability"], "file-write");
+        assert_eq!(entry["reason"], "permission-denied:file-write");
+    }
+    #[test]
+    fn unknown_app_identifiers_are_not_retained_as_free_text() {
+        let entry = operator_audit_entry(&json!({"appId":"private-data", "type":"private-data"}), &json!({"ok":false,"reason":"unsupported-app"}), 100);
+        assert!(!entry.to_string().contains("private-data"));
     }
 }

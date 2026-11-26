@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { useNotesStore, type NoteListItem } from '../../store/notesStore';
+import { loadAppPreferences, useAppPreference } from '../../store/appPreferences';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
 import SendToMenu, { useCreativeInbox } from '../../components/SendToMenu';
 import {
@@ -220,6 +221,16 @@ const DexNotes: React.FC = () => {
     sidebarCollapsed, listCollapsed, paneSize,
     loading, saving, searching,
   } = store;
+  const preferredEditorMode = useAppPreference('notes', 'defaultEditorMode');
+  const preferredNoteList = useAppPreference('notes', 'defaultNoteList');
+  const autosaveDelay = Number(useAppPreference('notes', 'autosaveDelay'));
+  useEffect(() => { void loadAppPreferences(); }, []);
+  useEffect(() => {
+    useNotesStore.getState().setEditorMode(preferredEditorMode === 'split' || preferredEditorMode === 'preview' ? preferredEditorMode : 'edit');
+  }, [preferredEditorMode]);
+  useEffect(() => {
+    useNotesStore.getState().setViewMode(preferredNoteList === 'grid' || preferredNoteList === 'compact' ? preferredNoteList : 'list');
+  }, [preferredNoteList]);
 
   // -- Refs -------------------------------------------------------------
 
@@ -295,7 +306,7 @@ const DexNotes: React.FC = () => {
   const createAttempted = useRef(false);
 
   useEffect(() => {
-    if (loading || initFailed) return;
+    if (loading || useNotesStore.getState().loading || initFailed) return;
     if (!activeNote) {
       if (notes.length > 0) {
         store.selectNote(notes[0].id);
@@ -319,43 +330,73 @@ const DexNotes: React.FC = () => {
 
   // -- Auto-title: derive name from first line of content ----------------
 
-  const autoTitleTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const drafts = useRef(new Map<string, {
+    content: string;
+    plainText: string;
+    originalTitle: string;
+    suggestedTitle?: string;
+    timer?: ReturnType<typeof setTimeout>;
+    saving?: Promise<boolean>;
+  }>());
+  const [failedDraftId, setFailedDraftId] = useState<string | null>(null);
 
-  const handleEditorChangeWithAutoTitle = useCallback((content: string, plainText: string, wordCount: number) => {
-    if (!activeNote) return;
+  const flushDraft = useCallback((id: string, explicitTitle?: string) => {
+    const draft = drafts.current.get(id);
+    if (!draft) return;
+    if (draft.saving) return explicitTitle === undefined ? draft.saving : undefined;
+    clearTimeout(draft.timer);
 
-    const currentTitle = activeNote.title || '';
-    const isUntitled = !currentTitle || currentTitle === 'Untitled' || currentTitle === 'New Note' || currentTitle.startsWith('Daily Note');
-
-    if (isUntitled && plainText.trim()) {
-      const firstLine = plainText.split('\n')[0].trim().slice(0, 60);
-      if (firstLine && firstLine !== currentTitle) {
-        if (autoTitleTimerRef.current) clearTimeout(autoTitleTimerRef.current);
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        autoTitleTimerRef.current = setTimeout(() => {
-          setTitleValue(firstLine);
-          store.updateNote(activeNote.id, { title: firstLine, content, plain_text: plainText });
-        }, 500);
-        return;
+    const state = useNotesStore.getState();
+    const note = state.activeNote?.id === id ? state.activeNote : state.notes.find(item => item.id === id);
+    const suggestedTitle = (note?.title ?? '') === draft.originalTitle ? draft.suggestedTitle : undefined;
+    const title = explicitTitle ?? suggestedTitle;
+    draft.saving = state.updateNote(id, {
+      content: draft.content,
+      plain_text: draft.plainText,
+      ...(title === undefined ? {} : { title }),
+    }).then(saved => {
+      if (drafts.current.get(id) !== draft) return saved;
+      if (saved) {
+        drafts.current.delete(id);
+        setFailedDraftId(previous => previous === id ? null : previous);
+      } else {
+        draft.saving = undefined;
+        setFailedDraftId(id);
       }
-    }
+      return saved;
+    });
+    return draft.saving;
+  }, []);
 
-    // Debounce content-only saves — avoid an IPC call on every keystroke.
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      store.updateNote(activeNote.id, { content, plain_text: plainText });
-    }, 500);
-  }, [activeNote, store]);
-
-  // -- Auto-save pane sizes ---------------------------------------------
+  const handleEditorChangeWithAutoTitle = useCallback((content: string, plainText: string, editedAt: number) => {
+    if (!activeNote) return;
+    const { id } = activeNote;
+    const originalTitle = titleValue || '';
+    const needsTitle = !originalTitle || originalTitle === 'Untitled' || originalTitle === 'New Note' || originalTitle.startsWith('Daily Note');
+    const firstLine = plainText.split('\n', 1)[0].trim().slice(0, 60);
+    const suggestedTitle = needsTitle && firstLine && firstLine !== originalTitle ? firstLine : undefined;
+    clearTimeout(drafts.current.get(id)?.timer);
+    drafts.current.set(id, {
+      content, plainText, originalTitle, suggestedTitle,
+      timer: setTimeout(() => { void flushDraft(id); }, Math.max(0, autosaveDelay - (Date.now() - editedAt))),
+    });
+  }, [activeNote?.id, autosaveDelay, titleValue, flushDraft]);
 
   useEffect(() => {
+    const id = activeNote?.id;
+    return () => { if (id) void flushDraft(id); };
+  }, [activeNote?.id, flushDraft]);
+
+  useEffect(() => {
+    const flushAll = () => { for (const id of drafts.current.keys()) void flushDraft(id); };
+    window.addEventListener('pagehide', flushAll);
     return () => {
-      if (autoTitleTimerRef.current) clearTimeout(autoTitleTimerRef.current);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      window.removeEventListener('pagehide', flushAll);
+      flushAll();
     };
-  }, []);
+  }, [flushDraft]);
+
+  // -- Auto-save pane sizes ---------------------------------------------
 
   useEffect(() => {
     const timer = setTimeout(() => store.savePaneSize(), 1000);
@@ -410,8 +451,8 @@ const DexNotes: React.FC = () => {
 
   // -- Editor Callbacks -------------------------------------------------
 
-  const handleEditorChange = useCallback((content: string, plainText: string, wordCount: number) => {
-    handleEditorChangeWithAutoTitle(content, plainText, wordCount);
+  const handleEditorChange = useCallback((content: string, plainText: string, _wordCount: number, editedAt: number) => {
+    handleEditorChangeWithAutoTitle(content, plainText, editedAt);
     // Trigger word suggestions based on current caret position
     try {
       const sel = window.getSelection();
@@ -431,20 +472,27 @@ const DexNotes: React.FC = () => {
   }, [handleEditorChangeWithAutoTitle, wordSuggestions]);
 
   const handleSave = useCallback(() => {
-    // Already auto-saving, but force save on Ctrl+S
-    if (!activeNote) return;
-    store.updateNote(activeNote.id, {
-      content: activeNote.content,
-      plain_text: activeNote.plain_text,
-    });
-  }, [activeNote, store]);
+    if (activeNote) void flushDraft(activeNote.id);
+  }, [activeNote?.id, flushDraft]);
+
+  const afterDraftSaved = useCallback(async (id: string, action: () => void) => {
+    if (await flushDraft(id) !== false) action();
+  }, [flushDraft]);
 
   const handleTitleChange = useCallback((title: string) => {
     setTitleValue(title);
     if (activeNote) {
-      store.updateNote(activeNote.id, { title });
+      const id = activeNote.id;
+      if (!flushDraft(id, title)) {
+        void store.updateNote(id, { title }).then(saved => {
+          if (saved) return;
+          window.dispatchEvent(new CustomEvent('dex-toast', {
+            detail: { type: 'error', message: 'Could not save the note title.' },
+          }));
+        });
+      }
     }
-  }, [activeNote, store]);
+  }, [activeNote?.id, flushDraft, store]);
 
   // -- Delete with confirmation -----------------------------------------
   const handleDeleteWithConfirm = useCallback((id: string) => {
@@ -454,16 +502,19 @@ const DexNotes: React.FC = () => {
   const confirmDelete = useCallback(() => {
     if (confirmDeleteId) {
       const note = notes.find(n => n.id === confirmDeleteId);
-      store.deleteNote(confirmDeleteId);
+      const id = confirmDeleteId;
+      void (async () => {
+        if (await flushDraft(id) === false) return;
+        await store.deleteNote(id);
+        if (note) {
+          if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current);
+          setDeleteToast({ title: note.title || 'Untitled', visible: true });
+          deleteToastTimer.current = setTimeout(() => setDeleteToast(null), 3500);
+        }
+      })();
       setConfirmDeleteId(null);
-      // Show "Moved to Trash" toast
-      if (note) {
-        if (deleteToastTimer.current) clearTimeout(deleteToastTimer.current);
-        setDeleteToast({ title: note.title || 'Untitled', visible: true });
-        deleteToastTimer.current = setTimeout(() => setDeleteToast(null), 3500);
-      }
     }
-  }, [confirmDeleteId, store, notes]);
+  }, [confirmDeleteId, flushDraft, store, notes]);
 
   const cancelDelete = useCallback(() => {
     setConfirmDeleteId(null);
@@ -772,19 +823,21 @@ const DexNotes: React.FC = () => {
             editorMode={editorMode}
             onEditorModeChange={store.setEditorMode}
             onTogglePin={() => store.togglePin(activeNote.id)}
-            onDuplicate={() => store.duplicateNote(activeNote.id)}
+            onDuplicate={() => { void afterDraftSaved(activeNote.id, () => store.duplicateNote(activeNote.id)); }}
             onDelete={() => handleDeleteWithConfirm(activeNote.id)}
-            onExport={(fmt) => store.exportNote(activeNote.id, fmt)}
+            onExport={(fmt) => { void afterDraftSaved(activeNote.id, () => store.exportNote(activeNote.id, fmt)); }}
             onToggleFocus={store.toggleFocusMode}
             onToggleLock={() => store.updateNote(activeNote.id, { locked: activeNote.locked ? 0 : 1 })}
             onColorLabel={(c) => store.updateNote(activeNote.id, { color_label: c })}
             focusMode={focusMode}
             saving={saving}
+            saveFailed={failedDraftId === activeNote.id}
             lastSavedAt={lastSavedAt}
           />
           <TitleInput title={titleValue} onChange={handleTitleChange} />
           <NotesEditor
-            content={activeNote.content}
+            key={activeNote.id}
+            content={drafts.current.get(activeNote.id)?.content ?? activeNote.content}
             onChange={handleEditorChange}
             onSave={handleSave}
             editorMode={editorMode}
@@ -1063,14 +1116,15 @@ const DexNotes: React.FC = () => {
               editorMode={editorMode}
               onEditorModeChange={store.setEditorMode}
               onTogglePin={() => store.togglePin(activeNote.id)}
-              onDuplicate={() => store.duplicateNote(activeNote.id)}
+              onDuplicate={() => { void afterDraftSaved(activeNote.id, () => store.duplicateNote(activeNote.id)); }}
               onDelete={() => handleDeleteWithConfirm(activeNote.id)}
-              onExport={(fmt) => store.exportNote(activeNote.id, fmt)}
+              onExport={(fmt) => { void afterDraftSaved(activeNote.id, () => store.exportNote(activeNote.id, fmt)); }}
               onToggleFocus={store.toggleFocusMode}
               onToggleLock={() => store.updateNote(activeNote.id, { locked: activeNote.locked ? 0 : 1 })}
               onColorLabel={(c) => store.updateNote(activeNote.id, { color_label: c })}
               focusMode={focusMode}
               saving={saving}
+              saveFailed={failedDraftId === activeNote.id}
               lastSavedAt={lastSavedAt}
             />
             {(() => {
@@ -1107,7 +1161,8 @@ const DexNotes: React.FC = () => {
             />
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
               <NotesEditor
-                content={activeNote.content}
+                key={activeNote.id}
+                content={drafts.current.get(activeNote.id)?.content ?? activeNote.content}
                 onChange={handleEditorChange}
                 onSave={handleSave}
                 editorMode={editorMode}

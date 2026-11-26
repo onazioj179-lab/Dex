@@ -1,0 +1,52 @@
+.dex-project-tasks {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-inset, var(--color-bg-base));
+  color: var(--color-text-primary);
+}
+
+.dex-project-tasks p { margin: 0; }
+.dex-project-tasks-detail { font-size: 12px; }
+.dex-project-tasks-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dex-project-tasks-toolbar label { display: flex; align-items: center; gap: 6px; }
+.dex-project-tasks button,
+.dex-project-tasks select,
+.dex-project-tasks-toggle {
+  min-height: 24px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary, var(--color-bg-base));
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.dex-project-tasks button,
+.dex-project-tasks-toggle { cursor: pointer; }
+.dex-project-tasks-toggle { margin-inline-start: auto; }
+.dex-project-tasks-toggle[aria-pressed="true"] { background: var(--color-bg-hover); }
+.dex-project-tasks button:disabled { opacity: .55; }
+.dex-project-tasks pre {
+  flex: 1;
+  min-height: 48px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.45 var(--font-mono, monospace);
+}
+.dex-project-tasks details { flex-shrink: 0; max-height: 45%; overflow: auto; }
+.dex-project-tasks ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.dex-project-tasks li + li { margin-top: 4px; }
+.dex-project-tasks li button { width: 100%; text-align: left; overflow-wrap: anywhere; }

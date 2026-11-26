@@ -10,7 +10,12 @@
  * Renders centered preview panel with backdrop blur.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useEffect, useRef } from 'react';
+import { formatBytes } from '../../shared/format/units';
+import { openLocalFile } from '../services/media/localMedia';
+import DexIcon from '../components/DexIcon';
+import { LocalAudioPreview } from '../components/LocalAudioPreview';
+import { QuickLookVideo } from '../components/VideoPreview';
 import { isReduceMotion } from '../utils/MotionController';
 
 // ---------------------------------------------------------------------------
@@ -24,63 +29,63 @@ export interface QuickLookItem {
   title: string;
   /** URL, text content, or path depending on type */
   content: string;
+  path?: string;
+  size?: number;
+  loading?: boolean;
+  error?: string;
+  truncated?: boolean;
   /** Source element bounding rect for animation origin */
   originRect?: DOMRect | null;
 }
 
 interface QuickLookProps {
   item: QuickLookItem | null;
-  /** List of all previewable items for left/right navigation */
-  items?: QuickLookItem[];
+  position?: { index: number; total: number };
   onDismiss: () => void;
-  onNavigate?: (item: QuickLookItem) => void;
+  onStep?: (delta: number) => void;
 }
 
-// ---------------------------------------------------------------------------
-// COMPONENT
-// ---------------------------------------------------------------------------
-
-export const QuickLook: React.FC<QuickLookProps> = ({
-  item,
-  items = [],
-  onDismiss,
-  onNavigate,
-}) => {
-  const [currentItem, setCurrentItem] = useState<QuickLookItem | null>(item);
+export function QuickLook({ item: currentItem, position, onDismiss, onStep }: QuickLookProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const active = !!currentItem;
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    const origin = document.activeElement;
+    panelRef.current?.focus();
+    return () => { if (origin instanceof HTMLElement && origin.isConnected) origin.focus(); };
+  }, [active]);
 
   useEffect(() => {
-    setCurrentItem(item);
-  }, [item]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    if (!currentItem) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === ' ') {
-        e.preventDefault();
+    if (!active) return;
+    const handler = (event: KeyboardEvent) => {
+      const panel = panelRef.current;
+      if (!panel || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const interactive = target?.closest?.('button, input, select, textarea, a, video, audio, iframe, [contenteditable="true"]');
+      if (event.key === 'Escape' || (event.key === ' ' && !event.repeat && !interactive)) {
+        event.preventDefault();
+        event.stopPropagation();
         onDismiss();
-        return;
-      }
-      if (items.length > 1) {
-        const idx = items.findIndex(i => i.title === currentItem.title && i.type === currentItem.type);
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          const next = items[(idx + 1) % items.length];
-          setCurrentItem(next);
-          onNavigate?.(next);
-        }
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          const prev = items[(idx - 1 + items.length) % items.length];
-          setCurrentItem(prev);
-          onNavigate?.(prev);
+      } else if (!interactive && position && position.total > 1 &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        event.preventDefault();
+        event.stopPropagation();
+        onStep?.(event.key === 'ArrowLeft' ? -1 : 1);
+      } else if (event.key === 'Tab') {
+        const controls = Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), video[controls], audio[controls], iframe'));
+        const first = controls[0];
+        const last = controls.at(-1);
+        const focused = document.activeElement;
+        if (first && (focused === panel || !panel.contains(focused) || (event.shiftKey ? focused === first : focused === last))) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
         }
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [currentItem, items, onDismiss, onNavigate]);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [active, position, onStep, onDismiss]);
 
   if (!currentItem) return null;
 
@@ -109,6 +114,7 @@ export const QuickLook: React.FC<QuickLookProps> = ({
     >
       <div
         ref={panelRef}
+        tabIndex={-1}
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(720px, 85vw)',
@@ -166,25 +172,18 @@ export const QuickLook: React.FC<QuickLookProps> = ({
           padding: 'var(--space-4)',
           minHeight: 200,
         }}>
-          <QuickLookContent item={currentItem} />
+          <QuickLookContent key={currentItem.path ?? currentItem.title} item={currentItem} />
         </div>
 
-        {/* Navigation hint */}
-        {items.length > 1 && (
-          <div style={{
-            padding: 'var(--space-2) var(--space-4)',
-            borderTop: '1px solid var(--color-bg-hover)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--space-4)',
-            flexShrink: 0,
-          }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              Use arrow keys to navigate
-            </span>
-          </div>
-        )}
+        <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '8px 16px', borderTop: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', fontSize: 12 }}>
+          <span>{currentItem.truncated ? 'First 256 KiB shown' : currentItem.size !== undefined && currentItem.type !== 'folder' ? formatBytes(currentItem.size) : currentItem.type === 'folder' ? 'Folder' : ''}</span>
+          {position && position.total > 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" onClick={() => onStep?.(-1)} disabled={position.index === 0} aria-label="Previous file"><DexIcon name="chevron-left" size={14} /></button>
+            <span>{position.index + 1} / {position.total}</span>
+            <button type="button" onClick={() => onStep?.(1)} disabled={position.index === position.total - 1} aria-label="Next file"><DexIcon name="chevron-right" size={14} /></button>
+          </div>}
+        </footer>
       </div>
     </div>
   );
@@ -195,6 +194,23 @@ export const QuickLook: React.FC<QuickLookProps> = ({
 // ---------------------------------------------------------------------------
 
 const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
+  const [failed, setFailed] = useState(false);
+  const [externalError, setExternalError] = useState('');
+  const open = () => {
+    if (!item.path) return;
+    setExternalError('');
+    void openLocalFile(item.path).catch(error => setExternalError(error.message));
+  };
+  if (item.loading) return <p role="status">Loading preview…</p>;
+  if (item.error || failed || item.type === 'unknown') return (
+    <div style={{ display: 'grid', justifyItems: 'center', gap: 12, padding: 28 }}>
+      <span role="status">{item.error || (failed ? 'This file could not be previewed.' : 'No preview available')}</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {item.path && <button onClick={open}>Open file</button>}
+      </div>
+      {externalError && <span role="alert">{externalError}</span>}
+    </div>
+  );
   switch (item.type) {
     case 'image':
       return (
@@ -202,6 +218,7 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
           <img
             src={item.content}
             alt={item.title}
+            onError={() => setFailed(true)}
             style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 6, objectFit: 'contain' }}
           />
         </div>
@@ -209,19 +226,14 @@ const QuickLookContent: React.FC<{ item: QuickLookItem }> = ({ item }) => {
 
     case 'video':
       return (
-        <video
-          src={item.content}
-          controls
-          autoPlay
-          style={{ width: '100%', maxHeight: '60vh', borderRadius: 6, background: '#000' }}
-        />
+        <QuickLookVideo url={item.content} path={item.path} onOpen={open} openError={externalError} />
       );
 
     case 'audio':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-8) 0' }}>
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <audio src={item.content} controls autoPlay style={{ width: '100%', maxWidth: 400 }} />
+          <LocalAudioPreview url={item.content} path={item.path} title={item.title} />
         </div>
       );
 
@@ -324,24 +336,3 @@ const TypeIcon: React.FC<{ type: QuickLookItemType }> = ({ type }) => {
       return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
   }
 };
-
-// ---------------------------------------------------------------------------
-// HOOK: useQuickLook
-// ---------------------------------------------------------------------------
-
-export function useQuickLook() {
-  const [item, setItem] = useState<QuickLookItem | null>(null);
-  const [items, setItems] = useState<QuickLookItem[]>([]);
-
-  const show = useCallback((ql: QuickLookItem, list?: QuickLookItem[]) => {
-    setItem(ql);
-    if (list) setItems(list);
-  }, []);
-
-  const dismiss = useCallback(() => {
-    setItem(null);
-    setItems([]);
-  }, []);
-
-  return { item, items, show, dismiss, setItem };
-}

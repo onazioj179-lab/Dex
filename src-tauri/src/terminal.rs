@@ -1,76 +1,57 @@
-// =============================================================================
-// DEX 6.0 — Terminal / PTY service (Electron PtyService parity, native)
-// Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
-// =============================================================================
-//! In-app shell-session manager for the terminal panel (DexCode + Nexus). A
-//! faithful port of `src/main/core/PtyService.ts`: like the Electron version it
-//! uses piped stdio over `std::process::Command` (NOT a real PTY / node-pty), so
-//! it works on every platform with no native build tools. Output is streamed to
-//! the renderer with the same event contract.
-//!
-//! IPC surface (routed by the `pty:` prefix in `dex_ipc`):
-//!   pty:spawn / pty:create ({ shell?, cwd?, cols?, rows? }) -> { sessionId } | { error }
-//!   pty:write     ({ sessionId, data })         -> { success } | { success:false, error }
-//!   pty:read      ({ sessionId })               -> { success, alive, data, code? }  (pull-drain output)
-//!   pty:resize    ({ sessionId, cols, rows })   -> { success }   (no-op; geometry only)
-//!   pty:kill / pty:destroy ({ sessionId })      -> { success }
-//!   pty:getSize   ({ sessionId })               -> { found, cols, rows }
-//!   pty:getStatus ({ sessionId })               -> { alive, exists, code?, shell?, cwd?, cols?, rows? }
-//!   pty:list      ()                            -> { sessions: [{ id, shell, cwd, alive }] }
-//! Events emitted to the renderer (via `native_ops::emit_event`):
-//!   "pty:data" { sessionId, data }
-//!   "pty:exit" { sessionId, code }
+// DEX Platform — Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+//! Native PTY lifecycle, window-scoped IPC and bounded terminal delivery.
 
+use crate::terminal_pty::{self, Process, Terminal, Utf8Stream};
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::Mutex;
-use tauri::Manager;
+use std::collections::{HashMap, VecDeque};
+use std::io::{self, Read, Write};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::{self, SyncSender, TrySendError},
+    Arc, Mutex,
+};
+use tauri::{Emitter, Manager};
 
 const MAX_SESSIONS: usize = 16;
+const MAX_RECENT_EXITS: usize = 32;
+const MAX_BUFFER: usize = 256 * 1024;
+const MAX_INPUT: usize = 64 * 1024;
 
-/// One live shell session. The `Child` is kept so `kill`/exit-reaping can act on
-/// it; `stdin` is split out so `pty:write` can feed keystrokes without locking
-/// the child handle.
-pub struct Session {
-    id: String,
-    shell: String,
-    cwd: String,
-    cols: u32,
-    rows: u32,
-    child: Child,
-    stdin: Option<ChildStdin>,
-    /// Pending output for the pull-based `pty:read` channel. The reader threads
-    /// append decoded chunks here in addition to emitting `pty:data` events, so a
-    /// renderer can either subscribe to events OR poll `pty:read` (or both).
-    /// Capped at `MAX_BUFFER` bytes — oldest data is dropped to bound memory.
+struct Output {
     buffer: String,
+    attached: bool,
 }
 
-/// Exit record retained briefly after a session ends so `pty:getStatus` /
-/// `pty:read` can still report the final code and drain trailing output.
+struct Io {
+    terminal: Option<Terminal>,
+    input: Option<SyncSender<String>>,
+    size: portable_pty::PtySize,
+}
+
+struct Session {
+    id: String,
+    owner: String,
+    shell: String,
+    cwd: String,
+    io: Mutex<Io>,
+    output: Mutex<Output>,
+    child_exited: AtomicBool,
+}
+
 struct ExitRecord {
-    code: Option<i32>,
-    buffer: String,
+    id: String,
+    owner: String,
+    code: Option<u32>,
+    output: Output,
 }
 
 #[derive(Default)]
 pub struct Inner {
-    sessions: HashMap<String, Session>,
-    /// Recently-exited sessions (bounded), keyed by id. Lets a renderer that
-    /// polls observe the exit + any final output it had not yet read.
-    recent_exits: HashMap<String, ExitRecord>,
-    next_id: u32,
+    sessions: HashMap<String, Arc<Session>>,
+    exits: VecDeque<ExitRecord>,
+    next_id: u64,
 }
 
-/// Hard cap on a session's retained output buffer (bytes). Keeps a long-lived
-/// session from growing unbounded when the renderer never drains via `pty:read`.
-const MAX_BUFFER: usize = 256 * 1024;
-/// Cap on retained exit records so a churny session list cannot leak memory.
-const MAX_RECENT_EXITS: usize = 32;
-
-/// Tauri-managed terminal state (registered in `setup()`).
 pub type TerminalState = Mutex<Inner>;
 
 fn home_dir() -> String {
@@ -102,7 +83,8 @@ fn resolve_shell() -> (String, Vec<String>) {
             "{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
             sys_root
         );
-        let cmd = std::env::var("COMSPEC").unwrap_or_else(|_| format!("{}\\System32\\cmd.exe", sys_root));
+        let cmd =
+            std::env::var("COMSPEC").unwrap_or_else(|_| format!("{}\\System32\\cmd.exe", sys_root));
         if exists_abs(&pwsh) {
             return (pwsh, vec!["-NoLogo".into()]);
         }
@@ -128,26 +110,6 @@ fn resolve_shell() -> (String, Vec<String>) {
     }
 }
 
-/// Whether a caller-supplied shell override is a recognized shell binary (matched
-/// by basename) — stops a compromised renderer from launching an arbitrary PATH
-/// executable via `pty:spawn` while still allowing a legitimate custom shell.
-fn shell_allowed(req: &str) -> bool {
-    const ALLOWED: &[&str] = &[
-        "pwsh", "pwsh.exe", "powershell", "powershell.exe", "cmd", "cmd.exe", "bash",
-        "bash.exe", "zsh", "sh", "fish", "dash", "nu", "nu.exe", "git-bash.exe", "wsl.exe",
-        "ksh", "tcsh", "csh",
-    ];
-    let base = std::path::Path::new(req)
-        .file_name()
-        .map(|s| s.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    if !ALLOWED.contains(&base.as_str()) {
-        return false;
-    }
-    // Absolute overrides must exist; bare names resolve on PATH at spawn time.
-    !std::path::Path::new(req).is_absolute() || std::path::Path::new(req).exists()
-}
-
 /// Default arguments for a shell chosen by basename (correct even when the caller
 /// overrode the resolved default — avoids carrying e.g. pwsh's `-NoLogo` to cmd).
 fn args_for(shell: &str) -> Vec<String> {
@@ -157,7 +119,7 @@ fn args_for(shell: &str) -> Vec<String> {
         .unwrap_or_default();
     match base.as_str() {
         "pwsh" | "pwsh.exe" | "powershell" | "powershell.exe" => vec!["-NoLogo".into()],
-        "cmd" | "cmd.exe" => vec![],
+        "cmd" | "cmd.exe" => vec!["/D".into()],
         // Interactive unix shells.
         "bash" | "bash.exe" | "zsh" | "sh" | "fish" | "dash" | "ksh" | "tcsh" | "csh" => {
             vec!["-i".into()]
@@ -166,328 +128,417 @@ fn args_for(shell: &str) -> Vec<String> {
     }
 }
 
-/// Append a chunk to a session's pull buffer (for `pty:read`), capped at
-/// MAX_BUFFER with oldest bytes dropped on a UTF-8 boundary. Kept as a free fn so
-/// the `State` guard is cleanly scoped (avoids an NLL borrow issue in the reader
-/// thread loop).
-fn push_session_buffer(app: &tauri::AppHandle, id: &str, data: &str) {
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return,
+fn profile_paths() -> Vec<(&'static str, String)> {
+    #[cfg(windows)]
+    let candidates = {
+        let system = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+        let programs = std::env::var("PROGRAMFILES").unwrap_or_else(|_| "C:\\Program Files".into());
+        vec![
+            (
+                "PowerShell 7",
+                format!("{programs}\\PowerShell\\7\\pwsh.exe"),
+            ),
+            (
+                "Windows PowerShell",
+                format!("{system}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
+            ),
+            ("Command Prompt", format!("{system}\\System32\\cmd.exe")),
+        ]
     };
-    if let Some(s) = inner.sessions.get_mut(id) {
-        s.buffer.push_str(data);
-        if s.buffer.len() > MAX_BUFFER {
-            let overflow = s.buffer.len() - MAX_BUFFER;
-            let mut cut = overflow;
-            while cut < s.buffer.len() && !s.buffer.is_char_boundary(cut) {
-                cut += 1;
+    #[cfg(not(windows))]
+    let candidates = [
+        ("Bash", "/bin/bash"),
+        ("Zsh", "/bin/zsh"),
+        ("Fish", "/usr/bin/fish"),
+        ("POSIX shell", "/bin/sh"),
+    ]
+    .into_iter()
+    .map(|(name, path)| (name, path.to_owned()))
+    .collect::<Vec<_>>();
+    candidates
+        .into_iter()
+        .filter(|(_, path)| std::path::Path::new(path).is_file())
+        .collect()
+}
+
+fn requested_profile(request: &str) -> Option<String> {
+    let path = std::path::Path::new(request);
+    let canonical = path
+        .is_absolute()
+        .then(|| path.canonicalize().ok())
+        .flatten();
+    let (default, _) = resolve_shell();
+    profile_paths()
+        .into_iter()
+        .map(|(_, profile)| profile)
+        .chain([default])
+        .find(|profile| {
+            let profile = std::path::Path::new(profile);
+            if let Some(canonical) = &canonical {
+                return profile
+                    .canonicalize()
+                    .is_ok_and(|installed| &installed == canonical);
             }
-            s.buffer.drain(..cut);
-        }
+            if path.components().count() != 1 {
+                return false;
+            }
+            let name = profile
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            #[cfg(windows)]
+            return name.eq_ignore_ascii_case(request)
+                || name
+                    .strip_suffix(".exe")
+                    .is_some_and(|name| name.eq_ignore_ascii_case(request));
+            #[cfg(not(windows))]
+            return name == request;
+        })
+}
+
+fn emit_data(app: &tauri::AppHandle, owner: &str, id: &str, data: &str) {
+    if !data.is_empty() {
+        let _ = app.emit_to(owner, "pty:data", json!({ "sessionId": id, "data": data }));
     }
 }
 
-/// Stream a child's stdout/stderr to the renderer as `pty:data` events. The
-/// primary (stdout) reader finalizes the session on EOF — reaps the child for its
-/// exit code and emits `pty:exit`.
-fn spawn_reader<R: Read + Send + 'static>(
-    app: tauri::AppHandle,
-    id: String,
-    mut reader: R,
-    finalize_on_eof: bool,
-) {
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    // Append to the session's pull buffer (for `pty:read`) before
-                    // emitting the push event, so a poller never misses a chunk.
-                    push_session_buffer(&app, &id, &data);
-                    crate::native_ops::emit_event(
-                        &app,
-                        "pty:data",
-                        &json!({ "sessionId": id, "data": data }),
-                    );
-                }
-                Err(_) => break,
-            }
-        }
-        if finalize_on_eof {
-            finalize(&app, &id);
-        }
+fn finish(app: &tauri::AppHandle, session: &Session, code: Option<u32>) {
+    let state = app.state::<TerminalState>();
+    let Ok(mut state) = state.lock() else { return };
+    if state.sessions.remove(&session.id).is_none() {
+        return;
+    }
+    let Ok(mut output) = session.output.lock() else {
+        return;
+    };
+    if output.attached {
+        let _ = app.emit_to(
+            session.owner.as_str(),
+            "pty:exit",
+            json!({ "sessionId": session.id, "code": code }),
+        );
+    }
+    if state.exits.len() == MAX_RECENT_EXITS {
+        state.exits.pop_front();
+    }
+    state.exits.push_back(ExitRecord {
+        id: session.id.clone(),
+        owner: session.owner.clone(),
+        code,
+        output: Output {
+            buffer: std::mem::take(&mut output.buffer),
+            attached: output.attached,
+        },
     });
 }
 
-/// Remove a session and emit its `pty:exit` (with the reaped exit code). Idempotent
-/// — if it was already removed (e.g. a concurrent `pty:kill` then this EOF), this
-/// is a no-op.
-fn finalize(app: &tauri::AppHandle, id: &str) {
-    let state = app.state::<TerminalState>();
-    let session = match state.lock() {
-        Ok(mut inner) => inner.sessions.remove(id),
-        Err(_) => return,
-    };
-    if let Some(mut s) = session {
-        let code = s.child.wait().ok().and_then(|st| st.code());
-        // Retain the exit code + any undrained output so a polling renderer can
-        // still observe them via `pty:getStatus` / `pty:read` after teardown.
-        if let Ok(mut inner) = state.lock() {
-            if inner.recent_exits.len() >= MAX_RECENT_EXITS {
-                // Evict an arbitrary old record to keep the map bounded.
-                if let Some(k) = inner.recent_exits.keys().next().cloned() {
-                    inner.recent_exits.remove(&k);
-                }
-            }
-            inner.recent_exits.insert(
-                id.to_string(),
-                ExitRecord { code, buffer: std::mem::take(&mut s.buffer) },
-            );
+impl Session {
+    fn publish(&self, app: &tauri::AppHandle, data: &str) {
+        let Ok(mut output) = self.output.lock() else {
+            return;
+        };
+        output.buffer.push_str(data);
+        let mut cut = output.buffer.len().saturating_sub(MAX_BUFFER);
+        while !output.buffer.is_char_boundary(cut) {
+            cut += 1;
         }
-        crate::native_ops::emit_event(app, "pty:exit", &json!({ "sessionId": id, "code": code }));
+        output.buffer.drain(..cut);
+        if output.attached {
+            emit_data(app, &self.owner, &self.id, data);
+        }
+    }
+
+    fn terminate(&self) -> Result<(), String> {
+        let mut io = self.io.lock().map_err(|_| "Terminal state unavailable")?;
+        if !self.child_exited.load(Ordering::Acquire) {
+            if let Some(terminal) = io.terminal.as_mut() {
+                terminal.kill().map_err(|error| error.to_string())?;
+            }
+        }
+        io.input.take();
+        Ok(())
     }
 }
 
-fn spawn_session(app: &tauri::AppHandle, opts: &Value) -> Value {
+fn spawn_session(app: &tauri::AppHandle, owner: &str, opts: &Value) -> Result<Value, String> {
     let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "error": "terminal state unavailable" }),
-    };
-    if inner.sessions.len() >= MAX_SESSIONS {
-        return json!({ "error": format!("Maximum {} terminal sessions reached.", MAX_SESSIONS) });
+    let mut state = state.lock().map_err(|_| "Terminal state unavailable")?;
+    if app.get_webview_window(owner).is_none() {
+        return Err("Terminal window is closed.".into());
     }
-
-    let (def_shell, _) = resolve_shell();
-    let mut shell = def_shell;
-    if let Some(req) = opts.get("shell").and_then(|v| v.as_str()) {
-        if shell_allowed(req) {
-            shell = req.to_string();
-        }
+    if state.sessions.len() >= MAX_SESSIONS {
+        return Err(format!("Maximum {MAX_SESSIONS} terminal sessions reached."));
     }
-    let args = args_for(&shell);
-
-    let cwd = opts
-        .get("cwd")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
+    let (mut shell, _) = resolve_shell();
+    if let Some(requested) = opts["shell"].as_str().filter(|shell| !shell.is_empty()) {
+        shell = requested_profile(requested)
+            .ok_or("The selected terminal shell is unavailable or unsupported.")?;
+    }
+    let cwd = opts["cwd"]
+        .as_str()
+        .filter(|cwd| !cwd.is_empty())
+        .map(str::to_owned)
         .unwrap_or_else(home_dir);
-    let cols = opts.get("cols").and_then(|v| v.as_u64()).unwrap_or(80).max(1) as u32;
-    let rows = opts.get("rows").and_then(|v| v.as_u64()).unwrap_or(24).max(1) as u32;
-
-    let mut cmd = Command::new(&shell);
-    cmd.args(&args)
-        .current_dir(&cwd)
-        .env("TERM", "xterm-256color")
-        .env("COLORTERM", "truecolor")
-        .env("COLUMNS", cols.to_string())
-        .env("LINES", rows.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW (Electron windowsHide parity)
-    }
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        // ENOENT / unspawnable shell surfaces here synchronously; the renderer's
-        // spawn-failure path shows "terminal unavailable" instead of looping.
-        Err(e) => return json!({ "error": e.to_string() }),
-    };
-
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
-    let stdin = child.stdin.take();
-
-    inner.next_id += 1;
-    let id = format!("pty-{}", inner.next_id);
-    inner.sessions.insert(
-        id.clone(),
-        Session {
-            id: id.clone(),
-            shell: shell.clone(),
-            cwd,
-            cols,
-            rows,
-            child,
-            stdin,
-            buffer: String::new(),
-        },
+    let size = terminal_pty::size(
+        opts["cols"].as_u64().unwrap_or(80),
+        opts["rows"].as_u64().unwrap_or(24),
     );
-    drop(inner); // release the lock before starting the reader threads
+    let Process {
+        mut child,
+        mut reader,
+        mut writer,
+        terminal,
+        startup,
+    } = terminal_pty::spawn(&shell, &args_for(&shell), &cwd, size)?;
+    let (send_input, receive_input) = mpsc::sync_channel::<String>(32);
+    let (send_code, receive_code) = mpsc::sync_channel(1);
+    state.next_id += 1;
+    let id = format!("pty-{}", state.next_id);
+    let session = Arc::new(Session {
+        id: id.clone(),
+        owner: owner.to_owned(),
+        shell,
+        cwd,
+        io: Mutex::new(Io {
+            terminal: Some(terminal),
+            input: Some(send_input),
+            size,
+        }),
+        output: Mutex::new(Output {
+            buffer: String::new(),
+            attached: opts["deferEvents"].as_bool() != Some(true),
+        }),
+        child_exited: AtomicBool::new(false),
+    });
+    state.sessions.insert(id.clone(), Arc::clone(&session));
+    drop(state);
 
-    if let Some(out) = stdout {
-        spawn_reader(app.clone(), id.clone(), out, true);
-    }
-    if let Some(err) = stderr {
-        spawn_reader(app.clone(), id.clone(), err, false);
-    }
-
-    json!({ "sessionId": id })
-}
-
-fn write_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
-    let data = opts.get("data").and_then(|v| v.as_str()).unwrap_or_default();
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "terminal state unavailable" }),
-    };
-    match inner.sessions.get_mut(sid) {
-        Some(s) => match s.stdin.as_mut() {
-            Some(stdin) => match stdin.write_all(data.as_bytes()).and_then(|_| stdin.flush()) {
-                Ok(_) => json!({ "success": true }),
-                Err(e) => json!({ "success": false, "error": e.to_string() }),
-            },
-            None => json!({ "success": false, "error": "session stdin closed" }),
-        },
-        None => json!({ "success": false, "error": "Unknown session" }),
-    }
-}
-
-fn resize_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    // Pipe-based stdio has no real TTY, so this only records geometry (matches
-    // Electron, which keeps cols/rows for fit-addon and best-effort SIGWINCH).
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false }),
-    };
-    match inner.sessions.get_mut(sid) {
-        Some(s) => {
-            if let Some(c) = opts.get("cols").and_then(|v| v.as_u64()) {
-                if c > 0 {
-                    s.cols = c as u32;
-                }
-            }
-            if let Some(r) = opts.get("rows").and_then(|v| v.as_u64()) {
-                if r > 0 {
-                    s.rows = r as u32;
-                }
-            }
-            json!({ "success": true })
+    std::thread::spawn(move || {
+        if terminal_pty::prepare_input(startup, &mut *writer).is_err() {
+            return;
         }
-        None => json!({ "success": false }),
-    }
-}
-
-fn kill_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false }),
-    };
-    // Kill but leave the entry; the stdout reader hits EOF and `finalize` reaps it
-    // and emits `pty:exit` (single source of truth for session teardown).
-    match inner.sessions.get_mut(sid) {
-        Some(s) => {
-            let _ = s.child.kill();
-            json!({ "success": true })
+        for data in receive_input {
+            if writer
+                .write_all(data.as_bytes())
+                .and_then(|_| writer.flush())
+                .is_err()
+            {
+                break;
+            }
         }
-        None => json!({ "success": false }),
-    }
+    });
+    let waiting = Arc::clone(&session);
+    std::thread::spawn(move || {
+        let code = child.wait().ok().map(|status| status.exit_code());
+        waiting.child_exited.store(true, Ordering::Release);
+        let terminal = if let Ok(mut io) = waiting.io.lock() {
+            io.input.take();
+            io.terminal.take()
+        } else {
+            None
+        };
+        // Keep the output reader running while the console is closed, then
+        // let the reader deliver the exit after it has drained the final text.
+        drop(terminal);
+        let _ = send_code.send(code);
+    });
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut decoder = Utf8Stream::default();
+        let mut buffer = [0; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(count) => session.publish(&app, &decoder.decode(&buffer[..count])),
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        session.publish(&app, &decoder.finish());
+        finish(&app, &session, receive_code.recv().unwrap_or(None));
+    });
+    Ok(json!({ "sessionId": id, "interactive": true }))
 }
 
-fn list_sessions(app: &tauri::AppHandle) -> Value {
-    let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "sessions": [] }),
-    };
-    let sessions: Vec<Value> = inner
+fn attach(
+    app: &tauri::AppHandle,
+    owner: &str,
+    id: &str,
+    state: &mut Inner,
+) -> Result<Value, String> {
+    if let Some(session) = state
         .sessions
-        .values()
-        .map(|s| json!({ "id": s.id, "shell": s.shell, "cwd": s.cwd, "alive": true }))
-        .collect();
-    json!({ "sessions": sessions })
-}
-
-/// Return the recorded geometry for a session. Pipe-based stdio has no real TTY,
-/// so cols/rows are the values last set by `pty:resize`/spawn (what the fit-addon
-/// drives). Reports `found:false` for an unknown/exited session.
-fn get_size(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
-    let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "found": false, "cols": 0, "rows": 0 }),
+        .get(id)
+        .filter(|session| session.owner == owner)
+    {
+        let mut output = session
+            .output
+            .lock()
+            .map_err(|_| "Terminal output unavailable")?;
+        if !output.attached {
+            emit_data(app, owner, id, &output.buffer);
+            output.attached = true;
+        }
+        return Ok(json!({ "success": true, "alive": true }));
+    }
+    let Some(record) = state
+        .exits
+        .iter_mut()
+        .find(|record| record.owner == owner && record.id == id)
+    else {
+        return Err("Unknown terminal session".into());
     };
-    match inner.sessions.get(sid) {
-        Some(s) => json!({ "found": true, "cols": s.cols, "rows": s.rows }),
-        None => json!({ "found": false, "cols": 0, "rows": 0 }),
+    if !record.output.attached {
+        emit_data(app, owner, id, &record.output.buffer);
+        let _ = app.emit_to(
+            owner,
+            "pty:exit",
+            json!({ "sessionId": id, "code": record.code }),
+        );
+        record.output.attached = true;
     }
+    Ok(json!({ "success": true, "alive": false, "code": record.code }))
 }
 
-/// Report liveness for a session: `alive:true` while the child runs; once it has
-/// exited (and been finalized) `alive:false` with the retained exit `code`. An id
-/// never seen yields `{ alive:false, exists:false }`.
-fn get_status(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
+fn request(
+    app: &tauri::AppHandle,
+    owner: &str,
+    channel: &str,
+    opts: &Value,
+) -> Result<Value, String> {
+    if channel == "pty:listProfiles" {
+        let profiles: Vec<Value> = profile_paths()
+            .into_iter()
+            .map(|(label, shell)| json!({ "label": label, "shell": shell }))
+            .collect();
+        return Ok(json!({ "profiles": profiles }));
+    }
+    if matches!(channel, "pty:spawn" | "pty:create") {
+        return spawn_session(app, owner, opts);
+    }
+    let id = opts["sessionId"].as_str().unwrap_or_default();
     let state = app.state::<TerminalState>();
-    let inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "alive": false, "exists": false }),
+    let mut state = state.lock().map_err(|_| "Terminal state unavailable")?;
+    if channel == "pty:list" {
+        let sessions: Vec<Value> = state
+            .sessions
+            .values()
+            .filter(|session| session.owner == owner)
+            .map(|session| {
+                json!({ "id": session.id, "shell": session.shell, "cwd": session.cwd,
+                "alive": !session.child_exited.load(Ordering::Acquire) })
+            })
+            .collect();
+        return Ok(json!({ "sessions": sessions }));
+    }
+    if channel == "pty:attach" {
+        return attach(app, owner, id, &mut state);
+    }
+    let session = state
+        .sessions
+        .get(id)
+        .filter(|session| session.owner == owner)
+        .cloned();
+    let Some(session) = session else {
+        let exit = state
+            .exits
+            .iter()
+            .position(|record| record.owner == owner && record.id == id);
+        return match channel {
+            "pty:getSize" => Ok(json!({ "found": false, "cols": 0, "rows": 0 })),
+            "pty:getStatus" => Ok(match exit {
+                Some(index) => json!({ "alive": false, "exists": true, "code": state.exits[index].code }),
+                None => json!({ "alive": false, "exists": false }),
+            }),
+            "pty:read" => exit.and_then(|index| state.exits.remove(index))
+                .map(|record| json!({ "success": true, "alive": false, "code": record.code, "data": record.output.buffer }))
+                .ok_or_else(|| "Unknown terminal session".into()),
+            _ => Err("Unknown terminal session".into()),
+        };
     };
-    if let Some(s) = inner.sessions.get(sid) {
-        return json!({
-            "alive": true,
-            "exists": true,
-            "shell": s.shell,
-            "cwd": s.cwd,
-            "cols": s.cols,
-            "rows": s.rows,
-        });
+    drop(state);
+    if matches!(channel, "pty:kill" | "pty:destroy") {
+        session.terminate()?;
+        return Ok(json!({ "success": true }));
     }
-    if let Some(rec) = inner.recent_exits.get(sid) {
-        return json!({ "alive": false, "exists": true, "code": rec.code });
+    if channel == "pty:read" {
+        let mut output = session
+            .output
+            .lock()
+            .map_err(|_| "Terminal output unavailable")?;
+        return Ok(
+            json!({ "success": true, "alive": true, "data": std::mem::take(&mut output.buffer) }),
+        );
     }
-    json!({ "alive": false, "exists": false })
-}
-
-/// Pull-drain a session's buffered output (alternative to subscribing to the
-/// `pty:data` event stream). Returns the accumulated text and clears it. After a
-/// session exits, its final undrained output is still readable once from the
-/// retained exit record, which is then removed.
-fn read_session(app: &tauri::AppHandle, opts: &Value) -> Value {
-    let sid = opts.get("sessionId").and_then(|v| v.as_str()).unwrap_or_default();
-    let state = app.state::<TerminalState>();
-    let mut inner = match state.lock() {
-        Ok(g) => g,
-        Err(_) => return json!({ "success": false, "error": "terminal state unavailable", "data": "" }),
-    };
-    if let Some(s) = inner.sessions.get_mut(sid) {
-        let data = std::mem::take(&mut s.buffer);
-        return json!({ "success": true, "alive": true, "data": data });
-    }
-    // Session already exited: hand back its trailing output once, then drop it.
-    if let Some(rec) = inner.recent_exits.remove(sid) {
-        return json!({ "success": true, "alive": false, "code": rec.code, "data": rec.buffer });
-    }
-    json!({ "success": false, "error": "Unknown session", "data": "" })
-}
-
-pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
-    let opts = args.get(0).cloned().unwrap_or(Value::Null);
+    let mut io = session
+        .io
+        .lock()
+        .map_err(|_| "Terminal state unavailable")?;
+    let size = io.size;
     match channel {
-        "pty:spawn" | "pty:create" => spawn_session(app, &opts),
-        "pty:write" => write_session(app, &opts),
-        "pty:read" => read_session(app, &opts),
-        "pty:resize" => resize_session(app, &opts),
-        "pty:kill" | "pty:destroy" => kill_session(app, &opts),
-        "pty:getSize" => get_size(app, &opts),
-        "pty:getStatus" => get_status(app, &opts),
-        "pty:list" => list_sessions(app),
-        _ => Value::Null,
+        "pty:write" => {
+            let data = opts["data"].as_str().ok_or("Missing terminal input")?;
+            if data.len() > MAX_INPUT {
+                return Err("Terminal input exceeds 64 KiB.".into());
+            }
+            let input = io.input.as_ref().ok_or("Terminal input is closed")?;
+            input
+                .try_send(data.to_owned())
+                .map_err(|error| match error {
+                    TrySendError::Full(_) => "Terminal input queue is full.",
+                    TrySendError::Disconnected(_) => "Terminal input is closed.",
+                })?;
+            Ok(json!({ "success": true }))
+        }
+        "pty:resize" => {
+            let cols = opts["cols"]
+                .as_u64()
+                .filter(|value| *value > 0)
+                .unwrap_or(size.cols.into());
+            let rows = opts["rows"]
+                .as_u64()
+                .filter(|value| *value > 0)
+                .unwrap_or(size.rows.into());
+            let next = terminal_pty::size(cols, rows);
+            if next != size {
+                io.terminal
+                    .as_ref()
+                    .ok_or("Terminal already closed")?
+                    .resize(next)?;
+                io.size = next;
+            }
+            Ok(json!({ "success": true }))
+        }
+        "pty:getSize" => Ok(json!({ "found": true, "cols": size.cols, "rows": size.rows })),
+        "pty:getStatus" => Ok(
+            json!({ "alive": !session.child_exited.load(Ordering::Acquire), "exists": true,
+            "shell": session.shell, "cwd": session.cwd, "cols": size.cols, "rows": size.rows }),
+        ),
+        _ => Ok(Value::Null),
     }
+}
+
+pub fn close_window(app: &tauri::AppHandle, owner: &str) {
+    let Some(state) = app.try_state::<TerminalState>() else {
+        return;
+    };
+    let Ok(mut state) = state.lock() else { return };
+    let mut sessions = Vec::new();
+    state.sessions.retain(|_, session| {
+        if session.owner != owner {
+            return true;
+        }
+        sessions.push(Arc::clone(session));
+        false
+    });
+    state.exits.retain(|record| record.owner != owner);
+    drop(state);
+    for session in sessions {
+        let _ = session.terminate();
+    }
+}
+
+pub fn dispatch(app: &tauri::AppHandle, owner: &str, channel: &str, args: &Value) -> Value {
+    request(app, owner, channel, &args[0])
+        .unwrap_or_else(|error| json!({ "success": false, "error": error }))
 }

@@ -27,7 +27,6 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sampleCanvas = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const frameToggle = useRef(0);
 
   // Pause the scope readback when Vinx is backgrounded WITHIN DEX (another app on
   // top). `document.hidden` only covers the whole window being hidden; this covers
@@ -51,6 +50,8 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
 
     const w = cv.width;
     const h = cv.height;
+    let lastSample = -Infinity;
+    let lastFrame = -1;
 
     const drawNoSignal = () => {
       ctx.fillStyle = '#0A0A0A';
@@ -62,7 +63,7 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
       ctx.fillText('No video signal', w / 2, h / 2);
     };
 
-    const tick = () => {
+    const tick = (now: number) => {
       // Skip all sampling/drawing while the scopes can't be seen: the window is
       // hidden (minimized / background tab) OR Vinx is backgrounded behind another
       // DEX app. drawImage + getImageData on a video is expensive and pointless when
@@ -71,17 +72,22 @@ export const ScopesPanel: React.FC<Props> = ({ videoEl, mode, height = 200 }) =>
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
-      frameToggle.current = (frameToggle.current + 1) % 2;
-      // 15fps ~ render every other rAF (~30fps source)
-      if (frameToggle.current === 0) {
+      if (now - lastSample < 1000 / 15) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
+      lastSample = now;
       if (!videoEl || videoEl.readyState < 2 || videoEl.videoWidth === 0) {
-        drawNoSignal();
+        if (lastFrame !== -2) drawNoSignal();
+        lastFrame = -2;
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
+      if (videoEl.paused && lastFrame === videoEl.currentTime) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      lastFrame = videoEl.currentTime;
       try {
         sCtx?.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
       } catch {

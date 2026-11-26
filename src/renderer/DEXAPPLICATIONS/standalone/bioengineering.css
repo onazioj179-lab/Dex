@@ -1,0 +1,80 @@
+.dex-bio {
+  container-type: inline-size;
+  height: 100%;
+  overflow: auto;
+  padding: clamp(16px, 3.5%, 36px);
+  color: var(--color-text-primary);
+  background: var(--color-bg-base);
+}
+.dex-bio header,
+.dex-bio__actions,
+.dex-bio__panel-heading,
+.dex-bio__estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.dex-bio h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(20px, 4cqi, 28px);
+  letter-spacing: -.035em;
+}
+.dex-bio h1 svg { color: var(--color-accent); }
+.dex-bio h2 { font-size: 15px; font-weight: 650; }
+.dex-bio p { color: var(--color-text-secondary); font-size: 13px; margin-block: 8px; }
+.dex-bio p[role="alert"] {
+  color: var(--color-error);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.dex-bio__workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, .8fr) minmax(320px, 1.2fr);
+  gap: 14px;
+  margin-top: 24px;
+  align-items: start;
+}
+.dex-bio__workspace > section {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-bg-elevated);
+}
+.dex-bio label { font-size: 12px; display: grid; gap: 4px; color: var(--color-text-secondary); }
+.dex-bio input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg-inset, var(--color-bg-base));
+  color: var(--color-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.dex-bio input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.dex-bio__panel-heading label { width: min(36%, 120px); min-width: 75px; }
+.dex-bio__rows { margin-block: 10px 8px; max-height: min(440px, 58vh); overflow: auto; }
+.dex-bio__rows table { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
+.dex-bio__rows th { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); position: sticky; top: 0; background: var(--color-bg-elevated); }
+.dex-bio__rows td, .dex-bio__rows th { padding: 3px; }
+.dex-bio__rows td:last-child, .dex-bio__rows th:last-child { width: 30px; }
+.dex-bio__plot { width: 100%; min-width: 0; margin-top: 12px; display: block; overflow: visible; }
+.dex-bio__plot text { fill: var(--color-text-secondary); font: 12px system-ui; }
+.dex-bio__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-block: 12px; }
+.dex-bio__stats > div { border-top: 1px solid var(--color-border); padding-top: 8px; }
+.dex-bio__stats dt { font-size: 11px; color: var(--color-text-secondary); }
+.dex-bio__stats dd { font-size: 15px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dex-bio__estimate { align-items: end; justify-content: flex-start; }
+.dex-bio__estimate label { width: min(148px, 100%); }
+.dex-bio__estimate output { min-width: 120px; font-size: 13px; padding: 6px 0; }
+@container (max-width: 640px) {
+  .dex-bio__workspace { grid-template-columns: minmax(0, 1fr); }
+}

@@ -5,8 +5,8 @@
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
 /**
- * BROWSER - DEX Secure Browser
- * Privacy mode - enhanced protection
+ * BROWSER - DEX Browser
+ * Capability-gated browsing with explicit, honest protection states.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
@@ -19,6 +19,12 @@ import { BLOCKED_DOMAIN_LIST } from '../config/blocked-domains';
 import { dispatchActivity, updateActivity, completeActivity } from '../utils/liveActivity';
 import { sendToNotes } from '../services/sendTo';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../uki/appContextRegistry';
+import { isTauri } from '../services/platform/tauriCompat';
+import { detachedAppId } from '../services/detachedWindow';
+import { loadAppPreferences, saveAppPreference, useAppPreference, useAppPreferences } from '../store/appPreferences';
+import { nativePageAction, useNativePageWindows, type NativePage } from './browserPageWindows';
+import { useBrowserTabStrip } from './browserTabStrip';
+import { browserDownloadAction, useBrowserDownloads } from './browserDownloads';
 
 // ===========================================================================
 // TYPES
@@ -65,7 +71,6 @@ interface BrowserSettings {
   blockThirdPartyCookies: boolean;
   enableTorMode: boolean;
   customUserAgent: string;
-  defaultSearchEngine: 'duckduckgo' | 'google' | 'startpage' | 'brave';
 }
 
 // ---------------------------------------------------------------------------
@@ -118,8 +123,8 @@ const _de = (s: string): string => {
 
 const BLOCKED_DOMAINS = new Set(BLOCKED_DOMAIN_LIST);
 
-// Privacy-mode User Agent
-const TOR_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0';
+// Reduced-fingerprinting user agent. This does NOT provide Tor routing.
+const REDUCED_FINGERPRINTING_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0';
 
 // ===========================================================================
 // ICONS
@@ -129,8 +134,7 @@ const TOR_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 F
 // ENTERPRISE SCALE CONSTANTS - Supports 1B+ users
 // ===========================================================================
 
-const MAX_TABS = 100; // Maximum tabs per session
-const TAB_MEMORY_LIMIT = 40; // Unload background tabs after this many are open
+const MAX_TABS = 500;
 const HISTORY_LIMIT = 2000; // Max history entries — auto-trims beyond this
 const BOOKMARK_LIMIT = 5000; // Max bookmarks
 const KEYCHAIN_STORAGE_KEY = 'dex-browser-keychain';
@@ -171,29 +175,37 @@ interface SavedSession {
 }
 
 // Default single blank tab — used as the fresh state and the restore fallback.
-const makeDefaultTabs = (): Tab[] => [
-  { id: '1', title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 },
-];
+const blankTab = (background = false): Tab => ({
+  id: crypto.randomUUID(), title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1, background,
+});
 
 // Restore tabs + active tab from the saved session. Only durable fields (id,
 // title, url, pinned) are persisted; transient state (loading, background,
 // crash flags, nav stacks) is rebuilt fresh here. Falls back to a single blank
 // tab when the saved session is absent or malformed — never throws.
-const loadSession = (): { tabs: Tab[]; activeTab: string } => {
-  const fallback = { tabs: makeDefaultTabs(), activeTab: '1' };
+const loadSession = (restore: boolean, storageKey: string): { tabs: Tab[]; activeTab: string } => {
+  const initial = blankTab();
+  const fallback = { tabs: [initial], activeTab: initial.id };
+  if (!restore) return fallback;
   try {
-    const saved = localStorage.getItem(SESSION_STORAGE_KEY);
+    const saved = localStorage.getItem(storageKey);
     if (!saved) return fallback;
     const parsed = JSON.parse(saved);
     if (!parsed || !Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return fallback;
+    const ids = new Set<string>();
     const tabs: Tab[] = parsed.tabs
-      .filter((t: any) => t && typeof t.id === 'string')
+      .filter((t: any) => {
+        if (!t || typeof t.id !== 'string' || !/^[\w-]{1,64}$/.test(t.id) || ids.has(t.id)) return false;
+        ids.add(t.id);
+        return true;
+      })
       .slice(0, MAX_TABS)
       .map((t: any) => ({
         id: t.id,
         title: typeof t.title === 'string' && t.title ? t.title : 'New Tab',
         url: typeof t.url === 'string' ? t.url : '',
         loading: false,
+        background: true,
         pinned: t.pinned === true ? true : undefined,
         navHistory: typeof t.url === 'string' && t.url ? [t.url] : [],
         navIndex: typeof t.url === 'string' && t.url ? 0 : -1,
@@ -262,15 +274,37 @@ interface DownloadItem {
 // ===============================================================================
 
 export const Browser: React.FC = () => {
+  const loaded = useAppPreferences(state => state.loaded);
+  useEffect(() => { void loadAppPreferences(); }, []);
+  return loaded ? <BrowserWorkspace /> : <p role="status">Loading Browser preferences…</p>;
+};
+
+const BrowserWorkspace: React.FC = () => {
   // ===== PATTERN LEARNING =====
   useAppTracking('browser');
   const toast = useToastHelpers();
+  const browserRoot = useRef<HTMLDivElement>(null);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   // Restore the previous session (open tabs + active tab) on mount; falls back
   // to a single blank tab when no valid session is saved. Computed once so the
   // tabs and activeTab initializers stay in sync.
+  const restoreTabs = useAppPreference('browser', 'restoreTabs') === true;
+  const searchProvider = String(useAppPreference('browser', 'searchProvider'));
+  const nativePages = isTauri();
+  const nativeDownloads = useBrowserDownloads(nativePages);
+  const downloadRequests = useRef(new Set<number>());
+  const [sessionKey] = useState(() => {
+    const detached = detachedAppId();
+    return detached ? `${SESSION_STORAGE_KEY}:detached:${detached}` : SESSION_STORAGE_KEY;
+  });
+  const { pages: nativePageStates, open: nativeOpenPage, status: nativePageStatus, retry: retryPageStatus } = useNativePageWindows(nativePages);
+  const nativePageStatesReady = nativePageStatus === 'ready';
+  const pendingPageOpens = useRef(new Map<string, Promise<void>>());
+  const closingTabs = useRef(new Set<string>());
   const initialSessionRef = useRef<{ tabs: Tab[]; activeTab: string }>();
-  if (!initialSessionRef.current) initialSessionRef.current = loadSession();
+  if (!initialSessionRef.current) initialSessionRef.current = loadSession(restoreTabs, sessionKey);
   const [tabs, setTabs] = useState<Tab[]>(() => initialSessionRef.current!.tabs);
   const [activeTab, setActiveTab] = useState(() => initialSessionRef.current!.activeTab);
   const [urlInput, setUrlInput] = useState(() => {
@@ -279,11 +313,32 @@ export const Browser: React.FC = () => {
   });
   const [tabErrors, setTabErrors] = useState<Record<string, string | null>>({});
   const [crashedTabs, setCrashedTabs] = useState<Set<string>>(new Set());
+  const [tabQuery, setTabQuery] = useState('');
+  const searchResults = useMemo(() => {
+    const query = tabQuery.trim().toLowerCase();
+    return tabs.filter(tab => !query || `${tab.title} ${tab.url}`.toLowerCase().includes(query));
+  }, [tabs, tabQuery]);
+  const openPageWindow = useCallback(async (id: string, url: string, navigate = false) => {
+    if (closingTabs.current.has(id)) return;
+    const address = url.replace(/^http:\/\//i, 'https://');
+    setTabErrors(prev => prev[id] ? { ...prev, [id]: null } : prev);
+    const queue = pendingPageOpens.current;
+    const request = Promise.resolve(queue.get(id)).then(() => nativeOpenPage(id, address, navigate)).catch(error => {
+      if (queue.get(id) !== request || closingTabs.current.has(id)) return;
+      const message = error instanceof Error ? error.message : 'Could not open the web page window.';
+      setTabErrors(prev => ({ ...prev, [id]: message }));
+      toastRef.current.error(message);
+    });
+    queue.set(id, request);
+    await request;
+    if (queue.get(id) === request) queue.delete(id);
+  }, [nativeOpenPage]);
 
   // -- uki context: surface the active tab (title + URL) to the assistant.
   // Registered once on mount; a latest-value ref (refreshed each render) keeps
   // the pure resolver reading live state without re-registering.
   const ukiCtxRef = useRef({ tabs, activeTab });
+  const browserSecurityRef = useRef({ forceHttps: true, blockTrackers: true, blockAds: true, reducedFingerprinting: false });
   useEffect(() => { ukiCtxRef.current = { tabs, activeTab }; });
   useEffect(() => {
     registerUkiAppContext('browser', () => {
@@ -299,6 +354,10 @@ export const Browser: React.FC = () => {
           url: tab?.url,
           loading: tab?.loading ?? false,
           openTabs: c.tabs.length,
+          security: browserSecurityRef.current,
+          securityGuidance: tab?.url?.startsWith('http:')
+            ? 'Unencrypted HTTP address. Prefer HTTPS and never enter credentials.'
+            : 'Review domain spelling before entering credentials or approving downloads.',
         },
       };
     });
@@ -339,13 +398,13 @@ export const Browser: React.FC = () => {
     blockThirdPartyCookies: true,
     enableTorMode: false,
     customUserAgent: '',
-    defaultSearchEngine: 'duckduckgo',
   });
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [showDownloads, setShowDownloads] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showTabMenu, setShowTabMenu] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
+  const [httpsUpgradeCount, setHttpsUpgradeCount] = useState(0);
 
   // ---- Keychain state (IPC-only, never in localStorage) ----
   const [savedPasswords, setSavedPasswords] = useState<SavedPassword[]>([]);
@@ -356,7 +415,6 @@ export const Browser: React.FC = () => {
   const [savePrompt, setSavePrompt] = useState<{ domain: string; username: string; password: string } | null>(null);
   // Tracks which webviews have already had autofill injected to avoid duplicates
   const autofillInjectedRef = useRef<Set<string>>(new Set());
-  const keychainSaveRef = useRef<ReturnType<typeof setTimeout>>();
   // Per-session unguessable sentinel for credential detection (prevents spoofing)
   const credsSentinelRef = useRef('__DEX_CREDS_' + Math.random().toString(36).slice(2, 10) + '__');
 
@@ -375,12 +433,16 @@ export const Browser: React.FC = () => {
   activeTabRef.current = activeTab;
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
-  const tabContainerRef = useRef<HTMLDivElement>(null);
+  const nativePageStatesRef = useRef(nativePageStates);
+  nativePageStatesRef.current = nativePageStates;
+  const tabStrip = useBrowserTabStrip(tabs, activeTab);
   // Refs that point at the latest createTab / refresh callbacks. The keyboard
   // handler is registered before those callbacks are defined, so we go through
   // a ref to avoid a stale closure or a re-binding cascade on every render.
   const createTabRef = useRef<((background?: boolean) => void) | null>(null);
+  const closeTabRef = useRef<((id: string) => void) | null>(null);
   const refreshRef = useRef<(() => void) | null>(null);
+  const findPageRef = useRef<(() => void) | null>(null);
   // Points at the latest applyZoomForWebview. attachWebviewEvents is defined
   // before that callback exists, so the webview event handlers reach it via ref.
   const applyZoomRef = useRef<((webview: any, tabId: string) => void) | null>(null);
@@ -428,53 +490,12 @@ export const Browser: React.FC = () => {
     };
   }, []);
 
-  // Keep the active and pinned tabs resident; unload older background tabs once
-  // the tab count exceeds the memory budget so the browser stays responsive.
+  // Restored metadata stays dormant until selected. An already running
+  // page stays resident so switching tabs cannot discard unsaved page state.
   useEffect(() => {
-    setTabs(prev => {
-      let changed = false;
-
-      if (prev.length <= TAB_MEMORY_LIMIT) {
-        const restored = prev.map(tab => {
-          if (tab.background && (tab.id === activeTab || !tab.url || tab.pinned)) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        });
-        return changed ? restored : prev;
-      }
-
-      let remainingToUnload = prev.length - TAB_MEMORY_LIMIT;
-      const next = prev.map(tab => {
-        const shouldKeepLoaded = tab.id === activeTab || tab.pinned || !tab.url;
-        if (shouldKeepLoaded) {
-          if (tab.background) {
-            changed = true;
-            return { ...tab, background: false };
-          }
-          return tab;
-        }
-
-        if (remainingToUnload > 0) {
-          remainingToUnload -= 1;
-          if (!tab.background) {
-            changed = true;
-            return { ...tab, background: true };
-          }
-          return tab;
-        }
-
-        if (tab.background) {
-          changed = true;
-          return { ...tab, background: false };
-        }
-        return tab;
-      });
-
-      return changed ? next : prev;
-    });
-  }, [activeTab, tabs.length]);
+    if (nativePages || !tabsRef.current.find(tab => tab.id === activeTab)?.background) return;
+    setTabs(prev => prev.map(tab => tab.id === activeTab ? { ...tab, background: false } : tab));
+  }, [activeTab, nativePages]);
 
   // Find-in-page
   const [showFindBar, setShowFindBar] = useState(false);
@@ -668,14 +689,11 @@ export const Browser: React.FC = () => {
       if (!mounted) return;
       if (r) { try { setBrowserSettings(prev => ({ ...prev, ...JSON.parse(r) })); } catch (e) { console.warn('[DEX]', e); } }
     }).catch((e: unknown) => { console.warn('[DEX]', e); });
-    ipc('capability:storage:get', KEYCHAIN_STORAGE_KEY).then((r: string | null) => {
-      if (!mounted) return;
-      if (r) { try { const p = JSON.parse(r); if (Array.isArray(p)) setSavedPasswords(p); } catch (e) { console.warn('[DEX]', e); } }
-    }).catch((e: unknown) => { console.warn('[DEX]', e); });
-    ipc('capability:storage:get', CARDS_STORAGE_KEY).then((r: string | null) => {
-      if (!mounted) return;
-      if (r) { try { const p = JSON.parse(r); if (Array.isArray(p)) setSavedCards(p); } catch (e) { console.warn('[DEX]', e); } }
-    }).catch((e: unknown) => { console.warn('[DEX]', e); });
+    // Generic capability storage is not a credential vault. Purge historical
+    // browser secrets and keep new entries session-only unless a real OS vault
+    // bridge is available in a future backend.
+    ipc('capability:storage:set', KEYCHAIN_STORAGE_KEY, '[]').catch(() => {});
+    ipc('capability:storage:set', CARDS_STORAGE_KEY, '[]').catch(() => {});
     return () => { mounted = false; };
   }, []);
 
@@ -695,12 +713,18 @@ export const Browser: React.FC = () => {
   // Keyboard shortcuts (Ctrl+F find, Ctrl+Shift+I devtools)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      const target = e.target;
+      if (e.defaultPrevented || !(target instanceof Node) || !browserRoot.current?.contains(target)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        if (nativePages && !findPageRef.current) return;
         e.preventDefault();
-        setShowFindBar(true);
-        focusTimerRef.current = setTimeout(() => findInputRef.current?.focus(), 100);
+        if (nativePages) findPageRef.current?.();
+        else {
+          setShowFindBar(true);
+          focusTimerRef.current = setTimeout(() => findInputRef.current?.focus(), 100);
+        }
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
+      if (!nativePages && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
         e.preventDefault();
         setDevToolsOpen(prev => !prev);
       }
@@ -719,30 +743,7 @@ export const Browser: React.FC = () => {
         e.preventDefault();
         e.stopPropagation();
         const currentId = activeTabRef.current;
-        if (currentId) {
-          // Inline closeTab logic to avoid stale closure
-          webviewEventsRef.current.delete(currentId);
-          webviewSrcRef.current.delete(currentId);
-          autofillInjectedRef.current.delete(currentId);
-          setTabs(prev => {
-            if (prev.length === 1) {
-              const newId = `tab_${Date.now()}`;
-              setActiveTab(newId);
-              setUrlInput('');
-              return [{ id: newId, title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 }];
-            }
-            const newTabs = prev.filter(t => t.id !== currentId);
-            if (activeTabRef.current === currentId) {
-              const closedIndex = prev.findIndex(t => t.id === currentId);
-              const newActiveIndex = Math.min(closedIndex, newTabs.length - 1);
-              setActiveTab(newTabs[newActiveIndex].id);
-              setUrlInput(newTabs[newActiveIndex].url);
-            }
-            return newTabs;
-          });
-          setTabErrors(prev => { const next = { ...prev }; delete next[currentId]; return next; });
-          setCrashedTabs(prev => { const next = new Set(prev); next.delete(currentId); return next; });
-        }
+        if (currentId) closeTabRef.current?.(currentId);
       }
       // Ctrl+T -- new tab. Stop propagation so the global "open command palette"
       // shortcut doesn't fire on top of it.
@@ -783,7 +784,7 @@ export const Browser: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showFindBar, fullscreenTabId]);
+  }, [showFindBar, fullscreenTabId, nativePages]);
 
   // Persist history (debounced) — cap at HISTORY_LIMIT (2000)
   useEffect(() => {
@@ -799,8 +800,11 @@ export const Browser: React.FC = () => {
   // (debounced). Only durable fields are stored — transient loading/background/
   // nav state is dropped and rebuilt on restore.
   useEffect(() => {
-    if (sessionSaveRef.current) clearTimeout(sessionSaveRef.current);
-    sessionSaveRef.current = setTimeout(() => {
+    if (!restoreTabs) return;
+    let pending = true;
+    const save = () => {
+      if (!pending || useAppPreferences.getState().apps.browser?.restoreTabs === false) return;
+      pending = false;
       try {
         const session: SavedSession = {
           tabs: tabs.map(t => ({
@@ -811,10 +815,18 @@ export const Browser: React.FC = () => {
           })),
           activeTab,
         };
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        localStorage.setItem(sessionKey, JSON.stringify(session));
       } catch (e) { console.warn('[DEX]', e); }
-    }, 500);
-  }, [tabs, activeTab]);
+    };
+    sessionSaveRef.current = setTimeout(save, 500);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearTimeout(sessionSaveRef.current);
+      window.removeEventListener('pagehide', save);
+      // Only flush on the last commit (e.g. a window closes before the timer).
+      if (tabsRef.current === tabs && activeTabRef.current === activeTab) save();
+    };
+  }, [tabs, activeTab, restoreTabs, sessionKey]);
 
   // Auto-clear: trim history beyond limit + prune entries older than 30 days
   useEffect(() => {
@@ -835,43 +847,104 @@ export const Browser: React.FC = () => {
     }, 500);
   }, [browserSettings]);
 
-  // Persist keychain (debounced)
-  useEffect(() => {
-    if (keychainSaveRef.current) clearTimeout(keychainSaveRef.current);
-    keychainSaveRef.current = setTimeout(() => {
-      const pw = JSON.stringify(savedPasswords);
-      const cd = JSON.stringify(savedCards);
-      // Credentials stored ONLY via IPC to main process secure storage — never in localStorage
-      (window as any).electron?.invoke?.('capability:storage:set', KEYCHAIN_STORAGE_KEY, pw).catch((e: unknown) => { console.warn('[DEX]', e); });
-      (window as any).electron?.invoke?.('capability:storage:set', CARDS_STORAGE_KEY, cd).catch((e: unknown) => { console.warn('[DEX]', e); });
-    }, 500);
-  }, [savedPasswords, savedCards]);
-
-  // Cleanup keychain timer
-  useEffect(() => {
-    return () => { if (keychainSaveRef.current) clearTimeout(keychainSaveRef.current); };
-  }, []);
+  // Credentials remain memory-only until an OS-vault bridge is available.
 
   // Add to history - MOVED BEFORE useEffect that uses it
   const addToHistory = useCallback((url: string, title: string) => {
     if (!url || url === '') return;
     const entry: HistoryEntry = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       url,
       title: title || url,
       visitedAt: Date.now(),
     };
     setHistory(prev => {
-      const updated = [entry, ...prev.filter(h => h.url !== url)];
+      const earlier = prev.find(item => item.url === url);
+      const updated = [{ ...entry, id: earlier?.id ?? entry.id }, ...prev.filter(h => h.url !== url)];
       return updated.length > HISTORY_LIMIT ? updated.slice(0, HISTORY_LIMIT) : updated;
     });
+  }, []);
+
+  const appliedPageStates = useRef<ReadonlyMap<string, NativePage>>(new Map());
+  useEffect(() => {
+    if (!nativePages) return;
+    const previous = appliedPageStates.current;
+    appliedPageStates.current = nativePageStates;
+    const changes = new Map(Array.from(nativePageStates).filter(([id, state]) => previous.get(id) !== state));
+    if (!changes.size) return;
+    const active = changes.get(activeTabRef.current);
+    const oldAddress = tabsRef.current.find(tab => tab.id === activeTabRef.current)?.url;
+    if (active?.status === 'open') {
+      setUrlInput(raw => document.activeElement === urlInputRef.current && raw !== oldAddress ? raw : active.url);
+    }
+    setTabs(current => {
+      let changed = false;
+      const updated = current.map(tab => {
+        const page = changes.get(tab.id);
+        if (!page || page.status !== 'open' || (tab.url === page.url && tab.title === page.title)) return tab;
+        changed = true;
+        if (tab.url === page.url) return { ...tab, title: page.title };
+        const navHistory = [...tab.navHistory.slice(0, tab.navIndex + 1), page.url].slice(-80);
+        return { ...tab, title: page.title, url: page.url, navHistory, navIndex: navHistory.length - 1 };
+      });
+      return changed ? updated : current;
+    });
+    for (const [id, page] of changes) {
+      const earlier = previous.get(id);
+      if (page.status === 'open' && tabsRef.current.some(tab => tab.id === id) &&
+        (earlier?.status !== 'open' || earlier.url !== page.url || earlier.title !== page.title)) {
+        addToHistory(page.url, page.title);
+      }
+    }
+  }, [addToHistory, nativePages, nativePageStates]);
+
+  const hasLivePage = useCallback((id: string) => {
+    const page = nativePageStatesRef.current.get(id);
+    return pendingPageOpens.current.has(id) || (page !== undefined && page.status !== 'closed');
+  }, []);
+
+  const actOnPageWindow = useCallback(async (id: string, action: 'reload' | 'back' | 'forward' | 'find') => {
+    try {
+      await nativePageAction(id, action);
+    } catch (error) {
+      toastRef.current.error(error instanceof Error ? error.message : 'The page window did not respond.');
+    }
+  }, []);
+
+  const actOnDownload = useCallback(async (id: number, action: 'save' | 'cancel') => {
+    if (downloadRequests.current.has(id)) return;
+    downloadRequests.current.add(id);
+    try {
+      await browserDownloadAction(id, action);
+    } catch (error) {
+      toastRef.current.error(error instanceof Error ? error.message : 'The download action could not be completed.');
+    } finally {
+      downloadRequests.current.delete(id);
+    }
   }, []);
 
   // Clear history
   const clearHistory = useCallback(() => {
     setHistory([]);
     localStorage.removeItem('dex-browser-history');
+    (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-history', '[]').catch(() => {});
   }, []);
+
+  useEffect(() => {
+    browserSecurityRef.current = {
+      forceHttps: nativePages || browserSettings.forceHttps,
+      blockTrackers: !nativePages && browserSettings.blockTrackers,
+      blockAds: !nativePages && browserSettings.blockAds,
+      reducedFingerprinting: !nativePages && browserSettings.enableTorMode,
+    };
+  }, [browserSettings.forceHttps, browserSettings.blockTrackers, browserSettings.blockAds, browserSettings.enableTorMode, nativePages]);
+
+  useEffect(() => () => {
+    if (!browserSettings.clearOnExit) return;
+    localStorage.removeItem('dex-browser-history');
+    if (!nativePages) localStorage.removeItem(sessionKey);
+    (window as any).electron?.invoke?.('capability:storage:set', 'dex-browser-history', '[]').catch(() => {});
+  }, [browserSettings.clearOnExit, nativePages]);
 
   // ---- Keychain CRUD ----
   const savePassword = useCallback((domain: string, username: string, password: string) => {
@@ -1277,6 +1350,14 @@ export const Browser: React.FC = () => {
   }, []);
 
   const currentTab = useMemo(() => tabs.find(t => t.id === activeTab), [tabs, activeTab]);
+  const activePageState = nativePageStates.get(activeTab);
+  const activePageWindow = activePageState?.status === 'closed' ? undefined : activePageState;
+  findPageRef.current = nativePages && activePageWindow?.status === 'open' && activePageWindow.canFind === true
+    ? () => { void actOnPageWindow(activeTab, 'find'); } : null;
+  const activePageError = tabErrors[activeTab] ?? (activePageWindow?.status === 'failed' ? activePageWindow.error : null);
+  const canGoBack = activePageWindow ? activePageWindow.canGoBack === true : Boolean(currentTab && currentTab.navIndex > 0);
+  const canGoForward = activePageWindow ? activePageWindow.canGoForward === true
+    : Boolean(currentTab && currentTab.navIndex < currentTab.navHistory.length - 1);
 
   // Silent blocking - optimized for performance
   const shouldBlock = useCallback((url: string): boolean => {
@@ -1317,12 +1398,13 @@ export const Browser: React.FC = () => {
 
   // Force HTTPS - enhanced
   const upgradeToHttps = useCallback((url: string): string => {
-    if (!browserSettings.forceHttps) return url;
+    if (!nativePages && !browserSettings.forceHttps) return url;
     if (url.startsWith('http://')) {
+      setHttpsUpgradeCount(count => count + 1);
       return url.replace('http://', 'https://');
     }
     return url;
-  }, [browserSettings.forceHttps]);
+  }, [browserSettings.forceHttps, nativePages]);
 
   // Create new tab with enterprise limits
   const createTab = useCallback((background = false) => {
@@ -1331,15 +1413,7 @@ export const Browser: React.FC = () => {
       return;
     }
     
-    const newTab: Tab = {
-      id: `tab_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      title: 'New Tab',
-      url: '',
-      loading: false,
-      background,
-      navHistory: [],
-      navIndex: -1,
-    };
+    const newTab = blankTab(background);
     
     setTabs(prev => [...prev, newTab]);
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'browserTabsOpened', amount: 1 } }));
@@ -1412,7 +1486,7 @@ export const Browser: React.FC = () => {
   }, []);
 
   // Close single tab
-  const closeTab = useCallback((id: string) => {
+  const removeTab = useCallback((id: string) => {
     // Cleanup refs for the closed tab to prevent memory leaks
     webviewEventsRef.current.delete(id);
     webviewSrcRef.current.delete(id);
@@ -1424,11 +1498,12 @@ export const Browser: React.FC = () => {
       credMsgHandlersRef.current.delete(id);
     }
     setTabs(prev => {
+      if (!prev.some(tab => tab.id === id)) return prev;
       if (prev.length === 1) {
-        const newId = `tab_${Date.now()}`;
-        setActiveTab(newId);
+        const next = blankTab();
+        setActiveTab(next.id);
         setUrlInput('');
-        return [{ id: newId, title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 }];
+        return [next];
       }
       const newTabs = prev.filter(t => t.id !== id);
       if (activeTabRef.current === id) {
@@ -1443,15 +1518,34 @@ export const Browser: React.FC = () => {
     setCrashedTabs(prev => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
 
+  const closeTab = useCallback(async (id: string) => {
+    if (!nativePages) {
+      removeTab(id);
+      return;
+    }
+    if (closingTabs.current.has(id)) return;
+    closingTabs.current.add(id);
+    try {
+      await pendingPageOpens.current.get(id);
+      await nativePageAction(id, 'close');
+      removeTab(id);
+    } catch (error) {
+      toastRef.current.error(error instanceof Error ? error.message : 'Could not close the page window.');
+    } finally {
+      closingTabs.current.delete(id);
+    }
+  }, [nativePages, removeTab]);
+  closeTabRef.current = id => { void closeTab(id); };
+
   // Close all tabs except pinned
   const closeAllTabs = useCallback(() => {
-    const pinnedTabs = tabsRef.current.filter(t => t.pinned);
+    const pinnedTabs = tabsRef.current.filter(t => t.pinned || nativePages && hasLivePage(t.id));
     if (pinnedTabs.length > 0) {
       setTabs(pinnedTabs);
       setActiveTab(pinnedTabs[0].id);
       setUrlInput(pinnedTabs[0].url);
     } else {
-      const newTab: Tab = { id: `tab_${Date.now()}`, title: 'New Tab', url: '', loading: false, navHistory: [], navIndex: -1 };
+      const newTab = blankTab();
       setTabs([newTab]);
       setActiveTab(newTab.id);
       setUrlInput('');
@@ -1459,36 +1553,36 @@ export const Browser: React.FC = () => {
     setTabErrors({});
     setCrashedTabs(new Set());
     setShowTabMenu(false);
-  }, []);
+  }, [hasLivePage, nativePages]);
 
   // Close all tabs to the right
   const closeTabsToRight = useCallback((id: string) => {
     setTabs(prev => {
       const index = prev.findIndex(t => t.id === id);
       if (index === -1) return prev;
-      const newTabs = prev.slice(0, index + 1);
+      const newTabs = prev.filter((tab, position) => position <= index || tab.pinned || nativePages && hasLivePage(tab.id));
       if (!newTabs.find(t => t.id === activeTabRef.current)) {
         setActiveTab(newTabs[newTabs.length - 1].id);
         setUrlInput(newTabs[newTabs.length - 1].url);
       }
       return newTabs;
     });
-  }, []);
+  }, [hasLivePage, nativePages]);
 
   // Close other tabs (keep only active)
   const closeOtherTabs = useCallback(() => {
     setTabs(prev => {
       const currentActiveTab = activeTabRef.current;
       const current = prev.find(t => t.id === currentActiveTab);
-      const pinnedTabs = prev.filter(t => t.pinned && t.id !== currentActiveTab);
-      return current ? [...pinnedTabs, current] : prev;
+      return current ? prev.filter(t => t.id === currentActiveTab || t.pinned || nativePages && hasLivePage(t.id)) : prev;
     });
     setShowTabMenu(false);
-  }, []);
+  }, [hasLivePage, nativePages]);
 
   // Duplicate tab
   const duplicateTab = useCallback((id: string) => {
     setTabs(prev => {
+      if (prev.length >= MAX_TABS) return prev;
       if (prev.length >= MAX_TABS) return prev;
       const tab = prev.find(t => t.id === id);
       if (!tab) return prev;
@@ -1498,7 +1592,8 @@ export const Browser: React.FC = () => {
         url: tab.url,
         loading: false,
         navHistory: [...(tab.navHistory || [])],
-        navIndex: tab.navIndex || -1,
+        navIndex: tab.navIndex,
+        background: true,
       };
       const index = prev.findIndex(t => t.id === id);
       const newTabs = [...prev];
@@ -1527,15 +1622,36 @@ export const Browser: React.FC = () => {
           startpage: 'https://www.startpage.com/do/search?q=',
           brave: 'https://search.brave.com/search?q=',
         };
-        const engine = searchEngines[browserSettings.defaultSearchEngine] || searchEngines.duckduckgo;
+        const engine = searchEngines[searchProvider] || searchEngines.duckduckgo;
         finalUrl = `${engine}${encodeURIComponent(finalUrl)}`;
       }
     }
 
     finalUrl = upgradeToHttps(finalUrl);
+    try {
+      const parsed = new URL(finalUrl);
+      if (parsed.hostname.endsWith('.onion')) {
+        toast.error('Onion addresses require a verified Tor transport. DEX will not pretend this session is routed through Tor.');
+        return;
+      }
+      if (parsed.username || parsed.password) {
+        toast.error('Blocked: credentials embedded in an address can conceal the real destination.');
+        return;
+      }
+      if (parsed.hostname.includes('xn--')) {
+        window.dispatchEvent(new CustomEvent('dex-notification', { detail: {
+          type: 'warning', title: 'Lookalike domain warning',
+          body: 'This address uses internationalized domain encoding. Verify the destination before entering credentials.',
+          source: 'Browser Security',
+        }}));
+      }
+    } catch {
+      toast.error('Blocked: invalid address');
+      return;
+    }
     if (shouldBlock(finalUrl)) return;
 
-    addToHistory(finalUrl, finalUrl.slice(0, 50));
+    if (!nativePages) addToHistory(finalUrl, finalUrl.slice(0, 50));
     setShowSuggestions(false);
 
     const currentActiveTab = activeTabRef.current;
@@ -1551,7 +1667,7 @@ export const Browser: React.FC = () => {
         return { 
           ...t, 
           url: finalUrl, 
-          loading: true, 
+          loading: !nativePages,
           title: finalUrl.slice(0, 30),
           navHistory: newNavHistory,
           navIndex: newNavHistory.length - 1
@@ -1561,14 +1677,16 @@ export const Browser: React.FC = () => {
     }));
     setUrlInput(finalUrl);
 
-    if (isNewWebview) {
+    if (nativePages) {
+      void openPageWindow(currentActiveTab, finalUrl, true);
+    } else if (isNewWebview) {
       // Webview will mount on next render — set stable src for initial load
       webviewSrcRef.current.set(currentActiveTab, finalUrl);
     } else {
       // Webview already exists — navigate imperatively (don't change src)
       try { wv.loadURL(finalUrl); } catch (e) { console.error('[Browser] loadURL error:', e); }
     }
-  }, [shouldBlock, upgradeToHttps, browserSettings.defaultSearchEngine, addToHistory]);
+  }, [shouldBlock, upgradeToHttps, searchProvider, addToHistory, nativePages, openPageWindow]);
 
   // Pick up search query from Spotlight (via localStorage bridge)
   useEffect(() => {
@@ -1635,46 +1753,61 @@ export const Browser: React.FC = () => {
   // Navigation: Go Back
   const goBack = useCallback(() => {
     const currentActiveTab = activeTabRef.current;
+    if (nativePages && hasLivePage(currentActiveTab)) {
+      void actOnPageWindow(currentActiveTab, 'back');
+      return;
+    }
     const tab = tabsRef.current.find(t => t.id === currentActiveTab);
     if (tab && tab.navIndex > 0) {
       const newIndex = tab.navIndex - 1;
       const prevUrl = tab.navHistory[newIndex];
       setTabs(prev => prev.map(t =>
         t.id === currentActiveTab
-          ? { ...t, url: prevUrl, navIndex: newIndex, loading: true, title: prevUrl.slice(0, 30) }
+          ? { ...t, url: prevUrl, navIndex: newIndex, loading: !nativePages, title: prevUrl.slice(0, 30) }
           : t
       ));
       setTabErrors(prev => ({ ...prev, [currentActiveTab]: null }));
       setUrlInput(prevUrl);
       const wv = webviewRefs.current.get(currentActiveTab);
-      if (wv) { try { wv.loadURL(prevUrl); } catch (e) { console.warn('[DEX]', e); } }
+      if (nativePages) void openPageWindow(currentActiveTab, prevUrl, true);
+      else if (wv) { try { wv.loadURL(prevUrl); } catch (e) { console.warn('[DEX]', e); } }
     }
-  }, []);
+  }, [actOnPageWindow, hasLivePage, nativePages, openPageWindow]);
 
   // Navigation: Go Forward
   const goForward = useCallback(() => {
     const currentActiveTab = activeTabRef.current;
+    if (nativePages && hasLivePage(currentActiveTab)) {
+      void actOnPageWindow(currentActiveTab, 'forward');
+      return;
+    }
     const tab = tabsRef.current.find(t => t.id === currentActiveTab);
     if (tab && tab.navIndex < tab.navHistory.length - 1) {
       const newIndex = tab.navIndex + 1;
       const nextUrl = tab.navHistory[newIndex];
       setTabs(prev => prev.map(t =>
         t.id === currentActiveTab
-          ? { ...t, url: nextUrl, navIndex: newIndex, loading: true, title: nextUrl.slice(0, 30) }
+          ? { ...t, url: nextUrl, navIndex: newIndex, loading: !nativePages, title: nextUrl.slice(0, 30) }
           : t
       ));
       setTabErrors(prev => ({ ...prev, [currentActiveTab]: null }));
       setUrlInput(nextUrl);
       const wv = webviewRefs.current.get(currentActiveTab);
-      if (wv) { try { wv.loadURL(nextUrl); } catch (e) { console.warn('[DEX]', e); } }
+      if (nativePages) void openPageWindow(currentActiveTab, nextUrl, true);
+      else if (wv) { try { wv.loadURL(nextUrl); } catch (e) { console.warn('[DEX]', e); } }
     }
-  }, []);
+  }, [actOnPageWindow, hasLivePage, nativePages, openPageWindow]);
 
   // Navigation: Refresh current page
   const refresh = useCallback(() => {
     const currentActiveTab = activeTabRef.current;
     const tab = tabsRef.current.find(t => t.id === currentActiveTab);
     if (tab && tab.url) {
+      if (nativePages) {
+        if (hasLivePage(tab.id)) void actOnPageWindow(tab.id, 'reload');
+        else void openPageWindow(tab.id, tab.url);
+        return;
+      }
       setCrashedTabs(prev => { const next = new Set(prev); next.delete(currentActiveTab); return next; });
       setTabErrors(prev => ({ ...prev, [currentActiveTab]: null }));
       setTabs(prev => prev.map(t =>
@@ -1685,7 +1818,7 @@ export const Browser: React.FC = () => {
         try { wv.reload(); } catch (e) { console.warn('[DEX]', e); }
       }
     }
-  }, []);
+  }, [actOnPageWindow, hasLivePage, nativePages, openPageWindow]);
   refreshRef.current = refresh;
 
   const addBookmark = (folderId?: string) => {
@@ -1782,28 +1915,26 @@ export const Browser: React.FC = () => {
   }, [urlInput, urlFocused, bookmarks, history]);
 
   return (
-    <div style={styles.container}>
+    <div ref={browserRoot} className="dex-app-surface" style={styles.container}>
       {/* Safari-style unified bar: tabs + navigation */}
-      <div style={styles.topBar}>
+      <div className="dex-app-toolbar" style={styles.topBar}>
         {/* Navigation controls */}
-        <div style={styles.navControls}>
+        <div className="dex-control-cluster" style={styles.navControls}>
           <button
-            style={{...styles.navBtn, opacity: currentTab && currentTab.navIndex > 0 ? 1 : 0.4, cursor: currentTab && currentTab.navIndex > 0 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease, background 0.12s' }}
+            style={{...styles.navBtn, opacity: canGoBack ? 1 : 0.4, cursor: canGoBack ? 'pointer' : 'not-allowed' }}
             onClick={goBack}
-            disabled={!currentTab || currentTab.navIndex <= 0}
+            disabled={!canGoBack}
             title="Back"
             aria-label="Go back"
-            aria-disabled={!currentTab || currentTab.navIndex <= 0}
           >
             {Icon.back}
           </button>
           <button
-            style={{...styles.navBtn, opacity: currentTab && currentTab.navIndex < (currentTab.navHistory?.length || 0) - 1 ? 1 : 0.4, cursor: currentTab && currentTab.navIndex < (currentTab.navHistory?.length || 0) - 1 ? 'pointer' : 'not-allowed', transition: 'opacity 0.15s ease, background 0.12s' }}
+            style={{...styles.navBtn, opacity: canGoForward ? 1 : 0.4, cursor: canGoForward ? 'pointer' : 'not-allowed' }}
             onClick={goForward}
-            disabled={!currentTab || currentTab.navIndex >= (currentTab.navHistory?.length || 0) - 1}
+            disabled={!canGoForward}
             title="Forward"
             aria-label="Go forward"
-            aria-disabled={!currentTab || currentTab.navIndex >= (currentTab.navHistory?.length || 0) - 1}
           >
             {Icon.forward}
           </button>
@@ -1826,12 +1957,17 @@ export const Browser: React.FC = () => {
         )}
 
         {/* Tab strip */}
-        <div style={styles.tabStrip} ref={tabContainerRef}>
-          {tabs.map((tab) => {
+        <div aria-label="Open browser tabs" style={{ ...styles.tabStrip, ...(tabStrip.virtual ? { overflowX: 'auto', scrollbarWidth: 'thin' } : {}) }}
+          ref={tabStrip.container} onScroll={tabStrip.virtual ? tabStrip.onScroll : undefined}>
+          <div style={tabStrip.virtual
+            ? { position: 'relative', width: tabStrip.total, height: 28, flex: '0 0 auto' }
+            : { display: 'flex', minWidth: 0, gap: 2 }}>
+          {tabStrip.visible.map(({ tab, left, width }) => {
             const tabGroup = Array.from(tabGroups.entries()).find(([_, g]) => g.tabIds.includes(tab.id));
             return (
             <div
               key={tab.id}
+              data-browser-tab={tab.id}
               draggable={!tab.pinned}
               onDragStart={(e) => handleTabDragStart(e, tab.id)}
               onDragEnd={handleTabDragEnd}
@@ -1840,6 +1976,7 @@ export const Browser: React.FC = () => {
               onDragLeave={() => setDragOverTab(null)}
               style={{
                 ...styles.tab,
+                ...(tabStrip.virtual ? { position: 'absolute', left, width: width - 2, height: 28, flexShrink: 0 } : {}),
                 ...(activeTab === tab.id ? styles.tabActive : {}),
                 ...(tabGroup ? { borderBottom: `2px solid ${tabGroup[1].color}` } : {}),
                 ...(draggingTab === tab.id ? { opacity: 0.5 } : {}),
@@ -1856,7 +1993,7 @@ export const Browser: React.FC = () => {
               title={`${tab.title}\n${tab.url}${tabGroup ? `\nGroup: ${tabGroup[1].name}` : ''}`}
             >
               {tab.pinned && <span style={styles.pinDot} />}
-              {tab.loading ? (
+              {tab.loading || nativePageStates.get(tab.id)?.status === 'opening' ? (
                 <span style={styles.loadingDot} />
               ) : (
                 tab.url?.startsWith('https://') ? (
@@ -1877,27 +2014,49 @@ export const Browser: React.FC = () => {
               )}
             </div>
           ); })}
-          <button
-            style={styles.newTabBtn}
-            onClick={() => createTab()}
-            disabled={tabs.length >= MAX_TABS}
-            title="New tab"
-            aria-label="New tab"
-          >
-            {Icon.plus}
-          </button>
+          </div>
         </div>
+        <button style={styles.newTabBtn} onClick={() => createTab()} disabled={tabs.length >= MAX_TABS}
+          title="New tab" aria-label="New tab">{Icon.plus}</button>
 
         {/* Right actions */}
         <div style={styles.rightActions}>
+          <details style={{ position: 'relative' }}>
+            <summary aria-label="Search open tabs" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>Find tab</summary>
+            <div style={{ position: 'absolute', background: 'var(--color-bg-elevated)', zIndex: 20, right: 0, top: '100%', width: 280, padding: 10, border: '1px solid var(--color-border)', borderRadius: 10 }}>
+              <input aria-label="Search open tabs by title or address" placeholder="Title or address" style={{ width: '100%' }} value={tabQuery} onChange={e => setTabQuery(e.target.value)} />
+              <div style={{ display: 'grid', gap: 3, maxHeight: 240, overflow: 'auto' }}>
+                {searchResults.slice(0, 50).map(tab => (
+                  <button key={tab.id} title={tab.url} style={{ ...styles.dropdownItem, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={e => {
+                    setActiveTab(tab.id);
+                    setUrlInput(tab.url);
+                    const menu = e.currentTarget.closest('details');
+                    if (menu) menu.open = false;
+                  }}>{tab.title}</button>
+                ))}
+                {searchResults.length === 0 && <span>No matching tabs</span>}
+                {searchResults.length > 50 && <span>Refine your search to see more tabs.</span>}
+              </div>
+            </div>
+          </details>
           <button
+            style={styles.navBtn}
+            onClick={() => setShowTabMenu(value => !value)}
+            aria-label="Tab actions"
+            aria-expanded={showTabMenu}
+            title="Tab actions"
+          >
+            ⋯
+          </button>
+          {(!nativePages || nativeDownloads.supported) && <button
             style={{...styles.navBtn, position: 'relative'}}
             onClick={() => setShowDownloads(!showDownloads)}
             aria-label="Downloads"
           >
             {Icon.download}
-            {downloads.some(d => d.status === 'downloading') && <span style={styles.activeDot} />}
-          </button>
+            {(downloads.some(d => d.status === 'downloading') || nativeDownloads.items.some(item =>
+              item.status === 'waiting' || item.status === 'downloading')) && <span style={styles.activeDot} />}
+          </button>}
           <button
             style={{...styles.navBtn, ...(showKeychain ? { color: 'var(--color-accent)' } : {})}}
             onClick={() => setShowKeychain(p => !p)}
@@ -1961,7 +2120,7 @@ export const Browser: React.FC = () => {
         <button style={styles.navBtnSmall} onClick={() => addBookmark()} aria-label="Bookmark" title="Bookmark this page">{Icon.bookmark}</button>
 
         {/* Per-site zoom controls — remembered per hostname */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {!nativePages && <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <button
             style={{ ...styles.navBtnSmall, ...(currentTab?.url ? {} : { opacity: 0.4, cursor: 'not-allowed' }) }}
             onClick={() => adjustZoom('out')}
@@ -1987,7 +2146,7 @@ export const Browser: React.FC = () => {
             aria-label="Zoom in"
             title="Zoom in"
           >{Icon.zoomIn}</button>
-        </div>
+        </div>}
 
         <button
           style={{...styles.navBtnSmall, ...(currentTab?.url ? {} : { opacity: 0.4, cursor: 'not-allowed' })}}
@@ -1997,16 +2156,19 @@ export const Browser: React.FC = () => {
           aria-label="Send link to Notes"
           title="Send link to Notes"
         >{Icon.sendToNotes}</button>
-        <button
+        {!nativePages && <button
           style={{...styles.navBtnSmall, ...(currentTab ? {} : { opacity: 0.4, cursor: 'not-allowed' })}}
           onClick={toggleReadingMode}
           disabled={!currentTab}
           aria-disabled={!currentTab}
           aria-label="Reading mode"
           title="Reading mode"
-        >{Icon.reader}</button>
+        >{Icon.reader}</button>}
         <button style={styles.navBtnSmall} onClick={() => setShowBookmarks(!showBookmarks)} aria-label="Bookmarks" title="Bookmarks">{Icon.bookmarkList}</button>
         <button style={styles.navBtnSmall} onClick={() => setShowHistory(!showHistory)} aria-label="History" title="History & Tools">{Icon.history}</button>
+        {nativePages && activePageWindow?.canFind && <button style={styles.navBtnSmall}
+          onClick={() => findPageRef.current?.()} disabled={!findPageRef.current}
+          aria-label="Find in page" title="Find in page (Ctrl+F)">{Icon.search}</button>}
       </div>
 
       {/* Tab Menu - context menu */}
@@ -2031,9 +2193,14 @@ export const Browser: React.FC = () => {
             </button>
           ))}
           <div style={styles.dropdownDivider} />
-          <button style={styles.dropdownItem} onClick={closeOtherTabs}>Close Other Tabs</button>
-          <button style={styles.dropdownItem} onClick={() => { closeTabsToRight(activeTab); setShowTabMenu(false); }}>Close Tabs to Right</button>
-          <button style={{...styles.dropdownItem, color: 'var(--color-error)'}} onClick={closeAllTabs}>Close All Tabs</button>
+          <button style={styles.dropdownItem} onClick={closeOtherTabs} disabled={!nativePageStatesReady}>Close Other Tabs</button>
+          <button style={styles.dropdownItem} onClick={() => { closeTabsToRight(activeTab); setShowTabMenu(false); }} disabled={!nativePageStatesReady}>Close Tabs to Right</button>
+          <button style={{...styles.dropdownItem, color: 'var(--color-error)'}} onClick={closeAllTabs} disabled={!nativePageStatesReady}>Close All Tabs</button>
+          {nativePages && <small style={{ color: 'var(--color-text-secondary)' }}>
+            {nativePageStatesReady ? 'Bulk close keeps pinned tabs and open page windows.'
+              : nativePageStatus === 'error' ? 'Open page windows could not be checked.' : 'Checking which page windows are open…'}
+          </small>}
+          {nativePageStatus === 'error' && <button type="button" style={styles.dropdownItem} onClick={retryPageStatus}>Retry window check</button>}
         </div>
       )}
 
@@ -2168,7 +2335,22 @@ export const Browser: React.FC = () => {
             <span>Downloads</span>
             <button style={styles.panelClose} onClick={() => setShowDownloads(false)} aria-label="Close">{Icon.close}</button>
           </div>
-          {downloads.length === 0 ? (
+          {nativePages ? (nativeDownloads.items.length === 0 ? <div style={styles.emptyPanel}>No downloads yet</div>
+            : nativeDownloads.items.map(item => (
+              <div key={item.id} style={styles.downloadRow}>
+                <span style={styles.downloadName} title={item.name}>{item.name}</span>
+                <div style={styles.downloadStatus}>{item.host} · {{
+                  waiting: 'Ready to save', choosing: 'Choosing location…', downloading: 'Downloading',
+                  completed: 'Completed', canceled: 'Canceled', failed: 'Transfer failed',
+                }[item.status]}</div>
+                {item.status === 'downloading' && <progress aria-label={`Download progress for ${item.name}`}
+                  max={1} value={item.total && item.total > 0 ? Math.min(1, item.received / item.total) : undefined} />}
+                {item.status === 'waiting' && <button style={styles.dropdownItem}
+                  onClick={() => void actOnDownload(item.id, 'save')}>Choose location</button>}
+                {(item.status === 'waiting' || item.status === 'choosing' || item.status === 'downloading') &&
+                  <button style={styles.dropdownItem} onClick={() => void actOnDownload(item.id, 'cancel')}>Cancel download</button>}
+              </div>
+            ))) : downloads.length === 0 ? (
             <div style={styles.emptyPanel}>No downloads yet</div>
           ) : (
             downloads.map(d => (
@@ -2281,11 +2463,11 @@ export const Browser: React.FC = () => {
       {showSettings && (
         <div className="dex-liquid-glass-strong" style={styles.settingsPanel}>
           <div style={styles.sidePanelHeader}>
-            <span style={{ fontWeight: 600, fontSize: '13px' }}>Privacy & Security</span>
+            <span style={{ fontWeight: 600, fontSize: '13px' }}>{nativePages ? 'Browser preferences' : 'Privacy & Security'}</span>
             <button style={styles.panelClose} onClick={() => setShowSettings(false)} aria-label="Close">{Icon.close}</button>
           </div>
           <div style={styles.settingsList}>
-            {([
+            {!nativePages && ([
               { key: 'blockTrackers', label: 'Block Trackers' },
               { key: 'blockAds', label: 'Block Ads' },
               { key: 'forceHttps', label: 'Force HTTPS' },
@@ -2293,11 +2475,14 @@ export const Browser: React.FC = () => {
               { key: 'doNotTrack', label: 'Do Not Track' },
               { key: 'clearOnExit', label: 'Clear Data on Exit' },
               { key: 'blockThirdPartyCookies', label: 'Block 3rd-Party Cookies' },
-              { key: 'enableTorMode', label: 'Privacy Mode' },
+              { key: 'enableTorMode', label: 'Reduced Fingerprinting UA' },
             ] as { key: keyof BrowserSettings; label: string }[]).map(item => (
               <label key={item.key} style={styles.settingRow}>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>{item.label}</span>
-                <div
+                <button
+                  type="button"
+                  aria-label={`Toggle ${item.label}`}
+                  aria-pressed={Boolean(browserSettings[item.key])}
                   style={{
                     ...styles.toggleTrack,
                     background: browserSettings[item.key] ? 'var(--color-success)' : 'var(--color-bg-hover)',
@@ -2308,21 +2493,27 @@ export const Browser: React.FC = () => {
                     ...styles.toggleKnob,
                     transform: browserSettings[item.key] ? 'translateX(14px)' : 'translateX(0)',
                   }} />
-                </div>
+                </button>
               </label>
             ))}
+            {!nativePages && <div style={{ padding: '8px 10px', border: '1px solid var(--color-border-subtle)', borderRadius: 6, color: 'var(--color-text-tertiary)', fontSize: 10.5, lineHeight: 1.45 }}>
+              Reduced Fingerprinting changes the browser identity only. It does not route traffic through Tor. UKI can explain the active protections and flag risky addresses.
+            </div>}
+            {nativePages && <p>HTTPS pages open in separate windows from the DEX workspace.</p>}
             <div style={{ ...styles.settingRow, flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
               <span style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>Search Engine</span>
               <Select
                 size="sm"
                 options={[{ value: 'duckduckgo', label: 'DuckDuckGo' }, { value: 'google', label: 'Google' }, { value: 'startpage', label: 'Startpage' }, { value: 'brave', label: 'Brave Search' }]}
-                value={browserSettings.defaultSearchEngine}
-                onChange={v => setBrowserSettings(s => ({ ...s, defaultSearchEngine: v as BrowserSettings['defaultSearchEngine'] }))}
+                value={searchProvider}
+                onChange={v => { void saveAppPreference('browser', 'searchProvider', v).then(saved => {
+                  if (!saved) toast.error('Search provider could not be saved.');
+                }); }}
               />
             </div>
 
             {/* TrackBlock Stats */}
-            <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3) 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
+            {!nativePages && <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3) 0 4px', borderTop: '1px solid var(--color-border-subtle)' }}>
               <div className="dex-label-caps" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -2331,10 +2522,10 @@ export const Browser: React.FC = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                 {[
-                  { label: 'Trackers Blocked', value: blockedCount, color: 'var(--color-warning)' },
-                  { label: 'HTTPS Upgrades', value: browserSettings.forceHttps ? history.filter(h => h.url?.startsWith('https')).length : 0, color: 'var(--color-success)' },
-                  { label: 'Fingerprints', value: browserSettings.fingerprintProtection ? Math.floor(blockedCount * 0.3) : 0, color: '#bf5af2' },
-                  { label: 'Cookies Blocked', value: browserSettings.blockThirdPartyCookies ? Math.floor(blockedCount * 0.6) : 0, color: 'var(--color-accent)' },
+                  { label: 'Requests Blocked', value: blockedCount, color: 'var(--color-text-primary)' },
+                  { label: 'HTTPS Upgrades', value: httpsUpgradeCount, color: 'var(--color-text-secondary)' },
+                  { label: 'Fingerprint Policy', value: browserSettings.fingerprintProtection ? 'On' : 'Off', color: 'var(--color-text-secondary)' },
+                  { label: 'Cookie Policy', value: browserSettings.blockThirdPartyCookies ? 'On' : 'Off', color: 'var(--color-text-secondary)' },
                 ].map(stat => (
                   <div key={stat.label} style={{ padding: '10px var(--space-3)', borderRadius: 6, background: 'var(--color-bg-secondary)' }}>
                     <div style={{ fontSize: 18, fontWeight: 600, color: stat.color }}>{stat.value.toLocaleString()}</div>
@@ -2342,7 +2533,7 @@ export const Browser: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       )}
@@ -2534,8 +2725,17 @@ export const Browser: React.FC = () => {
           </div>
         )}
 
-        {/* Render a webview for each tab that has a URL -- hide inactive */}
-        {tabs.map(tab => (tab.url && (tab.id === activeTab || !tab.background)) ? (
+        {nativePages && currentTab?.url && (
+          <div style={{ display: 'grid', alignContent: 'center', justifyItems: 'center', gap: 12, height: '100%', padding: 20 }}>
+            <p style={{ overflowWrap: 'anywhere', textAlign: 'center' }}>{currentTab.url}</p>
+            {activePageError && <p role="status">{activePageError}</p>}
+            {activePageWindow?.status === 'opening' && <p role="status">Loading page in its window…</p>}
+            <button style={styles.errorBtn} onClick={() => void openPageWindow(currentTab.id, currentTab.url, Boolean(activePageError))}>
+              {activePageError ? 'Retry opening page' : activePageWindow ? 'Show web page window' : 'Open web page window'}
+            </button>
+          </div>
+        )}
+        {!nativePages && tabs.map(tab => (tab.url && (tab.id === activeTab || !tab.background)) ? (
           <div
             key={tab.id}
             style={fullscreenTabId === tab.id ? {
@@ -2588,9 +2788,9 @@ export const Browser: React.FC = () => {
               {...{
                 partition: 'persist:dex-browser',
                 allowpopups: 'false',
-                disablebackgroundthrottling: 'true',
+                disablebackgroundthrottling: 'false',
                 webpreferences: 'contextIsolation=yes, nodeIntegration=no, javascript=yes, images=yes, webSecurity=yes',
-                useragent: browserSettings.enableTorMode ? TOR_USER_AGENT : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                useragent: browserSettings.enableTorMode ? REDUCED_FINGERPRINTING_USER_AGENT : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
               } as Record<string, string>}
             />
           </div>
@@ -2683,7 +2883,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--color-text-primary)',
     cursor: 'pointer',
     padding: '4px',
-    borderRadius: '10px',
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2974,7 +3174,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '12px',
     boxShadow: '0 12px 40px var(--color-shadow-strong)',
     zIndex: 100,
-    overflow: 'hidden',
+    maxHeight: 'min(460px, calc(100% - 90px))',
+    overflowY: 'auto',
   },
   downloadRow: {
     padding: '10px 14px',
@@ -3085,7 +3286,9 @@ const styles: Record<string, React.CSSProperties> = {
   toggleTrack: {
     width: '34px',
     height: '20px',
-    borderRadius: '10px',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    padding: 0,
     position: 'relative',
     cursor: 'pointer',
     transition: 'background 0.2s',
@@ -3094,7 +3297,7 @@ const styles: Record<string, React.CSSProperties> = {
   toggleKnob: {
     width: '16px',
     height: '16px',
-    borderRadius: '50%',
+    borderRadius: '4px',
     background: 'var(--color-bg-elevated)',
     position: 'absolute',
     top: '2px',

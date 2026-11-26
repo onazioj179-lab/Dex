@@ -78,7 +78,7 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         search(value);
-      }, 300);
+      }, 70);
     },
     [search, setQuery]
   );
@@ -112,10 +112,11 @@ export function GlobalSearchOverlay(): React.ReactElement | null {
       onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
     >
       <div
+        className="dex-frosted-ice-strong"
         style={{
           width: 'min(640px, calc(100vw - 48px))',
           maxHeight: '70vh',
-          background: 'var(--color-bg-surface)',
+          background: 'var(--color-bg-glass-strong)',
           border: '1px solid var(--color-border, #3a3a3c)',
           borderRadius: '10px',
           boxShadow: 'var(--pg-shadow-popover)',

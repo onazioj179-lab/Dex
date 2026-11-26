@@ -26,7 +26,9 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
+import { useReducedMotion } from '../utils/useReducedMotion';
+import { useMotionPresence } from '../utils/useMotionPresence';
+import { useAppAppearance } from '../utils/appAppearanceContext';
 import { zIndex as zIndexTokens, radius, colors, transition } from '../styles/tokens';
 
 // ---------------------------------------------------------------------------
@@ -178,12 +180,12 @@ const styles = {
 // Animation helpers
 // ---------------------------------------------------------------------------
 
-function getInitialTransform(placement: DropdownPlacement): string {
-  if (placement.startsWith('top')) return 'translateY(8px) scale(0.96)';
-  if (placement.startsWith('bottom')) return 'translateY(-8px) scale(0.96)';
-  if (placement.startsWith('left')) return 'translateX(8px) scale(0.96)';
-  if (placement.startsWith('right')) return 'translateX(-8px) scale(0.96)';
-  return 'scale(0.96)';
+function getTransformOrigin(placement: DropdownPlacement): string {
+  const [side, align] = placement.split('-');
+  const edge = align === 'start' ? '0%' : align === 'end' ? '100%' : '50%';
+  if (side === 'top') return `${edge} 100%`;
+  if (side === 'bottom') return `${edge} 0%`;
+  return `${side === 'left' ? '100%' : '0%'} ${edge}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,12 +218,14 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [actualPlacement, setActualPlacement] = useState(placement);
     const [focusedIndex, setFocusedIndex] = useState(-1);
-    const [animState, setAnimState] = useState<'entering' | 'visible' | 'exiting'>('entering');
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const appearance = useAppAppearance();
+    const reducedMotion = useReducedMotion();
+    const present = useMotionPresence(open);
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
-      focus: () => containerRef.current?.focus(),
+      focus: () => { if (open) containerRef.current?.focus(); },
       close: onClose,
     }));
 
@@ -319,44 +323,16 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
       setActualPlacement(finalPlacement);
     }, [open, triggerRef, placement, offset, width, maxHeight, items?.length]);
 
-    // Animation state management
-    useEffect(() => {
-      if (open) {
-        setAnimState('entering');
-        const timeout = setTimeout(() => setAnimState('visible'), 20);
-        return () => clearTimeout(timeout);
-      } else {
-        setAnimState('exiting');
-      }
-    }, [open]);
-
-    // Close on outside mousedown (instant)
     useEffect(() => {
       if (!open) return;
-      let removeMouseDown: (() => void) | null = null;
-
-      // Small delay to prevent the click that opened it from closing it
-      const timeoutId = setTimeout(() => {
-        const handleMouseDown = (e: MouseEvent) => {
-          const target = e.target as Node;
-          if (
-            containerRef.current && 
-            !containerRef.current.contains(target) &&
-            triggerRef.current &&
-            !triggerRef.current.contains(target)
-          ) {
-            onClose();
-          }
-        };
-
-        document.addEventListener('mousedown', handleMouseDown);
-        removeMouseDown = () => document.removeEventListener('mousedown', handleMouseDown);
-      }, 50);
-
-      return () => {
-        clearTimeout(timeoutId);
-        removeMouseDown?.();
+      const handlePointer = (event: PointerEvent) => {
+        const target = event.target;
+        if (target instanceof Node && !containerRef.current?.contains(target) && !triggerRef.current?.contains(target)) {
+          onClose();
+        }
       };
+      document.addEventListener('pointerdown', handlePointer);
+      return () => document.removeEventListener('pointerdown', handlePointer);
     }, [open, onClose, triggerRef]);
 
     // Keyboard navigation
@@ -415,41 +391,28 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
     }, [open, onClose, focusedIndex, selectableItems, triggerRef]);
 
     // Focus first item on open
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (open && containerRef.current) {
-        // Focus container first, then first item if exists
-        containerRef.current.focus();
-        if (selectableItems.length > 0) {
-          setFocusedIndex(0);
-          setTimeout(() => itemRefs.current[0]?.focus(), 50);
-        }
+        setFocusedIndex(selectableItems.length > 0 ? 0 : -1);
+        (itemRefs.current[0] ?? containerRef.current).focus({ preventScroll: true });
       } else {
         setFocusedIndex(-1);
       }
     }, [open, selectableItems.length]);
 
     const handleItemSelect = useCallback((item: DropdownItem) => {
-      if (item.disabled) return;
+      if (!open || item.disabled) return;
       onSelect?.(item);
       if (closeOnSelect) {
         onClose();
       }
-    }, [onSelect, closeOnSelect, onClose]);
+    }, [open, onSelect, closeOnSelect, onClose]);
 
-    if (!open) return null;
-
-    const reducedMotion = isReduceMotion();
-    const animationStyle: React.CSSProperties = reducedMotion
-      ? { opacity: animState === 'visible' ? 1 : 0 }
-      : {
-          opacity: animState === 'visible' ? 1 : 0,
-          transform: animState === 'visible' ? 'translateY(0) scale(1)' : getInitialTransform(actualPlacement),
-          transition: `opacity 150ms ease-out, transform 150ms ease-out`,
-        };
+    if (!present) return null;
 
     const containerStyle: React.CSSProperties = {
       ...styles.container,
-      ...animationStyle,
+      transformOrigin: getTransformOrigin(actualPlacement),
       left: position.x,
       top: position.y,
       width: width === 'match-trigger' 
@@ -478,7 +441,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
         const currentSelectableIndex = selectableIndex;
         if (!item.disabled) selectableIndex++;
 
-        const isFocused = focusedIndex === currentSelectableIndex;
+        const isFocused = !item.disabled && open && focusedIndex === currentSelectableIndex;
         const itemStyle: React.CSSProperties = {
           ...styles.item,
           ...(isFocused ? styles.itemFocused : {}),
@@ -489,7 +452,7 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
         return (
           <button
             key={item.id}
-            ref={el => { itemRefs.current[currentSelectableIndex] = el; }}
+            ref={item.disabled ? undefined : el => { itemRefs.current[currentSelectableIndex] = el; }}
             role="menuitem"
             tabIndex={isFocused ? 0 : -1}
             disabled={item.disabled}
@@ -508,13 +471,18 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
 
     const content = (
       <>
-        {backdrop && <div style={styles.backdrop} onClick={onClose} />}
+        {backdrop && open && <div style={styles.backdrop} />}
         <div
+          {...appearance}
           ref={containerRef}
           role="menu"
-          tabIndex={-1}
+          tabIndex={open ? -1 : undefined}
+          data-open={open}
+          data-anchored={reducedMotion ? undefined : true}
+          aria-hidden={!open}
+          {...(!open ? { inert: '' } : {})}
           aria-label={ariaLabel || 'Dropdown menu'}
-          className={`dex-liquid-glass${className ? ` ${className}` : ''}`}
+          className={`dex-liquid-glass dex-motion-surface${className ? ` ${className}` : ''}`}
           style={containerStyle}
         >
           <div style={contentStyle}>
