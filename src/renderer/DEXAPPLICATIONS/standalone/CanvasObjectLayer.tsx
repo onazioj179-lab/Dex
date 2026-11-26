@@ -225,7 +225,7 @@ export const CanvasObjectLayer: React.FC<Props> = ({ objects, zoom, pan, snap, s
               const before = objsRef.current;
               const copy = { ...selected, id: newObjectId(), x: selected.x + 24, y: selected.y + 24, locked: false };
               onCommit(before, [...before, copy]); onSelect(copy.id);
-            }} style={tbBtn} aria-label="Duplicate (Ctrl+D)">Duplicate</button>}
+            }} style={tbBtn} aria-label="Duplicate">Duplicate</button>}
             {selected.kind !== 'connector' && <button onClick={() => {
               const before = objsRef.current;
               onCommit(before, [...before.filter((x) => x.id !== selected.id), selected]);

@@ -66,7 +66,6 @@ export const CommandPalette: React.FC<{ commands: PaletteCommand[]; onClose: () 
               }}
             >
               <span style={{ flex: 1 }}>{c.label}</span>
-              {c.shortcut && <kbd style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'inherit' }}>{c.shortcut}</kbd>}
             </div>
           ))}
         </div>

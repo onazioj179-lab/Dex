@@ -1906,7 +1906,7 @@ export const Files: React.FC = () => {
                 className="dex-toolbtn"
                 style={styles.navBtn}
                 onClick={handleCreateFolder}
-                title="New Folder (Ctrl+Shift+N)"
+                title="New Folder"
                 aria-label="Create new folder"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
@@ -2094,8 +2094,8 @@ export const Files: React.FC = () => {
             {selectedFiles.size > 1 && <button onClick={() => setShowBatchRename(true)} title="Rename the selected items with a preview" data-testid="files-batch-rename" style={{ padding: '5px var(--space-3)', borderRadius: 6, background: 'var(--color-accent-soft)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Rename...</button>}
             <button onClick={handleBatchDelete} title="Delete selected (Del)" style={{ padding: '5px var(--space-3)', borderRadius: 9999, background: 'var(--color-error-muted)', border: '1px solid var(--color-error-border, rgba(255,69,58,0.35))', color: 'var(--color-error)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             <div style={{ width: 1, height: 18, background: 'var(--color-border)' }} />
-            <button onClick={handleBatchCopy} title="Copy here, paste into another folder (Ctrl+C)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
-            <button onClick={handleBatchCut} title="Cut, paste into another folder (Ctrl+X)" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
+            <button onClick={handleBatchCopy} title="Copy" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Copy</button>
+            <button onClick={handleBatchCut} title="Cut" style={{ padding: '3px 12px', borderRadius: 9999, background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer' }}>Cut</button>
             <button onClick={async () => {
               try {
                 await navigator.clipboard.writeText([...selectedFiles].join('\n'));

@@ -3640,11 +3640,6 @@ export const DexDropdown: React.FC<DexDropdownProps> = ({
             >
               {item.icon && <span style={{ width: 16, display: 'flex' }}>{item.icon}</span>}
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.shortcut && (
-                <span style={{ fontSize: fontSize.xs, color: 'var(--color-text-muted)' }}>
-                  {item.shortcut}
-                </span>
-              )}
             </button>
           );
         })}
@@ -3898,11 +3893,6 @@ export const DexContextMenu: React.FC<DexContextMenuProps> = ({
             >
               {item.icon && <span style={{ width: 16, display: 'flex' }}>{item.icon}</span>}
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.shortcut && (
-                <span style={{ fontSize: fontSize.xs, color: 'var(--color-text-muted)' }}>
-                  {item.shortcut}
-                </span>
-              )}
             </button>
           );
         })}
@@ -4401,11 +4391,6 @@ export const DexSplitButton: React.FC<DexSplitButtonProps> = ({
             >
               {item.icon && <span style={{ width: 16, display: 'flex' }}>{item.icon}</span>}
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.shortcut && (
-                <span style={{ fontSize: fontSize.xs, color: 'var(--color-text-muted)' }}>
-                  {item.shortcut}
-                </span>
-              )}
             </button>
           );
         })}
@@ -4928,7 +4913,7 @@ export const DexToolbar: React.FC<DexToolbarProps> = ({
           key={item.id}
           onClick={() => !item.disabled && onSelect(item.id)}
           disabled={item.disabled}
-          title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
+          title={item.label}
           style={{
             width: 36,
             height: 36,

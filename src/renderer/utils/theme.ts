@@ -147,7 +147,9 @@ function syncNativeWindowTheme(theme: ThemeName, retry = true): void {
       // At boot the bridge can arrive after this module runs: try once more
       // after load, with whatever theme is applied by then.
       if (retry && typeof window !== 'undefined') {
-        const again = () => syncNativeWindowTheme(currentTheme(), false);
+        // The page can be gone by the time this fires (window closing, a
+        // torn-down test document): then there is nothing left to sync.
+        const again = () => { if (typeof document !== 'undefined') syncNativeWindowTheme(currentTheme(), false); };
         if (document.readyState === 'complete') setTimeout(again, 500);
         else window.addEventListener('load', again, { once: true });
       }

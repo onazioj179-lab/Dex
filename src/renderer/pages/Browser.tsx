@@ -2218,7 +2218,7 @@ ${text}
           <button
             style={styles.newTabBtn}
             onClick={() => setShowTabSearch(v => !v)}
-            title="Search tabs (Ctrl+Shift+A)"
+            title="Search tabs"
             aria-label="Search tabs"
             aria-expanded={showTabSearch}
           >

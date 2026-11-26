@@ -455,8 +455,8 @@ const BioStudio: React.FC = () => {
         surface="plain"
         toolbar={
           <div style={{ display: 'flex', gap: 4 }}>
-            <button style={btn} disabled={!hist.past.length} onClick={() => dispatch({ type: 'undo' })} aria-label="Undo" title="Undo (Ctrl+Z)">Undo</button>
-            <button style={btn} disabled={!hist.future.length} onClick={() => dispatch({ type: 'redo' })} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+            <button style={btn} disabled={!hist.past.length} onClick={() => dispatch({ type: 'undo' })} aria-label="Undo" title="Undo">Undo</button>
+            <button style={btn} disabled={!hist.future.length} onClick={() => dispatch({ type: 'redo' })} aria-label="Redo" title="Redo">Redo</button>
           </div>
         }
         toolbarEnd={<button style={btn} disabled={!active} onClick={saveResult}>Save result</button>}

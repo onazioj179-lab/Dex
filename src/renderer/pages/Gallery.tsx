@@ -2075,8 +2075,8 @@ export const Gallery: React.FC = () => {
               </div>
             ))}
             <div style={{ display: 'flex', gap: 4, margin: '6px 0' }}>
-              <button type="button" aria-label="Undo adjustment" title="Undo (Ctrl+Z)" disabled={!historyRef.current.canUndo} onClick={undoEdit} style={editBtn(!historyRef.current.canUndo)}><DexIcon name="undo" size={12} /> Undo</button>
-              <button type="button" aria-label="Redo adjustment" title="Redo (Ctrl+Shift+Z)" disabled={!historyRef.current.canRedo} onClick={redoEdit} style={editBtn(!historyRef.current.canRedo)}><DexIcon name="redo" size={12} /> Redo</button>
+              <button type="button" aria-label="Undo adjustment" title="Undo" disabled={!historyRef.current.canUndo} onClick={undoEdit} style={editBtn(!historyRef.current.canUndo)}><DexIcon name="undo" size={12} /> Undo</button>
+              <button type="button" aria-label="Redo adjustment" title="Redo" disabled={!historyRef.current.canRedo} onClick={redoEdit} style={editBtn(!historyRef.current.canRedo)}><DexIcon name="redo" size={12} /> Redo</button>
               <button type="button" aria-label="Hold to see the original" title="Hold (or hold the \ key) to see the original" aria-pressed={showOriginal}
                 onPointerDown={() => setShowOriginal(true)} onPointerUp={() => setShowOriginal(false)} onPointerLeave={() => setShowOriginal(false)}
                 style={editBtn(false)}>Original</button>

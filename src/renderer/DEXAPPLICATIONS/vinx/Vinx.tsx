@@ -1262,7 +1262,7 @@ const VinxEditor: React.FC = () => {
 
         {/* Undo/Redo */}
         <button
-          aria-label="Undo (Ctrl+Z)"
+          aria-label="Undo"
           style={undoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={undo}
           disabled={undoStack.length === 0}
@@ -1270,7 +1270,7 @@ const VinxEditor: React.FC = () => {
           {UndoIcon}
         </button>
         <button
-          aria-label="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
           style={redoStack.length > 0 ? toolbarBtnActiveStyle : toolbarBtnStyle}
           onClick={redo}
           disabled={redoStack.length === 0}

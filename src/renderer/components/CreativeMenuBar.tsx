@@ -140,7 +140,6 @@ const DropdownPanel: React.FC<PanelProps> = ({ items, x, y, accent, onClose, pre
             )}
             {item.icon && <span style={{ width: 16, display: 'inline-flex', justifyContent: 'center', flexShrink: 0 }}>{item.icon}</span>}
             <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-            {item.shortcut && <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums', marginLeft: 12 }}>{item.shortcut}</span>}
             {hasSub && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>▸</span>}
           </div>
         );

@@ -752,7 +752,6 @@ export const UnifiedDropdown = forwardRef<DropdownRef, UnifiedDropdownProps>(
           >
             {item.icon && <span style={styles.itemIcon}>{item.icon}</span>}
             <span style={styles.itemLabel}>{item.label}</span>
-            {item.shortcut && <span style={styles.itemShortcut}>{item.shortcut}</span>}
           </button>
         );
       });
