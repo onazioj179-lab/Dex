@@ -126,6 +126,7 @@ mod native_signals {
     };
     use webview2_com::{
         ContainsFullScreenElementChangedEventHandler, HistoryChangedEventHandler, NavigationCompletedEventHandler,
+        NavigationStartingEventHandler,
         WebResourceRequestedEventHandler,
     };
     use windows_core::{BOOL, PWSTR};
@@ -246,6 +247,23 @@ mod native_signals {
                         let mut on = BOOL(0);
                         let _ = c.ContainsFullScreenElement(&mut on);
                         emit(&a, &o, json!({ "id": t, "type": "fullscreen", "on": on.as_bool() }));
+                    }
+                    Ok(())
+                })),
+                &mut token,
+            );
+
+            // Loading starts when the user clicks, not when the server first
+            // answers: Tauri's "started" comes from ContentLoading, so a slow
+            // site (2-3 s to first byte) showed no sign of loading and looked
+            // frozen on the old page.
+            let (a, o, t) = (app.clone(), owner.clone(), tab.clone());
+            let _ = core.add_NavigationStarting(
+                &NavigationStartingEventHandler::create(Box::new(move |_sender, args| {
+                    if let Some(args) = args {
+                        let mut uri = PWSTR::null();
+                        let url = if args.Uri(&mut uri).is_ok() { webview2_com::take_pwstr(uri) } else { String::new() };
+                        emit(&a, &o, json!({ "id": t, "type": "load", "state": "started", "url": url }));
                     }
                     Ok(())
                 })),
