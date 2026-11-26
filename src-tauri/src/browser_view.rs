@@ -153,6 +153,23 @@ mod native_signals {
             let env = pw.environment();
             let mut token = 0i64;
 
+            // Edge's own tracking prevention at its strictest level: blocks
+            // known cross-site trackers' storage and requests on top of DEX's
+            // blocklist. Older runtimes without the API just keep their default.
+            {
+                use webview2_com::Microsoft::Web::WebView2::Win32::{
+                    ICoreWebView2Profile3, ICoreWebView2_13, COREWEBVIEW2_TRACKING_PREVENTION_LEVEL_STRICT,
+                };
+                use windows_core::Interface;
+                if let Ok(c13) = core.cast::<ICoreWebView2_13>() {
+                    if let Ok(profile) = c13.Profile() {
+                        if let Ok(p3) = profile.cast::<ICoreWebView2Profile3>() {
+                            let _ = p3.SetPreferredTrackingPreventionLevel(COREWEBVIEW2_TRACKING_PREVENTION_LEVEL_STRICT);
+                        }
+                    }
+                }
+            }
+
             // Network-level ad/tracker blocking (crate::browser_block decides); a
             // block answers 403 locally so nothing leaves the machine.
             //

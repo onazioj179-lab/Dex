@@ -53,3 +53,29 @@ export function normalizeAddress(input: string, searchPrefix: string): AddressRe
   }
   return { kind: 'search', url: `${searchPrefix}${encodeURIComponent(raw)}` };
 }
+
+/**
+ * Query parameters that only exist to track people across sites (ad clicks,
+ * newsletters, social shares). Removed from addresses before they load, so a
+ * shared or clicked link does not carry the tracking tag along.
+ */
+const TRACKING_PARAMS = new Set([
+  'fbclid', 'gclid', 'gclsrc', 'dclid', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'twclid', 'ttclid', 'li_fat_id', 'igshid',
+  'mc_cid', 'mc_eid', '_hsenc', '_hsmi', 'mkt_tok', 'oly_anon_id', 'oly_enc_id', 'vero_id', 'rb_clickid', 's_cid',
+  'ref_src', 'ref_url', '__s', 'ncid', 'wickedid', 'scid',
+]);
+
+export function stripTrackingParams(url: string): string {
+  let u: URL;
+  try { u = new URL(url); } catch { return url; }
+  if (!/^https?:$/.test(u.protocol) || !u.search) return url;
+  let changed = false;
+  for (const key of [...u.searchParams.keys()]) {
+    const k = key.toLowerCase();
+    if (TRACKING_PARAMS.has(k) || k.startsWith('utm_') || k.startsWith('pk_') || k.startsWith('mtm_')) {
+      u.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  return changed ? u.toString().replace(/\?$/, '') : url;
+}

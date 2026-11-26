@@ -41,7 +41,7 @@ import { getStoredTier } from '../services/TierManager';
 import { isTauri } from '../services/platform/tauriCompat';
 import { useDexSetting, writeDexSetting } from '../hooks/useDexSetting';
 import { useRunningApps } from '../store/runningApps';
-import { normalizeAddress } from '../services/browserAddress';
+import { normalizeAddress, stripTrackingParams } from '../services/browserAddress';
 import { keyEventForApp } from '../shell/input/appKeyScope';
 import { registerAppIntentHandler } from '../services/appIntents';
 import { dexConfirm, dexPrompt } from '../components/dexConfirm';
@@ -1817,7 +1817,8 @@ ${text}
       toast.error(resolved.reason);
       return;
     }
-    let finalUrl = resolved.url;
+    // Tracking tags (utm_*, fbclid, gclid …) never reach the site.
+    let finalUrl = stripTrackingParams(resolved.url);
 
     // Local dev servers and LAN devices are plain http; don't force https on them.
     if (!/^http:\/\/(localhost|127\.|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(finalUrl)) finalUrl = upgradeToHttps(finalUrl);

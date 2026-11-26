@@ -25,10 +25,10 @@ describe('terminal profiles', () => {
   });
 
   it('reads settings defensively', () => {
-    expect(parseSettings(null)).toEqual({ fontSize: FONT_DEFAULT, defaultShell: null });
-    expect(parseSettings('{not json')).toEqual({ fontSize: FONT_DEFAULT, defaultShell: null });
-    expect(parseSettings(JSON.stringify({ fontSize: 400, defaultShell: 42 }))).toEqual({ fontSize: FONT_MAX, defaultShell: null });
-    expect(parseSettings(JSON.stringify({ fontSize: 16, defaultShell: SHELLS[1].path }))).toEqual({ fontSize: 16, defaultShell: SHELLS[1].path });
+    expect(parseSettings(null)).toEqual({ fontSize: FONT_DEFAULT, defaultShell: null, scheme: 'dex' });
+    expect(parseSettings('{not json')).toEqual({ fontSize: FONT_DEFAULT, defaultShell: null, scheme: 'dex' });
+    expect(parseSettings(JSON.stringify({ fontSize: 400, defaultShell: 42 }))).toEqual({ fontSize: FONT_MAX, defaultShell: null, scheme: 'dex' });
+    expect(parseSettings(JSON.stringify({ fontSize: 16, defaultShell: SHELLS[1].path }))).toEqual({ fontSize: 16, defaultShell: SHELLS[1].path, scheme: 'dex' });
   });
 
   it('keeps pane profiles only for panes that still exist', () => {

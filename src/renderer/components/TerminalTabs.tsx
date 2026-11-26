@@ -28,7 +28,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Terminal } from './Terminal';
+import { Terminal, TERMINAL_SCHEMES } from './Terminal';
 import { WindowToolbar, useUnifiedChrome } from '../shell/windowChrome';
 import {
   LAYOUT_KEY, LAYOUT_KEY_V1, MAX_PANES, addTab as addTabL, closePane as closePaneL, closeTab as closeTabL,
@@ -399,6 +399,21 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                 );
               })}
               <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+              <div style={{ padding: '4px 10px 2px', fontSize: 11, fontWeight: 500, color: 'var(--color-text-tertiary, #8a8a8a)' }}>Colours</div>
+              <div role="radiogroup" aria-label="Terminal colours" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '2px 8px 6px' }}>
+                {Object.entries(TERMINAL_SCHEMES).map(([id, sc]) => {
+                  const on = (settings.scheme || 'dex') === id;
+                  return (
+                    <button key={id} type="button" role="radio" aria-checked={on} onClick={() => setSettings((prev) => ({ ...prev, scheme: id }))}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px 0 4px', borderRadius: 9999, cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit',
+                        border: on ? '1px solid var(--color-accent, #0a84ff)' : '1px solid rgba(255,255,255,0.10)', background: on ? 'rgba(10,132,255,0.16)' : 'transparent', color: 'var(--color-text-primary, #e0e0e0)' }}>
+                      <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: 9999, background: sc.theme.background, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: sc.theme.foreground, fontSize: 9, fontWeight: 700 }}>A</span>
+                      {sc.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 12, color: 'var(--color-text-primary, #e0e0e0)' }}>
                 <span style={{ flex: 1 }}>Text size</span>
                 <button type="button" aria-label="Smaller text" title="Smaller (Ctrl+-)" disabled={settings.fontSize <= FONT_MIN} onClick={() => stepFontSize(-1)} style={{ ...stepBtn, opacity: settings.fontSize <= FONT_MIN ? 0.35 : 1 }}>−</button>
@@ -455,6 +470,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
                       cwd={paneProfiles[p]?.cwd ?? cwd}
                       shell={paneProfiles[p]?.shell}
                       fontSize={settings.fontSize}
+                      scheme={settings.scheme}
                       onClose={() => closePane(t.id, p)}
                       onRunningCommand={(cmd) => setRunning((prev) => (prev[p] === cmd ? prev : { ...prev, [p]: cmd }))}
                     />

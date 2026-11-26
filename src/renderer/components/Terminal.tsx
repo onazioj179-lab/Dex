@@ -82,6 +82,8 @@ export interface TerminalProps {
   onRunningCommand?: (cmd: string | null) => void;
   /** Text size in px (default 13). Changing it refits the terminal; the session keeps running. */
   fontSize?: number;
+  /** Colour scheme id (TERMINAL_SCHEMES); applied live. */
+  scheme?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +122,30 @@ const FAST_EXIT_MS = 1500;
 
 /** Graphite terminal palette; DEX blue cursor and selection. Literal colours:
  *  xterm.js paints to its own renderer and cannot read CSS variables. */
+/**
+ * Colour schemes. Every one keeps body text at 7:1 or better against its
+ * background and the 16 ANSI colours readable on it (the old fixed scheme made
+ * light-on-light program output unreadable for people who prefer light).
+ */
+export const TERMINAL_SCHEMES: Record<string, { label: string; theme: ITheme }> = {
+  dex: { label: 'DEX Dark', theme: {} as ITheme },
+  contrast: { label: 'High Contrast', theme: {
+    background: '#000000', foreground: '#ffffff', cursor: '#ffd60a', cursorAccent: '#000000', selectionBackground: 'rgba(255,214,10,0.45)',
+    black: '#000000', red: '#ff5f5f', green: '#5fff87', yellow: '#ffff5f', blue: '#5fafff', magenta: '#ff87ff', cyan: '#5fffff', white: '#ffffff',
+    brightBlack: '#a8a8a8', brightRed: '#ff8787', brightGreen: '#87ffaf', brightYellow: '#ffff87', brightBlue: '#87cfff', brightMagenta: '#ffafff', brightCyan: '#87ffff', brightWhite: '#ffffff',
+  } },
+  solarized: { label: 'Solarized Dark', theme: {
+    background: '#002b36', foreground: '#eee8d5', cursor: '#268bd2', cursorAccent: '#002b36', selectionBackground: 'rgba(38,139,210,0.4)',
+    black: '#073642', red: '#ff6b5e', green: '#a3c33a', yellow: '#e0b03b', blue: '#4aa7ec', magenta: '#e872ae', cyan: '#46c2b6', white: '#eee8d5',
+    brightBlack: '#839496', brightRed: '#ff8a5c', brightGreen: '#b9d65a', brightYellow: '#f0c860', brightBlue: '#7cbff2', brightMagenta: '#a9a9f5', brightCyan: '#73d6cc', brightWhite: '#fdf6e3',
+  } },
+  light: { label: 'Light', theme: {
+    background: '#fbfbfd', foreground: '#1d1d1f', cursor: '#0066cc', cursorAccent: '#fbfbfd', selectionBackground: 'rgba(0,102,204,0.22)',
+    black: '#1d1d1f', red: '#c0282d', green: '#1f7a36', yellow: '#8a6100', blue: '#0057b8', magenta: '#9a2c9e', cyan: '#0f6f7d', white: '#6e6e73',
+    brightBlack: '#57575c', brightRed: '#d0373c', brightGreen: '#23873c', brightYellow: '#9a6c00', brightBlue: '#0066cc', brightMagenta: '#a93bad', brightCyan: '#117f8f', brightWhite: '#3a3a3c',
+  } },
+};
+
 const THEME: ITheme = {
   background: '#0e0f11',
   foreground: '#d4d6da',
@@ -131,6 +157,11 @@ const THEME: ITheme = {
   brightBlack: '#6b7078', brightRed: '#ff8a8a', brightGreen: '#7ee2a2', brightYellow: '#f0d38f',
   brightBlue: '#70b8ff', brightMagenta: '#d7a8f2', brightCyan: '#7fd8e4', brightWhite: '#ffffff',
 };
+
+TERMINAL_SCHEMES.dex.theme = THEME;
+export function schemeTheme(id?: string): ITheme {
+  return (id && TERMINAL_SCHEMES[id]?.theme) || THEME;
+}
 
 const toolbarBtn = (active = false): React.CSSProperties => ({
   // DEX Capsule geometry: 24 px tall, fully rounded (icon buttons are circles), shared accent tint when on.
@@ -159,7 +190,10 @@ const Glyph: React.FC<{ name: keyof typeof TI; size?: number }> = ({ name, size 
 
 type Status = 'starting' | 'running' | 'exited' | 'unavailable' | 'no-bridge';
 
-export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand, fontSize = 13 }) => {
+export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell, onClose, height, onRunningCommand, fontSize = 13, scheme }) => {
+  const T = schemeTheme(scheme);
+  const schemeRef = useRef(T);
+  schemeRef.current = T;
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -263,7 +297,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         cursorStyle: 'bar',
         scrollback: 10000,
         allowProposedApi: true,
-        theme: THEME,
+        theme: schemeRef.current,
         // ConPTY already translates line endings.
         convertEol: false,
         windowsPty: isWindows ? { backend: 'conpty' } : undefined,
@@ -362,6 +396,12 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       term.dispose();
     };
   }, [write]);
+
+  // Colour scheme: applied to the live terminal (no restart, scrollback kept).
+  useEffect(() => {
+    const term = termRef.current;
+    if (term) term.options.theme = T;
+  }, [T]);
 
   // Text size: applied to the live terminal, then refit so the shell learns
   // its new column/row count (xterm's onResize forwards it to the PTY).
@@ -585,8 +625,8 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
         display: 'flex', flexDirection: 'column',
         // flex/width so it fills a split pane (a bare flex child shrinks to content).
         height: height ?? '100%', minHeight: 80, flex: 1, minWidth: 0, width: '100%',
-        background: THEME.background,
-        color: THEME.foreground,
+        background: T.background,
+        color: T.foreground,
         border: '1px solid var(--color-border-subtle, rgba(255,255,255,0.08))',
         borderRadius: 10,
         overflow: 'hidden',
@@ -673,7 +713,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
             flexShrink: 1, minHeight: 0, maxHeight: 'min(180px, 40%)', overflow: 'auto',
             padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)',
             background: '#121418', fontFamily: '"Cascadia Mono", Consolas, monospace', fontSize: 12,
-            whiteSpace: 'pre', color: dexResult.ok ? THEME.foreground : '#ffb3b3',
+            whiteSpace: 'pre', color: dexResult.ok ? T.foreground : '#ffb3b3',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: '#6b7078', marginBottom: 2 }}>

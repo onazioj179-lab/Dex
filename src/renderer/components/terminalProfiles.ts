@@ -32,6 +32,8 @@ export interface TermSettings {
   fontSize: number;
   /** Path of the shell for new tabs; null = the system default. */
   defaultShell: string | null;
+  /** Colour scheme id (TERMINAL_SCHEME_IDS). */
+  scheme: string;
 }
 
 export const SETTINGS_KEY = 'dex.terminal.settings.v1';
@@ -47,8 +49,11 @@ export function clampFontSize(n: unknown): number {
 }
 
 export function defaultSettings(): TermSettings {
-  return { fontSize: FONT_DEFAULT, defaultShell: null };
+  return { fontSize: FONT_DEFAULT, defaultShell: null, scheme: 'dex' };
 }
+
+/** Colour schemes offered in the Terminal menu (definitions in Terminal.tsx). */
+export const TERMINAL_SCHEME_IDS = ['dex', 'contrast', 'solarized', 'light'];
 
 export function parseSettings(raw: string | null): TermSettings {
   try {
@@ -57,6 +62,7 @@ export function parseSettings(raw: string | null): TermSettings {
     return {
       fontSize: clampFontSize(o.fontSize),
       defaultShell: typeof o.defaultShell === 'string' && o.defaultShell ? o.defaultShell : null,
+      scheme: typeof o.scheme === 'string' && TERMINAL_SCHEME_IDS.includes(o.scheme) ? o.scheme : 'dex',
     };
   } catch {
     return defaultSettings();
