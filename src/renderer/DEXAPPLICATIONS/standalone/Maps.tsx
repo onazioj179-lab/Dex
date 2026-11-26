@@ -61,6 +61,7 @@ import { useAppTracking } from '../../services/usePatternLearning';
 import { sendToNotes } from '../../services/sendTo';
 import { sendCreativeInput } from '../../services/creativeIntake';
 import { openCalendarDraft } from '../../services/calendarDraft';
+import { applyThreeD } from './mapsThreeD';
 import { registerUkiAppContext, unregisterUkiAppContext } from '../../uki/appContextRegistry';
 
 // Free, key-less basemap styles. Vector styles come from OpenFreeMap; the
@@ -223,12 +224,17 @@ const barPill: React.CSSProperties = {
   background: 'transparent', border: 'none', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
 };
 
-const ctrlBtn: React.CSSProperties = {
-  width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'transparent', border: '1px solid transparent',
-  color: 'var(--color-text-primary)', cursor: 'pointer', padding: 0,
-  transition: 'background 0.12s ease, color 0.12s ease',
-};
+const MAPS_CONTROLS_CSS = `
+:where(.dex-maps-pill) { display: flex; flex-direction: column; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--color-border-subtle); box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+:where(.dex-maps-ctl) { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0;
+  background: transparent; color: var(--color-text-primary); cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+:where(.dex-maps-ctl) + :where(.dex-maps-ctl) { border-top: 1px solid var(--color-border-subtle); }
+:where(.dex-maps-ctl):hover:not(:disabled) { background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
+:where(.dex-maps-ctl):disabled { opacity: 0.45; cursor: default; }
+:where(.dex-maps-ctl)[data-on] { color: var(--color-accent); }
+`;
+
 
 // Scoped polish: crisp hover transitions and a subtle press
 // for the action buttons inside cards/drawers. Mirrors this file's inline
@@ -276,6 +282,9 @@ const DexMaps: React.FC = () => {
   const [styleKey, setStyleKey] = useState<StyleKey>(() => (savedView?.style && savedView.style in MAP_STYLES ? savedView.style as StyleKey : 'liberty'));
   const styleKeyRef = useRef(styleKey);
   styleKeyRef.current = styleKey;
+  // Real 3D (terrain, hill shading, buildings at their heights, sky): kept
+  // apart from the tilt so a tilted 2D map and a flat 3D map both exist.
+  const [threeD, setThreeD] = useState(() => { try { return localStorage.getItem('dex-maps-3d') === '1'; } catch { return false; } });
   const [bearing, setBearing] = useState(savedView?.bearing ?? 0);
   const [pitch, setPitch] = useState(savedView?.pitch ?? 0);
   const [query, setQuery] = useState('');
@@ -471,6 +480,27 @@ const DexMaps: React.FC = () => {
   useEffect(() => {
     mapRef.current?.setStyle(MAP_STYLES[styleKey].style);
   }, [styleKey]); // the map is created with the current style; only changes re-style it
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLive) return;
+    try { localStorage.setItem('dex-maps-3d', threeD ? '1' : '0'); } catch { /* storage blocked */ }
+    const dark = () => document.documentElement.getAttribute('data-theme') !== 'light';
+    const apply = () => { try { applyThreeD(map, threeD, dark()); } catch (e) { console.warn('[Maps] 3D', e); } };
+    if (map.isStyleLoaded()) apply(); else map.once('idle', apply);
+    map.on('style.load', apply);
+    return () => { map.off('style.load', apply); map.off('idle', apply); };
+  }, [threeD, styleKey, mapLive]);
+
+  const toggleThreeD = () => {
+    const next = !threeD;
+    setThreeD(next);
+    const map = mapRef.current;
+    if (!map) return;
+    const duration = isReduceMotion() ? 0 : 900;
+    if (next) map.easeTo({ pitch: 62, bearing: Math.abs(map.getBearing()) < 1 ? -20 : map.getBearing(), zoom: Math.max(map.getZoom(), 15), duration });
+    else map.easeTo({ pitch: 0, duration });
+  };
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1013,35 +1043,31 @@ const DexMaps: React.FC = () => {
         </div>
       )}
 
-      {/* Vertical control stack (custom, DEX-styled) */}
-      <div className="dex-mat-frosted" style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', borderRadius: 'var(--radius-md)', overflow: 'hidden', zIndex: 5 }}>
-        <button aria-label="Zoom in" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomIn()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          <DexIcon name="plus" size={16} />
-        </button>
-        <button aria-label="Zoom out" style={{ ...ctrlBtn, borderWidth: 0, borderBottom: '1px solid var(--color-border)' }}
-          onClick={() => mapRef.current?.zoomOut()} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          <DexIcon name="minus" size={16} />
-        </button>
-        <button aria-label="My location" style={{ ...ctrlBtn, borderWidth: 0 }}
-          onClick={locate} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.10)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          <DexIcon name="navigation" size={15} />
-        </button>
+      {/* Controls: one pill stack (Apple Maps style): 3D and compass, zoom,
+          then your location. Hairline separators, same 36 px targets. */}
+      <div style={{ position: 'absolute', right: 12, bottom: 28, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 5 }}>
+        <div className="dex-mat-frosted dex-maps-pill">
+          <button type="button" aria-label={threeD ? 'Switch to 2D' : 'Switch to 3D'} aria-pressed={threeD} onClick={toggleThreeD}
+            className="dex-maps-ctl" data-on={threeD || undefined} style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.2 }}>
+            {threeD ? '2D' : '3D'}
+          </button>
+          <button type="button" aria-label="Face north" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
+            onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: threeD ? mapRef.current.getPitch() : 0, duration: isReduceMotion() ? 0 : 400 })}
+            className="dex-maps-ctl">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)` }}>
+              <path d="M12 3l3.6 9H8.4z" fill="#ff453a" /><path d="M12 21l-3.6-9h7.2z" fill="currentColor" opacity="0.55" />
+            </svg>
+          </button>
+        </div>
+        <div className="dex-mat-frosted dex-maps-pill">
+          <button type="button" aria-label="Zoom in" className="dex-maps-ctl" onClick={() => mapRef.current?.zoomIn()}><DexIcon name="plus" size={16} /></button>
+          <button type="button" aria-label="Zoom out" className="dex-maps-ctl" onClick={() => mapRef.current?.zoomOut()}><DexIcon name="minus" size={16} /></button>
+        </div>
+        <div className="dex-mat-frosted dex-maps-pill">
+          <button type="button" aria-label="My location" className="dex-maps-ctl" onClick={locate}><DexIcon name="navigation" size={15} /></button>
+        </div>
       </div>
-
-      {/* Compass (shows rotation; click = north up, flat) and 3D tilt. */}
-      <div style={{ position: 'absolute', right: 12, bottom: 146, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 5 }}>
-        <button aria-label={pitch > 1 ? 'Flat view' : '3D view'} aria-pressed={pitch > 1}
-          onClick={() => mapRef.current?.easeTo({ pitch: pitch > 1 ? 0 : 60, duration: isReduceMotion() ? 0 : 400 })}
-          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, color: pitch > 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}>3D</button>
-        <button aria-label="Reset to north" disabled={Math.abs(bearing) < 0.5 && pitch < 1}
-          onClick={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: isReduceMotion() ? 0 : 400 })}
-          className="dex-mat-frosted" style={{ ...ctrlBtn, borderRadius: 'var(--radius-sm)', opacity: Math.abs(bearing) < 0.5 && pitch < 1 ? 0.55 : 1 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)`, transition: 'transform 0.1s linear' }}>
-            <path d="M12 2l4 10h-8z" fill="#ff453a" /><path d="M12 22l-4-10h8z" fill="currentColor" opacity="0.6" />
-          </svg>
-        </button>
-      </div>
+      <style>{MAPS_CONTROLS_CSS}</style>
 
       {/* Basemap: every style visible and one click away (was a button that cycled). */}
       <div className="dex-mat-frosted" style={{ position: 'absolute', left: 12, bottom: 28, zIndex: 5, borderRadius: 'var(--radius-sm)', padding: 2 }}>
