@@ -23,7 +23,7 @@ import { useRecentFiles } from '../store/useRecentFiles';
 
 import { useAppTransition } from '../utils/motionHooks';
 import { APP_WINDOW_SIZES, rememberedWindowSize, rememberWindowSize, getAppEntry, QUICK_ACTIONS } from '../services/appRegistry';
-import { AppContextMenuHost, openAppContextMenu, runAppAction, type AppCommandDetail } from './AppContextMenu';
+import { AppContextMenuHost, openAppContextMenu, runAppAction, sendAppCommand, type AppCommandDetail } from './AppContextMenu';
 import { AppMenuPanel } from './AppMenuPanel';
 import { dispatchAppIntent } from '../services/appIntents';
 import { useUkiStore } from '../store/ukiStore';
@@ -81,6 +81,9 @@ const loadEngagementModule = (): Promise<EngagementModule> =>
 import { rewardUnlocks as rewardUnlocksEngine, recordChallengeAction, recordChallengeForStat } from '../services/achievementEngine';
 import { installSendToBridge } from '../services/sendTo';
 import { notify, readHubTarget } from '../services/notify';
+import { scheduleAutomaticUpdateCheck } from '../services/softwareUpdate';
+import { isTauri } from '../services/platform/tauriCompat';
+import { getBuildInfo } from '../utils/appVersion';
 // Permission store is consumed by QuickControls; keep the import side-effect-free.
 import { QuickControls } from '../shell/QuickControls';
 import ControlCenter from './ControlCenter';
@@ -1214,6 +1217,19 @@ export const AppManager: React.FC = () => {
   // Global "Send to Notes" bridge: any app can dispatch dex-send-to-notes /
   // uki:create-note ({ text, title }) and a real note is created.
   useEffect(() => { installSendToBridge(); }, []);
+
+  // Software Update: a quiet once-a-day check on release builds (Settings ›
+  // Software Update › Automatic updates). It only tells you; nothing downloads.
+  useEffect(() => scheduleAutomaticUpdateCheck(isTauri() && getBuildInfo().channel === 'stable', (version) => {
+    void notify({
+      title: `DEX ${version} is available`,
+      source: 'Software Update',
+      actions: [{ label: 'View', onClick: () => {
+        sendAppCommand('settings', 'open');
+        setTimeout(() => window.dispatchEvent(new CustomEvent('dex-settings-navigate', { detail: { section: 'updates' } })), 400);
+      } }],
+    });
+  }), []);
 
   const sessionRecordedRef = useRef(false);
   useEffect(() => {

@@ -37,7 +37,8 @@ base64 = "0.22"     # Node Buffer base64 parity (session-replay states, binary-o
 tauri-plugin-dialog = "2"        # native file/folder pickers (dialog:showOpenDialog, files:openDialog) — replaces Electron dialog.showOpenDialog
 tauri-plugin-notification = "2"  # OS notification toasts (notification-center:send) — replaces Electron Notification
 tauri-plugin-single-instance = "2"  # second launch focuses the running window instead of a duplicate shell (see main())
-ureq = { version = "2", features = ["tls"] }  # tiny blocking HTTP client for link-preview metadata fetch
+ureq = { version = "2", features = ["tls"] }
+minisign-verify = "0.3"  # Software Update rollback: same signature check as the updater  # tiny blocking HTTP client for link-preview metadata fetch
 notify = "6"        # live filesystem watching (file-watcher:newFile auto-import/notify) — replaces Electron fs.watch
 tiny_http = "0.12"  # LAN file-share HTTP server (http-transfer: QR/link download + upload) — replaces Electron http.createServer
 portable-pty = "0.9"  # real pseudoterminal for the Terminal app (ConPTY on Windows, openpty on unix) — terminal.rs

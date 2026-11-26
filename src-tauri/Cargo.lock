@@ -1037,6 +1037,7 @@ dependencies = [
  "dex-smart-router",
  "dex-vault",
  "flate2",
+ "minisign-verify",
  "notify",
  "open",
  "portable-pty",

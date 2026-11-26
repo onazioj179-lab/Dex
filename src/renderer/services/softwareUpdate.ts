@@ -120,3 +120,83 @@ export const useSoftwareUpdate = create<SoftwareUpdateState>((set, get) => {
     },
   };
 });
+
+// ---------------------------------------------------------------------------
+// Earlier versions (rollback) and automatic checks
+// ---------------------------------------------------------------------------
+
+export interface ReleaseVersion { version: string; publishedAt: string | null; notes: string; prerelease: boolean }
+
+type Invoke = (channel: string, ...args: unknown[]) => Promise<unknown>;
+const nativeInvoke = (): Invoke | null =>
+  (window as unknown as { dex?: { invoke?: Invoke } }).dex?.invoke ?? null;
+
+/** -1, 0, 1 for dotted numeric versions ("7.0.10" > "7.0.9"). */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+  const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+/** Signed DEX releases on GitHub, newest first. */
+export async function listReleaseVersions(): Promise<ReleaseVersion[]> {
+  const invoke = nativeInvoke();
+  if (!invoke) throw new Error('Earlier versions are available in the desktop app.');
+  const res = await invoke('update:versions') as { success?: boolean; versions?: ReleaseVersion[]; error?: string } | null;
+  if (!res?.success) throw new Error(res?.error || 'DEX could not load the release list.');
+  return [...(res.versions ?? [])].sort((x, y) => compareVersions(y.version, x.version));
+}
+
+/**
+ * Reinstall a published version (rollback when it is older). The native side
+ * verifies the installer's signature with the updater's key, starts it in
+ * update mode (data kept, DEX relaunches) and quits DEX. On failure nothing
+ * changed, and the returned message says why.
+ */
+export async function installReleaseVersion(version: string): Promise<{ ok: boolean; error?: string }> {
+  const invoke = nativeInvoke();
+  if (!invoke) return { ok: false, error: 'Install the Windows desktop app to change versions.' };
+  try {
+    // An older DEX may not read data written by a newer one: snapshot it first
+    // (Settings › Storage › Backups restores it). No backup, no version change.
+    const backup = await invoke('backup:create', 'manual', `Before installing DEX ${version}`) as { id?: string; success?: boolean; error?: string } | null;
+    if (!backup?.id) return { ok: false, error: `DEX could not back up your data first${backup?.error ? ` (${backup.error})` : ''}, so nothing was changed.` };
+    const res = await invoke('update:installVersion', version) as { success?: boolean; error?: string } | null;
+    return res?.success ? { ok: true } : { ok: false, error: res?.error || 'The installer could not start. Your current version is unchanged.' };
+  } catch (e) {
+    return { ok: false, error: rawMessage(e) };
+  }
+}
+
+const AUTO_KEY = 'dex-update-auto-check';
+const LAST_KEY = 'dex-update-last-check';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function getAutoCheck(): boolean {
+  try { return localStorage.getItem(AUTO_KEY) !== '0'; } catch { return true; }
+}
+export function setAutoCheck(on: boolean): void {
+  try { localStorage.setItem(AUTO_KEY, on ? '1' : '0'); } catch { /* storage blocked */ }
+}
+
+/**
+ * Once a day, a while after start, ask whether a newer DEX exists and say so
+ * once (nothing downloads on its own). `notify` is how the caller surfaces it.
+ */
+export function scheduleAutomaticUpdateCheck(enabled: boolean, onAvailable: (version: string) => void): () => void {
+  if (!enabled || !getAutoCheck()) return () => {};
+  let last = 0;
+  try { last = Number(localStorage.getItem(LAST_KEY)) || 0; } catch { /* storage blocked */ }
+  if (Date.now() - last < DAY_MS) return () => {};
+  const timer = window.setTimeout(async () => {
+    try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch { /* storage blocked */ }
+    await useSoftwareUpdate.getState().check();
+    const { phase, version } = useSoftwareUpdate.getState();
+    if (phase === 'available' && version) onAvailable(version);
+  }, 45_000);
+  return () => window.clearTimeout(timer);
+}
