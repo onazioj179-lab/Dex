@@ -324,11 +324,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                 </span>
               )}
               <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-              {item.shortcut && (
-                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: '"SF Mono", monospace', marginLeft: 'var(--space-3)', flexShrink: 0 }}>
-                  {item.shortcut}
-                </span>
-              )}
               {hasSub && (
                 <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4 }}>{String.fromCharCode(9656)}</span>
               )}
@@ -366,7 +361,6 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClose }) =
                     >
                       {sub.icon && <span style={{ display: 'flex', width: 16, justifyContent: 'center', opacity: 0.7 }}>{sub.icon}</span>}
                       <span style={{ flex: 1 }}>{sub.label}</span>
-                      {sub.shortcut && <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'monospace' }}>{sub.shortcut}</span>}
                     </div>
                   ))}
                 </div>

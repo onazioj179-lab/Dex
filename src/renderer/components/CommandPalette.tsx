@@ -669,13 +669,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                           }}>{cmd.subtitle}</div>
                         )}
                       </div>
-                      {cmd.shortcut && (
-                        <span style={{
-                          ...styles.itemShortcut,
-                          background: isSelected ? 'var(--color-text-tertiary)' : styles.itemShortcut.background,
-                          color: isSelected ? '#fff' : styles.itemShortcut.color,
-                        }}>{cmd.shortcut}</span>
-                      )}
                     </div>
                   );
                 })}

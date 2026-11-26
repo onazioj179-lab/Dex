@@ -367,7 +367,7 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               </div>
             );
           })}
-          <button type="button" onClick={newTab} aria-label="New terminal session" title="New tab (Ctrl+Shift+T)" className="dex-hover-bg" style={{ ...iconBtn, marginLeft: 2 }}>
+          <button type="button" onClick={newTab} aria-label="New terminal session" title="New tab" className="dex-hover-bg" style={{ ...iconBtn, marginLeft: 2 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
           </button>
         </div>
@@ -416,18 +416,18 @@ export const TerminalTabs: React.FC<TerminalTabsProps> = ({ onClose, cwd, height
               <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 12, color: 'var(--color-text-primary, #e0e0e0)' }}>
                 <span style={{ flex: 1 }}>Text size</span>
-                <button type="button" aria-label="Smaller text" title="Smaller (Ctrl+-)" disabled={settings.fontSize <= FONT_MIN} onClick={() => stepFontSize(-1)} style={{ ...stepBtn, opacity: settings.fontSize <= FONT_MIN ? 0.35 : 1 }}>−</button>
+                <button type="button" aria-label="Smaller text" title="Smaller" disabled={settings.fontSize <= FONT_MIN} onClick={() => stepFontSize(-1)} style={{ ...stepBtn, opacity: settings.fontSize <= FONT_MIN ? 0.35 : 1 }}>−</button>
                 <span aria-live="polite" style={{ minWidth: 20, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{settings.fontSize}</span>
-                <button type="button" aria-label="Larger text" title="Larger (Ctrl+=)" disabled={settings.fontSize >= FONT_MAX} onClick={() => stepFontSize(1)} style={{ ...stepBtn, opacity: settings.fontSize >= FONT_MAX ? 0.35 : 1 }}>+</button>
-                <button type="button" title="Default size (Ctrl+0)" disabled={settings.fontSize === FONT_DEFAULT} onClick={() => setFontSize(FONT_DEFAULT)} style={{ ...stepBtn, width: 'auto', padding: '0 6px', fontSize: 11, opacity: settings.fontSize === FONT_DEFAULT ? 0.35 : 1 }}>Reset</button>
+                <button type="button" aria-label="Larger text" title="Larger" disabled={settings.fontSize >= FONT_MAX} onClick={() => stepFontSize(1)} style={{ ...stepBtn, opacity: settings.fontSize >= FONT_MAX ? 0.35 : 1 }}>+</button>
+                <button type="button" title="Default size" disabled={settings.fontSize === FONT_DEFAULT} onClick={() => setFontSize(FONT_DEFAULT)} style={{ ...stepBtn, width: 'auto', padding: '0 6px', fontSize: 11, opacity: settings.fontSize === FONT_DEFAULT ? 0.35 : 1 }}>Reset</button>
               </div>
             </div>,
             document.body,
           )}
-          <button type="button" onClick={() => split('row')} disabled={!canRight} aria-label="Split right" title={`Split right (Ctrl+Shift+D)${axisHint('row')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canRight ? 1 : 0.35 }}>
+          <button type="button" onClick={() => split('row')} disabled={!canRight} aria-label="Split right" title={`Split right${axisHint('row')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canRight ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
           </button>
-          <button type="button" onClick={() => split('column')} disabled={!canDown} aria-label="Split down" title={`Split down (Ctrl+Shift+E)${axisHint('column')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canDown ? 1 : 0.35 }}>
+          <button type="button" onClick={() => split('column')} disabled={!canDown} aria-label="Split down" title={`Split down${axisHint('column')}`} className="dex-hover-bg" style={{ ...iconBtn, opacity: canDown ? 1 : 0.35 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="3" y1="12" x2="21" y2="12" /></svg>
           </button>
         </div>

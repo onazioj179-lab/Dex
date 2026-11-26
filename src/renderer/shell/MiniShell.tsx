@@ -153,7 +153,7 @@ export const MiniShell: React.FC = () => {
         <div style={styles.divider} />
         <button
           type="button"
-          title="Expand DEX (Ctrl+Shift+M)"
+          title="Expand DEX"
           aria-label="Expand DEX to full window"
           className="mini-action mini-expand"
           style={styles.actionBtn}

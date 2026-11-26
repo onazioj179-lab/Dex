@@ -78,7 +78,7 @@ const AskUkiSelection: React.FC = () => {
       // preventDefault on mousedown so clicking the chip doesn't collapse the selection before onClick
       onMouseDown={e => e.preventDefault()}
       onClick={() => ask(sel.text)}
-      title="Ask UKI about the selected text (Ctrl+Shift+U)"
+      title="Ask UKI"
       aria-label="Ask UKI about the selected text"
       style={{
         position: 'fixed', left, top, zIndex: 2147483000,

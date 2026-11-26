@@ -1387,7 +1387,7 @@ const Canvas: React.FC = () => {
           <button style={s.actionBtn} onClick={() => zoomAt(1 / 1.2)} title="Zoom out" aria-label="Zoom out">
             <DexIcon name="minus" size={16} />
           </button>
-          <button style={s.zoomLabel} onClick={resetZoom} title="Reset zoom (Ctrl+0)" aria-label={`Zoom ${Math.round(zoom * 100)}%, reset to 100%`}>{Math.round(zoom * 100)}%</button>
+          <button style={s.zoomLabel} onClick={resetZoom} title="Reset zoom" aria-label={`Zoom ${Math.round(zoom * 100)}%, reset to 100%`}>{Math.round(zoom * 100)}%</button>
           <button style={s.actionBtn} onClick={() => zoomAt(1.2)} title="Zoom in" aria-label="Zoom in">
             <DexIcon name="plus" size={16} />
           </button>
@@ -1407,10 +1407,10 @@ const Canvas: React.FC = () => {
               label={saveState.error ? 'Not saved' : (!saveState.pending && !saveState.savedAt ? 'Up to date' : undefined)}
             />
           </span>
-          <button style={{ ...s.actionBtn, ...(historyState.canUndo ? {} : s.actionBtnDisabled) }} onClick={undo} disabled={!historyState.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
+          <button style={{ ...s.actionBtn, ...(historyState.canUndo ? {} : s.actionBtnDisabled) }} onClick={undo} disabled={!historyState.canUndo} title="Undo" aria-label="Undo">
             <DexIcon name="undo" size={16} />
           </button>
-          <button style={{ ...s.actionBtn, ...(historyState.canRedo ? {} : s.actionBtnDisabled) }} onClick={redo} disabled={!historyState.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <button style={{ ...s.actionBtn, ...(historyState.canRedo ? {} : s.actionBtnDisabled) }} onClick={redo} disabled={!historyState.canRedo} title="Redo" aria-label="Redo">
             <DexIcon name="redo" size={16} />
           </button>
           <button style={s.actionBtn} onClick={clearActive} title="Clear active layer" aria-label="Clear">

@@ -39,7 +39,6 @@ function resolveGuide(appId: string): ResolvedGuide {
   }
   // Generic guide -- works for any app with no custom content.
   const sections: LearnSection[] = [];
-  if (def?.shortcut) sections.push({ heading: 'Open it', items: [`Shortcut: ${def.shortcut}`] });
   sections.push({ heading: 'Everywhere in DEX', items: GLOBAL_LEARN_TIPS });
   return { name, overview: def?.description || `${name} is a DEX app.`, sections };
 }

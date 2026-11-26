@@ -498,7 +498,6 @@ export default function Store(): React.ReactElement {
               <InfoRow label="Category" value={CATEGORY_LABELS[selected.category]} />
               {selected.version && <InfoRow label="Version" value={selected.version} />}
               {selected.buildDate && <InfoRow label="Updated" value={selected.buildDate} />}
-              {selected.shortcut && <InfoRow label="Shortcut" value={selected.shortcut} />}
               <InfoRow label="Opened" value={opens === 0 ? 'Not yet' : `${opens.toLocaleString()} time${opens === 1 ? '' : 's'}`} />
               <InfoRow label="App ID" value={selected.id} />
               <InfoRow label="Source" value="Built-in (DEX)" />

@@ -358,7 +358,7 @@ const SystemMonitorPanel: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px 0', borderTop: '1px solid var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Task Manager</div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Processes, performance history, DEX apps and diagnostics.{shortcut ? ` ${shortcut}` : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Processes, performance history, DEX apps and diagnostics.</div>
         </div>
         <button
           type="button"

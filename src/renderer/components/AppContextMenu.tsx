@@ -223,7 +223,6 @@ export const AppInfoDialog: React.FC<{ entry: AppEntry; onClose: () => void }> =
         {row('Version', entry.version ? formatDisplayVersion(entry.version) : '—')}
         {entry.buildDate && row('Build', entry.buildDate)}
         {row('App ID', <code style={{ fontSize: 12 }}>{entry.id}</code>)}
-        {entry.shortcut && row('Shortcut', entry.shortcut)}
         {row('Status', running ? (running.isMinimized ? 'Running (minimized)' : 'Running') : 'Not running')}
         {row('Pinned', [pinned.dock && 'Dock', pinned.menu && 'App Menu'].filter(Boolean).join(', ') || 'No')}
         {entry.actions.length > 0 && row('Quick actions', entry.actions.map(a => a.label).join(', '))}

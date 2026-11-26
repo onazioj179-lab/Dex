@@ -1184,7 +1184,7 @@ export const NotesEditor: React.FC<NotesEditorProps> = memo(({
                     key={action.id}
                     aria-label={action.label}
                     style={styles.toolbarBtn}
-                    title={action.label + (action.shortcut ? ` (${action.shortcut})` : '')}
+                    title={action.label}
                     onMouseEnter={e => { e.currentTarget.style.background = styles.toolbarBtnActive.background as string; e.currentTarget.style.color = styles.toolbarBtnActive.color as string; }}
                     onMouseLeave={e => { e.currentTarget.style.background = styles.toolbarBtn.background as string; e.currentTarget.style.color = styles.toolbarBtn.color as string; }}
                     onMouseDown={e => { e.preventDefault(); handleToolbarAction(action); }}

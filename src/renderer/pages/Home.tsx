@@ -772,7 +772,6 @@ export const Home: React.FC = () => {
                 >
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, color: 'var(--color-text-secondary)' }}>{item.icon}</span>
                   {item.label}
-                  {item.shortcut && <span style={{ marginLeft: 'auto', paddingLeft: 16, fontSize: 11, color: 'var(--color-text-tertiary)' }}>{item.shortcut}</span>}
                 </button>
               )
             )}

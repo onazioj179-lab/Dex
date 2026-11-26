@@ -1232,7 +1232,7 @@ export const FindReplace: React.FC<FindReplaceProps> = memo(({
         </span>
         <button
           aria-label="Previous match"
-          title="Previous match (Shift+Enter)"
+          title="Previous match"
           onClick={() => step(-1)}
           disabled={matchCount === 0}
           style={{ background: 'none', border: 'none', color: matchCount === 0 ? colors.textDim : colors.text, cursor: matchCount === 0 ? 'default' : 'pointer', fontSize: 13, opacity: matchCount === 0 ? 0.4 : 1, padding: '0 2px' }}

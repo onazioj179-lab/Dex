@@ -889,8 +889,8 @@ const PresentationBuilder: React.FC<{ inStudio?: boolean }> = ({ inStudio = fals
           <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
             {currentIdx + 1} / {slides.length}
           </span>
-          <button onClick={() => travel('undo')} disabled={!historyDepth.past} style={{ ...toolbarBtn, opacity: historyDepth.past ? 1 : 0.45 }} title="Undo (Ctrl+Z)" aria-label="Undo">Undo</button>
-          <button onClick={() => travel('redo')} disabled={!historyDepth.future} style={{ ...toolbarBtn, opacity: historyDepth.future ? 1 : 0.45 }} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
+          <button onClick={() => travel('undo')} disabled={!historyDepth.past} style={{ ...toolbarBtn, opacity: historyDepth.past ? 1 : 0.45 }} title="Undo" aria-label="Undo">Undo</button>
+          <button onClick={() => travel('redo')} disabled={!historyDepth.future} style={{ ...toolbarBtn, opacity: historyDepth.future ? 1 : 0.45 }} title="Redo" aria-label="Redo">Redo</button>
           <span title={saveError ?? undefined}><AutosaveIndicator state={saveState} lastSavedAt={lastSavedAt} label={saveError ? 'Not saved' : undefined} /></span>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -918,8 +918,8 @@ const PresentationBuilder: React.FC<{ inStudio?: boolean }> = ({ inStudio = fals
           <input ref={deckInput} type="file" accept=".dexdeck,.dexdeck.json,.json,application/json" hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) void openDeckFile(f); e.target.value = ''; }} />
           {!inStudio && <>
-            <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open a .dexdeck file (Ctrl+O)">Open Deck…</button>
-            <button onClick={saveDeckFile} style={toolbarBtn} title="Save the deck to a file (Ctrl+Shift+S)">Save Deck…</button>
+            <button onClick={() => deckInput.current?.click()} style={toolbarBtn} title="Open">Open Deck…</button>
+            <button onClick={saveDeckFile} style={toolbarBtn} title="Save">Save Deck…</button>
           </>}
           <button onClick={saveCheckpointNow} style={toolbarBtn} title="Keep this version on this device; restore it from Collab Hub">Checkpoint</button>
           <button onClick={() => setShowOutline(true)} style={toolbarBtn}>Import Outline</button>

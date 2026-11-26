@@ -26,7 +26,7 @@ import { useDockStore, DOCK_TILE, DOCK_PAD, DOCK_THICKNESS, DOCK_MARGIN, dockRes
 import { computeWorkArea, isHorizontalDockEdge, placeDock, type WorkArea, type DockEdge } from '../../../shared/shell/workArea';
 import { isReduceMotion, onReduceMotionChange } from '../../utils/MotionController';
 import { slitRect, distanceToRect, SLIT_NEAR } from '../floatingLauncherGeometry';
-import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION, DOCK_POSITIONS, dockPositionAt, type DockPosition } from './dockLayout';
+import { dockLayout, dropIndex, moveTo, DOCK_GAP, DOCK_GROUP_GAP, DOCK_MOTION, dockPositionAt, type DockPosition } from './dockLayout';
 
 const LONG_PRESS_MS = 500;
 const DRAG_THRESHOLD = 6;
@@ -197,7 +197,9 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
   const [tuckPref, setTuckPref] = useState(readTuckPref);
   const [tucked, setTucked] = useState(false);
   const [slitNear, setSlitNear] = useState(false);
-  const dockFocused = () => !!rootRef.current && rootRef.current.contains(document.activeElement);
+  // Keyboard focus keeps the Dock out; the focus a mouse click leaves behind
+  // does not (it kept a clicked Dock from ever hiding again).
+  const dockFocused = () => !!rootRef.current?.querySelector(':focus-visible');
   const canTuck = tuckPref && !open && !freePx && !hidden && !menu && !placementPreview && !freePreview;
   const along = placed.start + placed.length / 2;
   const slitFor = (near: boolean) => {
@@ -210,7 +212,10 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (!canTuck) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
-    const arm = () => { if (!timer) timer = setTimeout(() => { timer = null; if (!dockFocused()) setTucked(true); }, TUCK_AFTER_MS); };
+    // The timer re-checks on fire: arming right after an untuck used to slide the
+    // Dock back into its wall under a resting pointer (no pointermove to cancel).
+    const inUse = () => dockFocused() || !!placementDrag.current || !!rootRef.current?.matches(':hover');
+    const arm = () => { if (!timer) timer = setTimeout(() => { timer = null; if (!inUse()) setTucked(true); }, TUCK_AFTER_MS); };
     const onMove = (e: PointerEvent) => {
       if (tucked) {
         const d = distanceToRect(e.clientX, e.clientY, slitFor(true));
@@ -288,7 +293,9 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     if (!e.isPrimary || e.button !== 0) return;
     const trigger = triggerRef.current;
     const fromTrigger = trigger?.contains(e.target as Node);
-    if (!fromTrigger && (expanded || (e.target as Element).closest('button'))) return;
+    // Tiles reorder; anywhere else on the Dock (the button, padding, separators)
+    // picks the whole Dock up, open or folded.
+    if (!fromTrigger && (e.target as Element).closest('button')) return;
     clearTimeout(collapseTimer.current);
     suppressTriggerClick.current = false;
     placementDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
@@ -504,16 +511,11 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
     );
   };
 
+  // Placement is direct: drag the Dock anywhere, release near an edge to snap.
   const triggerMenu: ContextMenuItem[] = [
-    { id: 'toggle', label: expanded ? 'Collapse Dock' : 'Expand Dock', onClick: () => (expanded ? collapse(true) : setExpanded(true)) },
-    { id: 'launcher', label: 'Search apps', onClick: onOpenLauncher, dividerAfter: true },
-    ...DOCK_POSITIONS.map(position => ({
-      id: 'position-' + position.edge + '-' + position.align,
-      label: (savedEdge === position.edge && savedAlign === position.align ? '✓ ' : '') + 'Position: ' + position.label,
-      onClick: () => setPrefs({ edge: position.edge, align: position.align }),
-    })),
-    { id: 'auto', label: `${autoCollapse ? '✓ ' : ''}Collapse automatically`, onClick: () => useDockStore.getState().setPrefs({ autoCollapse: !autoCollapse }) },
-    { id: 'tuck', label: `${tuckPref ? '✓ ' : ''}Hide in the edge when not in use`, onClick: toggleTuckPref },
+    { id: 'toggle', label: expanded ? 'Collapse' : 'Expand', onClick: () => (expanded ? collapse(true) : setExpanded(true)), dividerAfter: true },
+    { id: 'auto', label: `${autoCollapse ? '✓ ' : ''}Auto-collapse`, onClick: () => useDockStore.getState().setPrefs({ autoCollapse: !autoCollapse }) },
+    { id: 'tuck', label: `${tuckPref ? '✓ ' : ''}Auto-hide`, onClick: toggleTuckPref },
   ];
 
   return (
@@ -609,7 +611,17 @@ export const MorphingDock: React.FC<MorphingDockProps> = ({ onOpenLauncher }) =>
             tabIndex={isTucked ? 0 : -1}
             aria-hidden={!isTucked || undefined}
             aria-label="Show the Dock"
-            onPointerDown={e => { e.preventDefault(); untuck(); }}
+            onPointerDown={e => {
+              e.preventDefault();
+              untuck();
+              // Grab-and-drag straight out of the wall. The slit unmounts once the
+              // drag starts, so the Dock itself takes the pointer and runs the
+              // same placement drag as its button.
+              if (e.isPrimary && e.button === 0 && rootRef.current) {
+                placementDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+                try { rootRef.current.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+              }
+            }}
             onClick={() => untuck(true)}
             onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
             style={{

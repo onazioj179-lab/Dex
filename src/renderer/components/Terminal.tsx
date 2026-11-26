@@ -661,7 +661,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
           <button
             type="button"
             onClick={() => { setFind((f) => (f ? null : { q: '', hit: null })); setTimeout(() => findInputRef.current?.focus(), 0); }}
-            title="Find in output (Ctrl+F)" aria-label="Search scrollback" aria-pressed={!!find} style={iconBtn(!!find)}
+            title="Find in output" aria-label="Search scrollback" aria-pressed={!!find} style={iconBtn(!!find)}
           ><Glyph name="find" /></button>
           <button type="button" onClick={() => setShowSnippets((o) => !o)} title="Saved commands" aria-label="Saved snippets" aria-pressed={showSnippets} style={iconBtn(showSnippets)}><Glyph name="snippets" /></button>
           <button type="button" onClick={toNotes} title="Send output (or selection) to Notes" aria-label="Send to Notes" style={iconBtn()}><Glyph name="notes" /></button>
@@ -756,7 +756,7 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
               borderRadius: 9999, outline: 'none',
             }}
           />
-          <button type="button" aria-label="Previous match" title="Previous (Shift+Enter)" onClick={() => runFind(find.q, true)} style={iconBtn()}><Glyph name="up" /></button>
+          <button type="button" aria-label="Previous match" title="Previous" onClick={() => runFind(find.q, true)} style={iconBtn()}><Glyph name="up" /></button>
           <button type="button" aria-label="Next match" title="Next (Enter)" onClick={() => runFind(find.q)} style={iconBtn()}><Glyph name="down" /></button>
           <button type="button" aria-label="Close find" title="Close (Esc)" onClick={closeFind} style={iconBtn()}><Glyph name="close" size={11} /></button>
         </div>

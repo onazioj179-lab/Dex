@@ -1163,7 +1163,7 @@ const DexCode: React.FC = () => {
       {/* Activity bar (Xcode-style) -- slim icon column on far left */}
       <nav style={S.activityBar} aria-label="DexCode activity bar">
         <button
-          title="Toggle sidebar (Ctrl+B)"
+          title="Toggle sidebar"
           aria-label="Toggle sidebar"
           aria-pressed={!sidebarCollapsed}
           style={sidebarCollapsed ? S.activityBtn : S.activityBtnActive}
@@ -1174,7 +1174,7 @@ const DexCode: React.FC = () => {
           <DexIcon name="folder" size={16} />
         </button>
         <button
-          title="Quick Open file (Ctrl+P)"
+          title="Quick Open file"
           aria-label="Quick open file"
           aria-pressed={showQuickOpen}
           style={showQuickOpen ? S.activityBtnActive : S.activityBtn}
@@ -1596,7 +1596,7 @@ const DexCode: React.FC = () => {
               style={S.clearBtn}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              title="Find (Ctrl+F)"
+              title="Find"
             >
               <DexIcon name="search" size={11} />
             </button>
@@ -1724,9 +1724,9 @@ const DexCode: React.FC = () => {
                     aria-label="Find text"
                   />
                   {findText && <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>{findMatchCount} found</span>}
-                  <button onClick={findPrev} style={S.findNavBtn} title="Previous (Shift+Enter)"><DexIcon name="chevron-up" size={12} /></button>
+                  <button onClick={findPrev} style={S.findNavBtn} title="Previous"><DexIcon name="chevron-up" size={12} /></button>
                   <button onClick={findNext} style={S.findNavBtn} title="Next (Enter)"><DexIcon name="chevron-down" size={12} /></button>
-                  <button onClick={() => setShowReplace(v => !v)} style={{...S.findNavBtn, color: showReplace ? 'var(--color-accent, #4A9EFF)' : undefined}} title="Toggle Replace (Ctrl+H)"><DexIcon name="repeat" size={12} /></button>
+                  <button onClick={() => setShowReplace(v => !v)} style={{...S.findNavBtn, color: showReplace ? 'var(--color-accent, #4A9EFF)' : undefined}} title="Toggle Replace"><DexIcon name="repeat" size={12} /></button>
                   <button onClick={() => { setShowFind(false); setShowReplace(false); editorRef.current?.focus(); }} style={S.findNavBtn} title="Close (Esc)"><DexIcon name="close" size={12} /></button>
                 </div>
                 {showReplace && (

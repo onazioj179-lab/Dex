@@ -889,8 +889,8 @@ const PixelArt: React.FC = () => {
             style={toolBtn}
             title={`Import an image and downscale it into the ${size}x${size} grid`}
           >Import</button>
-          <button onClick={undo} disabled={!histRef.current.past.length} style={{ ...toolBtn, ...(!histRef.current.past.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Undo (Ctrl+Z)" aria-label="Undo">Undo</button>
-          <button onClick={redo} disabled={!histRef.current.future.length} style={{ ...toolBtn, ...(!histRef.current.future.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">Redo</button>
+          <button onClick={undo} disabled={!histRef.current.past.length} style={{ ...toolBtn, ...(!histRef.current.past.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Undo" aria-label="Undo">Undo</button>
+          <button onClick={redo} disabled={!histRef.current.future.length} style={{ ...toolBtn, ...(!histRef.current.future.length ? { opacity: 0.5, cursor: 'default' } : {}) }} title="Redo" aria-label="Redo">Redo</button>
           <button onClick={clearFrame} style={toolBtn}>Clear</button>
           <button onClick={exportPNG} style={{ ...toolBtn, background: 'var(--color-accent-fill)', color: '#fff', border: 'none' }}>Export PNG</button>
           <button onClick={exportSheet} disabled={frames.length < 2} style={{ ...toolBtn, ...(frames.length < 2 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} title={frames.length < 2 ? 'Add a second frame to export a sprite sheet' : 'Export all frames as one sprite-sheet PNG'}>Export Sheet</button>
