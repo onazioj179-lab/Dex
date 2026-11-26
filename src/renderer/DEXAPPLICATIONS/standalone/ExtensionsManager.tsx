@@ -31,6 +31,8 @@ import {
   type PermissionId,
 } from '../../store/permissionStore';
 import { APP_TITLE, APP_SUBTITLE } from '../../styles/appHeader';
+import DexIcon from '../../components/DexIcon';
+import { DexSwitch } from '../../components/controls/Switch';
 
 function toast(type: 'info' | 'success' | 'warning' | 'error', message: string): void {
   try {
@@ -43,6 +45,7 @@ function toast(type: 'info' | 'success' | 'warning' | 'error', message: string):
 const ExtensionsManager: React.FC = () => {
   const [records, setRecords] = useState<ExtensionRecord[]>([]);
   const [showInstall, setShowInstall] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [manifestText, setManifestText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Subscribe to the permission store so the "granted" badges stay live.
@@ -207,102 +210,67 @@ const ExtensionsManager: React.FC = () => {
         {records.length === 0 && (
           <div style={styles.empty}>No extensions installed.</div>
         )}
-        {records.map((rec) => {
-          const perms = permissionsFor(rec.manifest.id);
-          const missing = perms.filter((p: PermissionId) => !permissions[p]?.enabled);
-          return (
-            <div key={rec.manifest.id} className="ext-card dex-liquid-glass-strong" style={styles.card}>
-              <div style={styles.cardTop}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={styles.cardName}>
-                    {rec.manifest.name}
-                    {rec.builtin && <span style={styles.builtinTag}>BUILT-IN</span>}
+        {records.length > 0 && (
+          // One grouped list (Settings style): name, one plain line, a switch.
+          // Technical details (id, version, capabilities) sit behind Details.
+          <div className="ext-group" role="list" aria-label="Extensions">
+            {records.map((rec) => {
+              const perms = permissionsFor(rec.manifest.id);
+              const missing = perms.filter((p: PermissionId) => !permissions[p]?.enabled);
+              const open = expanded === rec.manifest.id;
+              return (
+                <div key={rec.manifest.id} role="listitem" className="ext-row">
+                  <div className="ext-row-main">
+                    <span className="ext-row-icon" aria-hidden="true"><DexIcon name="puzzle" size={16} color="currentColor" /></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="ext-row-name">{rec.manifest.name}{rec.builtin && <span className="ext-row-tag">Built-in</span>}</div>
+                      {rec.manifest.description && <div className="ext-row-desc">{rec.manifest.description}</div>}
+                      {rec.enabled && missing.length > 0 && (
+                        <button type="button" className="ext-link" onClick={() => handleGrant(rec)}>
+                          Needs {missing.map((p) => PERMISSION_LABELS[p]).join(', ')}: Allow
+                        </button>
+                      )}
+                    </div>
+                    <button type="button" className="ext-link ext-details" aria-expanded={open}
+                      onClick={() => setExpanded(open ? null : rec.manifest.id)}>{open ? 'Hide' : 'Details'}</button>
+                    <DexSwitch checked={rec.enabled} label={`${rec.manifest.name} enabled`} onChange={() => handleToggle(rec)} />
                   </div>
-                  <div style={styles.cardMeta}>
-                    {rec.manifest.id} · v{rec.manifest.version} · {rec.manifest.author}
-                  </div>
+                  {open && (
+                    <div className="ext-row-more">
+                      <div>{rec.manifest.id} · v{rec.manifest.version} · {rec.manifest.author}</div>
+                      <div>Can use: {rec.manifest.capabilities.length ? rec.manifest.capabilities.join(', ') : 'nothing'}</div>
+                      {perms.length > 0 && <div>System permissions: {perms.map((p) => `${PERMISSION_LABELS[p]} ${permissions[p]?.enabled ? '(allowed)' : '(not allowed)'}`).join(', ')}</div>}
+                      {!rec.builtin && (
+                        <button type="button" className="ext-link ext-remove" onClick={() => handleRemove(rec)}>Remove extension</button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <button
-                  className="ext-btn"
-                  style={{
-                    ...styles.toggle,
-                    background: rec.enabled
-                      ? 'var(--color-success, #30d158)'
-                      : 'var(--color-bg-surface)',
-                    color: rec.enabled ? '#000' : 'var(--color-text-secondary)',
-                  }}
-                  onClick={() => handleToggle(rec)}
-                  aria-pressed={rec.enabled}
-                  aria-label={rec.enabled ? 'Disable' : 'Enable'}
-                >
-                  {rec.enabled ? 'Enabled' : 'Disabled'}
-                </button>
-              </div>
-
-              {rec.manifest.description && (
-                <div style={styles.cardDesc}>{rec.manifest.description}</div>
-              )}
-
-              <div style={styles.capRow}>
-                {rec.manifest.capabilities.length === 0 && (
-                  <span style={styles.capChipMuted}>no capabilities</span>
-                )}
-                {rec.manifest.capabilities.map((cap) => (
-                  <span key={cap} style={styles.capChip}>
-                    {cap}
-                  </span>
-                ))}
-              </div>
-
-              {perms.length > 0 && (
-                <div style={styles.permRow}>
-                  <span style={styles.permLabel}>System permissions:</span>
-                  {perms.map((p) => (
-                    <span
-                      key={p}
-                      style={{
-                        ...styles.permChip,
-                        background: permissions[p]?.enabled
-                          ? 'var(--color-success-muted, rgba(48,209,88,0.16))'
-                          : 'var(--color-bg-surface)',
-                        color: permissions[p]?.enabled
-                          ? 'var(--color-success, #30d158)'
-                          : 'var(--color-text-tertiary)',
-                      }}
-                    >
-                      {PERMISSION_LABELS[p]} {permissions[p]?.enabled ? '✓' : '✕'}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div style={styles.cardActions}>
-                {missing.length > 0 && (
-                  <button
-                    className="ext-btn"
-                    style={styles.secondaryBtn}
-                    onClick={() => handleGrant(rec)}
-                  >
-                    Grant permissions
-                  </button>
-                )}
-                {!rec.builtin && (
-                  <button
-                    className="ext-btn ext-remove"
-                    style={styles.removeBtn}
-                    onClick={() => handleRemove(rec)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
+      <style>{EXT_LIST_CSS}</style>
     </div>
   );
 };
+
+const EXT_LIST_CSS = `
+:where(.ext-group) { border: 1px solid var(--color-border-subtle); border-radius: 14px; background: var(--color-bg-surface); overflow: hidden; }
+:where(.ext-row) + :where(.ext-row) { border-top: 1px solid var(--color-border-subtle); }
+:where(.ext-row-main) { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+:where(.ext-row-icon) { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent); }
+:where(.ext-row-name) { font-size: 13px; font-weight: 600; color: var(--color-text-primary); display: flex; align-items: center; gap: 6px; }
+:where(.ext-row-tag) { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); }
+:where(.ext-row-desc) { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:where(.ext-link) { padding: 0; border: 0; background: none; color: var(--color-accent); font-size: 12px; cursor: pointer; }
+:where(.ext-row-main) :where(.ext-link):not(.ext-details) { margin-top: 3px; }
+:where(.ext-details) { color: var(--color-text-secondary); flex-shrink: 0; }
+:where(.ext-row-more) { padding: 0 14px 12px 56px; display: grid; gap: 4px; font-size: 12px; color: var(--color-text-tertiary); overflow-wrap: anywhere; }
+:where(.ext-row-more) :where(.ext-remove) { color: var(--color-error); justify-self: start; margin-top: 2px; }
+`;
 
 const styles: Record<string, React.CSSProperties> = {
   container: {

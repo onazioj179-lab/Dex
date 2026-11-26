@@ -318,7 +318,7 @@ test.describe('Morphing Dock', () => {
     const ctx = await browser.newContext({ viewport: { width: 760, height: 520 } });
     const page = await ctx.newPage();
     await boot(page);
-    for (const id of ['notes', 'tasks', 'calendar', 'weather', 'kanban', 'calculator', 'files', 'settings', 'gallery', 'audio', 'worldclock', 'timer']) await open(page, id);
+    for (const id of ['notes', 'tasks', 'calendar', 'weather', 'activity', 'calculator', 'files', 'settings', 'gallery', 'audio', 'worldclock', 'timer']) await open(page, id);
     await settled(page);
     const v = await vp(page);
     const dock = (await box(page, '.dex-mdock'))!;

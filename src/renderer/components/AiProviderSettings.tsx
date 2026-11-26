@@ -15,6 +15,7 @@
 import React, { useEffect, useState } from 'react';
 import { allProviders, allModels, findModel, getProvider } from '../uki/providers/registry';
 import { getApiKey, setApiKey, removeApiKey, configuredProviders, isSecureKeystore } from '../uki/keystore';
+import { identifyKey } from '../uki/providers/identifyKey';
 import { refreshLiveModels, clearLiveModels, LIVE_MODELS_EVENT } from '../uki/providers/liveModels';
 import {
   getPreferredModel, setPreferredModel, getRoutingGoal, setRoutingGoal,
@@ -319,6 +320,8 @@ const AiProviderSettings: React.FC = () => {
         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{GOAL_HINTS[goal]}</span>
       </div>
 
+      <AnyKeyRow onSaved={(id) => { refreshModels(id); setSavedAt(id); setKeys((k) => ({ ...k, [id]: getApiKey(id) ?? '' })); }} />
+
       {providers.map((p) => (
         <div
           key={p.id}
@@ -404,3 +407,44 @@ const AiProviderSettings: React.FC = () => {
 };
 
 export default AiProviderSettings;
+
+/** One box for any provider's key: DEX works out whose it is. */
+function AnyKeyRow({ onSaved }: { onSaved: (providerId: string) => void }) {
+  const [key, setKey] = useState('');
+  const [state, setState] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string }>({ kind: 'idle' });
+  const save = async () => {
+    if (!key.trim()) return;
+    setState({ kind: 'busy' });
+    const id = await identifyKey(key);
+    if (!id) {
+      setState({ kind: 'error', text: "DEX couldn't tell which service this key is for. Paste it into that service's box below." });
+      return;
+    }
+    setApiKey(id, key.trim());
+    setKey('');
+    onSaved(id);
+    setState({ kind: 'ok', text: `Connected to ${getProvider(id)?.label ?? id}. UKI can use it now.` });
+  };
+  return (
+    <div style={{ padding: 14, marginBottom: 14, borderRadius: 10, background: 'var(--pg-surface)', border: '1px solid var(--pg-border)' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Paste any API key</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+        OpenAI, Anthropic, Google, OpenRouter, Groq, Mistral, DeepSeek or xAI. DEX recognises the service.
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); void save(); }} style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="password" value={key} onChange={(e) => { setKey(e.target.value); setState({ kind: 'idle' }); }}
+          placeholder="API key" aria-label="Any API key" autoComplete="off"
+          style={{ flex: 1, height: 32, padding: '0 10px', borderRadius: 6, fontSize: 13, background: 'var(--color-bg-base)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
+        />
+        <button type="submit" disabled={state.kind === 'busy' || !key.trim()}
+          style={{ height: 32, padding: '0 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          {state.kind === 'busy' ? 'Checking…' : 'Connect'}
+        </button>
+      </form>
+      {state.text && (
+        <div role={state.kind === 'error' ? 'alert' : 'status'} style={{ marginTop: 6, fontSize: 12, color: state.kind === 'error' ? 'var(--color-error)' : 'var(--color-success)' }}>{state.text}</div>
+      )}
+    </div>
+  );
+}

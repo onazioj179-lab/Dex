@@ -1983,6 +1983,14 @@ ${text}
   const refresh = useCallback(() => {
     const currentActiveTab = activeTabRef.current;
     const tab = tabsRef.current.find(t => t.id === currentActiveTab);
+    // While loading, the button is Stop: it used to reload instead, so a slow
+    // site started over every time someone tried to stop it.
+    if (tab?.loading) {
+      const wv = webviewRefs.current.get(currentActiveTab) as { stop?: () => unknown } | undefined;
+      try { wv?.stop?.(); } catch (e) { console.warn('[DEX]', e); }
+      setTabs(prev => prev.map(t => (t.id === currentActiveTab ? { ...t, loading: false } : t)));
+      return;
+    }
     if (tab && tab.url) {
       setCrashedTabs(prev => { const next = new Set(prev); next.delete(currentActiveTab); return next; });
       setTabErrors(prev => ({ ...prev, [currentActiveTab]: null }));
@@ -2281,7 +2289,12 @@ ${text}
 
       {/* Unified address bar with consolidated actions */}
       <div style={styles.addressBar}>
-        <button style={styles.navBtnSmall} onClick={refresh} title="Reload" aria-label="Reload page">
+        {currentTab?.loading && (
+          // Loading line under the address bar (Safari-style): a slow site
+          // looked frozen with only a tiny tab spinner to show it was working.
+          <span role="progressbar" aria-label="Loading page" className="dex-browser-loadline" />
+        )}
+        <button style={styles.navBtnSmall} onClick={refresh} title={currentTab?.loading ? 'Stop' : 'Reload'} aria-label={currentTab?.loading ? 'Stop loading' : 'Reload page'}>
           {currentTab?.loading ? Icon.close : Icon.refresh}
         </button>
         <form onSubmit={(e) => { handleSubmit(e); setShowSuggestions(false); }} style={styles.urlForm}>
@@ -3241,6 +3254,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // --- Address bar (Safari-style toolbar) ---
   addressBar: {
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
     gap: '4px',

@@ -221,6 +221,7 @@ const Calendar = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Calendar'
 const PasswordGenerator = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PasswordGenerator'));
 
 const KanbanApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/KanbanApp'));
+const ActivityHub = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/ActivityHub'));
 const AchievementsApp = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/Achievements'));
 const RecycleBin = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/RecycleBin'));
 const PowerRename = lazyRetry(() => import('../DEXAPPLICATIONS/standalone/PowerRename'));
@@ -269,7 +270,7 @@ type AppId = 'home' | 'files' | 'browser' | 'settings' | 'taskmanager' | 'transf
   | 'stopwatch' | 'unitconverter' | 'pomodoro' | 'qrcode' | 'colorpicker'
   | 'weather' | 'worldclock' | 'noisegenerator' | 'dexcode' | 'nexus' | 'learn' | 'collabhub' | 'canvas' | 'creativehub' | 'timer'
   | 'screenrecorder' | 'presentation' | 'pdfviewer' | 'pixelart' | 'maps' | 'git' | 'env' | 'ssh' | 'liveactivity'
-  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'powerrename' | 'health' | 'bio' | 'ledger' | 'terminal' | 'security';
+  | 'spaces' | 'inbox' | 'projectdash' | 'backup' | 'extensions' | 'activity' | 'powerrename' | 'health' | 'bio' | 'ledger' | 'terminal' | 'security';
 
 // Default floating window sizes per app live in the shared app registry
 // (shell/appRegistry.ts) so the window manager, launcher and app info agree.
@@ -372,7 +373,7 @@ const APP_COMPONENTS_RAW: Record<AppId, React.LazyExoticComponent<any>> = {
   videoeditor: VideoEditor, imosion: Imosion, prism: Prism, flux: Flux, forge: Forge,
   uki: Uki,
   calculator: Calculator, calendar: Calendar, passwordgenerator: PasswordGenerator,
-  kanban: KanbanApp, achievements: AchievementsApp,
+  kanban: KanbanApp, achievements: AchievementsApp, activity: ActivityHub,
   recyclebin: RecycleBin,
   powerrename: PowerRename,
   axl: Axl,
@@ -446,6 +447,7 @@ const Icons_RAW: Record<string, JSX.Element> = {
   passwordgenerator: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
 
   kanban: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
+  activity: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>,
   achievements: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 22V8h4v14"/><path d="M8 9h8l-1 5H9L8 9z"/></svg>,
   recyclebin: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
   powerrename: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={dockIconStyle}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>,
@@ -5212,17 +5214,27 @@ export const AppManager: React.FC = () => {
 
   const dragRafRef = useRef<number>(0);
 
+  // A press is a tap until the pointer moves 6 px. Starting the drag on press
+  // re-rendered the whole shell twice per tap and let the slightest jitter
+  // (always, on touch) reorder tabs under the finger and swallow the tap.
+  const tabPressRef = useRef<{ id: string; x: number; y: number; pointerId: number } | null>(null);
+  const tabDraggedRef = useRef(false);
   const handleTabDragStart = useCallback((e: React.PointerEvent, appId: string) => {
-    e.preventDefault();
+    if (e.button !== 0) return;
     e.stopPropagation();
-    const target = e.currentTarget as HTMLElement;
-    try { target.setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
-    draggingTabRef.current = appId;
-    setDraggingTab(appId);
+    tabPressRef.current = { id: appId, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    tabDraggedRef.current = false;
   }, []);
 
   const handleTabDragMove = useCallback((e: React.PointerEvent) => {
-    if (!draggingTabRef.current) return;
+    const press = tabPressRef.current;
+    if (!draggingTabRef.current) {
+      if (!press || press.pointerId !== e.pointerId || Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
+      draggingTabRef.current = press.id;
+      tabDraggedRef.current = true;
+      setDraggingTab(press.id);
+    }
     const dragging = draggingTabRef.current;
     const pointerX = e.clientX;
     const pointerY = e.clientY;
@@ -5246,6 +5258,7 @@ export const AppManager: React.FC = () => {
   }, []);
 
   const handleTabDragEnd = useCallback((e: React.PointerEvent) => {
+    tabPressRef.current = null;
     if (!draggingTabRef.current) return;
     const target = e.currentTarget as HTMLElement;
     try { target.releasePointerCapture(e.pointerId); } catch { /* release is best-effort */ }
@@ -5326,13 +5339,14 @@ export const AppManager: React.FC = () => {
               onPointerUp={handleTabDragEnd}
               onPointerCancel={handleTabDragEnd}
               onClick={() => {
-                if (!draggingTab) {
+                if (tabDraggedRef.current) { tabDraggedRef.current = false; return; }
+                {
                   if (minimizedApps.has(app.id)) restoreFloatingApp(app.id);
                   bringToFront(app.id as AppId);
                   setCurrentApp(app.id as AppId);
                 }
               }}
-              onDoubleClick={() => { if (!draggingTab) tileWindow(app.id as AppId, 'maximize'); }}
+              onDoubleClick={() => { if (!tabDraggedRef.current) tileWindow(app.id as AppId, 'maximize'); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 // One clean pill: a soft fill for the active app, nothing for

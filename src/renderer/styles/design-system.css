@@ -8544,3 +8544,18 @@ html[data-perf-tier="low"] :is(.dex-mat-clear, .dex-mat-frosted) {
 @keyframes dexEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .dex-enter { animation: dexEnter 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .dex-enter { animation: none; } }
+
+/* Browser: loading line under the address bar. Indeterminate, 2 px, accent. */
+.dex-browser-loadline {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; pointer-events: none;
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+.dex-browser-loadline::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 35%;
+  background: var(--color-accent); border-radius: 2px;
+  animation: dex-browser-load 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes dex-browser-load { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@media (prefers-reduced-motion: reduce) {
+  .dex-browser-loadline::after { animation: none; width: 100%; opacity: 0.6; }
+}

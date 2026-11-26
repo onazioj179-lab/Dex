@@ -16,7 +16,8 @@
  */
 
 export type ProviderId =
-  | 'openai' | 'anthropic' | 'google' | 'ollama' | 'openrouter' | 'local';
+  | 'openai' | 'anthropic' | 'google' | 'ollama' | 'openrouter' | 'local'
+  | 'groq' | 'mistral' | 'deepseek' | 'xai';
 
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
 
