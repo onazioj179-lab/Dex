@@ -28,6 +28,7 @@ import { AppMenuPanel } from './AppMenuPanel';
 import { dispatchAppIntent } from '../services/appIntents';
 import { useUkiStore } from '../store/ukiStore';
 import { startGlobalHotkeyListener } from '../services/globalHotkeys';
+import { actionFor } from '../shell/input/multiFinger';
 import { glassModal } from '../styles/glassMenu';
 import { DexSearchInput } from '../styles/components';
 import FloatingLauncher from './FloatingLauncher';
@@ -46,6 +47,7 @@ import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionC
 import DexIcon from './DexIcon';
 import { AppOpening } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
+import { UkiActivityPill } from './UkiActivityPill';
 import { UkiApprovalHost } from './UkiApprovalHost';
 import { DexConfirmHost } from './dexConfirm';
 import AskUkiSelection from './AskUkiSelection';
@@ -3355,6 +3357,27 @@ export const AppManager: React.FC = () => {
       setCurrentRunningApp('home' as AppId);
     });
 
+    // 3-10 finger taps, swipes and pinches (shell/input/multiFinger.ts), mapped
+    // to actions the user chooses in Settings › Touch & Pen (Mac-like defaults).
+    const unsubMulti = gestureRecognizer.on('multi-finger', (g) => {
+      if (onCanvas() || !g.fingers || !g.kind) return;
+      const action = actionFor({ fingers: g.fingers, kind: g.kind });
+      const ids = runningApps.map(a => a.id);
+      const curIdx = ids.indexOf(currentAppId);
+      switch (action) {
+        case 'ask-uki': try { useUkiStore.getState().openPanel(); } catch { /* not ready */ } break;
+        case 'search': case 'app-menu': setShowAppMenu(true); break;
+        case 'overview': setShowOverview(true); setCurrentRunningApp('home' as AppId); break;
+        case 'show-desktop': setShowOverview(false); setCurrentRunningApp('home' as AppId); break;
+        case 'clipboard': window.dispatchEvent(new CustomEvent('dex-open-clipboard')); break;
+        case 'next-app': if (curIdx >= 0 && curIdx < ids.length - 1) setCurrentRunningApp(ids[curIdx + 1] as AppId); break;
+        case 'previous-app': if (curIdx > 0) setCurrentRunningApp(ids[curIdx - 1] as AppId); break;
+        case 'close-app': if (currentAppId !== 'home') { handleCloseApp(currentAppId); setCurrentApp('home'); } break;
+        case 'notifications': window.dispatchEvent(new CustomEvent('dex-open-notification-center')); break;
+        default: break;
+      }
+    });
+
     const handleGesture = (e: Event) => {
       const g = (e as CustomEvent<GestureEvent>).detail;
       if (g.type === 'force-touch') {
@@ -3422,7 +3445,7 @@ export const AppManager: React.FC = () => {
       gestureEngine.destroy();
       window.removeEventListener('dex-gesture', handleGesture);
       window.removeEventListener('dex-stage-toggle', toggleStage);
-      unsub3L(); unsub3R(); unsub3U(); unsub3D(); unsubEdgeUp(); unsubPinch(); unsubSpread();
+      unsub3L(); unsub3R(); unsub3U(); unsub3D(); unsubEdgeUp(); unsubPinch(); unsubSpread(); unsubMulti();
       gestureRecognizer.detach();
     };
   }, [goBack, goForward, runningApps, currentAppId, setCurrentRunningApp]);
@@ -5727,6 +5750,8 @@ export const AppManager: React.FC = () => {
 
       {/* UKI Voice Assistant Transcript Overlay (Settings > UKI > Enable UKI) */}
       {ukiEnabled && <UkiOverlay />}
+      {/* What UKI is doing inside an app, while she does it. */}
+      <UkiActivityPill />
       {/* UKI approvals (Xack): always mounted so scheduled and Nexus runs can ask too. */}
       <UkiApprovalHost />
       <DexConfirmHost />
