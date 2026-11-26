@@ -195,6 +195,10 @@ fn append_message(conn: &Connection, args: &Value) -> Value {
     let created_at = msg.get("timestamp").and_then(|v| v.as_i64()).unwrap_or_else(now_ms);
     let data = serde_json::to_string(&msg).unwrap_or_default();
 
+    // A re-saved message (same id) replaces the row and must not be counted twice.
+    let existed: bool = conn
+        .query_row("SELECT EXISTS(SELECT 1 FROM uki_messages WHERE id = ?)", params![id], |r| r.get(0))
+        .unwrap_or(false);
     let inserted = conn.execute(
         "INSERT OR REPLACE INTO uki_messages (id, conversation_id, role, content, data, created_at)
          VALUES (?, ?, ?, ?, ?, ?)",
@@ -221,12 +225,11 @@ fn append_message(conn: &Connection, args: &Value) -> Value {
             );
         }
     }
+    // Increment instead of recounting the whole conversation on every message:
+    // history is unlimited, so a COUNT(*) here would grow with every reply.
     let _ = conn.execute(
-        "UPDATE uki_conversations SET
-            updated_at = ?,
-            message_count = (SELECT COUNT(*) FROM uki_messages WHERE conversation_id = ?)
-         WHERE id = ?",
-        params![now_ms(), conv_id, conv_id],
+        "UPDATE uki_conversations SET updated_at = ?, message_count = message_count + ? WHERE id = ?",
+        params![now_ms(), if existed { 0 } else { 1 }, conv_id],
     );
 
     conn.query_row(
@@ -336,6 +339,10 @@ mod tests {
         assert_eq!(got, vec!["msg 3", "msg 4"]);
         // No limit = the whole history.
         assert_eq!(get_messages(&c, &json!([id])).as_array().unwrap().len(), 5);
+        // The count follows new messages, and a re-saved message is not counted twice.
+        assert_eq!(get_conversation(&c, &id)["message_count"], 5);
+        append_message(&c, &json!([id, { "id": "m4", "role": "user", "content": "msg 4 edited", "timestamp": 1004 }]));
+        assert_eq!(get_conversation(&c, &id)["message_count"], 5);
     }
 
     #[test]
@@ -345,5 +352,45 @@ mod tests {
             create_conversation(&c, &json!([format!("c{i}")]));
         }
         assert_eq!(list_conversations(&c, &json!([100000])).as_array().unwrap().len(), 600);
+    }
+    /// Stress: a large history (DEX_STRESS x 20,000 messages in 200 conversations).
+    /// Loading a conversation, listing and searching must stay interactive.
+    #[test]
+    fn stays_fast_with_a_large_history() {
+        let scale: usize = std::env::var("DEX_STRESS").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
+        let c = db();
+        let total = 20_000 * scale;
+        let convs: Vec<String> = (0..200)
+            .map(|i| create_conversation(&c, &json!([format!("chat {i}")]))["id"].as_str().unwrap().to_string())
+            .collect();
+        let t0 = std::time::Instant::now();
+        c.execute_batch("BEGIN").unwrap();
+        for i in 0..total {
+            let id = &convs[i % convs.len()];
+            append_message(&c, &json!([id, { "id": format!("m{i}"), "role": if i % 2 == 0 { "user" } else { "copilot" },
+                "content": format!("message {i} about {} and more words", ["budget", "lagos", "terminal", "maps"][i % 4]), "timestamp": i as i64 }]));
+        }
+        c.execute_batch("COMMIT").unwrap();
+        let insert_ms = t0.elapsed().as_millis();
+
+        let t1 = std::time::Instant::now();
+        let msgs = get_messages(&c, &json!([convs[7]]));
+        let load_ms = t1.elapsed().as_millis();
+        assert_eq!(msgs.as_array().unwrap().len(), total / 200);
+
+        let t2 = std::time::Instant::now();
+        let list = list_conversations(&c, &json!([100000]));
+        let list_ms = t2.elapsed().as_millis();
+        assert_eq!(list.as_array().unwrap().len(), 200);
+
+        let t3 = std::time::Instant::now();
+        let hits = search(&c, &json!(["lagos", 40]));
+        let search_ms = t3.elapsed().as_millis();
+        assert_eq!(hits.as_array().unwrap().len(), 40);
+
+        eprintln!("uki_chat stress: {total} messages, insert {insert_ms} ms, load one conversation {load_ms} ms, list {list_ms} ms, search {search_ms} ms");
+        assert!(load_ms < 500 * scale as u128, "loading a conversation took {load_ms} ms");
+        assert!(list_ms < 200, "listing conversations took {list_ms} ms");
+        assert!(search_ms < 1000 * scale as u128, "search took {search_ms} ms");
     }
 }

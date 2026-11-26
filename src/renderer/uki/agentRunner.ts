@@ -26,6 +26,7 @@
 import { askConfiguredLLM } from './providers/connect';
 import type { ChatMessage } from './providers/types';
 import { searchWikipedia, lookupInstantAnswer } from './freeApis';
+import { redactHighConfidenceSecrets } from '../../shared/security/secretRedactor';
 import { formatUkiContexts } from './appContextRegistry';
 import { TtlCache, createToolBudget, chargeTool, type ToolBudget } from '../../shared/uki/webCache';
 import { notify } from '../services/notify';
@@ -179,6 +180,11 @@ function dispatch(event: string, detail: Record<string, unknown>): void {
 export async function webSearch(query: string): Promise<string> {
   const q = (query || '').trim();
   if (!q) return 'No query provided.';
+  // Never send a secret to a search engine. A model can be talked into putting
+  // a key it read from a file into a query (prompt injection = exfiltration).
+  if (redactHighConfidenceSecrets(q).removed.length) {
+    return 'Not searched: the query contained what looks like a password, key or token. Secrets are never sent to the web.';
+  }
   const key = q.toLowerCase();
   const cached = webSearchCache.get(key);
   if (cached) return cached;

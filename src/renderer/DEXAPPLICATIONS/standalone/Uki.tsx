@@ -266,6 +266,10 @@ export default function Uki(): React.ReactElement {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  // History is unlimited; draw the latest part and page back on request, so a
+  // conversation with thousands of messages opens instantly.
+  const PAGE = 200;
+  const [shownCount, setShownCount] = useState(PAGE);
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -307,6 +311,7 @@ export default function Uki(): React.ReactElement {
   }, [refreshConversations]);
 
   const loadMessages = useCallback(async (cid: string) => {
+    setShownCount(PAGE);
     const msgs = await dexInvoke<Message[]>('uki-chat:getMessages', cid);
     setMessages(Array.isArray(msgs) ? msgs : []);
   }, []);
@@ -800,7 +805,15 @@ export default function Uki(): React.ReactElement {
               </div>
             </div>
           )}
-          {messages.map((m) => (
+          {messages.length > shownCount && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 8px' }}>
+              <button type="button" onClick={() => setShownCount((c) => c + PAGE)}
+                style={{ height: 28, padding: '0 14px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+                Show earlier messages ({(messages.length - shownCount).toLocaleString()} more)
+              </button>
+            </div>
+          )}
+          {(messages.length > shownCount ? messages.slice(-shownCount) : messages).map((m) => (
             <div key={m.id} style={{ ...S.row, justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 4, maxWidth: '76%' }}>
                 <div style={{ ...S.bubble, maxWidth: '100%', ...(m.role === 'user' ? S.bubbleUser : m.role === 'system' ? S.bubbleSystem : S.bubbleAi) }}>

@@ -29,6 +29,7 @@
     "release:checksums": "node scripts/release-checksums.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "stress:uki": "node scripts/stress-uki.mjs",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",

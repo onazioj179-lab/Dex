@@ -257,6 +257,11 @@ export function exampleFor(name: ToolName): string {
 export type ValidationResult = { ok: true } | { ok: false; error: string };
 
 /** Core validator shared by the typed path and the catalog. */
+/** Longest string a core tool accepts (queries, paths, commands, titles). */
+export const MAX_STRING_ARG = 8_000;
+/** write_file content. */
+export const MAX_CONTENT_ARG = 2_100_000;
+
 function validateAgainstSpecs(
   name: string,
   args: Record<string, unknown>,
@@ -277,6 +282,13 @@ function validateAgainstSpecs(
       }
       if (!spec.optional && v.trim() === '') {
         return { ok: false, error: `${name} argument "${spec.name}" must not be empty.${reissue}` };
+      }
+      // A runaway model can emit megabytes in one argument; it must not reach the
+      // network (a 200 KB web_search query took 2 s) or the shell. Only a file's
+      // content may be large (write_file checks its own 2 MB limit).
+      const max = spec.name === 'content' ? MAX_CONTENT_ARG : MAX_STRING_ARG;
+      if (v.length > max) {
+        return { ok: false, error: `${name} argument "${spec.name}" is too long (${v.length.toLocaleString()} characters; the limit is ${max.toLocaleString()}). Shorten it.${reissue}` };
       }
     }
   }
