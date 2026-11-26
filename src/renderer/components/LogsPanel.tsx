@@ -170,7 +170,7 @@ export const LogsPanel: React.FC<LogsPanelProps> = ({
         <button
           onClick={clear}
           aria-label="Clear log entries"
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px var(--space-2)', fontSize: 10, fontFamily: 'inherit' }}
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 9999, color: 'var(--pg-text-secondary)', cursor: 'pointer', padding: '2px var(--space-2)', fontSize: 10, fontFamily: 'inherit' }}
         >
           Clear
         </button>

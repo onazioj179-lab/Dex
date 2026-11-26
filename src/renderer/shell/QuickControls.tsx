@@ -114,7 +114,7 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
       aria-expanded={ariaExpanded}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 22, height: 18, borderRadius: 4, padding: 0,
+        width: 22, height: 18, borderRadius: 9999, padding: 0,
         background: ariaExpanded ? 'var(--color-border)' : 'transparent',
         border: 'none', cursor: 'pointer',
         color: baseColor,

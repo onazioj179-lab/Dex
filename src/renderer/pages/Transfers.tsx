@@ -1071,7 +1071,7 @@ const Transfers: React.FC = () => {
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatTime(throughput.etaMs)}</div>
                   </div>
                   <button onClick={clearCompleted} style={{
-                    padding: '6px 14px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                    padding: '6px 14px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)',
                     background: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)',
                     fontSize: 12, cursor: 'pointer',
                   }}>Clear Completed</button>
@@ -1085,7 +1085,7 @@ const Transfers: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-error)' }}>Failed Transfers ({failedList.length})</div>
                   <button onClick={clearFailed} style={{
-                    padding: '4px 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)',
+                    padding: '4px 12px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)',
                     background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)', fontSize: 11, cursor: 'pointer',
                   }}>Clear All</button>
                 </div>
@@ -1196,7 +1196,7 @@ const Transfers: React.FC = () => {
                   placeholder="Search" size="md" fullWidth
                 />
                 <button onClick={clearHistory} style={{
-                  padding: 'var(--space-2) 14px', borderRadius: 6, border: '1px solid rgba(255,69,58,0.2)',
+                  padding: 'var(--space-2) 14px', borderRadius: 9999, border: '1px solid rgba(255,69,58,0.2)',
                   background: 'rgba(255,69,58,0.08)', color: 'var(--color-error)',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}>Clear All</button>

@@ -126,7 +126,7 @@ const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ open, onClose }) =>
             aria-label="Close diagnostics panel"
             style={{
               background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 4, color: 'var(--pg-text-secondary)', cursor: 'pointer',
+              borderRadius: 9999, color: 'var(--pg-text-secondary)', cursor: 'pointer',
               padding: '2px 10px', fontSize: 11,
             }}
           >

@@ -1953,7 +1953,7 @@ export const Gallery: React.FC = () => {
             { label: 'Compare', fn: () => setShowCompareMode(v => !v), active: showCompareMode },
             { label: 'Slideshow', fn: () => setShowSlideshow(v => !v), active: showSlideshow },
           ].map(b => (
-            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
+            <button key={b.label} aria-label={b.label} aria-pressed={b.active} onClick={b.fn} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3, flexShrink: 0, whiteSpace: 'nowrap' }}>{b.label}</button>
           ))}
         </div>
       </div>
@@ -2644,8 +2644,8 @@ const styles: Record<string, React.CSSProperties> = {
   title: { fontSize: 14, fontWeight: 700 },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)' },
   itemCount: { fontSize: 13, color: 'var(--color-text-muted)' },
-  viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 4, padding: 2 },
-  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 4, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
+  viewToggle: { display: 'flex', background: 'var(--color-bg-glass)', borderRadius: 9999, padding: 2 },
+  viewBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9999, border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' },
 
   // Content
   content: { flex: 1, overflow: 'auto', padding: 'var(--space-5)', scrollBehavior: 'smooth' as const, WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'contain' as any },
@@ -2671,7 +2671,7 @@ const styles: Record<string, React.CSSProperties> = {
   listInfo: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 2 },
   listName: { fontSize: 14, color: 'var(--color-text-primary)' },
   listMeta: { fontSize: 12, color: 'var(--color-text-muted)' },
-  listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
+  listFavBtn: { width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9999, border: 'none', background: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' },
 
   // Recent Media Section (bottom)
   recentSection: { marginTop: 'var(--space-8)', paddingTop: 'var(--space-5)', borderTop: '1px solid var(--color-border)' },
@@ -2689,7 +2689,7 @@ const styles: Record<string, React.CSSProperties> = {
   lightboxClose: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 4, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer' },
   lightboxTitle: { flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' },
   lightboxActions: { display: 'flex', gap: 'var(--space-2)' },
-  lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
+  lightboxBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 9999, border: 'none', background: 'var(--color-border)', color: 'var(--color-text-secondary)', cursor: 'pointer', transition: 'all 0.15s ease' },
   lightboxContent: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)', gap: 'var(--space-5)' },
   navBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: '50%', border: 'none', background: 'var(--color-border)', color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'all 0.15s ease' },
   lightboxImage: { flex: 1, maxWidth: '80%', aspectRatio: '16/10', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },

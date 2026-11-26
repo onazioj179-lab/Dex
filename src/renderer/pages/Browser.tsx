@@ -2334,7 +2334,7 @@ ${text}
             style={{
               background: 'transparent', border: 'none', color: 'var(--color-text-secondary)',
               cursor: currentTab?.url ? 'pointer' : 'not-allowed', fontSize: 11, minWidth: 34,
-              padding: '3px 2px', borderRadius: 4,
+              padding: '3px 2px', borderRadius: 9999,
             }}
             onClick={() => adjustZoom('reset')}
             disabled={!currentTab?.url}
@@ -3701,7 +3701,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   downloadBtn: {
     padding: '2px 8px', background: 'var(--color-bg-hover)', border: '1px solid var(--color-border-subtle)',
-    borderRadius: 6, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
+    borderRadius: 9999, color: 'var(--color-text-secondary)', fontSize: 11, cursor: 'pointer', lineHeight: '16px',
   },
   errorBtnAlt: {
     padding: 'var(--space-2) 18px',

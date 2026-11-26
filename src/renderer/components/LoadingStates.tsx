@@ -435,6 +435,64 @@ export interface DexLoaderProps {
  * The canonical DEX loading surface. Prefer this over a bare spinner or a
  * "Loading…" string anywhere the user waits for content.
  */
+export interface AppOpeningProps {
+  name: string;
+  /** The app's icon element (DexIcon), drawn on its tile. */
+  icon?: React.ReactNode;
+  /** App accent, used for the tile tint and the bar. */
+  accent?: string;
+  /** One line under the name (a loading milestone). */
+  sublabel?: string;
+  /** Show nothing for this long (ms), so a fast open never flashes a loader. */
+  delayMs?: number;
+}
+
+/**
+ * The open state for an app: its icon on a rounded tile, "Opening <name>",
+ * and a thin pill bar that sweeps. Respects reduced motion.
+ */
+export const AppOpening = memo<AppOpeningProps>(({ name, icon, accent = 'var(--color-accent)', sublabel, delayMs = 120 }) => {
+  const [shown, setShown] = useState(delayMs <= 0);
+  useEffect(() => {
+    if (delayMs <= 0) return;
+    const t = setTimeout(() => setShown(true), delayMs);
+    return () => clearTimeout(t);
+  }, [delayMs]);
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label={`Opening ${name}`}
+      style={{
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14,
+        opacity: shown ? 1 : 0, transition: 'opacity 0.18s ease',
+      }}
+    >
+      <style>{`
+        @keyframes dexAppOpenBar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+        @media (prefers-reduced-motion: reduce) { .dex-app-open-bar { animation: none !important; transform: none !important; width: 100% !important; opacity: 0.5; } }
+      `}</style>
+      <div style={{
+        width: 64, height: 64, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `color-mix(in srgb, ${accent} 14%, var(--color-bg-elevated))`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 28%, transparent), 0 6px 18px rgba(0,0,0,0.18)`,
+        color: accent,
+      }}>
+        {icon}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.005em' }}>Opening {name}</div>
+        {sublabel && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{sublabel}</div>}
+      </div>
+      <div style={{ width: 140, height: 3, borderRadius: 9999, background: 'var(--color-border-subtle)', overflow: 'hidden' }}>
+        <div className="dex-app-open-bar" style={{ width: '40%', height: '100%', borderRadius: 9999, background: accent, animation: 'dexAppOpenBar 1.1s cubic-bezier(0.45, 0, 0.25, 1) infinite' }} />
+      </div>
+    </div>
+  );
+});
+
+AppOpening.displayName = 'AppOpening';
+
 export const DexLoader = memo<DexLoaderProps>(({
   variant = 'panel',
   label,

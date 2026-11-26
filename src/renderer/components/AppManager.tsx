@@ -44,7 +44,7 @@ installLaunchOriginTracking();
 // The Home page still uses SpotlightSearch's `home` variant; that import lives in pages/Home.tsx.
 import { SpringAnimator, SPRING_PRESETS, isReduceMotion } from '../utils/MotionController';
 import DexIcon from './DexIcon';
-import { DexLoader } from './LoadingStates';
+import { AppOpening } from './LoadingStates';
 import UkiOverlay from './UkiOverlay';
 import { UkiApprovalHost } from './UkiApprovalHost';
 import { DexConfirmHost } from './dexConfirm';
@@ -688,12 +688,11 @@ const Loading: React.FC<{ appId?: string }> = ({ appId }) => {
       {/* Polished, consistent open state: the DEX reticle loader on a solid
           surface, labelled with the app name + a stepped milestone. Replaces the
           old grey skeleton, which read as empty/unfinished. */}
-      <DexLoader
-        variant="panel"
-        label={appDef?.name ? `Opening ${appDef.name}` : 'Opening…'}
-        sublabel={milestones[step] || milestones[milestones.length - 1]}
+      <AppOpening
+        name={appDef?.name || 'app'}
+        icon={<DexIcon name={appDef?.icon || appId || 'grid'} size={30} color="currentColor" />}
         accent={appDef?.color}
-        style={{ flex: 1 }}
+        sublabel={milestones[step] || milestones[milestones.length - 1]}
       />
     </div>
   );

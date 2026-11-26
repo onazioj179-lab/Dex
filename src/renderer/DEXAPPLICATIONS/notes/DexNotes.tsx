@@ -133,7 +133,7 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     padding: '4px 10px',
-    borderRadius: 4,
+    borderRadius: 9999,
     transition: 'background 0.1s, color 0.1s',
     fontWeight: 500,
   },
@@ -1412,7 +1412,7 @@ const DexNotesInner: React.FC = () => {
           <button
             onClick={undoDelete}
             style={{
-              marginLeft: 4, padding: '4px 10px', minHeight: 28, borderRadius: 6, border: 'none',
+              marginLeft: 4, padding: '4px 10px', minHeight: 28, borderRadius: 9999, border: 'none',
               background: 'var(--color-accent-light)', color: 'var(--color-accent)',
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}

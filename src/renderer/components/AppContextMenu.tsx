@@ -231,7 +231,7 @@ export const AppInfoDialog: React.FC<{ entry: AppEntry; onClose: () => void }> =
         {row('License', 'DEX Software License Agreement v1.0')}
         {row('Creator', CREATOR_NAME)}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-          <button type="button" onClick={onClose} style={{ height: 28, padding: '0 14px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', cursor: 'pointer' }}>Done</button>
+          <button type="button" onClick={onClose} style={{ height: 28, padding: '0 14px', borderRadius: 9999, border: '1px solid var(--color-border)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', cursor: 'pointer' }}>Done</button>
         </div>
       </div>
     </div>

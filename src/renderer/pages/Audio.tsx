@@ -1425,7 +1425,7 @@ export const Audio: React.FC = () => {
             { label: 'Visualizer', fn: () => setShowVisualizer(v => !v), active: showVisualizer },
             { label: 'Crossfade', fn: () => setShowCrossfadeSettings(v => !v), active: showCrossfadeSettings },
           ].map(b => (
-            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 4, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
+            <button key={b.label} onClick={b.fn} aria-label={`${b.active ? 'Hide' : 'Show'} ${b.label}`} aria-pressed={b.active} style={{ padding: '4px var(--space-2)', borderRadius: 9999, border: '1px solid ' + (b.active ? 'color-mix(in srgb, var(--color-accent) 30%, transparent)' : 'var(--color-border-subtle)'), background: b.active ? 'var(--color-accent-light)' : 'var(--color-border-subtle)', color: b.active ? 'var(--color-accent)' : 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3 }}>{b.label}</button>
           ))}
           {/* Sleep Timer */}
           <select

@@ -74,7 +74,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           type="button"
           onClick={onDeny}
           style={{
-            padding: '4px var(--space-3)', borderRadius: 4,
+            padding: '4px var(--space-3)', borderRadius: 9999,
             border: '1px solid rgba(127,127,127,0.4)',
             background: 'transparent', color: 'inherit', cursor: 'pointer',
           }}
@@ -85,7 +85,7 @@ export const UkiApprovalCard: React.FC<Props> = ({ plan, onApprove, onDeny }) =>
           type="button"
           onClick={onApprove}
           style={{
-            padding: '4px var(--space-3)', borderRadius: 4,
+            padding: '4px var(--space-3)', borderRadius: 9999,
             border: 'none', background: 'var(--color-accent-fill)', color: 'var(--color-accent-text)', cursor: 'pointer',
             fontWeight: 600,
           }}

@@ -20,6 +20,9 @@
 > (line + waypoints, fit, length), export saved places / track as GPX. Quick Look: folders list their contents, Markdown rendered
 > (sanitised), CSV/TSV as a table, big text cut at 200 KB, all media types, click-to-zoom images, Open / Show in Explorer.
 > Shared downloadText/downloadBlob now use the native Save dialog in the desktop app (Bio, Maps, Presentation, Spatial exports).
+> **Pill sweep + loading (sixth batch): DONE.** 40 square-cornered buttons/chips/toggles in 18 non-creative files are pills (list
+> rows and full-width controls left alone). Boot splash (pure CSS on the empty #root: DEX wordmark + pill bar, fades in after
+> 250 ms). Opening an app: its icon tile, "Opening <name>", milestone, sweeping pill bar, 120 ms delay (AppOpening).
 > **Not done (owner list):** further AXL/Bio/Ledger depth (e.g. multi-currency, MSA/BLAST-style search, B-rep solids); Gallery grid thumbnails for non-direct
 > video formats; Files Quick Look and Maps passes; app-by-app pill sweep beyond the
 > surfaces above; loading-screen redesign; any C++ work. Packaged-app click-through of everything above.

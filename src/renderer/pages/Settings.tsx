@@ -362,7 +362,7 @@ const SystemMonitorPanel: React.FC = () => {
         <button
           type="button"
           onClick={open}
-          style={{ height: 28, padding: '0 12px', borderRadius: 6, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+          style={{ height: 28, padding: '0 12px', borderRadius: 9999, border: '1px solid var(--color-border-subtle)', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
         >Open Task Manager</button>
       </div>
     </div>
@@ -978,7 +978,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
           disabled={!ttsAvailable || previewing}
           aria-label="Preview UKI voice"
           style={{
-            padding: '6px 14px', borderRadius: 6, fontSize: 12,
+            padding: '6px 14px', borderRadius: 9999, fontSize: 12,
             border: '1px solid var(--color-border)',
             background: previewing ? 'var(--color-bg-active)' : 'var(--color-bg-hover)',
             color: 'var(--color-text-primary)', cursor: ttsAvailable ? 'pointer' : 'not-allowed',
@@ -1113,7 +1113,7 @@ const UkiArchiveStats: React.FC<{ styles: any }> = ({ styles }) => {
         onClick={handleClear}
         disabled={busy || !stats || stats.archiveCount === 0}
         style={{
-          padding: '4px 10px', borderRadius: 4, fontSize: 11,
+          padding: '4px 10px', borderRadius: 9999, fontSize: 11,
           border: '1px solid var(--color-border)',
           background: 'var(--color-bg-hover)',
           color: 'var(--color-text-secondary)',
@@ -1202,7 +1202,7 @@ const UkiKnowledgeFeed: React.FC<{ styles: any }> = ({ styles: _styles }) => {
           onClick={handleRun}
           disabled={busy}
           style={{
-            padding: '4px 10px', borderRadius: 4, fontSize: 11,
+            padding: '4px 10px', borderRadius: 9999, fontSize: 11,
             border: '1px solid var(--color-border)',
             background: 'var(--color-bg-hover)',
             color: 'var(--color-text-secondary)',
