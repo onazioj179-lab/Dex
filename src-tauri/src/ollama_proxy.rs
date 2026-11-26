@@ -44,6 +44,9 @@ pub fn dispatch(args: &Value) -> Value {
     let timeout = if path == "/api/tags" { Duration::from_secs(3) } else { Duration::from_secs(600) };
     let agent = ureq::AgentBuilder::new().timeout(timeout).build();
     let url = format!("{BASE}{path}");
+    if let Err(e) = crate::net_gate::check_url(&url) {
+        return json!({ "ok": false, "status": 0, "error": e });
+    }
     let result = if method == "GET" {
         agent.get(&url).call()
     } else {

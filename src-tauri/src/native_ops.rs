@@ -595,8 +595,9 @@ fn backup_dir(app: &tauri::AppHandle, conn: &Connection) -> std::path::PathBuf {
     dir
 }
 
-/// Delete backups beyond `max_backups`, oldest first (file + row).
-fn prune_old_backups(conn: &Connection) {
+/// Delete backups beyond `max_backups`, oldest first (file + row). `protect`
+/// is never removed (the backup a restore is reading from).
+fn prune_old_backups(conn: &Connection, protect: Option<&str>) {
     let max: i64 = conn
         .query_row("SELECT max_backups FROM backup_settings WHERE id = 1", [], |r| r.get(0))
         .unwrap_or(10);
@@ -612,6 +613,9 @@ fn prune_old_backups(conn: &Connection) {
         Err(_) => return,
     };
     for (id, fp) in rows.into_iter().skip(max as usize) {
+        if protect == Some(id.as_str()) {
+            continue;
+        }
         let _ = std::fs::remove_file(&fp);
         let _ = conn.execute("DELETE FROM backups WHERE id = ?", params![id]);
     }
@@ -620,6 +624,10 @@ fn prune_old_backups(conn: &Connection) {
 /// `backup:create` — createBackup(type='manual', description=''). Returns the
 /// BackupRecord (matching the backups row shape + ISO created_at).
 pub fn backup_create(app: &tauri::AppHandle, args: &Value) -> Value {
+    create_backup(app, args, None)
+}
+
+fn create_backup(app: &tauri::AppHandle, args: &Value, protect: Option<&str>) -> Value {
     let btype = args.get(0).and_then(|v| v.as_str()).unwrap_or("manual").to_string();
     let description = args.get(1).and_then(|v| v.as_str()).unwrap_or("").to_string();
 
@@ -655,6 +663,12 @@ pub fn backup_create(app: &tauri::AppHandle, args: &Value) -> Value {
         if conn.execute_batch(&format!("VACUUM INTO '{}'", esc)).is_err() {
             return json!({ "success": false, "error": "snapshot failed (VACUUM INTO)" });
         }
+        // Settings and app data live outside dex.db: put them in the same file,
+        // under the same checksum.
+        if let Err(e) = crate::backup_extras::pack(app, &filepath) {
+            let _ = std::fs::remove_file(&filepath);
+            return json!({ "success": false, "error": format!("settings could not be added: {e}") });
+        }
         let bytes = match std::fs::read(&filepath) {
             Ok(b) => b,
             Err(_) => return json!({ "success": false, "error": "snapshot read-back failed" }),
@@ -676,7 +690,7 @@ pub fn backup_create(app: &tauri::AppHandle, args: &Value) -> Value {
                 [],
             );
         }
-        prune_old_backups(conn);
+        prune_old_backups(conn, protect);
 
         let created_at: String = conn
             .query_row("SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", [], |r| r.get(0))
@@ -733,7 +747,11 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
     }
 
     // 3. Pre-restore safety backup (locks+releases the db before we take it down).
-    let _ = backup_create(app, &json!(["pre_restore", "Pre-restore safety backup"]));
+    // Without it there is no way back, so a failure stops here.
+    let safety = create_backup(app, &json!(["pre_restore", "Pre-restore safety backup"]), Some(&id));
+    if safety.get("id").is_none() {
+        return fail("DEX couldn't back up your current data first, so nothing was changed");
+    }
 
     // 4-6. Swap under the db lock so no other op runs mid-restore.
     let db_path = app
@@ -749,12 +767,16 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
 
     let state = app.state::<crate::db::DbState>();
     let mut guard = state.lock_safe();
+    // The list of backups lives in the database being replaced: carry it across,
+    // or the restore would forget newer backups, including the safety copy.
+    let kept = guard.as_ref().map(crate::backup_extras::read_catalogue).unwrap_or_default();
     // Close the live connection (drops it) so the file can be replaced on Windows.
     let _ = guard.take();
 
     let mut errors: Vec<String> = Vec::new();
     let tmp = db_path.with_extension("restore-tmp");
-    if let Err(e) = std::fs::copy(&filepath, &tmp) {
+    // The verified bytes, not the path: what was checked is what gets restored.
+    if let Err(e) = std::fs::write(&tmp, &bytes) {
         errors.push(format!("Failed to stage snapshot: {}", e));
     } else if let Err(e) = std::fs::rename(&tmp, &db_path) {
         errors.push(format!("Failed to swap database: {}", e));
@@ -770,6 +792,12 @@ pub fn backup_restore(app: &tauri::AppHandle, args: &Value) -> Value {
     match crate::db::open(&db_path) {
         Ok(conn) => {
             crate::ensure_all_schemas(&conn);
+            if errors.is_empty() {
+                crate::backup_extras::write_catalogue(&conn, &kept);
+                if let Err(e) = crate::backup_extras::unpack(app, &conn) {
+                    errors.push(format!("Your data was restored, but settings were not: {e}"));
+                }
+            }
             *guard = Some(conn);
         }
         Err(e) => errors.push(format!("Failed to reopen database: {}", e)),

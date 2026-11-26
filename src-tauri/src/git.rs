@@ -187,10 +187,12 @@ pub fn dispatch(channel: &str, args: &Value) -> Value {
             if k { ok(out.trim()) } else { fail(if e.is_empty() { out.trim() } else { &e }) }
         }
         "git:push" => {
+            if let Err(e) = crate::net_gate::check_internet() { return fail(&e) }
             let (k, out, e) = run_git(&cwd, &["push"]);
             if k { ok((if e.is_empty() { &out } else { &e }).trim()) } else { fail(if e.is_empty() { &out } else { &e }) }
         }
         "git:pull" => {
+            if let Err(e) = crate::net_gate::check_internet() { return fail(&e) }
             let (k, out, e) = run_git(&cwd, &["pull", "--ff-only"]);
             if k { ok((if out.is_empty() { &e } else { &out }).trim()) } else { fail(if e.is_empty() { &out } else { &e }) }
         }

@@ -85,7 +85,7 @@ export const BrowserProxyPanel: React.FC<{ styles: Record<string, React.CSSPrope
   return (
     <>
       <h3 style={styles.sectionTitle}>Hide my IP address</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Route the Browser through</span>
           <span style={styles.settingDesc}>

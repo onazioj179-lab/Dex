@@ -78,7 +78,7 @@ export default function GlobalShortcutsPanel({ styles }: Props): React.ReactElem
   return (
     <>
       <h3 style={styles.sectionTitle}>System-wide shortcuts</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Use shortcuts from any app</span>
           <span style={styles.settingDesc}>These keys work even when DEX is in the background or minimized. Click a key to change it.</span>
@@ -89,7 +89,7 @@ export default function GlobalShortcutsPanel({ styles }: Props): React.ReactElem
         const status = !state.enabled || !b.enabled ? 'Off' : b.registered ? 'Working' : (b.error || 'Not active');
         const bad = state.enabled && b.enabled && !b.registered;
         return (
-          <div key={b.action} style={styles.settingRow}>
+          <div key={b.action} className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>{b.label}</span>
               <span style={{ ...styles.settingDesc, color: bad ? 'var(--color-error)' : undefined }}>{status}</span>

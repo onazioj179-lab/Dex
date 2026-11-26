@@ -41,9 +41,23 @@ export function initLearningWiring(): void {
     /* store not ready -- the subscription below still captures later switches */
   }
 
+  // Time in front: counted while DEX is visible, saved on switch and each minute.
+  let since: number | null = document.hidden ? null : Date.now();
+  const countTime = () => {
+    const now = Date.now();
+    if (since !== null && lastSeen) {
+      try { useLearningStore.getState().addAppTime(lastSeen, now - since); } catch { /* non-fatal */ }
+    }
+    since = document.hidden ? null : now;
+  };
+  document.addEventListener('visibilitychange', countTime);
+  window.addEventListener('pagehide', countTime);
+  setInterval(countTime, 60_000);
+
   useRunningApps.subscribe((state) => {
     const id = state.currentAppId;
     if (id === lastSeen) return;
+    countTime();
     lastSeen = id;
     try {
       useLearningStore.getState().trackAppOpen(id);

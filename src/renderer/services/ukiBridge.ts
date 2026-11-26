@@ -12,6 +12,7 @@
 import { useUkiStore } from '../store/ukiStore';
 import type { UkiUIState } from '../store/ukiStore';
 import { checkPermissionAccess, usePermissionStore } from '../store/permissionStore';
+import { requestPermission } from './permissionGate';
 import { useRunningApps } from '../store/runningApps';
 import { readDexSetting } from '../hooks/useDexSetting';
 import { isTauri } from './platform/tauriCompat';
@@ -109,10 +110,14 @@ function startSpeechRecognition(ipc: any, dex: any): void {
     return;
   }
   if (!checkPermissionAccess('microphone', 'uki')) {
-    store.getState().setError('Microphone is off. Turn on the mic permission pill, then try voice again.');
-    store.getState().stopListening();
-    shouldKeepListening = false;
-    recognition = null;
+    // Ask here: voice may run through native speech, which never calls getUserMedia.
+    void requestPermission(['microphone'], 'UKI').then((allowed) => {
+      if (allowed && shouldKeepListening) { startSpeechRecognition(ipc, dex); return; }
+      if (!allowed) store.getState().setError('Microphone access is off. Allow it to talk to UKI.');
+      store.getState().stopListening();
+      shouldKeepListening = false;
+      recognition = null;
+    });
     return;
   }
 

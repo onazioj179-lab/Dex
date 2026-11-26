@@ -210,7 +210,7 @@ fn is_safe_public_url(url: &str) -> bool {
 /// on any transport / HTTP error — the network-failure branch of the TS fetch.
 fn http_get(url: &str) -> Option<String> {
     // SSRF: refuse non-public targets (treated as a network failure by callers).
-    if !is_safe_public_url(url) {
+    if !is_safe_public_url(url) || crate::net_gate::check_url(url).is_err() {
         return None;
     }
     let agent = ureq::AgentBuilder::new()

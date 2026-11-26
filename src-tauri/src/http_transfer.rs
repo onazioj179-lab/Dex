@@ -71,6 +71,9 @@ struct ServerData {
     download_dir: String,
     hostname: String,
     counter: u64,
+    /// Secret in the link / QR code. Without it, anyone on the same Wi-Fi could
+    /// list and download everything being shared.
+    key: String,
 }
 
 /// Answered uploads kept so a phone polling /upload-status still gets its answer.
@@ -309,10 +312,43 @@ fn content_disposition(name: &str) -> String {
     format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
 }
 
+const KEY_COOKIE: &str = "dexshare";
+
+fn new_key() -> String {
+    dex_vault::crypto::random_bytes(16).iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn link_key(url: &str) -> Option<&str> {
+    url.split_once('?')?.1.split('&').find_map(|p| p.strip_prefix("k="))
+}
+
+fn cookie_key(header: &str) -> Option<String> {
+    header.split(';').find_map(|p| p.trim().strip_prefix(KEY_COOKIE)?.strip_prefix('=').map(str::to_string))
+}
+
+/// Constant-time comparison; an empty key never matches.
+fn same_key(given: &str, key: &str) -> bool {
+    !key.is_empty() && given.len() == key.len() && given.bytes().zip(key.bytes()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
+}
+
+fn share_url(ip: &str, port: u16, key: &str) -> String {
+    format!("http://{ip}:{port}/?k={key}")
+}
+
 fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut request: tiny_http::Request) {
     let method = request.method().as_str().to_string();
     let url = request.url().to_string();
     let path = url.split('?').next().unwrap_or("/").to_string();
+
+    let key = data.lock_safe().key.clone();
+    let by_link = link_key(&url).is_some_and(|k| same_key(k, &key));
+    let by_cookie = header_value(&request, "Cookie").and_then(|c| cookie_key(&c)).is_some_and(|k| same_key(&k, &key));
+    if !by_link && !by_cookie {
+        let _ = request.respond(
+            tiny_http::Response::from_string("Open the link or QR code shown in DEX on the sharing computer.").with_status_code(403),
+        );
+        return;
+    }
 
     // GET / -> web UI
     if method == "GET" && path == "/" {
@@ -321,9 +357,14 @@ fn handle_request(app: &tauri::AppHandle, data: &Arc<Mutex<ServerData>>, mut req
         let live: Vec<&SharedFile> = guard.shared.values().filter(|f| f.expires_at > now).collect();
         let html = generate_web_ui(&live, &guard.hostname);
         drop(guard);
-        let resp = tiny_http::Response::from_string(html).with_header(
+        let mut resp = tiny_http::Response::from_string(html).with_header(
             tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap(),
         );
+        // The page's own downloads and uploads then carry the key.
+        let cookie = format!("{KEY_COOKIE}={key}; Path=/; HttpOnly; SameSite=Strict");
+        if let Ok(h) = tiny_http::Header::from_bytes(&b"Set-Cookie"[..], cookie.as_bytes()) {
+            resp = resp.with_header(h);
+        }
         let _ = request.respond(resp);
         return;
     }
@@ -554,8 +595,11 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
     let state = app.state::<HttpTransferState>();
     let mut slot = state.lock_safe();
     if let Some(running) = slot.as_ref() {
-        let url = format!("http://{}:{}", local_ip(), running.port);
+        let url = share_url(&local_ip(), running.port, &running.data.lock_safe().key);
         return json!({ "success": true, "url": url, "qrData": url });
+    }
+    if let Err(e) = crate::net_gate::check_lan() {
+        return json!({ "success": false, "error": e });
     }
 
     // Bind, incrementing the port a few times on conflict (EADDRINUSE parity).
@@ -594,8 +638,10 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
         auto_accept,
         download_dir,
         hostname: hostname(),
+        key: new_key(),
         ..Default::default()
     }));
+    let key = data.lock_safe().key.clone();
     let server = Arc::new(server);
 
     let server_t = server.clone();
@@ -610,7 +656,7 @@ fn start_server(app: &tauri::AppHandle, opts: &Value) -> Value {
     });
 
     *slot = Some(Running { server, data, port, thread: Some(thread) });
-    let url = format!("http://{}:{}", local_ip(), port);
+    let url = share_url(&local_ip(), port, &key);
     json!({ "success": true, "url": url, "qrData": url })
 }
 
@@ -682,7 +728,7 @@ fn server_info(app: &tauri::AppHandle) -> Value {
     let ip = local_ip();
     match slot.as_ref() {
         Some(running) => {
-            let url = format!("http://{}:{}", ip, running.port);
+            let url = share_url(&ip, running.port, &running.data.lock_safe().key);
             let now = now_ms();
             let guard = running.data.lock_safe();
             let files: Vec<Value> = guard
@@ -903,5 +949,25 @@ mod tests {
         assert_eq!(format_size(2048), "2.0 KB");
         assert_eq!(file_label("clip.mp4"), "[VID]");
         assert_eq!(escape_html("<a>&\""), "&lt;a&gt;&amp;&quot;");
+    }
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_shared_link_or_its_cookie_opens_the_server() {
+        let key = new_key();
+        assert_eq!(key.len(), 32);
+        let url = share_url("10.0.0.2", 8080, &key);
+        assert_eq!(link_key(&url), Some(key.as_str()));
+        assert_eq!(link_key("/download/abc?x=1&k=zz"), Some("zz"));
+        assert_eq!(link_key("/api/files"), None);
+        assert_eq!(cookie_key(&format!("a=1; {KEY_COOKIE}={key}")).as_deref(), Some(key.as_str()));
+        assert_eq!(cookie_key("a=1"), None);
+        assert!(same_key(&key, &key));
+        assert!(!same_key("", ""));
+        assert!(!same_key(&key[1..], &key));
     }
 }

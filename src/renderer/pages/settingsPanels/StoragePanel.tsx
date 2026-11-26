@@ -137,7 +137,7 @@ export default function StoragePanel({ styles }: StoragePanelProps) {
       )}
 
       <h3 style={styles.sectionTitle}>Caches</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Clear caches</span>
           <span style={styles.settingDesc}>

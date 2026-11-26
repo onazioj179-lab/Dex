@@ -20,6 +20,7 @@ import {
   PERMISSION_DESCRIPTIONS,
   type PermissionId,
 } from '../store/permissionStore';
+import { useCaptureStore } from '../services/permissionGate';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG, 12x12 baseline so they sit nicely at 22px buttons)
@@ -51,6 +52,13 @@ const NetworkOffIcon = (
     <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
     <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
     <line x1="12" y1="20" x2="12.01" y2="20" />
+  </svg>
+);
+
+const ScreenIcon = (
+  <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8M12 17v4" />
   </svg>
 );
 
@@ -89,6 +97,7 @@ const networkIconFor = (mode: NetworkMode) => {
 interface PillProps {
   active: boolean;
   warning?: boolean;
+  live?: boolean;
   title: string;
   ariaLabel: string;
   ariaExpanded: boolean;
@@ -97,8 +106,11 @@ interface PillProps {
   onMouseEnter?: () => void;
 }
 
-const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, title, ariaLabel, ariaExpanded, icon, onClick }, ref) => {
-  const baseColor = warning
+const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, live, title, ariaLabel, ariaExpanded, icon, onClick }, ref) => {
+  // "In use" is a solid capsule, so it reads differently from merely allowed.
+  const baseColor = live
+    ? '#1d1d1f'
+    : warning
     ? 'var(--color-warning, #ffb020)'
     : active
       ? 'var(--color-text-primary)'
@@ -114,8 +126,8 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
       aria-expanded={ariaExpanded}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 22, height: 18, borderRadius: 9999, padding: 0,
-        background: ariaExpanded ? 'var(--color-border)' : 'transparent',
+        width: live ? 26 : 22, height: 18, borderRadius: 9999, padding: 0,
+        background: live ? 'var(--color-warning, #ffb020)' : ariaExpanded ? 'var(--color-border)' : 'transparent',
         border: 'none', cursor: 'pointer',
         color: baseColor,
         boxShadow: ariaExpanded ? 'var(--pg-shadow-chip)' : 'none',
@@ -123,11 +135,11 @@ const Pill = React.forwardRef<HTMLButtonElement, PillProps>(({ active, warning, 
         position: 'relative',
         flexShrink: 0,
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
-      onMouseLeave={e => { if (!ariaExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+      onMouseEnter={e => { if (!live) (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-hover)'; }}
+      onMouseLeave={e => { if (!live && !ariaExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     >
       {icon}
-      {warning && (
+      {warning && !live && (
         <span style={{
           position: 'absolute', top: 2, right: 2,
           width: 5, height: 5, borderRadius: '50%',
@@ -400,6 +412,11 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
   const micEnabled = usePermissionStore(s => s.permissions.microphone.enabled);
   const cameraEnabled = usePermissionStore(s => s.permissions.camera.enabled);
   const gpsEnabled = usePermissionStore(s => s.permissions.gps.enabled);
+  const screenEnabled = usePermissionStore(s => s.permissions.screen_recording.enabled);
+  const live = useCaptureStore(s => s.live);
+  const micLive = !!live.microphone;
+  const cameraLive = !!live.camera;
+  const screenLive = !!live.screen_recording;
 
   useEffect(() => { networkRefresh(); }, [networkRefresh]);
 
@@ -447,7 +464,7 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
   // default state needs no icon; Control Center holds every control. An icon
   // also stays while its own popover is open so the popover keeps its anchor.
   const show = (key: Exclude<OpenKey, null>, notable: boolean) => notable || open === key;
-  if (!show('network', networkOff) && !show('microphone', micEnabled) && !show('camera', cameraEnabled) && !show('gps', gpsEnabled)) return null;
+  if (!show('network', networkOff) && !show('microphone', micEnabled) && !show('camera', cameraEnabled) && !show('gps', gpsEnabled) && !show('screen_recording', screenLive)) return null;
 
   return (
     <span
@@ -468,8 +485,9 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ref={el => { refs.current['microphone'] = el; }}
         active={micEnabled}
         warning={micEnabled}
-        title={`Microphone: ${micEnabled ? 'On' : 'Off'}`}
-        ariaLabel={`Microphone permission ${micEnabled ? 'on' : 'off'}. Click to change.`}
+        live={micLive}
+        title={micLive ? 'Microphone in use' : `Microphone: ${micEnabled ? 'On' : 'Off'}`}
+        ariaLabel={micLive ? 'Microphone in use. Click to turn it off.' : `Microphone permission ${micEnabled ? 'on' : 'off'}. Click to change.`}
         ariaExpanded={open === 'microphone'}
         icon={MicIcon}
         onClick={() => togglePop('microphone')}
@@ -478,8 +496,9 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ref={el => { refs.current['camera'] = el; }}
         active={cameraEnabled}
         warning={cameraEnabled}
-        title={`Camera: ${cameraEnabled ? 'On' : 'Off'}`}
-        ariaLabel={`Camera permission ${cameraEnabled ? 'on' : 'off'}. Click to change.`}
+        live={cameraLive}
+        title={cameraLive ? 'Camera in use' : `Camera: ${cameraEnabled ? 'On' : 'Off'}`}
+        ariaLabel={cameraLive ? 'Camera in use. Click to turn it off.' : `Camera permission ${cameraEnabled ? 'on' : 'off'}. Click to change.`}
         ariaExpanded={open === 'camera'}
         icon={CameraIcon}
         onClick={() => togglePop('camera')}
@@ -493,6 +512,16 @@ export const QuickControls: React.FC<QuickControlsProps> = ({ onOpenSettings }) 
         ariaExpanded={open === 'gps'}
         icon={LocationIcon}
         onClick={() => togglePop('gps')}
+      />}
+      {show('screen_recording', screenLive) && <Pill
+        ref={el => { refs.current['screen_recording'] = el; }}
+        active={screenEnabled}
+        live={screenLive}
+        title={screenLive ? 'Screen is being captured' : 'Screen Recording: Off'}
+        ariaLabel={screenLive ? 'Screen is being captured. Click to stop.' : 'Screen recording permission. Click to change.'}
+        ariaExpanded={open === 'screen_recording'}
+        icon={ScreenIcon}
+        onClick={() => togglePop('screen_recording')}
       />}
       {open === 'network' && (
         <Popover anchorRect={anchor} onClose={close}>

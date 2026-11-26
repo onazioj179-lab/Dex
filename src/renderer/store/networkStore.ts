@@ -20,10 +20,23 @@ export const NETWORK_MODE_LABELS: Record<NetworkMode, string> = {
 };
 
 export const NETWORK_MODE_DESCRIPTIONS: Record<NetworkMode, string> = {
-  'full': 'All allowed domains permitted. Updates, telemetry, and marketplace work normally.',
-  'local-only': 'Only LAN/loopback connections. External servers are blocked.',
-  'disabled': 'All network requests blocked. Updates, marketplace, and telemetry paused.',
+  'full': 'DEX can reach the internet and your local network.',
+  'local-only': 'This computer and your local network only. UKI cloud providers, updates, maps and websites are blocked.',
+  'disabled': 'Nothing leaves this computer. Local AI and files keep working.',
 };
+
+/** Mirror of the native setting, so the rule applies from the first request. */
+const MODE_KEY = 'dex-network-mode';
+const isMode = (m: unknown): m is NetworkMode => m === 'full' || m === 'local-only' || m === 'disabled';
+function storedMode(): NetworkMode {
+  try {
+    const m = localStorage.getItem(MODE_KEY);
+    return isMode(m) ? m : 'full';
+  } catch { return 'full'; }
+}
+function rememberMode(mode: NetworkMode): void {
+  try { localStorage.setItem(MODE_KEY, mode); } catch { /* storage unavailable */ }
+}
 
 interface NetworkStoreState {
   mode: NetworkMode;
@@ -44,7 +57,7 @@ const bridge = (): { invoke: (ch: string, ...args: unknown[]) => Promise<unknown
 };
 
 export const useNetworkStore = create<NetworkStoreState>((set, get) => ({
-  mode: 'full',
+  mode: storedMode(),
   loaded: false,
   blockedAttempts: 0,
   online: typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -60,7 +73,8 @@ export const useNetworkStore = create<NetworkStoreState>((set, get) => ({
         b.invoke('network:config') as Promise<{ mode?: NetworkMode } | null>,
         b.invoke('network:summary').catch(() => null) as Promise<{ blockedAttempts?: number; status?: string } | null>,
       ]);
-      const mode = (config?.mode ?? 'full') as NetworkMode;
+      const mode: NetworkMode = isMode(config?.mode) ? config.mode : get().mode;
+      rememberMode(mode);
       set({
         mode,
         loaded: true,
@@ -75,6 +89,7 @@ export const useNetworkStore = create<NetworkStoreState>((set, get) => ({
   setMode: async (mode) => {
     const b = bridge();
     set({ mode });
+    rememberMode(mode);
     if (b) {
       try {
         await b.invoke('network:setMode', mode);
@@ -91,3 +106,10 @@ export const useNetworkStore = create<NetworkStoreState>((set, get) => ({
     await get().setMode(next);
   },
 }));
+
+// Another DEX window changed the mode: same-origin webviews share localStorage.
+if (typeof window !== 'undefined') {
+  window.addEventListener?.('storage', (e) => {
+    if (e.key === MODE_KEY) useNetworkStore.setState({ mode: storedMode() });
+  });
+}

@@ -67,6 +67,9 @@ pub(crate) fn parse_releases(body: &Value) -> Vec<Value> {
 }
 
 fn list_versions() -> Value {
+    if let Err(e) = crate::net_gate::check_internet() {
+        return fail(&e);
+    }
     let url = format!("https://api.github.com/repos/{REPO}/releases?per_page=20");
     match agent().get(&url).set("Accept", "application/vnd.github+json").call() {
         Ok(resp) => match resp.into_string().ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
@@ -104,6 +107,7 @@ fn updater_pubkey(app: &tauri::AppHandle) -> Option<String> {
 }
 
 fn download(url: &str, limit: u64) -> Result<Vec<u8>, String> {
+    crate::net_gate::check_url(url)?;
     let resp = agent().get(url).call().map_err(|e| match e {
         ureq::Error::Status(code, _) => format!("GitHub answered {code}"),
         _ => "the download was interrupted".to_string(),

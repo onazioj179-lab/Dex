@@ -177,6 +177,7 @@ mod governance_ctl;
 mod intelligence_ctl;
 mod learning_ctl;
 mod monitor_ctl;
+mod net_gate;
 mod network_ctl;
 mod security_ctl;
 mod store_ctl;
@@ -261,6 +262,7 @@ mod vinx_presentation;
 // Wave 4 — notification hub, localization engine, global search, FTS index,
 // multi-window/monitor, migration, link preview, live collab, file watcher,
 // backup/restore. (Several are window/network/fs-bound and degrade honestly.)
+mod backup_extras;
 mod backup_restore;
 mod file_watcher;
 mod full_text_index;
@@ -2808,6 +2810,8 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
         "dexnotes:removeAttachment" => native_ops::note_remove_attachment(&app, &args),
         "dexnotes:openAttachment" => native_ops::note_open_attachment(&app, &args),
         "backup:create" => native_ops::backup_create(&app, &args),
+        "backup:saveRendererState" => backup_extras::save_renderer_state(&app, &args),
+        "backup:rendererState" => backup_extras::renderer_state(&app),
         "backup:verify" => native_ops::backup_verify(&app, &args),
         "backup:restore" => native_ops::backup_restore(&app, &args),
         "export-bundle:create" => cmd_export_bundle::create(&app, &args),
@@ -3447,6 +3451,8 @@ fn main() {
             // Answer DEX's own clipboard/MIDI/camera permission requests from the
             // saved policy instead of a WebView2 prompt every time.
             webview_permissions::install(app.handle());
+            // Settings > Network applies from the first request of this launch.
+            network_ctl::apply_saved_mode(app.handle());
             // Native background in the saved theme before the first paint.
             apply_window_background(app.handle(), &kv_get(app.handle(), WINDOW_THEME_KEY));
             // Maximized DEX fills the whole monitor, over the Windows taskbar.

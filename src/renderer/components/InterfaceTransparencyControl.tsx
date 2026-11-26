@@ -46,7 +46,7 @@ export function InterfaceTransparencyControl({ styles, onChange }: { styles: Row
 
   return (
     <>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Interface Transparency</span>
           <span style={styles.settingDesc} id="dex-iface-transparency-desc">{describe(percent, forcedFlat)}</span>
@@ -65,7 +65,7 @@ export function InterfaceTransparencyControl({ styles, onChange }: { styles: Row
         </div>
       </div>
       {percent > 0 && (
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Glass style</span>
             <span style={styles.settingDesc}>Refined is restrained and crisp. Liquid is deeper, with stronger lensing.</span>
@@ -92,7 +92,7 @@ export function InterfaceTransparencyControl({ styles, onChange }: { styles: Row
         </div>
       )}
       {percent > 0 && (
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Blur strength</span>
             <span style={styles.settingDesc}>How strongly glass frosts what is behind it. Separate from transparency.</span>

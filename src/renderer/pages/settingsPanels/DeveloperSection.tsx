@@ -46,12 +46,11 @@ const DeveloperSection: React.FC<DeveloperSectionProps> = ({ onNavigate, styles 
       type="button"
       onClick={() => onNavigate(link.section)}
       aria-label={`Open ${link.title} settings`}
+      className="settings-row"
       style={{
         ...styles.settingRow,
         width: '100%',
-        background: 'transparent',
-        border: 'none',
-        borderBottom: '1px solid var(--color-border-subtle)',
+        color: 'inherit',
         cursor: 'pointer',
         textAlign: 'left',
       }}

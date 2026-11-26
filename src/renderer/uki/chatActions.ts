@@ -36,6 +36,7 @@ import { APP_REGISTRY } from '../store/appSubsystem';
 import { useNotesStore } from '../store/notesStore';
 import { buildDexCommands, findByUtterance } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
+import { parseSystemControl, opensAccess, describeSystemControl, runSystemControl } from './systemControls';
 
 /** Resolve free text to a DEX catalog ACTION command (window/system/nav), or null. */
 function resolveDexAction(text: string): ReturnType<typeof findByUtterance> {
@@ -54,6 +55,9 @@ const ACTION_MUTATES: Record<string, boolean> = {
   'uki.summarize': false,
   'uki.rewriteTone': false,
   'uki.bulletize': false,
+  // Privacy, network and backup: only what opens access asks first.
+  'system.safe': false,
+  'system.open': true,
 };
 
 /** True for any action whose handler calls the LLM (needs a configured provider). */
@@ -166,6 +170,16 @@ function chatActionRegistry(systemPrompt: string): ActionRegistry {
       executeDexCommand(cmd);
       return `Ran ${cmd.label}.`;
     },
+    'system.safe': (params) => {
+      const c = parseSystemControl(String(params.target ?? ''));
+      if (!c || opensAccess(c)) throw new Error('not a safe system command');
+      return runSystemControl(c);
+    },
+    'system.open': (params) => {
+      const c = parseSystemControl(String(params.target ?? ''));
+      if (!c) throw new Error('no matching system command');
+      return runSystemControl(c);
+    },
     'uki.summarize': llm('Summarise the following in 3 sentences. Return only the summary:'),
     'uki.rewriteTone': llm('Rewrite the following to be clear and professional. Return only the rewritten text:'),
     'uki.bulletize': llm('Convert the following into 5 concise bullet points. Return only the bullets:'),
@@ -230,6 +244,16 @@ export interface ChatCommand {
  */
 export function buildChatCommand(goal: string): ChatCommand {
   const trimmed = (goal ?? '').trim();
+  const control = parseSystemControl(trimmed);
+  if (control) {
+    const open = opensAccess(control);
+    return {
+      understood: true,
+      plan: { id: 'system-control', goal: trimmed, steps: [{ id: 'system-control-1', actionId: open ? 'system.open' : 'system.safe', params: { target: trimmed } }] },
+      summary: describeSystemControl(control),
+      tier: open ? 'confirm' : 'auto',
+    };
+  }
   const skills = chatSkillRegistry();
   const lower = trimmed.toLowerCase();
   const intentMatched =

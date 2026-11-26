@@ -26,6 +26,7 @@
  * color noise) -- the map itself is the only saturated surface.
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { urlAllowed } from '../../services/networkGate';
 import { SegmentedControl } from '../../components/controls';
 import { isReduceMotion } from '../../utils/MotionController';
 // maplibre-gl 6 ships ESM named exports only (no default).
@@ -399,6 +400,8 @@ const DexMaps: React.FC = () => {
         zoom: savedView?.zoom ?? 11,
         bearing: savedView?.bearing ?? 0,
         pitch: savedView?.pitch ?? 0,
+        // Tiles load from a worker, outside the page's network gate.
+        transformRequest: (url: string) => ({ url: urlAllowed(url) ? url : 'data:,' }),
       });
     } catch (err) {
       console.warn('[Maps] Map init failed:', err);
