@@ -23,6 +23,7 @@ import { APP_DEFINITIONS, useRunningApps } from '../store/runningApps';
 import { attachmentFromFile, handOffAttachments, type UkiAttachment } from '../uki/attachments';
 import { PanelHistory } from '../uki/chatHistory';
 import { isCreatorQuestion, creatorAnswer } from '../uki/identity';
+import { parseProcessQuestion, fetchProcessDigest, formatProcessAnswer } from '../uki/processTools';
 import { speakAsUki, readVoicePrefs, writeVoicePref, stepRate, SPEED_STEPS } from '../uki/voice';
 
 // Panel chats are kept in the UKI app's history (one conversation per panel session).
@@ -964,37 +965,28 @@ function trySystemTool(text: string): ToolResult {
     return { handled: true, response: `DEX is running smoothly. For full hardware details, open Settings → System.` };
   }
 
-  // Top processes / what's using CPU or memory (uses real native bridge)
-  if (/(?:top|biggest|heaviest|hungry|hungri[ey]st)\s*(?:process(?:es)?|apps?|programs?)|what(?:'s| is) (?:using|hogging|eating)\s*(?:the |my |all the )?(?:cpu|memory|ram|resources)|(?:cpu|memory|ram)\s*hog/.test(lower)) {
-    const wantsMem = /(?:memory|ram|mem)/.test(lower);
+  // Processes: every one of them, summarised natively (process_digest.rs) and
+  // grouped by program, so 1,000+ processes still give a short, true answer.
+  const procQ = parseProcessQuestion(text);
+  if (procQ) {
     const dexB = (window as any).dex;
-    if (dexB?.system?.getProcesses) {
-      dexB.system.getProcesses().then((procs: any[]) => {
-        if (!Array.isArray(procs) || procs.length === 0) {
-          window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response: 'No process data available right now.' } }));
-          return;
-        }
-        const sorted = [...procs].sort((a, b) => (wantsMem ? (b.memory || 0) - (a.memory || 0) : (b.cpu || 0) - (a.cpu || 0)));
-        const top5 = sorted.slice(0, 5);
-        const lines = top5.map((p, i) => `${i + 1}. ${p.name} — ${(p.cpu || 0).toFixed(1)}% CPU, ${(p.memory || 0).toFixed(1)}% mem`);
+    if (dexB?.invoke) {
+      fetchProcessDigest(dexB.invoke.bind(dexB), procQ.kind === 'running' ? procQ.name : undefined).then((d) => {
         window.dispatchEvent(new CustomEvent('dex-uki-async-response', {
-          detail: { response: `Top ${wantsMem ? 'memory' : 'CPU'} consumers:\n${lines.join('\n')}\n\nOpen Settings → System Monitor for full list.` }
+          detail: { response: d ? formatProcessAnswer(d, procQ) : 'The process list is not available right now.' },
         }));
       }).catch(() => {
-        window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response: 'Could not query process list.' } }));
+        window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response: 'Could not read the process list.' } }));
       });
-      return { handled: true, response: 'Checking processes...' };
+      return { handled: true, response: 'Checking the running processes…' };
     }
-    return { handled: true, response: 'Process monitoring unavailable. Open Settings → System Monitor.' };
+    return { handled: true, response: 'The process list needs the DEX desktop app.' };
   }
 
-  // Open task manager / system monitor
+  // Open Task Manager (it used to open Settings).
   if (/(?:open|show|launch|start)\s*(?:the\s*)?(?:task\s*manager|system\s*monitor|process(?:es)?|activity\s*monitor)/.test(lower)) {
-    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appName: 'Settings' } }));
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('dex-settings-navigate', { detail: { section: 'systemMonitor' } }));
-    }, 350);
-    return { handled: true, response: 'Opening System Monitor in Settings...' };
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'taskmanager', appName: 'Task Manager' } }));
+    return { handled: true, response: 'Opening Task Manager.' };
   }
 
   // Battery

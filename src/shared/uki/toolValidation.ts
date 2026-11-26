@@ -35,6 +35,7 @@ export const KNOWN_TOOLS = [
   'notify',
   'get_context',
   'list_apps',
+  'system_processes',
   'find_files',
   'find_context',
   'recall_conversations',
@@ -122,6 +123,13 @@ export const CORE_TOOLS: ToolSpec[] = [
     description: "search the user's files (Documents, Desktop, Downloads) by name or content; returns full paths.",
     args: [{ name: 'query', type: 'string' }],
     example: '{"query": "budget 2026"}',
+  },
+  {
+    name: 'system_processes',
+    argline: '{"by"?: "cpu" | "memory", "name"?: string}',
+    description: "see every running process on this PC (all of them, summarised: totals, the programs using the most CPU or memory, background vs windowed). With name, check whether a program is running and get its PIDs. Read-only.",
+    args: [{ name: 'by', type: 'string', optional: true }, { name: 'name', type: 'string', optional: true }],
+    example: '{"by": "cpu"}',
   },
   {
     name: 'recall_conversations',

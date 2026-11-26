@@ -1630,6 +1630,7 @@
     "system:getUserInfo",
     "system:killProcess",
     "system:killProcessTree",
+    "system:processDigest",
     "system:setLaunchAtLogin",
     "systemHealth:getReport",
     "tagging:addTag",

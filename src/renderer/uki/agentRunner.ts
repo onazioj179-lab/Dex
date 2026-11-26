@@ -212,6 +212,10 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
   switch (name as ToolName) {
     case 'web_search':
       return webSearch(String(args.query ?? ''));
+    case 'system_processes': {
+      const { runProcessTool } = await import('./processTools');
+      return runProcessTool(args);
+    }
     case 'recall_conversations': {
       const q = String(args.query ?? '').trim();
       if (!q) return 'No topic given.';
@@ -380,7 +384,7 @@ export async function runUkiAgent(opts: UkiAgentOptions): Promise<string | null>
   const messages: ChatMessage[] = [...(opts.history ?? [])];
   let userTurn = opts.userText;
   let budget: ToolBudget = createToolBudget({
-    web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1,
+    web_search: 4, open_app: 4, close_app: 4, notify: 3, get_context: 2, list_apps: 1, system_processes: 3,
     find_files: 4, find_context: 4, recall_conversations: 3, list_projects: 2, read_file: 6, write_file: 3, create_folder: 3, rename_file: 5, move_file: 5, trash_file: 3,
     schedule_task: 3, list_scheduled_tasks: 2, cancel_scheduled_task: 3,
     run_command: 3, command_status: 6, cancel_command: 2,

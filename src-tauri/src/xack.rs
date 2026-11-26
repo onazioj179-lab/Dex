@@ -189,6 +189,7 @@ pub fn builtin_catalog() -> Vec<Capability> {
         core("uki.notify", "Show a notification", Read, Never),
         core("uki.get_context", "Read the active apps' shared context", Read, Never),
         core("uki.list_apps", "List DEX apps", Read, Never),
+        core("uki.system_processes", "See the running processes (summarised)", Read, Never),
         core("uki.find_files", "Search indexed files", Read, Never),
         core("uki.find_context", "Retrieve indexed context from authorized folders (Umari)", Read, Never),
         core("uki.recall_conversations", "Search the saved UKI conversations", Read, Never),
