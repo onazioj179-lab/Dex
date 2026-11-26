@@ -83,6 +83,7 @@ mod global_hotkeys;
 mod terminal_compat;
 mod media_compat;
 mod process_digest;
+mod browser_proxy;
 mod context_ctl;
 mod controls_ctl;
 mod corepc_ctl;
@@ -2623,6 +2624,7 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
     if channel.starts_with("history:") { return history_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("hotkeys:") { return hotkey_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("global-hotkeys:") { return global_hotkeys::dispatch(&app, &channel, &args); }
+    if channel.starts_with("browserProxy:") { return browser_proxy::dispatch(&app, &channel, &args); }
     if matches!(channel.as_str(), "media:probe" | "media:prepare" | "media:cacheInfo" | "media:clearCache") { return media_compat::dispatch(&app, &channel, &args); }
     if channel.starts_with("http-transfer:") { return http_transfer_ctl::dispatch(&app, &channel, &args); }
     if channel.starts_with("idle:") { return idle_ctl::dispatch(&app, &channel, &args); }

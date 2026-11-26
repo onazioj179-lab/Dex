@@ -88,6 +88,13 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
             emit(&a3, &o3, json!({ "id": t3, "type": "new-window", "url": url.as_str() }));
             tauri::webview::NewWindowResponse::Deny
         });
+    // Through Tor / a proxy (browser_proxy.rs): the tab gets its own engine and
+    // profile launched with the proxy, because a running engine cannot switch.
+    let proxied = crate::browser_proxy::for_new_tab(app);
+    let builder = match &proxied {
+        Some((args, dir)) => builder.data_directory(dir.clone()).additional_browser_args(args),
+        None => builder,
+    };
 
     match window.add_child(builder, LogicalPosition::new(rect.x, rect.y), LogicalSize::new(rect.w, rect.h)) {
         Ok(wv) => {
@@ -96,7 +103,7 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
             }
             #[cfg(windows)]
             native_signals::attach(&wv, app.clone(), owner.clone(), tab.clone());
-            json!({ "success": true })
+            json!({ "success": true, "proxied": proxied.is_some() })
         }
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     }

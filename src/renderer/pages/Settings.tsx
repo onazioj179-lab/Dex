@@ -22,6 +22,7 @@ import { tooltipsEnabled, setTooltipsEnabled } from '../services/tooltips';
 import { DexSearchInput } from '../styles/components';
 import { Select } from '../components/Select';
 import { BrowserTabsSetting } from './settingsPanels/BrowserTabsSetting';
+import { BrowserProxyPanel } from './settingsPanels/BrowserProxyPanel';
 import { DexSwitch, CAPSULE_SELECTED_BG, SegmentedControl } from '../components/controls';
 import { AccountSettingsCard } from '../components/account/AccountSettingsCard';
 import { APP_DEFINITIONS } from '../store/runningApps';
@@ -3485,6 +3486,7 @@ export const Settings: React.FC = () => {
       {renderToggle('blockTrackers', 'Block Trackers', 'Block known cross-site trackers')}
       {renderToggle('blockAds', 'Block Ads', 'Block known ad servers')}
       {renderToggle('forceHttps', 'Force HTTPS', 'Upgrade http:// pages to https://')}
+      <BrowserProxyPanel styles={styles} />
 
       <h3 style={styles.sectionTitle}>Search</h3>
       {renderSelect('defaultSearchEngine', 'Search Engine', 'Default search engine for the browser', [
