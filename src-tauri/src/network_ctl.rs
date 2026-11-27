@@ -317,6 +317,9 @@ fn tcp_probe(host: &str, port: u16, timeout: Duration) -> (bool, u64) {
 // Connectivity check against a well-known host, mirroring NetworkGuard's
 // `dns.resolve('dns.google')` reachability test (we connect to dns.google:443).
 fn probe_connectivity() -> (bool, u64) {
+    if crate::net_gate::check_internet().is_err() {
+        return (false, 0);
+    }
     tcp_probe("dns.google", 443, Duration::from_millis(2500))
 }
 
@@ -377,11 +380,21 @@ fn update_config(app: &tauri::AppHandle, updates: &Value) -> Value {
         }
     }
     save_config(app, &cfg);
+    apply_saved_mode(app);
     crate::native_ops::emit_event(app, "config:changed", &cfg);
     json!({ "success": true })
 }
 
+/// Put the saved mode in force (startup).
+pub fn apply_saved_mode(app: &tauri::AppHandle) {
+    crate::net_gate::set(crate::net_gate::parse(&config_mode(app)).unwrap_or(crate::net_gate::Mode::Full));
+}
+
 fn set_mode(app: &tauri::AppHandle, mode: &str) -> Value {
+    let Some(parsed) = crate::net_gate::parse(mode) else {
+        return json!({ "success": false, "error": "unknown network mode" });
+    };
+    crate::net_gate::set(parsed);
     let mut cfg = load_config(app);
     if let Value::Object(map) = &mut cfg {
         map.insert("mode".into(), json!(mode));
@@ -736,6 +749,7 @@ fn classify_speed(mbps: f64) -> &'static str {
 
 // One HTTP request; return (bytes_read, elapsed_ms) or None on error/timeout.
 fn speed_request(method: &str, url: &str, timeout: Duration) -> Option<(u64, u64)> {
+    crate::net_gate::check_url(url).ok()?;
     let agent = ureq::AgentBuilder::new().timeout(timeout).build();
     let start = std::time::Instant::now();
     let req = match method {

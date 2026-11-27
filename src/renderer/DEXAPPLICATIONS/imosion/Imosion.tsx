@@ -30,7 +30,7 @@ import { useAppCheckpoints } from '../../hooks/useAppCheckpoints';
 import AutosaveIndicator, { type AutosaveState } from '../../components/AutosaveIndicator';
 import { useFileDrop } from '../../utils/useFileDrop';
 import { getTargetFPS } from '../../utils/adaptiveCanvas';
-import { checkPermissionAccess, usePermissionStore } from '../../store/permissionStore';
+import { usePermissionStore } from '../../store/permissionStore';
 import {
   REGION_TYPES,
   COMMON_TIME_SIGNATURES,
@@ -5790,14 +5790,6 @@ const Imosion: React.FC = () => {
   // Recording with selected audio device (earphones, interface, etc.)
   const startRecording = useCallback(async () => {
     try {
-      if (!checkPermissionAccess('microphone', 'imosion')) {
-        const systemGranted = await (window as any).dex?.voice?.requestMicrophonePermission?.().catch(() => false);
-        if (systemGranted) usePermissionStore.getState().setPermission('microphone', true);
-        if (!systemGranted || !checkPermissionAccess('microphone', 'imosion')) {
-          window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type: 'warning', message: 'Turn on microphone permission to record in Imosion' } }));
-          return;
-        }
-      }
       // Use selected input device for recording (supports any audio interface)
       const constraints: MediaStreamConstraints = {
         audio: {

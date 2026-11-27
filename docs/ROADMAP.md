@@ -1,5 +1,22 @@
 # DEX — Roadmap (single source of truth)
 
+> **GOAL (2026-11-26) — Owner: "users complain: settings controls don't work, security; polish, macOS feel, backup and
+> restore, UKI sharp".** Done on `claude/os-polish` (preview + unit/Rust tests; NOT yet run in a packaged build):
+> - **Dead Settings controls:** Privacy permission switches/timeouts and Daily Auto-Optimize saved but never redrew;
+>   Auto -> Dark did not update the Appearance control.
+> - **Privacy switches are enforced** (`services/permissionGate.ts`): mic, camera, screen and location go through one
+>   gate for every app, with an Allow / Don't Allow prompt, an in-use capsule in the top bar, and capture stopped when
+>   switched off. Imosion no longer turned the mic permission on by itself.
+> - **Network mode is enforced** (it changed nothing before): `services/networkGate.ts` + `src-tauri/src/net_gate.rs`
+>   (page requests, updates, downloads, link preview, webhooks, Git push/pull, Browser tabs, map tiles, transfers).
+>   Not covered: remote images in documents, Terminal and other programs.
+> - **Phone share server** now needs the key in the link/QR (anyone on the Wi-Fi could list and download shares).
+> - **Backup/restore:** backups now carry settings + interface data (`backup_extras.rs`, `services/dataBackup.ts`);
+>   restore keeps the backup list (the safety copy disappeared), cannot prune the backup it is reading, stops if the
+>   safety copy fails; backup folder picker. Not included: secrets, permissions, Ledger, note attachments.
+> - **UKI:** back up, go offline / local only / online, permissions on/off, privacy status (no provider needed).
+> - **UI:** Settings grouped inset lists, centred column, coloured section tiles; Learn shows real time per app and names.
+
 > **GOAL (2026-11-25, second batch) — owner list: UKI history/voice/philosophy, dock tuck, Home menu, licence, Terminal
 > macOS/Linux commands, Task Manager graphs, Notes Word features.** Done on `claude/main-ci-fix-uki`: unlimited UKI history in
 > her app + recall; British female voice + speed; philosophy + Ada Lovelace character + creator known (said only when asked);

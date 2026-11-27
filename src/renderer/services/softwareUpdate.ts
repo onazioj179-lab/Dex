@@ -1,6 +1,8 @@
 // DEX Platform — Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
 import { create } from 'zustand';
 import type { Update } from '@tauri-apps/plugin-updater';
+import { useNetworkStore } from '../store/networkStore';
+import { networkRefusal } from './networkGate';
 
 export type UpdatePhase = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'verifying' | 'ready' | 'installing' | 'error';
 /** The step that failed, so Try again resumes there instead of starting over. */
@@ -34,6 +36,8 @@ const rawMessage = (error: unknown) => error instanceof Error ? error.message : 
  */
 export function describeUpdateError(step: UpdateStep, error: unknown): string {
   const raw = rawMessage(error);
+  // DEX was told to stay off the network: say that, not "check your connection".
+  if (raw.includes('(Settings › Network)')) return raw;
   if (/signature|minisign|public key|pubkey/i.test(raw)) {
     return 'The update failed its signature check, so it was not installed. Your current version is unchanged.';
   }
@@ -68,6 +72,7 @@ export const useSoftwareUpdate = create<SoftwareUpdateState>((set, get) => {
       set({ phase: 'checking', version: '', notes: '', error: '', errorDetail: '', failedStep: null, received: 0, total: undefined });
       try {
         if (offline()) throw new Error('offline');
+        if (useNetworkStore.getState().mode !== 'full') throw new Error(networkRefusal());
         const previous = candidate;
         candidate = null;
         if (previous) await previous.close().catch(() => undefined);

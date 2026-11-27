@@ -60,6 +60,8 @@ interface LearningActions {
   trackPageVisit: (page: string) => void;
   /** Track leaving a page */
   trackPageLeave: () => void;
+  /** Time an app spent in front, in ms. */
+  addAppTime: (appId: string, ms: number) => void;
   /** Track action execution */
   trackAction: (actionId: string) => void;
   /** Track an app being opened/focused (frequency, recency, hour, pairing) */
@@ -166,6 +168,13 @@ export const useLearningStore = create<LearningState & LearningActions>()(
               [page]: (s.patterns.pageTime[page] || 0) + timeSpent,
             },
           },
+        }));
+      },
+
+      addAppTime: (appId, ms) => {
+        if (!get().enabled || !appId || appId === 'home' || !(ms > 0)) return;
+        set((s) => ({
+          patterns: { ...s.patterns, pageTime: { ...s.patterns.pageTime, [appId]: (s.patterns.pageTime[appId] || 0) + ms } },
         }));
       },
 

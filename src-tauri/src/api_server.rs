@@ -287,6 +287,10 @@ fn trigger_webhook(app: &tauri::AppHandle, event: &str, payload: &Value) -> Valu
             _ => continue,
         };
         let secret = sub.get("secret").and_then(|v| v.as_str()).unwrap_or("");
+        // Not a delivery failure: the user took DEX off that network.
+        if crate::net_gate::check_url(&url).is_err() {
+            continue;
+        }
 
         // Envelope (exact key order/shape of the Electron webhookPayload).
         let envelope = json!({

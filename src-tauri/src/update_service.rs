@@ -185,6 +185,8 @@ fn fetch_remote_version(url: &str) -> Option<String> {
         return None;
     }
 
+    crate::net_gate::check_url(url).ok()?;
+
     let agent = ureq::AgentBuilder::new().timeout(FETCH_TIMEOUT).build();
     let resp = agent.get(url).set("User-Agent", USER_AGENT).call().ok()?;
     // net.request only resolves a version on statusCode === 200; ureq's call()

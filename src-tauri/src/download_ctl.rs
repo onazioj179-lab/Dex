@@ -109,6 +109,7 @@ fn start(app: &tauri::AppHandle, url: &str) -> Value {
 /// it (the .part file is removed); `progress(received, total)` as bytes arrive.
 fn run(app: &tauri::AppHandle, url: &str, dest: Option<PathBuf>, cancel: Option<&AtomicBool>, progress: &mut dyn FnMut(u64, Option<u64>)) -> Value {
     let parsed = match check_url(url) { Ok(p) => p, Err(e) => return e };
+    if let Err(e) = crate::net_gate::check_url(parsed.as_str()) { return fail(e) }
     let dir = match dest {
         Some(d) => d,
         None => match app.path().download_dir() { Ok(d) => d, Err(_) => return fail("couldn't find the Downloads folder") },

@@ -5569,7 +5569,7 @@ export const AppManager: React.FC = () => {
             stays reachable from the control-center popover. */}
         <div className="dex-topbar-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
           {/* Quick Controls -- network mode + permission pills with popovers */}
-          <QuickControls onOpenSettings={() => setCurrentApp('settings' as AppId)} />
+          <QuickControls onOpenSettings={(section) => window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'settings', contextId: section === 'network' ? 'network' : 'privacy' } }))} />
         </div>
 
         {/* Control Center trigger -- opens the right-side glass panel. */}

@@ -171,7 +171,14 @@ export function setThemePreference(pref: ThemePreference, opts: { animate?: bool
     }
   } catch { /* storage unavailable: still apply for this session */ }
   const next = resolveThemePreference(pref);
-  if (opts.animate !== false && next !== currentTheme()) withViewTransition(() => applyTheme(next));
+  if (next === currentTheme()) {
+    applyTheme(next);
+    // Auto -> Dark on a dark system changes the choice but not the colours:
+    // say so, or the Appearance control keeps showing the old choice.
+    try { window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme: next } })); } catch { /* noop */ }
+    return;
+  }
+  if (opts.animate !== false) withViewTransition(() => applyTheme(next));
   else applyTheme(next);
 }
 

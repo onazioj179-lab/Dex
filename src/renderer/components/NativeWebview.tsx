@@ -17,6 +17,7 @@
 // elementFromPoint, which only sees the DOM, i.e. the placeholder).
 //
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { useNetworkStore } from '../store/networkStore';
 import { ADBLOCK_CONSOLE_PREFIX } from '../DEXAPPLICATIONS/browser/adblockContentScript';
 import { useSpatialStore } from '../store/spatialStore';
 
@@ -294,6 +295,10 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
       .finally(() => { creating.current = null; });
   }, [tabId, sync]);
 
+  // Request filtering is set up when a native page is created, so a change of
+  // network mode recreates it (and a page blocked offline loads once back on).
+  const networkMode = useNetworkStore((st) => st.mode);
+
   // Live while the app runs; released when it closes, recreated on relaunch.
   useEffect(() => {
     if (!alive) return;
@@ -310,7 +315,7 @@ export const NativeWebview = forwardRef<HTMLDivElement, Props>(function NativeWe
     };
     // Creation uses the latest src/url at the moment the app comes alive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alive, tabId]);
+  }, [alive, tabId, networkMode]);
 
   // New URL from the Browser (typed address, bookmark) -> navigate or create.
   useEffect(() => {

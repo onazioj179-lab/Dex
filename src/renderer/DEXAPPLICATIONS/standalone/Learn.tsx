@@ -15,6 +15,7 @@ import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from '
 import DexIcon from '../../components/DexIcon';
 import { useRunningApps } from '../../store/runningApps';
 import { useLearningStore } from '../../store/learningStore';
+import { APP_DEFINITIONS } from '../../store/runningApps';
 import { platform } from '../../utils';
 import { findPeakHourWindow, peakIndex } from '../../../shared/format/activityInsights';
 import { sendToNotes } from '../../services/sendTo';
@@ -765,9 +766,9 @@ const Learn: React.FC = () => {
             {/* Quick Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               {[
-                { label: 'Pages Visited', value: Object.keys(patterns.pageVisits).length, color: '#5e5ce6' },
-                { label: 'Actions Tracked', value: Object.values(patterns.actionFrequency).reduce((a, b) => a + b, 0), color: 'var(--color-success)' },
-                { label: 'Total Active', value: fmtMs(totalTimeMs), color: 'var(--color-warning)' },
+                { label: 'Apps Used', value: Object.keys(patterns.pageVisits).length, color: '#5e5ce6' },
+                { label: 'App Switches', value: Object.values(patterns.pageVisits).reduce((a, b) => a + b, 0), color: 'var(--color-success)' },
+                { label: 'Time in Apps', value: fmtMs(totalTimeMs), color: 'var(--color-warning)' },
               ].map(s => (
                 <div key={s.label} style={{ ...CARD, textAlign: 'center' as const, position: 'relative' as const, overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: s.color, opacity: 0.6 }} />
@@ -792,10 +793,10 @@ const Learn: React.FC = () => {
             {/* Top Pages */}
             {rankedPages.length > 0 && (
               <div style={CARD}>
-                <div style={CARD_TITLE}>Most Visited Pages</div>
+                <div style={CARD_TITLE}>Most Used Apps</div>
                 {rankedPages.slice(0, 6).map(([page, count]) => (
                   <div key={page} style={STAT_ROW}>
-                    <span style={{ opacity: 0.8 }}>{page}</span>
+                    <span style={{ flex: '0 0 140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{APP_DEFINITIONS[page]?.name ?? page}</span>
                     <div style={BAR_BG}>
                       <div style={{ width: `${(count / maxPageVisits) * 100}%`, height: '100%', borderRadius: 2, background: '#5e5ce6' }} />
                     </div>
@@ -1099,10 +1100,10 @@ const Learn: React.FC = () => {
             {/* Time Spent per Page */}
             {pageTimeEntries.length > 0 && (
               <div style={CARD}>
-                <div style={CARD_TITLE}>Time Spent</div>
+                <div style={CARD_TITLE}>Time per App</div>
                 {pageTimeEntries.map(([page, ms]) => (
                   <div key={page} style={STAT_ROW}>
-                    <span style={{ opacity: 0.8, flex: '0 0 120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{page}</span>
+                    <span style={{ opacity: 0.8, flex: '0 0 120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{APP_DEFINITIONS[page]?.name ?? page}</span>
                     <div style={BAR_BG}>
                       <div style={{ width: `${(ms / maxPageTime) * 100}%`, height: '100%', borderRadius: 2, background: 'var(--color-warning)' }} />
                     </div>

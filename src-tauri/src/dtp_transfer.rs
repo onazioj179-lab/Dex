@@ -274,6 +274,7 @@ fn dest_from(app: &tauri::AppHandle, opts: &Value) -> Option<PathBuf> {
 pub fn start_server(app: &tauri::AppHandle, args: &Value) -> Value {
     let opts = args.get(0).cloned().unwrap_or(Value::Null);
     let Some(dest) = dest_from(app, &opts) else { return fail("Couldn't find the Downloads folder.") };
+    if let Err(e) = crate::net_gate::check_lan() { return fail(e) }
     let mut guard = server().lock_safe();
     if let Some(s) = guard.as_ref() {
         { let mut d = s.dest.lock_safe();
@@ -432,6 +433,7 @@ pub fn send_files(app: &tauri::AppHandle, args: &Value) -> Value {
     let Some(address) = opts.get("targetAddress").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) else {
         return fail("No device address.");
     };
+    if let Err(e) = crate::net_gate::check_url(&format!("http://{}", if address.contains(':') && !address.starts_with('[') { format!("[{address}]") } else { address.to_string() })) { return fail(e) }
     let port = opts.get("targetPort").and_then(|v| v.as_u64()).filter(|p| *p > 0 && *p < 65536).unwrap_or(super::dtp_ctl::DTP_PORT as u64);
     let mut total = 0u64;
     for f in &files {

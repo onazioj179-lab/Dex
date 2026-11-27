@@ -62,8 +62,10 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
     if let Some(old) = app.get_webview(&label) {
         let _ = old.close();
     }
+    if let Err(e) = crate::net_gate::check_url(url.as_str()) { return json!({ "success": false, "error": e }) }
     let owner = window.label().to_string();
     let tab = id.to_string();
+    let (a0, o0, t0) = (app.clone(), owner.clone(), tab.clone());
 
     let (a1, o1, t1) = (app.clone(), owner.clone(), tab.clone());
     let (a2, o2, t2) = (app.clone(), owner.clone(), tab.clone());
@@ -73,6 +75,13 @@ fn create(app: &tauri::AppHandle, window: &tauri::Window, id: &str, url: &str, r
         // Let web pages use HTML5 drag and drop (uploads by dropping a file,
         // sortable lists); Tauri's own drop handler swallows it on Windows.
         .disable_drag_drop_handler()
+        .on_navigation(move |url| match crate::net_gate::check_url(url.as_str()) {
+            Ok(()) => true,
+            Err(reason) => {
+                emit(&a0, &o0, json!({ "id": t0, "type": "load-error", "code": 0, "description": reason }));
+                false
+            }
+        })
         .on_page_load(move |_wv, payload| {
             let state = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",
@@ -189,7 +198,7 @@ mod native_signals {
             // natively; documents were never blocked anyway), nothing at all is
             // intercepted while blocking is off, and the handler rejects
             // unlisted hosts before touching anything else.
-            if crate::browser_block::active() {
+            if crate::browser_block::active() || crate::net_gate::mode() != crate::net_gate::Mode::Full {
                 for ctx in [
                     COREWEBVIEW2_WEB_RESOURCE_CONTEXT_SCRIPT,
                     COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST,
@@ -209,6 +218,12 @@ mod native_signals {
                     let mut uri = PWSTR::null();
                     req.Uri(&mut uri)?;
                     let uri = webview2_com::take_pwstr(uri);
+                    if crate::net_gate::check_url(&uri).is_err() {
+                        if let Ok(resp) = env.CreateWebResourceResponse(None, 403, windows_core::w!("Blocked by DEX"), windows_core::w!("")) {
+                            let _ = args.SetResponse(&resp);
+                        }
+                        return Ok(());
+                    }
                     if !crate::browser_block::listed(&uri) {
                         return Ok(());
                     }
@@ -356,7 +371,10 @@ pub fn dispatch(app: &tauri::AppHandle, window: &tauri::Window, channel: &str, a
         "browserView:hide" => with_view(app, id, |wv| wv.hide()),
         "browserView:focus" => with_view(app, id, |wv| wv.set_focus()),
         "browserView:navigate" => match parse_web_url(args.get(1).and_then(|v| v.as_str()).unwrap_or("")) {
-            Some(url) => with_view(app, id, |wv| wv.navigate(url)),
+            Some(url) => match crate::net_gate::check_url(url.as_str()) {
+                Ok(()) => with_view(app, id, |wv| wv.navigate(url)),
+                Err(e) => json!({ "success": false, "error": e }),
+            },
             None => json!({ "success": false, "error": "only http(s) pages can be opened" }),
         },
         "browserView:reload" => with_view(app, id, |wv| wv.reload()),

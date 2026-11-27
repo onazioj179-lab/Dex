@@ -24,6 +24,21 @@ import './styles/print.css';
 import { installTauriCompat } from './services/platform/tauriCompat';
 installTauriCompat();
 
+// Privacy switches are enforced here, once, for every app: nothing reaches the
+// microphone, camera, screen or location without passing this gate.
+import { installPermissionGate } from './services/permissionGate';
+installPermissionGate();
+
+// Settings > Network: DEX's own requests obey the chosen mode from the start.
+import { installNetworkGate } from './services/networkGate';
+import { useNetworkStore } from './store/networkStore';
+installNetworkGate();
+void useNetworkStore.getState().refresh();
+
+// Backups include settings and app data: keep their native mirror current.
+import { startInterfaceStateMirror } from './services/dataBackup';
+startInterfaceStateMirror();
+
 // Multi-window: if this renderer was opened as a detached single-app OS window
 // (`?detached=<appId>`, created by the native multiwindow:detach handler), put
 // the shell into single-app mode and auto-open that app. No-op in the main

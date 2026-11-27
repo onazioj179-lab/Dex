@@ -68,6 +68,9 @@ export const useRunningApps = create<RunningAppsState>()(
       sessionHistory: [],
   
       launchApp: (app) => {
+        // A request with no app id (bad deep link, corrupt data) would take the
+        // whole shell down when the top bar reads it.
+        if (typeof app?.id !== 'string' || !app.id) return;
         // Retired apps never open again, whatever asks (a pin, a restored
         // session, an old shortcut, UKI).
         // A window id of an app that has only one window opens that window.
@@ -250,10 +253,11 @@ export const useRunningApps = create<RunningAppsState>()(
       // A stored session that was on a retired app comes back on Home.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RunningAppsState>;
-        const stored = p.currentAppId && MERGED_APPS[p.currentAppId] ? MERGED_APPS[p.currentAppId].to : p.currentAppId;
+        const saved = typeof p.currentAppId === 'string' ? p.currentAppId : undefined;
+        const stored = saved && MERGED_APPS[saved] ? MERGED_APPS[saved].to : saved;
         const currentAppId = stored && !RETIRED_APPS[stored] ? stored : current.currentAppId;
-        const sessionHistory = Array.isArray(p.sessionHistory) ? p.sessionHistory.filter((id) => !RETIRED_APPS[id]) : current.sessionHistory;
-        return { ...current, ...p, currentAppId, sessionHistory };
+        const sessionHistory = Array.isArray(p.sessionHistory) ? p.sessionHistory.filter((id) => typeof id === 'string' && !RETIRED_APPS[id]) : current.sessionHistory;
+        return { ...current, currentAppId, sessionHistory };
       },
     }
   )

@@ -10,7 +10,7 @@
  */
 
 import { CREATOR_NAME, CREATOR_CREDIT } from '../../shared/creator';
-import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo, memo, useCallback, useSyncExternalStore, useReducer } from 'react';
 import { getBundledAppVersion, getRuntimeAppVersion, formatDisplayVersion, getBuildInfo, formatBuildInfo } from '../utils/appVersion';
 import { openWithShell } from '../utils/openWithShell';
 import { isTauri } from '../services/platform/tauriCompat';
@@ -43,14 +43,7 @@ import {
   setManualOverride, clearManualOverride, isManualOverride,
   isAutoOptimizeEnabled, setAutoOptimizeEnabled,
 } from '../services/TierManager';
-import {
-  usePermissionStore, ALL_PERMISSIONS, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS,
-  type PermissionId,
-} from '../store/permissionStore';
-import {
-  useNetworkStore, NETWORK_MODE_LABELS, NETWORK_MODE_DESCRIPTIONS,
-  type NetworkMode,
-} from '../store/networkStore';
+import { PermissionControls, NetworkModeControls } from './settingsPanels/PrivacyControls';
 import { PluginMarketplace } from '../components/PluginMarketplace';
 import { NexusBiometrics } from '../components/NexusBiometrics';
 import AiProviderSettings from '../components/AiProviderSettings';
@@ -277,6 +270,27 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   account: Icons.account,
   about: Icons.about,
 };
+
+// Sidebar tiles, as in System Settings: a colour per area, white glyph.
+const TILE = { blue: '#0a84ff', gray: '#6e6e73', indigo: '#5e5ce6', pink: '#e8335d', red: '#e5433b', orange: '#d97a00', purple: '#a24bd6', teal: '#1f93a8' };
+const SECTION_TINT: Record<string, string> = {
+  general: TILE.gray, appearance: TILE.indigo, shell: TILE.gray, sound: TILE.pink, display: TILE.blue,
+  privacy: TILE.blue, permissions: TILE.teal, network: TILE.blue,
+  notifications: TILE.red, touch: TILE.indigo, window: TILE.teal, snap: TILE.indigo, files: TILE.teal,
+  performance: TILE.orange, systemMonitor: TILE.gray, accessibility: TILE.blue, storage: TILE.gray, browser: TILE.blue,
+  aiproviders: TILE.purple, uki: TILE.purple, creativeapps: TILE.pink,
+  developer: TILE.gray, plugins: TILE.orange, nexus: TILE.teal,
+  keyboard: TILE.gray, updates: TILE.blue, about: TILE.gray, account: TILE.blue, creator: TILE.gray,
+};
+
+const SectionTile: React.FC<{ section: SettingSection }> = ({ section }) => (
+  <span aria-hidden="true" style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, flexShrink: 0,
+    borderRadius: 6, background: SECTION_TINT[section.id] ?? TILE.gray, color: '#fff',
+  }}>
+    {React.cloneElement(section.icon as React.ReactElement<React.SVGProps<SVGSVGElement>>, { width: 14, height: 14, strokeWidth: 1.8 })}
+  </span>
+);
 
 const SECTIONS: SettingSection[] = SETTINGS_SECTIONS.map(s => ({
   id: s.id,
@@ -925,7 +939,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
   };
 
   const renderFloatSlider = (key: 'ukiVoiceRate' | 'ukiVoicePitch' | 'ukiVoiceVolume', label: string, description: string, min: number, max: number, step: number) => (
-    <div style={styles.settingRow}>
+    <div className="settings-row" style={styles.settingRow}>
       <div style={styles.settingInfo}>
         <span style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
@@ -968,7 +982,7 @@ const UkiVoiceSection: React.FC<UkiVoiceSectionProps> = ({ styles, settings, set
       {renderFloatSlider('ukiVoiceRate', 'Speech rate', 'How fast UKI speaks', 0.5, 2.0, 0.05)}
       {renderFloatSlider('ukiVoicePitch', 'Pitch', 'Voice pitch', 0.5, 2.0, 0.05)}
       {renderFloatSlider('ukiVoiceVolume', 'Volume', 'Speech volume', 0, 1, 0.05)}
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Preview</span>
           <span style={styles.settingDesc}>Hear the current voice settings</span>
@@ -1230,6 +1244,8 @@ export const Settings: React.FC = () => {
   const { confirm: confirmReset, ConfirmHost: ConfirmResetHost } = useConfirm();
   const toast = useToastHelpers();
   const [activeSection, setActiveSection] = useState('general');
+  // For the few values read straight from services (not state): redraw after a write.
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
   const [settingsSearch, setSettingsSearch] = useState('');
   // Collapsible sidebar categories (fold the settings sub-menus). Persisted; the
   // category containing the active section always stays expanded so you can see
@@ -1855,7 +1871,7 @@ export const Settings: React.FC = () => {
 
   /** A row that opens the matching Windows Settings page (ms-settings: URI). */
   const renderWindowsLink = (label: string, desc: string, uri: string) => (
-    <div style={styles.settingRow} key={uri}>
+    <div className="settings-row" style={styles.settingRow} key={uri}>
       <div style={styles.settingInfo}>
         <span style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{desc}</span>
@@ -1872,7 +1888,7 @@ export const Settings: React.FC = () => {
   const renderToggle = (key: keyof typeof DEFAULT_SETTINGS, label: string, description: string) => {
     const changed = isSettingChanged(key, settings[key]);
     return (
-      <div style={styles.settingRow} data-setting-row={label}>
+      <div className="settings-row" style={styles.settingRow} data-setting-row={label}>
         <div style={styles.settingInfo}>
           <span data-setting-search={label} style={{ ...styles.settingLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
             {label}
@@ -1897,7 +1913,7 @@ export const Settings: React.FC = () => {
   // A switch row for values that live outside DEFAULT_SETTINGS (native state,
   // other stores). Same markup as renderToggle.
   const renderLiveToggle = (label: string, description: string, checked: boolean, onChange: () => void, disabled = false) => (
-    <div style={styles.settingRow} data-setting-row={label}>
+    <div className="settings-row" style={styles.settingRow} data-setting-row={label}>
       <div style={styles.settingInfo}>
         <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
@@ -1946,7 +1962,7 @@ export const Settings: React.FC = () => {
     return (
       <div style={styles.settingsContent}>
         <h3 style={styles.sectionTitleFirst}>Dock Position</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Edge</span>
             <span style={styles.settingDesc}>Pin the dock to any side of the display.</span>
@@ -1970,7 +1986,7 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Dock Size</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Preset</span>
             <span style={styles.settingDesc}>Compact for screen real-estate, Floating for the lifted Windows-12 look.</span>
@@ -1994,7 +2010,7 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Dock</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Style</span>
             <span style={styles.settingDesc}>The Morphing Dock opens from a search button and keeps windows clear of it. The DEX Bar is the floating command bar.</span>
@@ -2006,7 +2022,7 @@ export const Settings: React.FC = () => {
         </div>
         {dock.style === 'morphing' && (
           <>
-            <div style={styles.settingRow}>
+            <div className="settings-row" style={styles.settingRow}>
               <div style={styles.settingInfo}>
                 <span style={styles.settingLabel}>Position</span>
                 <span style={styles.settingDesc}>Choose an edge or corner, or drag the Dock’s search button.</span>
@@ -2018,7 +2034,7 @@ export const Settings: React.FC = () => {
                 {DOCK_POSITIONS.map(p => <option key={p.edge + ':' + p.align} value={p.edge + ':' + p.align}>{p.label}</option>)}
               </select>
             </div>
-            <div style={styles.settingRow}>
+            <div className="settings-row" style={styles.settingRow}>
               <div style={styles.settingInfo}>
                 <span style={styles.settingLabel}>Collapse automatically</span>
                 <span style={styles.settingDesc}>Return to the search button after opening an app, on Escape, or when the pointer leaves.</span>
@@ -2027,7 +2043,7 @@ export const Settings: React.FC = () => {
             </div>
           </>
         )}
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Workspace padding</span>
             <span style={styles.settingDesc}>Space kept between windows and the screen edges, top bar and Dock: {dock.workspacePadding} px.</span>
@@ -2037,7 +2053,7 @@ export const Settings: React.FC = () => {
 
         {dock.style === 'classic' && (<>
         <h3 style={styles.sectionTitle}>DEX Bar</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Show DEX Bar</span>
             <span style={styles.settingDesc}>The floating command bar (search, UKI, suggestions). Hide it for a cleaner desktop; re-enable here anytime.</span>
@@ -2054,7 +2070,7 @@ export const Settings: React.FC = () => {
         <h3 style={styles.sectionTitle}>Liquid Glass</h3>
         <InterfaceTransparencyControl styles={styles} />
         {prefs.glassMode !== 'off' && (
-          <div style={styles.settingRow}>
+          <div className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>Tint</span>
               <span style={styles.settingDesc}>Color of the frosted-glass overlay (dock, menus).</span>
@@ -2070,7 +2086,7 @@ export const Settings: React.FC = () => {
         )}
 
         <h3 style={styles.sectionTitle}>Comfort & Power</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Night Shift</span>
             <span style={styles.settingDesc}>Warm color filter for evening use.</span>
@@ -2083,7 +2099,7 @@ export const Settings: React.FC = () => {
           />
         </div>
         {prefs.nightShift && (
-          <div style={styles.settingRow}>
+          <div className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>Night Shift intensity</span>
               <span style={styles.settingDesc}>{(prefs.nightShiftIntensity * 100).toFixed(0)}% warm.</span>
@@ -2097,7 +2113,7 @@ export const Settings: React.FC = () => {
             />
           </div>
         )}
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Low-End Mode</span>
             <span style={styles.settingDesc}>Treat this device as a low-tier PC: disable blur, animations, and heavy effects.</span>
@@ -2111,7 +2127,7 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Updates & Tabs</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Respect my update choice</span>
             <span style={styles.settingDesc}>Never auto-select Install. Default to Later in update prompts.</span>
@@ -2123,7 +2139,7 @@ export const Settings: React.FC = () => {
             aria-label="Respect my update choice"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Keep tabs alive on sleep</span>
             <span style={styles.settingDesc}>Prevent browser tabs from being refreshed after the system wakes.</span>
@@ -2135,7 +2151,7 @@ export const Settings: React.FC = () => {
             aria-label="Keep tabs alive on sleep"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Cloud clipboard sync</span>
             <span style={styles.settingDesc}>Sync clipboard across signed-in DEX devices (encrypted).</span>
@@ -2147,7 +2163,7 @@ export const Settings: React.FC = () => {
             aria-label="Enable cloud clipboard sync"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Mini Pulse monitor</span>
             <span style={styles.settingDesc}>Always-on-top pill showing CPU, memory, and FPS sparklines. Double-click to expand.</span>
@@ -2159,7 +2175,7 @@ export const Settings: React.FC = () => {
             aria-label="Enable Mini Pulse monitor"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Auto-recover crashed apps</span>
             <span style={styles.settingDesc}>Restart a crashed app automatically (up to 3 attempts), then show the crash card.</span>
@@ -2171,7 +2187,7 @@ export const Settings: React.FC = () => {
             aria-label="Auto-recover crashed apps"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Desktop creator mark</span>
             <span style={styles.settingDesc}>Show a small &ldquo;{CREATOR_NAME}&rdquo; in the corner of the desktop. It sits behind windows and icons.</span>
@@ -2183,7 +2199,7 @@ export const Settings: React.FC = () => {
             aria-label="Show desktop creator mark"
           />
         </div>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Compact mode</span>
             <span style={styles.settingDesc}>Shrink DEX to an always-on-top mini pill to keep it beside other work. Toggle anytime with Ctrl+Shift+M.</span>
@@ -2198,7 +2214,7 @@ export const Settings: React.FC = () => {
         </div>
 
         <h3 style={styles.sectionTitle}>Diagnostics</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Reset shell preferences</span>
             <span style={styles.settingDesc}>Restore dock, glass, night-shift, and update prefs to defaults.</span>
@@ -2223,7 +2239,7 @@ export const Settings: React.FC = () => {
   const renderAppearanceSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Theme</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Appearance</span>
           <span style={styles.settingDesc}>Dark, light, or follow the system appearance</span>
@@ -2367,7 +2383,7 @@ export const Settings: React.FC = () => {
         background: 'var(--color-bg-surface)',
         border: '1px solid var(--color-border-subtle)',
       }}>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Background Tint</span>
             <span style={styles.settingDesc}>Allow wallpaper color to show through windows</span>
@@ -2390,7 +2406,7 @@ export const Settings: React.FC = () => {
             ))}
           </div>
         </div>
-        <div style={{ ...styles.settingRow, marginTop: 'var(--space-3)' }}>
+        <div className="settings-row" style={{ ...styles.settingRow, marginTop: 'var(--space-3)' }}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Blur Intensity</span>
             <span style={styles.settingDesc}>Blur amount behind glass surfaces</span>
@@ -2406,7 +2422,7 @@ export const Settings: React.FC = () => {
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 28 }}>{settings.blurIntensity ?? 12}px</span>
           </div>
         </div>
-        <div style={{ ...styles.settingRow, marginTop: 'var(--space-2)' }}>
+        <div className="settings-row" style={{ ...styles.settingRow, marginTop: 'var(--space-2)' }}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Wallpaper Overlay</span>
             <span style={styles.settingDesc}>Dims the wallpaper behind the desktop for readability</span>
@@ -2422,7 +2438,7 @@ export const Settings: React.FC = () => {
       </div>
       
       <h3 style={styles.sectionTitle}>Window Controls</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Window Button Style</span>
           <span style={styles.settingDesc}>Choose between system (Windows) or traffic light (macOS) window buttons</span>
@@ -2481,7 +2497,7 @@ export const Settings: React.FC = () => {
       <h3 style={styles.sectionTitleFirst}>Authentication</h3>
       
       {/* Fingerprint / Biometric */}
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Fingerprint / Windows Hello</span>
           <span style={styles.settingDesc}>
@@ -2498,7 +2514,7 @@ export const Settings: React.FC = () => {
       </div>
       
       {/* PIN Setup */}
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>PIN Code</span>
           <span style={styles.settingDesc}>Use a 4-8 digit PIN to unlock</span>
@@ -2599,7 +2615,7 @@ export const Settings: React.FC = () => {
       )}
       
       {/* Password Setup */}
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Password</span>
           <span style={styles.settingDesc}>Use a password to unlock</span>
@@ -2701,7 +2717,7 @@ export const Settings: React.FC = () => {
       {/* Recovery Codes */}
       {(settings.pinEnabled || settings.passwordEnabled) && (
         <div style={{ marginTop: 'var(--space-3)' }}>
-          <div style={styles.settingRow}>
+          <div className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>Recovery Codes</span>
               <span style={styles.settingDesc}>Generate backup codes in case you forget your PIN or password</span>
@@ -2726,7 +2742,7 @@ export const Settings: React.FC = () => {
       {/* Security Questions -- account recovery so you're never locked out */}
       {(settings.pinEnabled || settings.passwordEnabled) && (
         <div style={{ marginTop: 'var(--space-3)' }}>
-          <div style={styles.settingRow}>
+          <div className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>Security Questions {securityQuestionsSet ? '(set up)' : ''}</span>
               <span style={styles.settingDesc}>Recover your account and reset your password if you ever forget it — you're never locked out</span>
@@ -2770,7 +2786,7 @@ export const Settings: React.FC = () => {
 
       <h3 style={styles.sectionTitle}>Privacy</h3>
       {renderToggle('locationServices', 'Location Services', 'Allow DEX to access your location')}
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Crash reports</span>
           <span style={styles.settingDesc}>Kept on this device for diagnostics. DEX does not send crash reports, analytics or usage data anywhere.</span>
@@ -2796,7 +2812,7 @@ export const Settings: React.FC = () => {
           <span style={styles.aboutValue}>Provided by Windows Security, not by DEX</span>
         </div>
       </div>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Windows Security</span>
           <span style={styles.settingDesc}>Check Microsoft Defender Antivirus and Windows Firewall status</span>
@@ -2830,76 +2846,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <h3 style={styles.sectionTitle}>Permission Controls</h3>
-      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
-        All permissions are OFF by default. Unused permissions auto-disable after the configured timeout.
-      </div>
-      {(() => {
-        const { permissions, setPermission, setAutoDisableMinutes } = usePermissionStore.getState();
-        return ALL_PERMISSIONS.map(id => {
-          const entry = permissions[id];
-          return (
-            <div key={id} style={{ ...styles.settingRow, flexWrap: 'wrap' }}>
-              <div style={styles.settingInfo}>
-                <span style={styles.settingLabel}>{PERMISSION_LABELS[id]}</span>
-                <span style={styles.settingDesc}>{PERMISSION_DESCRIPTIONS[id]}</span>
-                {entry.enabled && entry.lastUsedAt && (
-                  <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-                    Last used: {new Date(entry.lastUsedAt).toLocaleTimeString()} &middot; Auto-off: {entry.autoDisableMinutes} min
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                {entry.enabled && (
-                  <select
-                    value={entry.autoDisableMinutes}
-                    onChange={e => setAutoDisableMinutes(id, Number(e.target.value))}
-                    style={{
-                      background: 'var(--color-bg-surface)',
-                      border: '1px solid var(--color-border-subtle)',
-                      borderRadius: 4, color: 'var(--color-text-secondary)',
-                      fontSize: 11, padding: '4px 6px', cursor: 'pointer',
-                    }}
-                    aria-label={`Auto-disable timeout for ${PERMISSION_LABELS[id]}`}
-                  >
-                    <option value={5}>5 min</option>
-                    <option value={15}>15 min</option>
-                    <option value={30}>30 min</option>
-                    <option value={60}>1 hour</option>
-                    <option value={1440}>Never</option>
-                  </select>
-                )}
-                <label style={{ position: 'relative', display: 'inline-block', width: 42, height: 24, flexShrink: 0, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={entry.enabled}
-                    onChange={e => setPermission(id, e.target.checked)}
-                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                    aria-label={`Toggle ${PERMISSION_LABELS[id]} permission`}
-                  />
-                  <span style={{
-                    position: 'absolute', inset: 0, borderRadius: 10,
-                    background: entry.enabled ? 'var(--color-accent)' : 'var(--color-bg-hover)',
-                    transition: 'background 0.2s ease',
-                  }}>
-                    <span style={{
-                      position: 'absolute', left: entry.enabled ? 20 : 2, top: 2, width: 20, height: 20,
-                      borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                    }} />
-                  </span>
-                </label>
-              </div>
-            </div>
-          );
-        });
-      })()}
-      <button
-        style={{ ...styles.dangerBtnSmall, marginTop: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
-        onClick={() => usePermissionStore.getState().revokeAll()}
-        aria-label="Revoke all permissions"
-      >
-        Revoke All Permissions
-      </button>
+      <PermissionControls styles={styles} />
 
       <h3 style={styles.sectionTitle}>Danger Zone</h3>
       <button 
@@ -3157,7 +3104,7 @@ export const Settings: React.FC = () => {
     unit: string = '',
     step: number = 1,
   ) => (
-    <div style={styles.settingRow} data-setting-row={label}>
+    <div className="settings-row" style={styles.settingRow} data-setting-row={label}>
       <div style={styles.settingInfo}>
         <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
@@ -3189,7 +3136,7 @@ export const Settings: React.FC = () => {
     description: string,
     options: { value: string; label: string }[],
   ) => (
-    <div style={styles.settingRow} data-setting-row={label}>
+    <div className="settings-row" style={styles.settingRow} data-setting-row={label}>
       <div style={styles.settingInfo}>
         <span data-setting-search={label} style={styles.settingLabel}>{label}</span>
         <span style={styles.settingDesc}>{description}</span>
@@ -3220,7 +3167,7 @@ export const Settings: React.FC = () => {
   const renderSoundSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Sound</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Interface sounds</span>
           <span style={styles.settingDesc}>Tones for toggles, notifications, copy and errors. Media apps are unaffected.</span>
@@ -3232,7 +3179,7 @@ export const Settings: React.FC = () => {
           aria-label="Interface sounds"
         />
       </div>
-      <div style={{ ...styles.settingRow, opacity: uiSoundsOn ? 1 : 0.5 }}>
+      <div className="settings-row" style={{ ...styles.settingRow, opacity: uiSoundsOn ? 1 : 0.5 }}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Interface volume</span>
           <span style={styles.settingDesc}>{Math.round(uiSoundVolume * 100)}%</span>
@@ -3268,14 +3215,14 @@ export const Settings: React.FC = () => {
       {renderWindowsLink('Night light (Windows)', 'System-wide blue-light reduction for all apps.', 'ms-settings:nightlight')}
 
       <h3 style={styles.sectionTitle}>In DEX</h3>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Night Shift</span>
           <span style={styles.settingDesc}>DEX's warm color filter and its intensity.</span>
         </div>
         <button type="button" style={styles.manageBtn} onClick={() => setActiveSection('shell')}>Shell &amp; Dock</button>
       </div>
-      <div style={styles.settingRow}>
+      <div className="settings-row" style={styles.settingRow}>
         <div style={styles.settingInfo}>
           <span style={styles.settingLabel}>Glass &amp; blur</span>
           <span style={styles.settingDesc}>Blur intensity and glass opacity.</span>
@@ -3361,7 +3308,7 @@ export const Settings: React.FC = () => {
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Daily Auto-Optimize</div>
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Re-detect hardware and optimize settings each day</div>
               </div>
-              <DexSwitch checked={autoOpt} onChange={(v) => setAutoOptimizeEnabled(v)} label="Daily Auto-Optimize" />
+              <DexSwitch checked={autoOpt} onChange={(v) => { setAutoOptimizeEnabled(v); redraw(); }} label="Daily Auto-Optimize" />
             </div>
           </>
         );
@@ -3404,44 +3351,13 @@ export const Settings: React.FC = () => {
   // =========================================================================
   // NETWORK SETTINGS
   // =========================================================================
-  const renderNetworkSettings = () => {
-    const networkMode = useNetworkStore.getState().mode;
-    const setNetworkMode = useNetworkStore.getState().setMode;
-    return (
+  const renderNetworkSettings = () => (
     <div style={styles.settingsContent}>
       <h3 style={styles.sectionTitleFirst}>Network Mode</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-        {(['full', 'local-only', 'disabled'] as NetworkMode[]).map(m => {
-          const selected = m === networkMode;
-          return (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setNetworkMode(m)}
-              style={{
-                display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
-                background: selected ? 'var(--color-bg-active, #252528)' : 'transparent',
-                border: `1px solid ${selected ? 'var(--dex-focus-color, #fff)' : 'var(--color-border, rgba(255,255,255,0.10))'}`,
-                borderRadius: 6, padding: 'var(--space-3) 14px', cursor: 'pointer', textAlign: 'left',
-                color: 'var(--color-text-primary)',
-                transition: 'background 0.12s, border-color 0.12s',
-              }}
-            >
-              <span style={{
-                marginTop: 3, width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                background: selected ? 'var(--color-accent-fill)' : 'transparent',
-                border: `2px solid ${selected ? 'var(--color-accent, #4A9EFF)' : 'var(--color-border)'}`,
-                boxShadow: selected ? 'inset 0 0 0 3px var(--color-bg-elevated, #111)' : 'none',
-              }} />
-              <span style={{ flex: 1 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{NETWORK_MODE_LABELS[m]}</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4, lineHeight: 1.5 }}>
-                  {NETWORK_MODE_DESCRIPTIONS[m]}
-                </span>
-              </span>
-            </button>
-          );
-        })}
+      <NetworkModeControls />
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.5 }}>
+        Applies to DEX itself: its apps, UKI, updates, transfers and Browser tabs. Windows, other programs and
+        commands you run in Terminal are not affected.
       </div>
 
       {/* Wi-Fi, Bluetooth, IPv6, DNS-over-HTTPS, bandwidth and web-content
@@ -3452,8 +3368,7 @@ export const Settings: React.FC = () => {
       {renderWindowsLink('Bluetooth & devices', 'Pairing, discoverability and device modes.', 'ms-settings:bluetooth')}
       {renderWindowsLink('Network & internet', 'IP settings, DNS (including DNS over HTTPS) and proxies.', 'ms-settings:network')}
     </div>
-    );
-  };
+  );
 
   // =========================================================================
   // FILES SETTINGS
@@ -3590,7 +3505,7 @@ export const Settings: React.FC = () => {
     return (
       <div style={styles.settingsContent}>
         <h3 style={styles.sectionTitleFirst}>Getting around</h3>
-        <div style={styles.settingRow}>
+        <div className="settings-row" style={styles.settingRow}>
           <div style={styles.settingInfo}>
             <span style={styles.settingLabel}>Show tooltips</span>
             <span style={styles.settingDesc}>Little labels that pop up when the pointer rests on a control. Off: what they said is here in Help.</span>
@@ -3598,7 +3513,7 @@ export const Settings: React.FC = () => {
           <input type="checkbox" checked={showTips} onChange={(e) => { setTooltipsEnabled(e.target.checked); setShowTips(e.target.checked); }} aria-label="Show tooltips" />
         </div>
         {tips.map(([label, desc]) => (
-          <div key={label} style={styles.settingRow}>
+          <div key={label} className="settings-row" style={styles.settingRow}>
             <div style={styles.settingInfo}>
               <span style={styles.settingLabel}>{label}</span>
               <span style={styles.settingDesc}>{desc}</span>
@@ -3610,7 +3525,7 @@ export const Settings: React.FC = () => {
           <React.Fragment key={g.title}>
             <h3 style={styles.sectionTitle}>{g.title}</h3>
             {g.rows.map(([keys, action]) => (
-              <div key={keys} style={styles.settingRow}>
+              <div key={keys} className="settings-row" style={styles.settingRow}>
                 <div style={styles.settingInfo}>
                   <span style={styles.settingLabel}>{action}</span>
                 </div>
@@ -3894,6 +3809,16 @@ export const Settings: React.FC = () => {
         .settings-btn:active { transform: scale(0.97); }
         .settings-toggle:hover { background: var(--color-bg-hover) !important; }
         .settings-select:hover { border-color: var(--color-border-strong) !important; }
+        /* Grouped inset lists: neighbouring rows join into one rounded card. */
+        .settings-shell .settings-row, .settings-shell .settings-group {
+          padding: 11px 14px; min-height: 44px; box-sizing: border-box;
+          background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+          border: 1px solid var(--color-border-subtle);
+        }
+        .settings-shell .settings-group { padding: 0; border-radius: 12px; overflow: hidden; }
+        .settings-shell .settings-row:not(.settings-row + .settings-row) { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+        .settings-shell .settings-row:not(:has(+ .settings-row)) { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-bottom: 8px; }
+        .settings-shell .settings-row + .settings-row { border-top-width: 0; }
         .settings-action:hover { background: var(--color-bg-hover) !important; }
         .settings-danger:hover { background: rgba(255,69,58,0.18) !important; }
         .settings-color:hover { box-shadow: 0 0 0 1px var(--color-border-strong); }
@@ -4114,7 +4039,7 @@ export const Settings: React.FC = () => {
                       }}
                       onClick={() => jumpToSection(section.id)}
                     >
-                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-text-primary)' : 'currentColor' }}>{section.icon}</span>
+                      <SectionTile section={section} />
                       <span>{section.name}</span>
                     </button>
                   ))}
@@ -4154,7 +4079,7 @@ export const Settings: React.FC = () => {
                       }}
                       onClick={() => setActiveSection(section.id)}
                     >
-                      <span style={{ ...styles.sectionIcon, color: activeSection === section.id ? 'var(--color-text-primary)' : 'currentColor' }}>{section.icon}</span>
+                      <SectionTile section={section} />
                       <span>{section.name}</span>
                     </button>
                   ))}
@@ -4277,10 +4202,6 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.01em',
     position: 'relative',
   },
-  sectionIcon: {
-    display: 'flex',
-    alignItems: 'center',
-  },
 
   // Generic small button (segmented controls, inline actions)
   button: {
@@ -4326,7 +4247,8 @@ const styles: Record<string, React.CSSProperties> = {
   settingsContent: {
     flex: 1,
     overflow: 'auto',
-    padding: '4px var(--space-6) var(--space-6)',
+    // A centred reading column, as in System Settings.
+    padding: '4px max(var(--space-6), calc((100% - 720px) / 2)) var(--space-6)',
     scrollBehavior: 'smooth',
   },
   sectionTitle: {
@@ -4355,8 +4277,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 'var(--space-2)',
-    padding: '12px 0',
-    borderBottom: '1px solid var(--color-border-subtle)',
   },
   settingInfo: {
     flex: '1 1 160px',

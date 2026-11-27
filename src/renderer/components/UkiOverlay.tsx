@@ -12,6 +12,8 @@
  * screen reading, improved TTS/STT, and accessibility tools
  */
 import { detectEmotion, isDateQuestion, isLocalTimeQuestion, type EmotionType } from '../uki/localIntents';
+import { parseSystemControl, opensAccess, describeSystemControl, runSystemControl } from '../uki/systemControls';
+import { dexConfirm } from './dexConfirm';
 import { parseNoteRequest, parseSummarizeRequest, isReasoningRequest, summarizeText, describeReasoning, sentences } from '../uki/assistive';
 import { sendToNotes } from '../services/sendTo';
 import { discoverEasterEgg } from '../services/easterEggs';
@@ -876,7 +878,7 @@ function tryFunResponse(text: string): string | null {
   
   // Can you / capabilities
   if (/what\s*can\s*(?:you|u)\s*do|your\s*capabilities|help\s*(?:me|pls)?$|what\s*(?:do|r)\s*(?:you|u)\s*(?:do|good at)/.test(lower)) {
-    return "I can: open and close apps, search the web, read your screen, tell time and date, do math, convert units, help with accessibility, and tell jokes. Try saying 'open notes', 'what's on my screen', or 'help with accessibility'!";
+    return "I can: open and close apps, search the web, read your screen, tell time and date, do math, convert units, back up DEX, control privacy and network access, and help with accessibility. Try saying 'open notes', 'back up now', 'go offline' or 'turn off the camera'.";
   }
   
   // Easter eggs
@@ -928,6 +930,19 @@ function trySystemTool(text: string): ToolResult {
   const funResult = tryFunResponse(text); // Use original for tone detection
   if (funResult) {
     return { handled: true, response: funResult };
+  }
+
+  // Privacy, network mode and backups: done here, with no provider needed.
+  const control = parseSystemControl(text);
+  if (control) {
+    const run = async () => {
+      if (opensAccess(control) && !(await dexConfirm({ title: `${describeSystemControl(control)}?`, confirmLabel: 'Allow', cancelLabel: "Don't Allow" }))) return 'Left as it was.';
+      return runSystemControl(control);
+    };
+    run()
+      .catch(() => 'I could not do that.')
+      .then((response) => window.dispatchEvent(new CustomEvent('dex-uki-async-response', { detail: { response } })));
+    return { handled: true, response: control.op === 'backup' ? 'Backing up…' : 'One moment…' };
   }
 
   // Time / Date (with typo tolerance)
