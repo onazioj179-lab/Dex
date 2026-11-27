@@ -13,6 +13,38 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('application', { name: 'DEX Desktop' })).toBeVisible();
 });
 
+test('Activity records a new task and opens its details after Tasks closes', async ({ page }) => {
+  await page.evaluate(() => {
+    const original = window.dex;
+    const feed: Record<string, unknown>[] = [];
+    Object.assign(window, { dex: {
+      ...original,
+      async invoke(channel: string, ...args: unknown[]) {
+        if (channel === 'activity-feed:record') {
+          feed.unshift({ id: feed.length + 1, event_type: args[0], source: args[1],
+            app: args[2], title: args[3], details: JSON.stringify(args[4]), created_at: new Date().toISOString() });
+          return { success: true };
+        }
+        if (channel === 'activity-feed:get') return [...feed];
+        return original?.invoke?.(channel, ...args);
+      },
+    } });
+    window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'tasks' } }));
+  });
+  const tasks = page.locator('[data-floating-window="tasks"]');
+  const input = tasks.getByRole('textbox', { name: 'Add a task' });
+  await input.fill('Review activity handoff');
+  await input.press('Enter');
+  await expect(tasks.getByText('Review activity handoff', { exact: true })).toBeVisible();
+  await tasks.getByRole('button', { name: 'Close Tasks', exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId: 'activity' } })));
+  const activity = page.locator('[data-floating-window="activity"]');
+  await activity.getByRole('radio', { name: 'Live', exact: true }).click();
+  await activity.getByText('Created Review activity handoff', { exact: true }).click();
+  await expect(tasks.getByPlaceholder('Add a description...')).toBeVisible();
+  await expect(tasks.getByText('Review activity handoff', { exact: true })).toBeVisible();
+});
+
 test('App Menu opens an indexed file in its containing folder', async ({ page }) => {
   const directory = 'C:\\Work\\Field notes';
   const file = {

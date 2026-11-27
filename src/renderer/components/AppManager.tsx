@@ -3256,6 +3256,8 @@ export const AppManager: React.FC = () => {
           dispatchAppIntent('browser', 'navigate-url', detail.contextId);
         } else if (typeof detail.contextId === 'string' && appId === 'notes') {
           dispatchAppIntent('notes', 'open-note', detail.contextId);
+        } else if (typeof detail.contextId === 'string' && appId === 'tasks') {
+          dispatchAppIntent('tasks', 'open-task', detail.contextId);
         } else if (typeof detail.contextId === 'string' && appId === 'files') {
           dispatchAppIntent('files', 'reveal-path', { path: detail.contextId, folder: detail.contextKind === 'folder' });
         } else if (appId === 'settings' && detail.contextId) {

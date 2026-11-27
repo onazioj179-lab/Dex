@@ -15,6 +15,7 @@ import { AssistedTextarea } from '../components/AssistedTextarea';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { notify } from '../services/notify';
+import { registerAppIntentHandler } from '../services/appIntents';
 import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
@@ -589,6 +590,22 @@ export const Tasks: React.FC = () => {
   const [chipPriority, setChipPriority] = useState<Task['priority'] | null>(null);
   const [chipList, setChipList] = useState<string | null>(null);
   const [chipHasDue, setChipHasDue] = useState(false);
+  const [requestedTask, setRequestedTask] = useState<string | null>(null);
+  useEffect(() => registerAppIntentHandler('tasks', (action, payload) => {
+    if (action !== 'open-task' || typeof payload !== 'string') return false;
+    setSelectedList('all');
+    setShowCompleted(true);
+    setShowCalendarView(false);
+    setSearchQuery('');
+    setTagFilter('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setChipPriority(null);
+    setChipList(null);
+    setChipHasDue(false);
+    setExpandedTask(payload);
+    setRequestedTask(payload);
+  }), []);
   const taskListRef = useRef<HTMLDivElement>(null);
   const triageIdRef = useRef<string | null>(null);
   useEffect(() => { triageIdRef.current = triageId; }, [triageId]);
@@ -858,6 +875,21 @@ export const Tasks: React.FC = () => {
   useEffect(() => { setTaskVisibleCount(TASKS_PER_PAGE); }, [sortBy, sortedTasks.length]);
   const visibleTasks = tasksWindowed ? sortedTasks.slice(0, taskVisibleCount) : sortedTasks;
   const remainingTasks = sortedTasks.length - visibleTasks.length;
+  useEffect(() => {
+    if (!requestedTask || isLoading) return;
+    const index = sortedTasks.findIndex(task => task.id === requestedTask);
+    if (index < 0) {
+      toast.info('This task is no longer available.');
+      setRequestedTask(null);
+      return;
+    }
+    if (tasksWindowed && index >= taskVisibleCount) {
+      setTaskVisibleCount(index + 1);
+      return;
+    }
+    taskListRef.current?.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(requestedTask)}"]`)?.scrollIntoView({ block: 'nearest' });
+    setRequestedTask(null);
+  }, [requestedTask, isLoading, sortedTasks, tasksWindowed, taskVisibleCount, toast]);
   // Keep the keyboard-triage id order in sync with what's actually on screen, and
   // drop the cursor if the highlighted row scrolls/filters out of view.
   useEffect(() => {
@@ -1826,7 +1858,7 @@ export const Tasks: React.FC = () => {
           ) : (
           <>
           {visibleTasks.map(task => (
-            <div key={task.id}>
+            <div key={task.id} data-task-id={task.id}>
               <div
                 className={`dex-task-item dex-tasks-task-row${recentlyCompleted === task.id ? ' dex-task-complete' : ''}`}
                 draggable={sortBy === 'manual'}

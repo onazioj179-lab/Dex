@@ -41,6 +41,28 @@ vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().m
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); map.handlers.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); takeCalendarDraft(); });
 
+it('opens the recorded note by ID and keeps legacy activity rows usable', async () => {
+  const navigate = vi.fn();
+  const open = vi.fn();
+  window.addEventListener('dex-spotlight-navigate', navigate);
+  window.addEventListener('dex-open-app', open);
+  const entry = { id: 1, app: 'notes', title: 'Design decisions', event_type: 'note',
+    source: 'DEX', details: JSON.stringify({ contextId: 'note-42' }), created_at: new Date().toISOString() };
+  vi.stubGlobal('dex', { invoke: vi.fn(async (channel: string) =>
+    channel === 'activity-feed:get' ? [entry, { ...entry, id: 2, title: 'Older note', details: 'plain text' }] : null) });
+  try {
+    render(<Activity />);
+    fireEvent.click(screen.getByRole('button', { name: 'App', exact: true }));
+    fireEvent.click(await screen.findByText('Design decisions'));
+    expect(navigate.mock.calls[0][0].detail).toEqual({ appId: 'notes', contextId: 'note-42' });
+    fireEvent.keyDown(screen.getByText('Older note').closest('[role="button"]')!, { key: 'Enter' });
+    expect(open.mock.calls[0][0].detail).toEqual({ appId: 'notes' });
+  } finally {
+    window.removeEventListener('dex-spotlight-navigate', navigate);
+    window.removeEventListener('dex-open-app', open);
+  }
+});
+
 /** The map starts once its tile worker URL is set (async): wait for it. */
 async function mapReady() {
   await waitFor(() => expect(map.handlers.has('click')).toBe(true));

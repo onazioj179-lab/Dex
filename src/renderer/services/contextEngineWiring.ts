@@ -30,6 +30,11 @@ function trackFile({ appId, path }: { appId: string; path: string | null }): voi
   if (appId === foregroundAppId) contextEngine.setFile(path, false);
 }
 
+function recordFeed(eventType: string, appId: string, title: string, contextId?: string): void {
+  void window.dex?.invoke('activity-feed:record', eventType, 'DEX', appId, title,
+    contextId ? { contextId } : {}).catch(error => console.warn('[Activity] Could not record work', error));
+}
+
 /** Begin feeding the shared Context Engine from stores and work events. */
 export function startContextEngine(): void {
   if (started || typeof window === 'undefined') return;
@@ -52,7 +57,10 @@ export function startContextEngine(): void {
     setContextForegroundApp(foregroundAppId);
     publishApps(runningApps);
     for (const app of runningApps) {
-      if (app.id !== 'home' && !oldIds.has(app.id)) contextEngine.recordActivity('app', nowAppName(app));
+      if (app.id !== 'home' && !oldIds.has(app.id)) {
+        contextEngine.recordActivity('app', nowAppName(app));
+        recordFeed('app', app.id, `Opened ${nowAppName(app)}`);
+      }
     }
   });
   publishApps(useRunningApps.getState().runningApps);
@@ -70,10 +78,24 @@ export function startContextEngine(): void {
     if (!path) return;
     trackFile({ appId, path });
     contextEngine.recordActivity('file', path);
+    recordFeed('file', 'files', `Opened ${path.split(/[\\/]/).pop() || path}`, path);
   });
-  ContextBus.on('file:saved', ({ path }) => { if (path) contextEngine.recordActivity('save', path); });
-  ContextBus.on('note:opened', ({ id, title }) => { contextEngine.recordActivity('note', title || id); });
-  ContextBus.on('task:created', ({ title }) => { contextEngine.recordActivity('task', title); });
-  ContextBus.on('task:completed', ({ title, id }) => { contextEngine.recordActivity('complete', title || id); });
+  ContextBus.on('file:saved', ({ path }) => {
+    if (!path) return;
+    contextEngine.recordActivity('save', path);
+    recordFeed('file', 'files', `Saved ${path.split(/[\\/]/).pop() || path}`, path);
+  });
+  ContextBus.on('note:opened', ({ id, title }) => {
+    contextEngine.recordActivity('note', title || id);
+    recordFeed('note', 'notes', title || 'Opened note', id);
+  });
+  ContextBus.on('task:created', ({ title, id }) => {
+    contextEngine.recordActivity('task', title);
+    recordFeed('task', 'tasks', `Created ${title}`, id);
+  });
+  ContextBus.on('task:completed', ({ title, id }) => {
+    contextEngine.recordActivity('complete', title || id);
+    recordFeed('task', 'tasks', title ? `Completed ${title}` : 'Completed task', id);
+  });
   ContextBus.onWithReplay('continuity:project', ({ name, projectId }) => { contextEngine.setProject(name || projectId); });
 }

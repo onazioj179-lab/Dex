@@ -268,6 +268,19 @@ const LiveActivityBrowser: React.FC = () => {
     } catch { /* navigation best-effort */ }
   }, [launchApp, bringToFront]);
 
+  const openEntry = useCallback((entry: ActivityEntry) => {
+    let contextId: unknown;
+    try { contextId = JSON.parse(entry.details || '{}')?.contextId; } catch { /* older entries may contain plain text */ }
+    if (typeof contextId === 'string' && contextId &&
+        ['notes', 'files', 'tasks'].includes(entry.app)) {
+      window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
+        detail: { appId: entry.app, contextId },
+      }));
+      return;
+    }
+    openApp(entry.app);
+  }, [openApp]);
+
   const exportSlice = useCallback(async (destination: 'file' | 'notes') => {
     if (busy) return;
     setBusy(true);
@@ -305,7 +318,8 @@ const LiveActivityBrowser: React.FC = () => {
     if (busy) return;
     setBusy(true);
     try {
-      await invoke('activity-feed:clear');
+      const result = await invoke<{ success: boolean }>('activity-feed:clear');
+      if (!result?.success) throw new Error('Activity history could not be cleared');
       displayedRef.current = [];
       setEntries([]);
       bufferRef.current = null;
@@ -328,8 +342,8 @@ const LiveActivityBrowser: React.FC = () => {
         key={e.id}
         role={clickable ? 'button' : undefined}
         tabIndex={clickable ? 0 : undefined}
-        onClick={clickable ? () => openApp(e.app) : undefined}
-        onKeyDown={clickable ? (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openApp(e.app); } } : undefined}
+        onClick={clickable ? () => openEntry(e) : undefined}
+        onKeyDown={clickable ? (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEntry(e); } } : undefined}
         className={clickable ? 'dex-hover-bg' : undefined}
         style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
@@ -359,7 +373,7 @@ const LiveActivityBrowser: React.FC = () => {
         </span>
       </div>
     );
-  }, [openApp]);
+  }, [openEntry]);
 
   return (
     <div style={PAGE}>
@@ -379,52 +393,31 @@ const LiveActivityBrowser: React.FC = () => {
         <div style={{ width: 220 }}>
           <DexSearchInput value={query} onChange={e => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search activity" size="sm" fullWidth />
         </div>
-        <button
+        <Button size="sm"
           type="button"
           onClick={togglePause}
           aria-pressed={paused}
           aria-label={paused ? 'Resume live feed' : 'Pause live feed'}
-          title={paused ? 'Resume live feed' : 'Pause live feed'}
-          style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: paused ? 'var(--color-accent-light)' : 'transparent',
-            border: `1px solid ${paused ? 'var(--color-accent)' : 'var(--color-border)'}`,
-            color: paused ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
-          }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             {paused ? <polygon points="6 4 20 12 6 20 6 4" /> : <><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>}
           </svg>
           {paused ? (bufferCount ? `Resume (${bufferCount})` : 'Resume') : 'Pause'}
-        </button>
-        <button
+        </Button>
+        <Button size="sm"
           type="button"
           onClick={() => { void exportSlice('notes'); }}
           disabled={busy || !filtered.length}
           aria-label="Send filtered activity to Notes"
-          title="Send the current view to Notes"
-          style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: busy ? 'default' : 'pointer',
-            background: 'transparent', border: '1px solid var(--color-border)',
-            color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
-            opacity: busy ? 0.5 : 1,
-          }}
-        >Send to Notes</button>
+        >Send to Notes</Button>
         <Button size="sm" type="button" disabled={busy || !filtered.length} aria-label="Save filtered activity"
           onClick={() => void exportSlice('file')}>Save log</Button>
-        <button
+        <Button size="sm"
           type="button"
           onClick={() => { void clearAll(); }}
           disabled={busy}
           aria-label="Clear activity log"
-          style={{
-            height: 28, padding: '0 var(--space-3)', borderRadius: 'var(--radius-sm)', cursor: busy ? 'default' : 'pointer',
-            background: 'transparent', border: '1px solid var(--color-border)',
-            color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500, flexShrink: 0,
-            opacity: busy ? 0.5 : 1,
-          }}
-        >Clear</button>
+        >Clear</Button>
       </div>
 
       {/* Type filter chips */}
