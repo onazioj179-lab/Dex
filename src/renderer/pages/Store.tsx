@@ -212,10 +212,8 @@ export default function Store(): React.ReactElement {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        toast(`Removed ${APP_DEFINITIONS[id]?.name ?? id} from favorites`);
       } else {
         next.add(id);
-        toast(`Added ${APP_DEFINITIONS[id]?.name ?? id} to favorites`, 'success');
       }
       return next;
     });
@@ -342,7 +340,12 @@ export default function Store(): React.ReactElement {
         role="button"
         tabIndex={0}
         onClick={() => setSelectedId(app.id)}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(app.id); } }}
+        onKeyDown={e => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setSelectedId(app.id);
+          }
+        }}
         style={{ ...styles.card, ...(compact ? styles.cardCompact : null) }}
         title={`${app.name} — view details`}
       >

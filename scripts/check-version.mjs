@@ -36,7 +36,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     .filter(([, v]) => v !== expected)
     .map(([file, v]) => `${file} has ${v ?? 'no version'}, package.json has ${expected}`);
   const tag = process.argv[2];
-  if (tag && tag !== `v${expected}`) problems.push(`tag ${tag} does not match version ${expected}`);
+  const serial = JSON.parse(read('package.json')).dexBuild;
+  const buildTag = /^\d+[a-z]$/.test(serial ?? '') ? `v${expected}(${serial})` : null;
+  if (tag && tag !== `v${expected}` && tag !== buildTag) problems.push(`tag ${tag} does not match version ${expected} and build ${serial}`);
   if (problems.length) {
     for (const p of problems) console.error(`version mismatch: ${p}`);
     process.exit(1);

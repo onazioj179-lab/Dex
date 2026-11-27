@@ -160,11 +160,17 @@ fn record(conn: &Connection, args: &Value) -> Value {
     let s = |i: usize| args.get(i).and_then(|v| v.as_str()).unwrap_or("").to_string();
     let details = args.get(4).cloned().unwrap_or_else(|| json!({}));
     let details_str = serde_json::to_string(&details).unwrap_or_else(|_| "{}".to_string());
-    let _ = conn.execute(
+    let result = conn.execute(
         "INSERT INTO activity_feed (event_type, source, app, title, details) VALUES (?,?,?,?,?)",
         params![s(0), s(1), s(2), s(3), details_str],
     );
-    json!({ "success": true })
+    match result {
+        Ok(_) => {
+            clean_old_entries(conn);
+            json!({ "success": true })
+        }
+        Err(error) => json!({ "success": false, "error": error.to_string() }),
+    }
 }
 
 pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
@@ -175,11 +181,41 @@ pub fn dispatch(conn: &Connection, channel: &str, args: &Value) -> Value {
         // clear/record return void in Electron; we report success so the bridge
         // telemetry doesn't count them as unported.
         "activity-feed:clear" => {
-            let _ = conn.execute("DELETE FROM activity_feed", []);
-            json!({ "success": true })
+            match conn.execute("DELETE FROM activity_feed", []) {
+                Ok(_) => json!({ "success": true }),
+                Err(error) => json!({ "success": false, "error": error.to_string() }),
+            }
         }
         "activity-feed:record" => record(conn, args),
         _ => Value::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recording_preserves_targets_and_bounds_the_live_feed() {
+        let conn = Connection::open_in_memory().unwrap();
+        ensure_schema(&conn);
+        conn.execute_batch(
+            "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x < 5000)
+             INSERT INTO activity_feed(event_type, title, created_at)
+             SELECT 'app', 'Older activity', '2020-01-01 00:00:00' FROM n;"
+        ).unwrap();
+        let result = record(&conn, &json!(["note", "DEX", "notes", "Review", {"contextId": "note-42"}]));
+        assert_eq!(result["success"], true);
+        assert_eq!(get_stats(&conn)["total"], MAX_ENTRIES);
+        let latest = get_feed(&conn, &json!({"limit": 1}));
+        let details: Value = serde_json::from_str(latest[0]["details"].as_str().unwrap()).unwrap();
+        assert_eq!(details["contextId"], "note-42");
+    }
+
+    #[test]
+    fn failed_recording_returns_an_error() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert_eq!(record(&conn, &json!(["note", "DEX", "notes", "Review"]))["success"], false);
     }
 }
 

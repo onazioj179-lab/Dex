@@ -8,6 +8,7 @@
 // Runtime, syntax highlight, templates, and file IO live in ./dexCode/*
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
+import { ContextBus } from '../../services/ContextBus';
 import { useCreativeInput } from '../../services/creativeIntake';
 import { createPortal } from 'react-dom';
 import DexIcon from '../../components/DexIcon';
@@ -146,6 +147,9 @@ const DexCode: React.FC = () => {
   });
   // File system state
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  useEffect(() => {
+    ContextBus.emit('file:focused', { appId: winId, path: currentFilePath });
+  }, [winId, currentFilePath]);
   const [isModified, setIsModified] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>(() => getRecentFiles());
   const [showRecentFiles, setShowRecentFiles] = useState(false);
@@ -280,8 +284,9 @@ const DexCode: React.FC = () => {
   const newKey = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
   const [tabs, setTabs] = useState<EditorTab[]>(() => [{ key: 'first', path: null, name: fileName, code, original: code, modified: false }]);
   const [activeTab, setActiveTab] = useState('first');
-  const liveRef = useRef({ code, fileName, currentFilePath, isModified });
-  liveRef.current = { code, fileName, currentFilePath, isModified };
+  const liveRef = useRef({ activeTab, code, fileName, currentFilePath, isModified });
+  liveRef.current = { activeTab, code, fileName, currentFilePath, isModified };
+  const savingTabs = useRef(new Set<string>());
   const snapshotActive = useCallback((list: EditorTab[]): EditorTab[] => list.map(t => t.key === activeTab
     ? { ...t, path: liveRef.current.currentFilePath, name: liveRef.current.fileName, code: liveRef.current.code, original: originalCodeRef.current, modified: liveRef.current.isModified }
     : t), [activeTab]);
@@ -295,6 +300,9 @@ const DexCode: React.FC = () => {
   }, []);
   /** Open text in a tab: an already-open path is focused, otherwise a new tab. */
   const openInTab = useCallback((doc: { path: string | null; name: string; code: string }) => {
+    if (doc.path && doc.path !== liveRef.current.currentFilePath) {
+      ContextBus.emit('file:opened', { appId: winId, path: doc.path });
+    }
     setTabs(prev => {
       const list = snapshotActive(prev);
       const existing = doc.path ? list.find(t => t.path && t.path.toLowerCase() === doc.path!.toLowerCase()) : undefined;
@@ -306,7 +314,7 @@ const DexCode: React.FC = () => {
       if (cur && !cur.path && !cur.modified && list.length === 1) return [tab];
       return [...list, tab];
     });
-  }, [snapshotActive, showTab, activeTab]);
+  }, [snapshotActive, showTab, activeTab, winId]);
   const switchTab = useCallback((key: string) => {
     if (key === activeTab) return;
     setTabs(prev => {
@@ -451,42 +459,38 @@ const DexCode: React.FC = () => {
     }
   }, [fileError, openInTab]);
 
-  const handleSaveFile = useCallback(async () => {
-    if (currentFilePath) {
-      const success = await saveFile(currentFilePath, code);
-      if (success) {
-        originalCodeRef.current = code;
-        setIsModified(false);
-      } else {
-        fileError('Not saved', new Error(`${currentFilePath} could not be written`));
+  const saveTab = useCallback(async (saveAs: boolean) => {
+    const { activeTab: key, code: savedCode, fileName: originalName, currentFilePath: originalPath } = liveRef.current;
+    if (savingTabs.current.has(key)) return;
+    savingTabs.current.add(key);
+    try {
+      const path = saveAs || !originalPath ? await saveFileDialog(savedCode, originalName) : originalPath;
+      if (!path) return;
+      if (!saveAs && originalPath && !await saveFile(path, savedCode)) {
+        throw new Error(`${path} could not be written`);
       }
-    } else {
-      // Save As if no current file
-      let path: string | null = null;
-      try { path = await saveFileDialog(code, fileName); } catch (e) { fileError('Not saved', e); return; }
-      if (path) {
-        setCurrentFilePath(path);
-        setFileName(path.split(/[\\/]/).pop() || 'file.dex');
-        originalCodeRef.current = code;
-        setIsModified(false);
+      ContextBus.emit('file:saved', { appId: winId, path });
+      const name = saveAs || !originalPath ? path.split(/[\\/]/).pop() || 'file.dex' : null;
+      if (liveRef.current.activeTab === key) {
+        if (name) { setCurrentFilePath(path); setFileName(name); }
+        originalCodeRef.current = savedCode;
+        setIsModified(liveRef.current.code !== savedCode);
+      } else {
+        setTabs(previous => previous.map(tab => tab.key === key
+          ? { ...tab, path, name: name ?? tab.name, original: savedCode, modified: tab.code !== savedCode } : tab));
+      }
+      if (saveAs || !originalPath) {
         addRecentFile(path);
         setRecentFiles(getRecentFiles());
       }
+    } catch (error) {
+      fileError('Not saved', error);
+    } finally {
+      savingTabs.current.delete(key);
     }
-  }, [code, currentFilePath, fileName, fileError]);
-
-  const handleSaveAs = useCallback(async () => {
-    let path: string | null = null;
-    try { path = await saveFileDialog(code, fileName); } catch (e) { fileError('Not saved', e); return; }
-    if (path) {
-      setCurrentFilePath(path);
-      setFileName(path.split(/[\\/]/).pop() || 'file.dex');
-      originalCodeRef.current = code;
-      setIsModified(false);
-      addRecentFile(path);
-      setRecentFiles(getRecentFiles());
-    }
-  }, [code, fileName, fileError]);
+  }, [fileError, winId]);
+  const handleSaveFile = useCallback(() => saveTab(false), [saveTab]);
+  const handleSaveAs = useCallback(() => saveTab(true), [saveTab]);
 
   const handleNewFile = useCallback(() => {
     openInTab({ path: null, name: 'untitled.dex', code: DEFAULT_CODE });

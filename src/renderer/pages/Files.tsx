@@ -17,6 +17,7 @@ import { PlayableVideo, PlayableAudio } from '../components/media/PlayableMedia'
 const PREVIEW_VIDEO_EXTS = ['.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.wmv', '.flv', '.mpg', '.mpeg', '.ts', '.mts', '.m2ts', '.3gp', '.ogv', '.vob', '.asf', '.f4v'];
 const PREVIEW_AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.wma', '.aiff', '.aif', '.ape', '.alac', '.wv', '.ac3', '.dts', '.mka', '.amr'];
 import { useAppWindowId, isExtraWindow } from '../services/appWindows';
+import { registerAppIntentHandler } from '../services/appIntents';
 import { useBackHandler } from '../services/backNavigation';
 import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { clampEventToViewport } from '../utils/menuPosition';
@@ -385,12 +386,15 @@ export const Files: React.FC = () => {
   const nextLocationTab = useRef(1);
   const { history, index: historyIndex } = locationTabs.find(tab => tab.id === activeLocationTab) ?? locationTabs[0];
   const selectedLocation = history[historyIndex];
+  const visibleLocation = useRef(selectedLocation);
+  visibleLocation.current = selectedLocation;
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'column'>('list');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const listingRequest = useRef(0);
+  const revealRequest = useRef<{ location: string; path: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [columnPath, setColumnPath] = useState<string[]>(['']); // For column view breadcrumb navigation
   // Column view (Miller columns): per-path entry cache + in-flight set so each
@@ -695,6 +699,19 @@ export const Files: React.FC = () => {
           }));
           setFiles(filesWithCategory);
           setCurrentPath(result.path);
+          if (revealRequest.current?.location === location) {
+            const path = revealRequest.current.path;
+            revealRequest.current = null;
+            const normalize = (value: string) => /^[A-Za-z]:|^\\\\/.test(path)
+              ? value.replace(/\\/g, '/').toLowerCase() : value;
+            const file = filesWithCategory.find((entry: FileItem) => normalize(entry.path) === normalize(path));
+            if (file) {
+              setSelectedFile(file.path);
+              setSelectedFiles(new Set([file.path]));
+            } else {
+              toast.info('The file is no longer in this folder.');
+            }
+          }
           recordRecentFolder(result.path);
           
           // Update collection counts
@@ -730,14 +747,18 @@ export const Files: React.FC = () => {
     setLoading(false);
   }, [getFileCategory, recordRecentFolder]);
 
+  const refreshVisibleFolder = useCallback(() => loadFiles(visibleLocation.current), [loadFiles]);
+
   // Load a single column's directory listing (column view). Reuses the same
   // files:list bridge as the main view, caching results per path so each pushed
   // Miller column populates instead of rendering blank.
   const loadColumn = useCallback(async (location: string) => {
     if (!window.dex?.invoke) return;
+    const generation = listingRequest.current;
     setColumnLoading(prev => { const next = new Set(prev); next.add(location); return next; });
     try {
       const result = await window.dex.invoke('files:list', location);
+      if (generation !== listingRequest.current) return;
       if (result?.success) {
         const filesWithCategory: FileItem[] = result.files.map((f: Omit<FileItem, 'modified' | 'category'> & { modified: string }) => ({
           ...f,
@@ -750,9 +771,11 @@ export const Files: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load column:', error);
-      setColumnData(prev => ({ ...prev, [location]: [] }));
+      if (generation === listingRequest.current) setColumnData(prev => ({ ...prev, [location]: [] }));
     } finally {
-      setColumnLoading(prev => { const next = new Set(prev); next.delete(location); return next; });
+      if (generation === listingRequest.current) {
+        setColumnLoading(prev => { const next = new Set(prev); next.delete(location); return next; });
+      }
     }
   }, [getFileCategory]);
 
@@ -775,15 +798,16 @@ export const Files: React.FC = () => {
     try {
       if (window.dex?.invoke) {
         await fileOp('files:move', dragFile.path, targetDir.path);
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     } catch (err) {
       console.error('Move failed:', err);
       toast.error('Failed to move file');
     }
-  }, [dragFile, currentPath, loadFiles]);
+  }, [dragFile, refreshVisibleFolder]);
 
   useEffect(() => {
+    if (revealRequest.current?.location !== selectedLocation) revealRequest.current = null;
     setSelectedFile(null);
     setSelectedFiles(new Set());
     setColumnPath([selectedLocation]);
@@ -819,21 +843,39 @@ export const Files: React.FC = () => {
         goBack();
       } else if (e.key === 'F5') {
         e.preventDefault();
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedFile, files, historyIndex, currentPath, activeLocationTab]);
+  }, [selectedFile, files, historyIndex, currentPath, activeLocationTab, refreshVisibleFolder, winId]);
 
-  const navigateTo = (path: string) => {
+  const navigateTo = useCallback((path: string) => {
     setActiveCollection(null);
     setLocationTabs(tabs => tabs.map(tab => {
       if (tab.id !== activeLocationTab || path === tab.history[tab.index]) return tab;
       const history = [...tab.history.slice(0, tab.index + 1), path];
       return { ...tab, history, index: history.length - 1 };
     }));
-  };
+  }, [activeLocationTab]);
+
+  useEffect(() => {
+    if (isExtraWindow(winId)) return;
+    return registerAppIntentHandler('files', (action, payload) => {
+      if (action !== 'reveal-path') return false;
+      const { path, folder } = (payload ?? {}) as { path?: string; folder?: boolean };
+      if (typeof path !== 'string' || !path) return false;
+      const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+      const root = separator === 0 || (separator === 2 && path[1] === ':');
+      const location = folder ? path : path.slice(0, separator + Number(root));
+      if (!location || (!folder && separator < 0)) return false;
+      revealRequest.current = folder ? null : { location, path };
+      setFilters(filters => ({ ...filters, query: '', category: 'all', dateRange: 'all', sizeRange: 'all' }));
+      navigateTo(location);
+      if (location === selectedLocation) void loadFiles(location);
+      return true;
+    });
+  }, [winId, navigateTo, selectedLocation, loadFiles]);
 
   const moveHistory = (offset: number) => {
     setActiveCollection(null);
@@ -934,7 +976,7 @@ export const Files: React.FC = () => {
           await fileOp('files:move', clipboard.file.path, dest);
           setClipboard(null);
         }
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     } catch (err) {
       console.error('Paste failed:', err);
@@ -953,7 +995,7 @@ export const Files: React.FC = () => {
     try {
       if (window.dex?.invoke) {
         await fileOp('files:mkdir', `${currentPath}/${name}`);
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     } catch (err) {
       toast.error('Failed to create folder');
@@ -990,7 +1032,7 @@ export const Files: React.FC = () => {
       // The OS Recycle Bin (restorable), never a permanent delete.
       if (window.dex?.invoke) {
         await fileOp('files:trash', file.path);
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     } catch (err) {
       console.error('Delete failed:', err);
@@ -1063,10 +1105,10 @@ export const Files: React.FC = () => {
       }
     }
     clearSelection();
-    loadFiles(currentPath);
+    refreshVisibleFolder();
     if (done > 0) toast.success(`Moved ${done} item${done === 1 ? '' : 's'} to the Recycle Bin`);
     if (failed > 0) toast.error(`${failed} item${failed === 1 ? '' : 's'} could not be deleted`);
-  }, [selectedFiles, files, currentPath, loadFiles, clearSelection, toast, confirm, confirmDeleteSetting]);
+  }, [selectedFiles, files, currentPath, refreshVisibleFolder, clearSelection, toast, confirm, confirmDeleteSetting]);
 
   const handleRenameFile = async (file: FileItem) => {
     setContextMenu(null);
@@ -1082,13 +1124,13 @@ export const Files: React.FC = () => {
     try {
       if (window.dex?.invoke) {
         await fileOp('files:rename', file.path, next);
-        loadFiles(currentPath);
+        refreshVisibleFolder();
       }
     } catch (err) {
       console.error('Rename failed:', err);
       toast.error('Failed to rename file');
     }
-  }, [renameDraft, currentPath, loadFiles, toast]);
+  }, [renameDraft, currentPath, refreshVisibleFolder, toast]);
 
   const cancelInlineRename = useCallback(() => {
     setRenamingPath(null);
@@ -1230,10 +1272,10 @@ export const Files: React.FC = () => {
     }
     if (mode === 'cut') setBatchClipboard(null);
     setSelectedFiles(new Set());
-    loadFiles(currentPath);
+    refreshVisibleFolder();
     if (ok > 0) toast.success(`${mode === 'copy' ? 'Copied' : 'Moved'} ${ok} item${ok === 1 ? '' : 's'}`);
     else toast.error('Paste operation failed');
-  }, [batchClipboard, currentPath, loadFiles, toast]);
+  }, [batchClipboard, currentPath, refreshVisibleFolder, toast]);
 
   // Prompt for a destination folder via the native open dialog (directory mode).
   // Mirrors the picker pattern used elsewhere (Home / PDFViewer): try
@@ -1303,8 +1345,8 @@ export const Files: React.FC = () => {
     clearSelection();
     // A move always mutates the current folder; a copy only does when the
     // destination is the folder being viewed. Refresh in either of those cases.
-    if (mode === 'move' || dest === currentPath) loadFiles(currentPath);
-  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, loadFiles]);
+    if (mode === 'move' || dest === currentPath) refreshVisibleFolder();
+  }, [selectedFiles, pickDestinationFolder, clearSelection, currentPath, refreshVisibleFolder]);
 
   // Empty-folder "Add Files": pick files with the native dialog and copy them
   // into the folder being viewed through files:copy, with live progress.
@@ -1354,8 +1396,8 @@ export const Files: React.FC = () => {
       title: `Copied to ${destName}`,
       subtitle: failed > 0 ? `${done} done · ${failed} failed` : `${done} item${done === 1 ? '' : 's'}`,
     });
-    loadFiles(dest);
-  }, [currentPath, loadFiles, toast]);
+    refreshVisibleFolder();
+  }, [currentPath, refreshVisibleFolder, toast]);
 
   // Keyboard shortcuts for the multi-selection. Declared after the batch
   // handlers so every reference is in scope. Delete removes the selection;
@@ -1924,7 +1966,7 @@ export const Files: React.FC = () => {
                 try {
                   if (window.dex?.invoke) {
                     const ops = await window.dex.invoke<{ success?: boolean }[]>('files:organizeByType', currentPath);
-                    loadFiles(currentPath);
+                    refreshVisibleFolder();
                     const list = Array.isArray(ops) ? ops : [];
                     const moved = list.filter(o => o.success).length;
                     const skipped = list.length - moved;
@@ -2123,7 +2165,7 @@ export const Files: React.FC = () => {
               </div>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary, #fff)' }}>Failed to load files</span>
               <span style={{ fontSize: 12, color: 'var(--color-text-secondary, #8a8a8a)', textAlign: 'center', maxWidth: 280 }}>{loadError}</span>
-              <button onClick={() => loadFiles(currentPath || selectedLocation)} style={{ marginTop: 'var(--space-2)', padding: '6px var(--space-4)', borderRadius: 6, background: 'var(--color-accent-fill)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+              <Button onClick={() => loadFiles(selectedLocation)} variant="primary" size="sm" style={{ marginTop: 'var(--space-2)' }}>Retry</Button>
             </div>
           ) : loading ? (
             <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2179,14 +2221,11 @@ export const Files: React.FC = () => {
                     ...styles.listRow,
                     background: dragOverPath === file.path
                       ? 'var(--color-accent-soft)'
-                      : selectedFiles.has(file.path)
-                        ? 'var(--color-accent-soft)'
-                        : selectedFile === file.path
-                          ? 'var(--color-bg-active)'
-                          : 'var(--color-bg-surface-solid)',
+                      : selectedFiles.has(file.path) || selectedFile === file.path
+                        ? 'var(--color-bg-active)'
+                        : 'var(--color-bg-surface-solid)',
                     outline: dragOverPath === file.path ? '2px solid var(--color-accent)' : 'none',
                     borderRadius: dragOverPath === file.path ? 6 : 0,
-                    boxShadow: selectedFiles.has(file.path) ? 'inset 3px 0 0 var(--color-accent)' : 'none',
                   }}
                   onClick={(e) => {
                     if (e.ctrlKey || e.metaKey || e.shiftKey) { handleSelectFile(file.path, idx, e); return; }
@@ -2617,7 +2656,7 @@ export const Files: React.FC = () => {
             if (r.failed) toast.error(`Nothing renamed: ${r.failed}. Items were put back.`);
             else toast.success(`Renamed ${r.renamed}${r.skipped ? `; ${r.skipped} left as is (conflicts)` : ''}`);
             clearSelection();
-            loadFiles(currentPath);
+            refreshVisibleFolder();
           }}
         />
       )}

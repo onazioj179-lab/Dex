@@ -49,6 +49,33 @@ it('ignores a stale folder response after moving to a new location', async () =>
   expect(screen.queryByText('stale.md')).toBeNull();
 });
 
+it('keeps the new folder visible when a previous folder mutation finishes', async () => {
+  let finishCreate!: (value: { success: true }) => void;
+  const invoke = vi.fn(async (channel: string, path: string) => {
+    if (channel === 'files:mkdir') {
+      return new Promise<{ success: true }>(resolve => { finishCreate = resolve; });
+    }
+    if (channel === 'files:list') {
+      return { ...listing(entry(`${path}.md`)), path: `C:/Test/${path}` };
+    }
+    return null;
+  });
+  vi.stubGlobal('dex', { invoke });
+  mount();
+  await screen.findByText('documents.md');
+  fireEvent.click(screen.getByRole('button', { name: 'Create new folder' }));
+  const name = screen.getByRole('textbox', { name: 'New folder name' });
+  fireEvent.change(name, { target: { value: 'Projects' } });
+  fireEvent.keyDown(name, { key: 'Enter' });
+  await waitFor(() => expect(invoke).toHaveBeenCalledWith('files:mkdir', 'C:/Test/documents/Projects'));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Downloads' }));
+  await screen.findByText('downloads.md');
+  await act(async () => finishCreate({ success: true }));
+  expect(screen.getByText('downloads.md')).toBeVisible();
+  expect(screen.queryByText('documents.md')).toBeNull();
+});
+
 
 it('keeps separate folder histories and restores the neighboring tab when a tab closes', async () => {
   vi.stubGlobal('dex', {

@@ -7,8 +7,10 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
 import { premiumGlassPanel, premiumGlassToolbar } from '../../styles/glassMenu';
+import { useRunningApps } from '../../store/runningApps';
+import { Button } from '../../ui/Button';
 
-type RecState = 'idle' | 'countdown' | 'recording' | 'paused';
+type RecState = 'idle' | 'choosing' | 'countdown' | 'recording' | 'paused' | 'finishing' | 'capturing';
 type CaptureMode = 'screen' | 'window' | 'browser';
 type OutputFormat = 'webm-vp9' | 'webm-vp8' | 'mp4';
 
@@ -25,13 +27,12 @@ interface FormatOption {
   id: OutputFormat;
   label: string;
   mimeType: string;
-  ext: string;
 }
 
 const FORMAT_OPTIONS: FormatOption[] = [
-  { id: 'webm-vp9', label: 'WebM (VP9)', mimeType: 'video/webm;codecs=vp9,opus', ext: 'webm' },
-  { id: 'webm-vp8', label: 'WebM (VP8)', mimeType: 'video/webm;codecs=vp8,opus', ext: 'webm' },
-  { id: 'mp4', label: 'MP4 (H.264)', mimeType: 'video/mp4;codecs=h264,aac', ext: 'mp4' },
+  { id: 'webm-vp9', label: 'WebM (VP9)', mimeType: 'video/webm;codecs=vp9,opus' },
+  { id: 'webm-vp8', label: 'WebM (VP8)', mimeType: 'video/webm;codecs=vp8,opus' },
+  { id: 'mp4', label: 'MP4 (H.264)', mimeType: 'video/mp4;codecs=h264,aac' },
 ];
 
 const FRAME_RATES = [15, 24, 30, 60];
@@ -50,8 +51,12 @@ const toast = (type: 'success' | 'error' | 'warning' | 'info', message: string) 
   window.dispatchEvent(new CustomEvent('dex-toast', { detail: { type, message } }));
 };
 
+function stopTracks(stream: MediaStream): void {
+  stream.getTracks().forEach(track => track.stop());
+}
+
 // Resolve a usable MediaRecorder mime type from the preferred format, with graceful fallback.
-const resolveMimeType = (preferred: OutputFormat): { mimeType: string; ext: string } => {
+const resolveMimeType = (preferred: OutputFormat): string => {
   const canRecord = typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function';
   const ordered = [
     ...FORMAT_OPTIONS.filter(f => f.id === preferred),
@@ -59,12 +64,11 @@ const resolveMimeType = (preferred: OutputFormat): { mimeType: string; ext: stri
   ];
   for (const opt of ordered) {
     if (!canRecord || MediaRecorder.isTypeSupported(opt.mimeType)) {
-      return { mimeType: opt.mimeType, ext: opt.ext };
+      return opt.mimeType;
     }
   }
   // Last-resort container with no codec hint.
-  if (canRecord && MediaRecorder.isTypeSupported('video/webm')) return { mimeType: 'video/webm', ext: 'webm' };
-  return { mimeType: '', ext: 'webm' };
+  return canRecord && MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
 };
 
 const ScreenRecorder: React.FC = () => {
@@ -89,15 +93,20 @@ const ScreenRecorder: React.FC = () => {
 
   const displayStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const recordStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const activeMimeRef = useRef<{ mimeType: string; ext: string }>({ mimeType: '', ext: 'webm' });
+  const mixerRef = useRef<AudioContext | null>(null);
+  const captureRequest = useRef(0);
+  const phase = useRef<RecState>('idle');
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const timerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
   // Track recent capture object URLs so we can revoke them on unmount.
-  const recentUrlsRef = useRef<string[]>([]);
+  const capturesRef = useRef<RecentCapture[]>([]);
+
+  const changePhase = useCallback((next: RecState) => {
+    phase.current = next;
+    setState(next);
+  }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -115,18 +124,25 @@ const ScreenRecorder: React.FC = () => {
 
   // Stop every track on every captured stream and detach the preview.
   const cleanupStreams = useCallback(() => {
-    [displayStreamRef, micStreamRef, recordStreamRef].forEach(ref => {
+    [displayStreamRef, micStreamRef].forEach(ref => {
       if (ref.current) {
-        ref.current.getTracks().forEach(t => { try { t.stop(); } catch { /* noop */ } });
+        stopTracks(ref.current);
         ref.current = null;
       }
     });
+    if (mixerRef.current) {
+      void mixerRef.current.close().catch(() => {});
+      mixerRef.current = null;
+    }
     if (previewRef.current) previewRef.current.srcObject = null;
   }, []);
 
   const pushRecent = useCallback((capture: RecentCapture) => {
-    recentUrlsRef.current.push(capture.url);
-    setRecent(prev => [capture, ...prev].slice(0, 12));
+    const captures = [capture, ...capturesRef.current];
+    const evicted = captures.splice(12);
+    evicted.forEach(item => URL.revokeObjectURL(item.url));
+    capturesRef.current = captures;
+    setRecent(captures);
   }, []);
 
   const triggerDownload = useCallback((url: string, name: string) => {
@@ -140,198 +156,185 @@ const ScreenRecorder: React.FC = () => {
 
   // Cleanup on unmount: timers, live streams, in-flight recorder, and object URLs.
   useEffect(() => () => {
+    ++captureRequest.current;
+    phase.current = 'idle';
     stopTimer();
     clearCountdown();
     cleanupStreams();
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
       try { recorderRef.current.stop(); } catch { /* noop */ }
     }
-    recentUrlsRef.current.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } });
-    recentUrlsRef.current = [];
+    recorderRef.current = null;
+    capturesRef.current.forEach(item => URL.revokeObjectURL(item.url));
+    capturesRef.current = [];
   }, [stopTimer, clearCountdown, cleanupStreams]);
 
-  // Build the combined recording stream and start the MediaRecorder.
-  const beginRecording = useCallback(async () => {
-    setErrorMsg(null);
-    chunksRef.current = [];
-
-    if (!supported) {
-      const msg = 'Screen capture is not available in this environment.';
-      setErrorMsg(msg);
-      toast('error', msg);
-      setState('idle');
-      return;
+  const handleStop = useCallback(() => {
+    if (phase.current === 'idle' || phase.current === 'finishing') return;
+    stopTimer();
+    clearCountdown();
+    const recorder = recorderRef.current;
+    if (recorder) {
+      changePhase('finishing');
+      try {
+        if (recorder.state !== 'inactive') recorder.stop();
+        cleanupStreams();
+        return;
+      } catch {
+        recorderRef.current = null;
+        setErrorMsg('The recording could not finish.');
+      }
     }
+    ++captureRequest.current;
+    cleanupStreams();
+    setCountdown(0);
+    changePhase('idle');
+  }, [stopTimer, clearCountdown, cleanupStreams, changePhase]);
 
-    let displayStream: MediaStream;
+  useEffect(() => useRunningApps.subscribe((state, previous) => {
+    if (previous.runningApps.some(app => app.id === 'screenrecorder') &&
+        !state.runningApps.some(app => app.id === 'screenrecorder')) handleStop();
+  }), [handleStop]);
+
+  const handleStart = useCallback(async () => {
+    if (phase.current !== 'idle' || !supported || typeof MediaRecorder === 'undefined') return;
+    const request = ++captureRequest.current;
+    changePhase('choosing');
+    setElapsed(0);
+    setErrorMsg(null);
+
+    let display: MediaStream;
     try {
-      const displayConstraints: DisplayMediaStreamOptions = {
+      // The picker needs the user's click. Count down after a source is chosen.
+      display = await navigator.mediaDevices.getDisplayMedia({
         video: {
           frameRate: { ideal: frameRate, max: frameRate },
-          // displaySurface hints the picker toward the chosen capture mode.
           displaySurface: captureMode === 'window' ? 'window' : captureMode === 'browser' ? 'browser' : 'monitor',
         } as MediaTrackConstraints,
         audio: systemAudio,
-      };
-      displayStream = await navigator.mediaDevices.getDisplayMedia(displayConstraints);
-    } catch (err) {
-      // User cancelled the picker, denied permission, or the API is blocked.
-      const aborted = err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError');
-      const msg = aborted
-        ? 'Screen capture was cancelled.'
-        : 'Screen capture failed. Check recording permissions and try again.';
-      setErrorMsg(aborted ? null : msg);
-      toast(aborted ? 'info' : 'error', msg);
-      setState('idle');
+      });
+    } catch (error) {
+      if (request !== captureRequest.current) return;
+      if (!(error instanceof DOMException && ['NotAllowedError', 'AbortError'].includes(error.name))) {
+        setErrorMsg('Screen capture failed. Check recording permissions and try again.');
+      }
+      changePhase('idle');
       return;
     }
+    if (request !== captureRequest.current) { stopTracks(display); return; }
+    displayStreamRef.current = display;
+    const videoTrack = display.getVideoTracks()[0];
+    if (!videoTrack || videoTrack.readyState === 'ended') {
+      cleanupStreams();
+      setErrorMsg('The selected source is no longer available.');
+      changePhase('idle');
+      return;
+    }
+    videoTrack.onended = handleStop;
 
-    displayStreamRef.current = displayStream;
-
-    // Optionally capture the microphone and mix it with system audio.
-    const audioTracks: MediaStreamTrack[] = [...displayStream.getAudioTracks()];
     if (micAudio) {
       try {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        micStreamRef.current = micStream;
-        audioTracks.push(...micStream.getAudioTracks());
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (request !== captureRequest.current) { stopTracks(mic); return; }
+        micStreamRef.current = mic;
       } catch {
-        toast('warning', 'Microphone unavailable — recording without mic.');
+        if (request !== captureRequest.current) return;
+        toast('warning', 'Microphone unavailable. Recording without it.');
       }
     }
 
-    // Assemble the final recording stream (video + all collected audio tracks).
-    const recordStream = new MediaStream();
-    displayStream.getVideoTracks().forEach(t => recordStream.addTrack(t));
-    audioTracks.forEach(t => recordStream.addTrack(t));
-    recordStreamRef.current = recordStream;
-
-    if (previewRef.current) {
-      previewRef.current.srcObject = displayStream;
-      previewRef.current.play().catch(() => { /* ignore autoplay rejection */ });
-    }
-
-    // If the user stops sharing from the browser's native bar, end the recording cleanly.
-    const videoTrack = displayStream.getVideoTracks()[0];
-    if (videoTrack) videoTrack.onended = () => { handleStopRef.current?.(); };
-
-    const resolved = resolveMimeType(format);
-    activeMimeRef.current = resolved;
-
-    let recorder: MediaRecorder;
-    try {
-      recorder = resolved.mimeType
-        ? new MediaRecorder(recordStream, { mimeType: resolved.mimeType })
-        : new MediaRecorder(recordStream);
-    } catch (err) {
-      console.error('[ScreenRecorder] MediaRecorder init failed:', err);
-      toast('error', 'Could not start the recorder with the selected format.');
-      cleanupStreams();
-      setState('idle');
-      return;
-    }
-    recorderRef.current = recorder;
-
-    recorder.ondataavailable = (ev) => {
-      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
-    };
-    recorder.onstop = () => {
-      const type = (recorder.mimeType || resolved.mimeType || 'video/webm').split(';')[0];
-      const blob = new Blob(chunksRef.current, { type });
-      chunksRef.current = [];
-      if (blob.size === 0) return;
-      const url = URL.createObjectURL(blob);
-      const name = `dex-screen-${fmtTimestamp(new Date())}.${resolved.ext}`;
-      pushRecent({ id: `${Date.now()}`, name, url, size: blob.size, kind: 'video', createdAt: Date.now() });
-      toast('success', `Recording saved (${fmtBytes(blob.size)})`);
-    };
-
-    try {
-      recorder.start(1000);
-    } catch (err) {
-      console.error('[ScreenRecorder] recorder.start failed:', err);
-      toast('error', 'Recorder failed to start.');
-      cleanupStreams();
-      setState('idle');
-      return;
-    }
-
-    setElapsed(0);
-    setState('recording');
-    stopTimer();
-    timerRef.current = window.setInterval(() => setElapsed(prev => prev + 1), 1000);
-  }, [supported, frameRate, captureMode, systemAudio, micAudio, format, cleanupStreams, pushRecent, stopTimer]);
-
-  // Run the configurable countdown, then begin recording.
-  const handleStart = useCallback(() => {
-    if (state !== 'idle') return;
-    if (!supported) {
-      const msg = 'Screen capture is not available in this environment.';
-      setErrorMsg(msg);
-      toast('error', msg);
-      return;
-    }
-    if (countdownSecs <= 0) {
-      beginRecording();
-      return;
-    }
-    setErrorMsg(null);
-    setCountdown(countdownSecs);
-    setState('countdown');
-    clearCountdown();
-    countdownRef.current = window.setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearCountdown();
-          beginRecording();
-          return 0;
+    const startRecorder = () => {
+      if (request !== captureRequest.current) return;
+      const resolved = resolveMimeType(format);
+      const chunks: Blob[] = [];
+      try {
+        const audioTracks = [...display.getAudioTracks(), ...(micStreamRef.current?.getAudioTracks() ?? [])];
+        const recording = new MediaStream([videoTrack]);
+        if (audioTracks.length > 1) {
+          const mixer = new AudioContext();
+          mixerRef.current = mixer;
+          const output = mixer.createMediaStreamDestination();
+          for (const track of audioTracks) {
+            mixer.createMediaStreamSource(new MediaStream([track])).connect(output);
+          }
+          recording.addTrack(output.stream.getAudioTracks()[0]);
+          void mixer.resume().catch(() => {});
+        } else if (audioTracks.length) {
+          recording.addTrack(audioTracks[0]);
         }
-        return prev - 1;
-      });
+        const recorder = resolved
+          ? new MediaRecorder(recording, { mimeType: resolved })
+          : new MediaRecorder(recording);
+        recorderRef.current = recorder;
+        recorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); };
+        recorder.onerror = () => {
+          if (request === captureRequest.current) setErrorMsg('The recorder encountered an error.');
+        };
+        recorder.onstop = () => {
+          if (request !== captureRequest.current) return;
+          recorderRef.current = null;
+          stopTimer();
+          cleanupStreams();
+          changePhase('idle');
+          const type = (recorder.mimeType || resolved || 'video/webm').split(';')[0];
+          const blob = new Blob(chunks, { type });
+          if (!blob.size) { setErrorMsg('No video was captured.'); return; }
+          const url = URL.createObjectURL(blob);
+          const ext = type === 'video/mp4' ? 'mp4' : 'webm';
+          const name = 'dex-screen-' + fmtTimestamp(new Date()) + '.' + ext;
+          pushRecent({ id: url, name, url, size: blob.size, kind: 'video', createdAt: Date.now() });
+          toast('success', 'Recording ready to download');
+        };
+        recorder.start(1000);
+        if (previewRef.current) {
+          previewRef.current.srcObject = display;
+          void previewRef.current.play().catch(() => {});
+        }
+        changePhase('recording');
+        timerRef.current = window.setInterval(() => setElapsed(prev => prev + 1), 1000);
+      } catch {
+        recorderRef.current = null;
+        cleanupStreams();
+        setErrorMsg('The recorder could not start. Try a different format.');
+        changePhase('idle');
+      }
+    };
+
+    if (!countdownSecs) { startRecorder(); return; }
+    let seconds = countdownSecs;
+    setCountdown(seconds);
+    changePhase('countdown');
+    countdownRef.current = window.setInterval(() => {
+      setCountdown(--seconds);
+      if (seconds === 0) {
+        clearCountdown();
+        startRecorder();
+      }
     }, 1000);
-  }, [state, supported, countdownSecs, beginRecording, clearCountdown]);
+  }, [supported, frameRate, captureMode, systemAudio, micAudio, format, countdownSecs,
+    changePhase, handleStop, clearCountdown, cleanupStreams, pushRecent, stopTimer]);
 
   const handlePause = useCallback(() => {
-    const rec = recorderRef.current;
-    if (!rec) return;
-    if (state === 'recording' && rec.state === 'recording') {
-      try { rec.pause(); } catch { return; }
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    if (phase.current === 'recording' && recorder.state === 'recording') {
+      try { recorder.pause(); } catch { return; }
       stopTimer();
-      setState('paused');
-    } else if (state === 'paused' && rec.state === 'paused') {
-      try { rec.resume(); } catch { return; }
-      setState('recording');
-      stopTimer();
-      timerRef.current = window.setInterval(() => setElapsed(p => p + 1), 1000);
+      changePhase('paused');
+    } else if (phase.current === 'paused' && recorder.state === 'paused') {
+      try { recorder.resume(); } catch { return; }
+      changePhase('recording');
+      timerRef.current = window.setInterval(() => setElapsed(prev => prev + 1), 1000);
     }
-  }, [state, stopTimer]);
-
-  const handleStop = useCallback(() => {
-    stopTimer();
-    clearCountdown();
-    if (state === 'countdown') {
-      setCountdown(0);
-      setState('idle');
-      return;
-    }
-    const rec = recorderRef.current;
-    if (rec && rec.state !== 'inactive') {
-      try { rec.stop(); } catch { /* noop */ }
-    }
-    cleanupStreams();
-    setState('idle');
-  }, [state, stopTimer, clearCountdown, cleanupStreams]);
-
-  // Keep a stable ref to handleStop so the track 'onended' handler always calls the latest version.
-  const handleStopRef = useRef<typeof handleStop>(handleStop);
-  useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
+  }, [stopTimer, changePhase]);
 
   // Capture a single still frame from a fresh display stream.
   const captureStill = useCallback(async (mode: 'download' | 'clipboard') => {
-    if (!supported) {
-      toast('error', 'Screen capture is not available in this environment.');
-      return;
-    }
+    if (!supported || phase.current !== 'idle') return;
+    const request = ++captureRequest.current;
+    const current = () => request === captureRequest.current;
+    changePhase('capturing');
+    setErrorMsg(null);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
@@ -339,13 +342,17 @@ const ScreenRecorder: React.FC = () => {
         audio: false,
       });
     } catch (err) {
+      if (!current()) return;
       const aborted = err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError');
-      if (!aborted) toast('error', 'Screenshot capture failed.');
+      if (!aborted) setErrorMsg('Screenshot capture failed.');
+      changePhase('idle');
       return;
     }
+    if (!current()) { stopTracks(stream); return; }
+    displayStreamRef.current = stream;
 
+    const video = document.createElement('video');
     try {
-      const video = document.createElement('video');
       video.srcObject = stream;
       video.muted = true;
       await video.play().catch(() => { /* ignore */ });
@@ -356,8 +363,10 @@ const ScreenRecorder: React.FC = () => {
         video.onloadeddata = () => { window.clearTimeout(t); resolve(); };
       });
 
-      const w = video.videoWidth || 1920;
-      const h = video.videoHeight || 1080;
+      if (!current()) return;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h || video.readyState < 2) throw new Error('No video frame received');
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
@@ -367,6 +376,8 @@ const ScreenRecorder: React.FC = () => {
 
       const blob: Blob | null = await new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/png'));
       if (!blob) throw new Error('encode failed');
+      if (!current()) return;
+      cleanupStreams();
 
       if (mode === 'clipboard') {
         try {
@@ -374,54 +385,55 @@ const ScreenRecorder: React.FC = () => {
           const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
           if (navigator.clipboard && ClipboardItemCtor) {
             await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })]);
-            toast('success', 'Screenshot copied to clipboard');
+            if (current()) toast('success', 'Screenshot copied to clipboard');
           } else {
             throw new Error('clipboard image write unsupported');
           }
         } catch {
+          if (!current()) return;
           // Fall back to a download if clipboard image write is blocked.
           const url = URL.createObjectURL(blob);
           const name = `dex-shot-${fmtTimestamp(new Date())}.png`;
           triggerDownload(url, name);
-          pushRecent({ id: `${Date.now()}`, name, url, size: blob.size, kind: 'image', createdAt: Date.now() });
+          pushRecent({ id: url, name, url, size: blob.size, kind: 'image', createdAt: Date.now() });
           toast('warning', 'Clipboard blocked — screenshot downloaded instead.');
         }
       } else {
         const url = URL.createObjectURL(blob);
         const name = `dex-shot-${fmtTimestamp(new Date())}.png`;
         triggerDownload(url, name);
-        pushRecent({ id: `${Date.now()}`, name, url, size: blob.size, kind: 'image', createdAt: Date.now() });
-        toast('success', 'Screenshot saved');
+        pushRecent({ id: url, name, url, size: blob.size, kind: 'image', createdAt: Date.now() });
+        toast('success', 'Screenshot download started');
       }
     } catch (err) {
-      console.error('[ScreenRecorder] still capture failed:', err);
-      toast('error', 'Could not grab the frame.');
+      if (current()) setErrorMsg('Could not capture a video frame.');
     } finally {
-      stream.getTracks().forEach(t => { try { t.stop(); } catch { /* noop */ } });
+      video.srcObject = null;
+      if (current()) {
+        cleanupStreams();
+        changePhase('idle');
+      }
     }
-  }, [supported, captureMode, triggerDownload, pushRecent]);
+  }, [supported, captureMode, triggerDownload, pushRecent, changePhase, cleanupStreams]);
 
   const removeRecent = useCallback((id: string) => {
-    setRecent(prev => {
-      const target = prev.find(r => r.id === id);
-      if (target) {
-        try { URL.revokeObjectURL(target.url); } catch { /* noop */ }
-        recentUrlsRef.current = recentUrlsRef.current.filter(u => u !== target.url);
-      }
-      return prev.filter(r => r.id !== id);
-    });
+    const target = capturesRef.current.find(item => item.id === id);
+    if (!target) return;
+    URL.revokeObjectURL(target.url);
+    capturesRef.current = capturesRef.current.filter(item => item.id !== id);
+    setRecent(capturesRef.current);
   }, []);
 
   const busy = state !== 'idle';
   const optionsDisabled = busy;
-  const startDisabled = busy || !supported;
+  const startDisabled = busy || !supported || typeof MediaRecorder === 'undefined';
   const pauseDisabled = state !== 'recording' && state !== 'paused';
-  const stopDisabled = state === 'idle';
-
-  const statusLabel =
-    state === 'idle' ? 'Ready' :
-    state === 'countdown' ? 'Starting…' :
-    state === 'recording' ? 'Recording' : 'Paused';
+  const stopDisabled = state === 'idle' || state === 'finishing';
+  const cancelPending = state === 'choosing' || state === 'countdown' || state === 'capturing';
+  const statusLabel: Record<RecState, string> = {
+    idle: supported ? 'Ready' : 'Screen capture unavailable', choosing: 'Choose a source…',
+    countdown: 'Starting…', recording: 'Recording', paused: 'Paused', finishing: 'Finishing…', capturing: 'Capturing screenshot…',
+  };
   const statusColor =
     state === 'recording' ? 'var(--color-error)' :
     state === 'paused' ? 'var(--color-warning)' :
@@ -541,8 +553,8 @@ const ScreenRecorder: React.FC = () => {
       </div>
 
       {/* Preview + recent area */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <div style={{ flex: 1, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', minHeight: 0, overflow: 'auto' }}>
+        <div style={{ flex: '3 1 420px', minWidth: 0, minHeight: 260, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <div style={{
             // A solid black video well: no backdrop blur (nothing shows through
             // it, and an inline blur made the low-tier rule repaint it white).
@@ -561,7 +573,7 @@ const ScreenRecorder: React.FC = () => {
                 display: state === 'recording' || state === 'paused' ? 'block' : 'none',
               }}
             />
-            {(state === 'idle' || state === 'countdown') && (
+            {pauseDisabled && (
               // The preview well is black in both themes; dark text tokens here.
               <div className="dex-theme-dark" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--color-text-muted)', background: 'transparent' }}>
                 {state === 'countdown' ? (
@@ -572,7 +584,7 @@ const ScreenRecorder: React.FC = () => {
                   <>
                     <DexIcon name="video" size={48} color="var(--color-text-muted)" />
                     <span style={{ fontSize: 13 }}>
-                      {supported ? 'Press Start to begin recording' : 'Screen capture unavailable here'}
+                      {state === 'idle' && supported ? 'Choose a source to begin recording' : statusLabel[state]}
                     </span>
                   </>
                 )}
@@ -593,39 +605,18 @@ const ScreenRecorder: React.FC = () => {
 
           {/* Controls */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleStart}
-              disabled={startDisabled}
-              style={controlButtonStyle(startDisabled, 'color-mix(in srgb, var(--color-error) 80%, #000)')}  /* white on the plain dark-theme red was 3.4:1 */
-            >Start</button>
-            <button
-              onClick={handlePause}
-              disabled={pauseDisabled}
-              style={controlButtonStyle(pauseDisabled, 'var(--color-warning)')}
-            >{state === 'paused' ? 'Resume' : 'Pause'}</button>
-            <button
-              onClick={handleStop}
-              disabled={stopDisabled}
-              style={controlButtonStyle(stopDisabled, 'var(--color-text-secondary)')}
-            >Stop</button>
-            <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border-subtle)', margin: '0 var(--space-1)' }} />
-            <button
-              onClick={() => captureStill('download')}
-              disabled={busy || !supported}
-              style={controlButtonStyle(busy || !supported, 'var(--color-accent-fill)')}
-            >Screenshot</button>
-            <button
-              onClick={() => captureStill('clipboard')}
-              disabled={busy || !supported}
-              style={controlButtonStyle(busy || !supported, 'var(--color-bg-hover)', 'var(--color-text-primary)')}
-            >Copy frame</button>
+            <Button variant="primary" onClick={handleStart} disabled={startDisabled}>Start recording</Button>
+            <Button onClick={handlePause} disabled={pauseDisabled}>{state === 'paused' ? 'Resume' : 'Pause'}</Button>
+            <Button onClick={handleStop} disabled={stopDisabled}>{cancelPending ? 'Cancel' : 'Stop'}</Button>
+            <Button variant="ghost" onClick={() => captureStill('download')} disabled={busy || !supported}>Screenshot</Button>
+            <Button variant="ghost" onClick={() => captureStill('clipboard')} disabled={busy || !supported}>Copy frame</Button>
           </div>
         </div>
 
         {/* Recent captures */}
         <div className="dex-liquid-glass-strong" style={{
-          width: 260, borderRadius: 0, display: 'flex', flexDirection: 'column',
-          minHeight: 0,
+          flex: '1 1 200px', borderRadius: 0, display: 'flex', flexDirection: 'column',
+          minHeight: 110, minWidth: 0,
         }}>
           <div style={{
             padding: '10px var(--space-3)', fontSize: 12, fontWeight: 600,
@@ -652,14 +643,8 @@ const ScreenRecorder: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{fmtBytes(item.size)}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      onClick={() => triggerDownload(item.url, item.name)}
-                      style={miniButtonStyle('var(--color-accent-fill)')}
-                    >Download</button>
-                    <button
-                      onClick={() => removeRecent(item.id)}
-                      style={miniButtonStyle('var(--color-bg-hover)', 'var(--color-text-secondary)')}
-                    >Remove</button>
+                    <Button size="sm" aria-label={`Download ${item.name}`} onClick={() => triggerDownload(item.url, item.name)}>Download</Button>
+                    <Button size="sm" variant="ghost" aria-label={`Remove ${item.name} from recent captures`} onClick={() => removeRecent(item.id)}>Remove</Button>
                   </div>
                 </div>
               </div>
@@ -669,13 +654,13 @@ const ScreenRecorder: React.FC = () => {
       </div>
 
       {/* Status bar */}
-      <div style={{
+      <div role="status" style={{
         padding: 'var(--space-2) var(--space-4)', borderTop: '1px solid var(--color-border-subtle)',
         background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         fontSize: 11, color: 'var(--color-text-muted)',
       }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor }} />
-        <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel}</span>
+        <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel[state]}</span>
         {errorMsg && <span style={{ color: 'var(--color-error)', marginLeft: 'var(--space-2)' }}>{errorMsg}</span>}
       </div>
     </div>
@@ -701,24 +686,6 @@ function toggleLabelStyle(disabled: boolean): React.CSSProperties {
     display: 'flex', alignItems: 'center', gap: 6,
     fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 500,
     opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
-  };
-}
-
-function controlButtonStyle(disabled: boolean, accent: string, textColor = '#fff'): React.CSSProperties {
-  return {
-    padding: 'var(--space-2) 18px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-    background: disabled ? 'var(--color-bg-hover)' : accent,
-    color: disabled ? 'var(--color-text-muted)' : textColor,
-    border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1, transition: 'opacity 120ms ease, transform 100ms ease',
-    minWidth: 88,
-  };
-}
-
-function miniButtonStyle(bg: string, textColor = '#fff'): React.CSSProperties {
-  return {
-    padding: '3px 8px', borderRadius: 10, fontSize: 10, fontWeight: 500,
-    background: bg, color: textColor, border: 'none', cursor: 'pointer',
   };
 }
 

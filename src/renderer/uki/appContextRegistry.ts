@@ -15,6 +15,7 @@ import {
   createAppContextResolver,
   registerAppContext,
   unregisterAppContext,
+  resolveAppContext,
   resolveAllAppContexts,
   formatContextForPrompt,
   type AppContextSnapshot,
@@ -44,6 +45,11 @@ export function registerUkiAppContext(appId: string, fn: AppContextResolverFn): 
 /** Remove an app's resolver (call from the component's effect cleanup). */
 export function unregisterUkiAppContext(appId: string): void {
   unregisterAppContext(registry, appId);
+}
+
+/** Read one live app context without resolving the rest of the desktop. */
+export function resolveUkiContext(appId: string): AppContextSnapshot | undefined {
+  return resolveAppContext(registry, appId);
 }
 
 /** Every currently-resolvable app snapshot (undefined results are skipped). */

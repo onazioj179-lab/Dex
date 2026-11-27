@@ -4,15 +4,6 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-// Launchpad + Spotlight: one search pill over a single app grid (pinned
-// first, then A-Z, each app once). Typing turns the grid into Spotlight results.
-// - Search covers app names, categories and registered quick actions; Enter
-//   runs only the highlighted result, never a guess.
-// - Recent is this device's own launch history (already kept by the shell);
-//   there is no recommendation engine and nothing leaves the machine.
-// - Right-click any app for the shared app menu; drag an app onto the Dock
-//   to pin it; drag pinned apps (or Alt+←/→) to reorder them.
-
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import DexIcon from './DexIcon';
 import { searchApps, type AppSearchHit } from '../services/appRegistry';
@@ -26,19 +17,27 @@ export interface MenuApp { id: string; label: string }
 
 export interface AppMenuPanelProps {
   apps: MenuApp[];
-  categories: { label: string; apps: MenuApp[] }[];
   currentApp: string;
   runningIds: Set<string>;
-  history: string[];
   renderIcon: (id: string, size: number) => React.ReactNode;
   onLaunch: (id: string) => void;
   onClose: () => void;
 }
 
 
-export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, currentApp, runningIds, history, renderIcon, onLaunch, onClose }) => {
+const INDEXED_RESULT_ID = /^(setting-|file-|fs-|note-|cmd-|command-|dexcmd-|codeproject-)/;
+const INDEXED_CATEGORIES = new Set(['settings', 'files', 'notes', 'commands', 'projects']);
+
+function titleMatch(title: string, query: string): number {
+  const text = title.toLowerCase();
+  if (text === query) return 3;
+  if (text.startsWith(query)) return 2;
+  return text.includes(query) ? 1 : 0;
+}
+
+export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, currentApp, runningIds, renderIcon, onLaunch, onClose }) => {
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -57,41 +56,32 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
   const more = useMemo<SpotlightResult[]>(() => {
     if (!q) return [];
     try {
-      // The engine promotes its best hit to category "top", so filter on the
-      // id; scores under 30 are loose fuzzy noise ("dark" -> "Password").
-      const KEEP = /^(setting-|file-|fs-|note-|cmd-|command-|dexcmd-|codeproject-)/;
-      const all = spotlightEngine.search(q);
-      const found = all
-        .filter(r => r.score >= 30 && (KEEP.test(r.id) || ['settings', 'files', 'notes', 'commands', 'projects'].includes(r.category)))
-        .slice(0, 8);
-      // "Ask UKI" is always the last row: it only fills UKI's box.
-      const ask = all.find(r => r.id.startsWith('uki-ask-'));
-      return ask ? [...found, ask] : found;
+      // Keep original categories so promoted results still report their source.
+      return spotlightEngine.search(q, { markTop: false })
+        .filter(r => r.score >= 30 && (INDEXED_RESULT_ID.test(r.id) || INDEXED_CATEGORIES.has(r.category)))
+        .slice(0, 12);
     } catch { return []; }
     // indexTick: async sources (files, projects) arrived after the keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, indexTick]);
-  const total = hits.length + more.length;
-  const hasMatches = hits.length > 0 || more.some(result => !result.id.startsWith('uki-ask-'));
-  const selected = Math.max(0, Math.min(active, total - 1));
-
-  useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(t); }, []);
+  useLayoutEffect(() => {
+    const previous = document.activeElement;
+    const input = inputRef.current;
+    input?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected &&
+          (document.activeElement === document.body || document.activeElement === input)) {
+        previous.focus({ preventScroll: true });
+      }
+    };
+  }, []);
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [q]);
-  useEffect(() => {
-    if (!q || !total) return;
-    document.getElementById(`${resultsId}-${selected}`)?.scrollIntoView?.({ block: 'nearest' });
-  }, [q, resultsId, selected, total]);
-  const changeQuery = (value: string) => { setActive(0); setQuery(value); };
+  const changeQuery = (value: string) => { setActiveKey(null); setQuery(value); };
 
   const pinned = pinnedIds.map(id => byId.get(id)).filter((a): a is MenuApp => !!a);
 
-  const runAt = (i: number) => {
-    if (i < hits.length) { runHit(hits[i]); return; }
-    const m = more[i - hits.length];
-    if (m) { try { m.action(); } finally { onClose(); } }
-  };
   const runHit = (h: AppSearchHit | undefined) => {
     if (!h) return;
     if (h.kind === 'action' && h.actionId) { runAppAction(h.appId, h.actionId); onClose(); }
@@ -103,11 +93,13 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     if (e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation();
       if (query) changeQuery(''); else onClose();
-    } else if (q && e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.max(0, Math.min(selected + 1, total - 1))); }
-    else if (q && e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(selected - 1, 0)); }
-    else if (q && e.key === 'PageDown') { e.preventDefault(); setActive(Math.max(0, Math.min(selected + 5, total - 1))); }
-    else if (q && e.key === 'PageUp') { e.preventDefault(); setActive(Math.max(selected - 5, 0)); }
-    else if (q && e.key === 'Enter') { e.preventDefault(); if (total) rows[selected]?.run(); }
+    } else if (q && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp')) {
+      e.preventDefault();
+      const step = e.key.startsWith('Page') ? 5 : 1;
+      const direction = e.key.endsWith('Down') ? 1 : -1;
+      const next = Math.max(0, Math.min(selected + step * direction, rows.length - 1));
+      setActiveKey(rows[next]?.key ?? null);
+    } else if (q && e.key === 'Enter') { e.preventDefault(); rows[selected]?.run(); }
     else if (!q && e.key === 'ArrowDown') { e.preventDefault(); gridRef.current?.querySelector<HTMLButtonElement>('button[data-launchpad-app-id]')?.focus(); }
   };
 
@@ -192,42 +184,50 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = btns.length - 1;
     else if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
-    else if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey) { inputRef.current?.focus(); return; }
+    else if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      changeQuery(e.key);
+      inputRef.current?.focus();
+      return;
+    }
     else return;
     e.preventDefault();
     btns[next]?.focus();
   };
 
-  // Spotlight-style results: a Top Hit, then small group labels.
-  type Row = { key: string; i: number; title: string; sub: string; icon: React.ReactNode; group: string; run: () => void; context?: (e: React.MouseEvent) => void };
+  type Row = { key: string; title: string; sub: string; icon: React.ReactNode; kind: string; score: number; run: () => void; context?: (e: React.MouseEvent) => void };
   const ranked: Row[] = [
-    ...hits.map((h, i): Row => ({
-      key: `${h.kind}:${h.appId}:${h.actionId ?? ''}`, i,
+    ...hits.map((h): Row => ({
+      key: `${h.kind}:${h.appId}:${h.actionId ?? ''}`,
       title: h.label,
-      sub: h.kind === 'action' ? h.detail || '' : (runningIds.has(h.appId) ? 'Running' : h.detail || ''),
+      sub: h.kind === 'action' ? h.detail : (runningIds.has(h.appId) ? 'Running' : ''),
       icon: h.kind === 'app' ? renderIcon(h.appId, 18) : <DexIcon name={h.icon} size={16} color="currentColor" />,
-      group: h.kind === 'action' ? 'Actions' : 'Applications',
+      kind: h.kind === 'action' ? 'Action' : 'App',
+      score: h.score,
       run: () => runHit(h),
       context: (e) => { e.preventDefault(); openAppContextMenu({ appId: h.appId, x: e.clientX, y: e.clientY, source: 'search' }); },
     })),
-    ...more.map((m, k): Row => {
-      const group = m.category === 'settings' || m.id.startsWith('setting-') ? 'Settings'
-        : m.id.startsWith('codeproject-') || m.category === 'projects' ? 'Projects'
-        : m.id.startsWith('uki-ask-') ? 'UKI'
-        : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'Files'
-        : m.category === 'notes' || m.id.startsWith('note-') ? 'Notes' : 'Commands';
-      return { key: m.id, i: hits.length + k, title: m.title, sub: m.subtitle || '', icon: <DexIcon name={m.icon || 'search'} size={16} color="currentColor" />, group, run: () => runAt(hits.length + k) };
+    ...more.map((m): Row => {
+      const kind = m.category === 'settings' || m.id.startsWith('setting-') ? 'Setting'
+        : m.id.startsWith('codeproject-') || m.category === 'projects' ? 'Project'
+        : m.category === 'files' || /^(file-|fs-)/.test(m.id) ? 'File'
+        : m.category === 'notes' || m.id.startsWith('note-') ? 'Note' : 'Command';
+      return {
+        key: m.id, title: m.title, sub: m.subtitle || '',
+        icon: <DexIcon name={m.icon || 'search'} size={16} color="currentColor" />,
+        // Spotlight's title and usage bonuses use a wider scale than the app registry.
+        kind, score: Math.min(100, m.score / 1.8),
+        run: () => { try { m.action(); } finally { onClose(); } },
+      };
     }),
   ];
-  // Best match first (Top Hit), then the rest grouped by kind in the order the
-  // groups first appear; the keyboard index follows this visual order.
-  const rows: Row[] = (() => {
-    if (!ranked.length) return ranked;
-    const [top, ...others] = ranked;
-    const order: string[] = [];
-    for (const r of others) if (!order.includes(r.group)) order.push(r.group);
-    return [top, ...order.flatMap(g => others.filter(r => r.group === g))].map((r, n) => ({ ...r, i: n }));
-  })();
+  const normalizedQuery = q.toLowerCase();
+  const rows = ranked.sort((a, b) => titleMatch(b.title, normalizedQuery) - titleMatch(a.title, normalizedQuery) || b.score - a.score);
+  const selected = Math.max(0, rows.findIndex(row => row.key === activeKey));
+  const activeId = rows.length ? `${resultsId}-${selected}` : undefined;
+  useEffect(() => {
+    if (activeId) document.getElementById(activeId)?.scrollIntoView({ block: 'nearest' });
+  }, [q, activeId, rows[selected]?.key]);
 
   return (
     <>
@@ -237,12 +237,12 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
         <input
           ref={inputRef}
           role="combobox"
-          aria-expanded={!!q}
-          aria-controls={q ? resultsId : undefined}
-          aria-activedescendant={q && total ? `${resultsId}-${selected}` : undefined}
+          aria-expanded={!!activeId}
+          aria-controls={activeId ? resultsId : undefined}
+          aria-activedescendant={activeId}
           aria-autocomplete="list"
           aria-label="Search apps and actions"
-          placeholder="Search apps, files, notes and settings"
+          placeholder="Search"
           value={query}
           onChange={e => changeQuery(e.target.value)}
           onKeyDown={onSearchKey}
@@ -256,39 +256,28 @@ export const AppMenuPanel: React.FC<AppMenuPanelProps> = ({ apps, categories, cu
         </button>
       </div>
       <div ref={scrollRef} className="dex-lp-scroll">
-      {q ? (
-        <div id={resultsId} role="listbox" aria-label="Results" className="dex-lp-results">
-          {!hasMatches && (
-            <div role="status" className="dex-lp-empty">Nothing matches &ldquo;{q}&rdquo;</div>
-          )}
-          {rows.map((r, n) => {
-            const top = n === 0 && hasMatches;
-            // A label above the first row of each group (the Top Hit has its own).
-            const showGroup = !top && (n === 0 || n === 1 || rows[n - 1].group !== r.group);
-            return (
-              <React.Fragment key={r.key}>
-                {top && <div role="presentation" className="dex-lp-group">Top Hit</div>}
-                {showGroup && <div role="presentation" className="dex-lp-group">{r.group}</div>}
-                <div
-                  id={`${resultsId}-${r.i}`}
+      {q ? (rows.length ? (
+        <div id={resultsId} role="listbox" aria-label="Search results" className="dex-lp-results">
+          {rows.map((r, index) => (
+                <div key={r.key}
+                  id={`${resultsId}-${index}`}
                   role="option"
-                  aria-selected={r.i === selected}
-                  className={top ? 'dex-lp-row dex-lp-row-top' : 'dex-lp-row'}
-                  onMouseMove={() => setActive(r.i)}
+                  aria-selected={index === selected}
+                  className="dex-lp-row"
+                  onMouseDown={event => event.preventDefault()}
                   onClick={r.run}
                   onContextMenu={r.context}
                 >
                   <span className="dex-lp-row-icon">{r.icon}</span>
                   <span className="dex-lp-row-text">
-                    <span className="dex-lp-row-title">{r.title}</span>
-                    {r.sub && <span className="dex-lp-row-sub">{r.sub}</span>}
+                    <span className="dex-lp-row-title" title={r.title}>{r.title}</span>
+                    {r.sub && <span className="dex-lp-row-sub" title={r.sub}>{r.sub}</span>}
                   </span>
+                  <span className="dex-lp-row-kind">{r.kind}</span>
                 </div>
-              </React.Fragment>
-            );
-          })}
+          ))}
         </div>
-      ) : (
+      ) : <div role="status" className="dex-lp-empty">No results</div>) : (
         <div ref={gridRef} className="dex-lp-grid" aria-label="Applications" data-launchpad-grid="" onKeyDown={onGridKey}>
           {gridApps.map(({ app, pinnedIndex }) => tile(app, pinnedIndex))}
         </div>
@@ -306,10 +295,10 @@ const LAUNCHPAD_CSS = `
   height: 44px; padding: 0 8px 0 16px; margin-bottom: 18px; border-radius: 9999px;
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   color: var(--color-text-tertiary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  transition: box-shadow 150ms var(--ease-out);
+  border: 1px solid var(--color-border);
+  transition: border-color 150ms var(--ease-out);
 }
-.dex-lp-search:focus-within { background: color-mix(in srgb, var(--color-text-primary) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-primary) 16%, transparent); }
+.dex-lp-search:focus-within { border-color: var(--color-border-strong); }
 .dex-lp-search input {
   flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent;
   font: inherit; font-size: 15px; letter-spacing: -0.01em; color: var(--color-text-primary);
@@ -323,7 +312,7 @@ const LAUNCHPAD_CSS = `
 .dex-lp-scroll::-webkit-scrollbar { width: 6px; }
 .dex-lp-scroll::-webkit-scrollbar-button { display: none; height: 0; }
 .dex-lp-scroll::-webkit-scrollbar-thumb { border-radius: 9999px; background: color-mix(in srgb, var(--color-text-primary) 18%, transparent); }
-.dex-lp-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 14px; column-gap: 4px; padding-bottom: 8px; }
+.dex-lp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 84px), 1fr)); row-gap: 14px; column-gap: 4px; padding-bottom: 8px; }
 .dex-lp-tile {
   display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0;
   padding: 6px 2px 2px; border: 0; border-radius: 14px; background: transparent; box-shadow: none;
@@ -345,23 +334,18 @@ const LAUNCHPAD_CSS = `
 }
 .dex-lp-dot { width: 4px; height: 4px; margin-top: -3px; border-radius: 9999px; background: transparent; }
 .dex-lp-dot[data-on] { background: var(--color-text-secondary); }
-.dex-lp-results { display: flex; flex-direction: column; gap: 1px; padding-bottom: 8px; }
-.dex-lp-group { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); }
-.dex-lp-group:first-child { padding-top: 0; }
-.dex-lp-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; border-radius: 10px; cursor: default; color: var(--color-text-primary); }
-.dex-lp-row-top { min-height: 52px; }
+.dex-lp-results { display: grid; gap: 2px; padding-bottom: 8px; }
+.dex-lp-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px; border-radius: 9px; cursor: pointer; color: var(--color-text-primary); }
+.dex-lp-row:hover { background: var(--color-bg-hover); }
 .dex-lp-row-icon {
-  width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; display: grid; place-items: center; overflow: hidden;
-  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent); color: var(--color-text-primary);
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0; display: grid; place-items: center; overflow: hidden;
+  background: var(--color-bg-active); color: var(--color-text-primary);
 }
-.dex-lp-row-top .dex-lp-row-icon { width: 36px; height: 36px; border-radius: 10px; }
 .dex-lp-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dex-lp-row-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dex-lp-row-top .dex-lp-row-title { font-size: 14px; font-weight: 600; }
-.dex-lp-row-sub { font-size: 11px; color: var(--color-text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dex-lp-row[aria-selected="true"] { background: var(--color-accent-fill); color: var(--color-accent-text); }
-.dex-lp-row[aria-selected="true"] .dex-lp-row-sub { color: color-mix(in srgb, var(--color-accent-text) 82%, transparent); }
-.dex-lp-row[aria-selected="true"] .dex-lp-row-icon { background: color-mix(in srgb, var(--color-accent-text) 20%, transparent); color: var(--color-accent-text); }
-.dex-lp-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--color-text-tertiary); overflow-wrap: anywhere; }
+.dex-lp-row-title { font-size: 14px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-lp-row-sub { font-size: 12px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-lp-row-kind { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+.dex-lp-row[aria-selected="true"] { background: var(--color-bg-active); }
+.dex-lp-empty { padding: 22px 12px; text-align: center; font-size: 13px; color: var(--color-text-secondary); }
 @media (prefers-reduced-motion: reduce) { .dex-lp-icon { transition: none; } .dex-lp-tile:active .dex-lp-icon { transform: none; } }
 `;

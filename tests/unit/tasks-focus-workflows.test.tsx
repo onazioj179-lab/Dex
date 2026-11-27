@@ -7,6 +7,7 @@ import { ToastProvider } from '../../src/renderer/components/Toast';
 import { sendToTasks, takeIncomingTasks } from '../../src/renderer/services/taskIntake';
 import { useTimerStore } from '../../src/renderer/store/timerStore';
 import { toLocalDateInput } from '../../src/renderer/utils/localDate';
+import { dispatchAppIntent } from '../../src/renderer/services/appIntents';
 
 const savedTimer = useTimerStore.getState();
 const row = (id: string, title: string, fields: Record<string, unknown> = {}) => ({
@@ -20,6 +21,24 @@ function seed(...rows: ReturnType<typeof row>[]) {
 function mountTasks() { return render(<ToastProvider><Tasks /></ToastProvider>); }
 
 beforeEach(() => localStorage.clear());
+
+it('opens an unscheduled task from an activity intent while Tasks is still loading', async () => {
+  const scroll = vi.fn();
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+  try {
+    seed(row('activity-target', 'Review the design', { description: 'Check the toolbar alignment' }));
+    mountTasks();
+    act(() => dispatchAppIntent('tasks', 'open-task', 'activity-target'));
+    expect(await screen.findByPlaceholderText('Add a description...')).toHaveValue('Check the toolbar alignment');
+    expect(screen.getByText('Review the design')).toBeVisible();
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'nearest' }));
+  } finally {
+    cleanup();
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', descriptor);
+    else delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
+});
 afterEach(() => {
   cleanup();
   takeIncomingTasks();

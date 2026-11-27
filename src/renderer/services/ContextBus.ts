@@ -26,8 +26,9 @@ export interface ContextEventMap {
   'clipboard:updated':{ kind: 'text' | 'image' | 'file'; size?: number };
   'file:saved':       { appId: string; path?: string; size?: number };
   'file:opened':      { appId: string; path?: string };
+  'file:focused':     { appId: string; path: string | null };
   'task:created':     { id: string; title: string; due?: number };
-  'task:completed':   { id: string };
+  'task:completed':   { id: string; title?: string };
   'note:opened':      { id: string; title?: string };
   'note:saved':       { id: string };
   'workflow:trigger': { id: string; reason: string };
@@ -47,7 +48,7 @@ export interface ContextEventMap {
    *  universal content kind) — kept as string here to avoid a renderer import. */
   'continuity:assetFocus':  { source: string; assetId: string; kind: string };
   /** Project context switched in any app -- enables shared project memory. */
-  'continuity:project':     { projectId: string; manifestPath?: string; source: string };
+  'continuity:project':     { projectId: string; name?: string; manifestPath?: string; source: string };
   /** Stage / workspace switched. */
   'continuity:stage':       { stageId: string; previousStageId?: string };
   /** A live preview pipe started/ended between apps. */
@@ -63,6 +64,11 @@ type Handler<C extends ContextChannel> = (payload: ContextEventMap[C]) => void;
 
 const DEFAULT_THROTTLE_MS = 16; // one event per channel per frame by default
 const RING_BUFFER_SIZE = 200;    // last N events for replay/crash inspection
+// Discrete work events must survive bursts (tab changes, bulk task completion).
+const unthrottledChannels = new Set<ContextChannel>([
+  'file:opened', 'file:focused', 'file:saved', 'note:opened',
+  'task:created', 'task:completed', 'continuity:project',
+]);
 let throttleMs = DEFAULT_THROTTLE_MS;
 
 interface BufferedEvent {
@@ -111,12 +117,14 @@ export const ContextBus = {
     return off;
   },
 
-  /** Emit. Throttled to one event per channel per ~frame; coalesces duplicates. */
+  /** Emit. Throttled to one event per channel per ~frame for continuous signals. */
   emit<C extends ContextChannel>(channel: C, payload: ContextEventMap[C]): void {
     const now = Date.now();
-    const last = lastEmitAt.get(channel) || 0;
-    if (throttleMs > 0 && now - last < throttleMs) return;
-    lastEmitAt.set(channel, now);
+    if (throttleMs > 0 && !unthrottledChannels.has(channel)) {
+      const last = lastEmitAt.get(channel);
+      if (last !== undefined && now - last < throttleMs) return;
+      lastEmitAt.set(channel, now);
+    }
 
     pushRing({ channel, payload, ts: now });
 

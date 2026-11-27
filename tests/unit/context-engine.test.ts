@@ -4,7 +4,7 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ContextEngine } from '../../src/shared/uki/contextEngine';
 
 describe('UKI 3.0 ContextEngine', () => {
@@ -66,5 +66,35 @@ describe('UKI 3.0 ContextEngine', () => {
     expect(e.getContext()).toEqual({
       project: null, file: null, workspace: null, task: null, openApps: [], recentActivity: [],
     });
+  });
+
+  it('publishes stable snapshots only when context changes', () => {
+    const e = new ContextEngine(() => 1);
+    const listener = vi.fn(e.getSnapshot);
+    const unsubscribe = e.subscribe(listener);
+    const empty = e.getSnapshot();
+
+    e.setOpenApps(['Notes', 'Notes']);
+    e.setOpenApps(['Notes']);
+    e.setWorkspace(null);
+    const withApps = e.getSnapshot();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.results[0].value).toBe(withApps);
+    expect(withApps.openApps).toEqual(['Notes']);
+    expect(empty.openApps).toEqual([]);
+
+    e.setFile('report.dex', false);
+    expect(e.getSnapshot().recentActivity).toEqual([]);
+    e.recordActivity('save', 'report.dex');
+    const saved = e.getSnapshot().recentActivity[0];
+    e.recordActivity('save', 'report.dex');
+    expect(e.getSnapshot().recentActivity[1]).toBe(saved);
+    expect(e.getSnapshot().recentActivity[0].id).not.toBe(saved.id);
+    expect(e.getContext().recentActivity[0]).toEqual({ kind: 'save', target: 'report.dex', at: 1 });
+
+    unsubscribe();
+    listener.mockClear();
+    e.clear();
+    expect(listener).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,7 @@ import { AssistedTextarea } from '../components/AssistedTextarea';
 import { useAppTracking } from '../services/usePatternLearning';
 import { useToastHelpers } from '../components/Toast';
 import { notify } from '../services/notify';
+import { registerAppIntentHandler } from '../services/appIntents';
 import { glassSidebar } from '../styles/glassMenu';
 import DexIcon from '../components/DexIcon';
 import ContextMenu, { useContextMenu, ContextMenuItem } from '../components/ContextMenu';
@@ -31,6 +32,7 @@ import { openWithShell } from '../utils/openWithShell';
 import { useTimerStore } from '../store/timerStore';
 import { persistOrWarn } from '../utils/persistOrWarn';
 import { takeIncomingTasks, TASK_INTAKE_EVENT } from '../services/taskIntake';
+import { ContextBus } from '../services/ContextBus';
 
 // ===========================================================================
 // TYPES
@@ -588,6 +590,22 @@ export const Tasks: React.FC = () => {
   const [chipPriority, setChipPriority] = useState<Task['priority'] | null>(null);
   const [chipList, setChipList] = useState<string | null>(null);
   const [chipHasDue, setChipHasDue] = useState(false);
+  const [requestedTask, setRequestedTask] = useState<string | null>(null);
+  useEffect(() => registerAppIntentHandler('tasks', (action, payload) => {
+    if (action !== 'open-task' || typeof payload !== 'string') return false;
+    setSelectedList('all');
+    setShowCompleted(true);
+    setShowCalendarView(false);
+    setSearchQuery('');
+    setTagFilter('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setChipPriority(null);
+    setChipList(null);
+    setChipHasDue(false);
+    setExpandedTask(payload);
+    setRequestedTask(payload);
+  }), []);
   const taskListRef = useRef<HTMLDivElement>(null);
   const triageIdRef = useRef<string | null>(null);
   useEffect(() => { triageIdRef.current = triageId; }, [triageId]);
@@ -658,6 +676,7 @@ export const Tasks: React.FC = () => {
         notes: '',
       };
       setTasks((prev) => [newTask, ...prev]);
+      ContextBus.emit('task:created', { id: newTask.id, title });
       return `Added task "${title}".`;
     });
     registerUkiAppAction('tasks', {
@@ -856,6 +875,21 @@ export const Tasks: React.FC = () => {
   useEffect(() => { setTaskVisibleCount(TASKS_PER_PAGE); }, [sortBy, sortedTasks.length]);
   const visibleTasks = tasksWindowed ? sortedTasks.slice(0, taskVisibleCount) : sortedTasks;
   const remainingTasks = sortedTasks.length - visibleTasks.length;
+  useEffect(() => {
+    if (!requestedTask || isLoading) return;
+    const index = sortedTasks.findIndex(task => task.id === requestedTask);
+    if (index < 0) {
+      toast.info('This task is no longer available.');
+      setRequestedTask(null);
+      return;
+    }
+    if (tasksWindowed && index >= taskVisibleCount) {
+      setTaskVisibleCount(index + 1);
+      return;
+    }
+    taskListRef.current?.querySelector<HTMLElement>(`[data-task-id="${CSS.escape(requestedTask)}"]`)?.scrollIntoView({ block: 'nearest' });
+    setRequestedTask(null);
+  }, [requestedTask, isLoading, sortedTasks, tasksWindowed, taskVisibleCount, toast]);
   // Keep the keyboard-triage id order in sync with what's actually on screen, and
   // drop the cursor if the highlighted row scrolls/filters out of view.
   useEffect(() => {
@@ -927,8 +961,9 @@ export const Tasks: React.FC = () => {
     setTasks(prev => task.completed
       ? prev.map(row => row.id === id ? { ...row, completed: false, completedAt: null } : row)
       : completeTaskRows(prev, new Set([id]), at));
-    if (task && !task.completed) {
+    if (!task.completed) {
       // Trigger the brief completion animation, then clear the flag so it can replay.
+      ContextBus.emit('task:completed', { id, title: task.title });
       setRecentlyCompleted(id);
       window.setTimeout(() => setRecentlyCompleted(prev => (prev === id ? null : prev)), 400);
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: 1 } }));
@@ -999,6 +1034,7 @@ export const Tasks: React.FC = () => {
       flagged: selectedList === 'flagged' ? true : undefined,
     };
     setTasks(previous => [newTask, ...previous]);
+    ContextBus.emit('task:created', { id: newTask.id, title });
     setNewTaskTitle('');
     setNewTaskDue('');
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCreated', amount: 1 } }));
@@ -1102,6 +1138,9 @@ export const Tasks: React.FC = () => {
     if (eligible.size) {
       const at = new Date().toISOString();
       setTasks(prev => completeTaskRows(prev, eligible, at));
+      for (const task of pending) {
+        if (eligible.has(task.id)) ContextBus.emit('task:completed', { id: task.id, title: task.title });
+      }
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: eligible.size } }));
     }
     const blocked = pending.filter(task => !eligible.has(task.id));
@@ -1521,6 +1560,7 @@ export const Tasks: React.FC = () => {
             size="sm"
             fullWidth
             placeholder="Search"
+            aria-label="Search tasks"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onClear={() => setSearchQuery('')}
@@ -1539,11 +1579,12 @@ export const Tasks: React.FC = () => {
               key={opt.id}
               onClick={() => setStatusFilter(opt.id)}
               aria-label={`Filter by status: ${opt.label}`}
+              aria-pressed={statusFilter === opt.id}
               style={{
                 padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                 border: '1px solid var(--color-border-subtle)',
-                background: statusFilter === opt.id ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
-                color: statusFilter === opt.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                background: statusFilter === opt.id ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)',
+                color: statusFilter === opt.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 fontWeight: statusFilter === opt.id ? 600 : 400, fontFamily: 'inherit',
               }}
             >
@@ -1565,11 +1606,12 @@ export const Tasks: React.FC = () => {
                 key={opt.id}
                 onClick={() => setPriorityFilter(opt.id)}
                 aria-label={`Filter by priority: ${opt.label}`}
+                aria-pressed={active}
                 style={{
                   padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                   border: `1px solid ${active ? accent : 'var(--color-border-subtle)'}`,
                   background: 'var(--color-bg-hover)',
-                  color: active ? accent : 'var(--color-text-secondary)',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontWeight: active ? 600 : 400, fontFamily: 'inherit',
                 }}
               >
@@ -1816,7 +1858,7 @@ export const Tasks: React.FC = () => {
           ) : (
           <>
           {visibleTasks.map(task => (
-            <div key={task.id}>
+            <div key={task.id} data-task-id={task.id}>
               <div
                 className={`dex-task-item dex-tasks-task-row${recentlyCompleted === task.id ? ' dex-task-complete' : ''}`}
                 draggable={sortBy === 'manual'}

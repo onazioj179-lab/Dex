@@ -179,7 +179,7 @@ export function formatOperatorBriefing(b: OperatorBriefing = buildOperatorBriefi
   // does not already carry, so UKI knows what the user just did, not only what
   // is open. Targets are clipped so the block stays token-bounded.
   try {
-    const recent = contextEngine.getContext().recentActivity
+    const recent = contextEngine.getSnapshot().recentActivity
       .slice(0, 4)
       .map((a) => `${a.kind}:${a.target.length > 24 ? a.target.slice(0, 24) + '…' : a.target}`);
     if (recent.length) lines.push(`recent: ${recent.join(', ')}`);

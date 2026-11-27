@@ -26,6 +26,7 @@ import { APP_WINDOW_SIZES, rememberedWindowSize, rememberWindowSize, getAppEntry
 import { AppContextMenuHost, openAppContextMenu, runAppAction, sendAppCommand, type AppCommandDetail } from './AppContextMenu';
 import { AppMenuPanel } from './AppMenuPanel';
 import { dispatchAppIntent } from '../services/appIntents';
+import { setContextForegroundApp } from '../services/contextEngineWiring';
 import { useUkiStore } from '../store/ukiStore';
 import { startGlobalHotkeyListener } from '../services/globalHotkeys';
 import { actionFor } from '../shell/input/multiFinger';
@@ -563,39 +564,6 @@ const LAUNCHPAD_APPS: { id: AppId; label: string; color: string }[] = ([
   color: LAUNCHPAD_COLOR_OVERRIDES[a.id] || APP_DEFINITIONS[a.id]?.color || 'var(--color-text-tertiary)',
 }));
 
-// -- App menu categories (module-level, computed once) --------------------
-const MODULE_APP_MENU_CATEGORIES: { label: string; apps: typeof LAUNCHPAD_APPS }[] = (() => {
-  const cats: { label: string; apps: typeof LAUNCHPAD_APPS }[] = [];
-  const catMap: Record<string, typeof LAUNCHPAD_APPS> = {};
-  const catOrder = ['System', 'Productivity', 'Creative Suite', 'Engineering', 'Media', 'Tools', 'Entertainment', 'Project Management', 'Rewards', 'Other'];
-  const appToCat: Record<string, string> = {
-    settings: 'System', power: 'System', recyclebin: 'System',
-    files: 'Productivity', browser: 'Productivity', notes: 'Productivity', tasks: 'Productivity', calendar: 'Productivity', workflows: 'Productivity', dexcode: 'Engineering', collabhub: 'Productivity', store: 'System', games: 'Entertainment',
-    videoeditor: 'Creative Suite', imosion: 'Creative Suite', prism: 'Creative Suite', flux: 'Creative Suite', forge: 'Creative Suite',
-    gallery: 'Media', audio: 'Media', noisegenerator: 'Media',
-    calculator: 'Tools', passwordgenerator: 'Tools', transfers: 'Tools', powerrename: 'Tools',
-    stopwatch: 'Tools', unitconverter: 'Tools', pomodoro: 'Tools', qrcode: 'Tools', colorpicker: 'Tools',
-    weather: 'Tools', worldclock: 'Tools',
-    canvas: 'Creative Suite', creativehub: 'Creative Suite', timer: 'Tools',
-    maps: 'Tools',
-    nexus: 'Tools',
-    learn: 'Tools',
-    screenrecorder: 'Media', presentation: 'Productivity', pdfviewer: 'Productivity', pixelart: 'Creative Suite',
-    kanban: 'Project Management',
-    taskmanager: 'System', liveactivity: 'System', spaces: 'System', backup: 'System', extensions: 'System',
-    inbox: 'Productivity', projectdash: 'Project Management', uki: 'Tools',
-    axl: 'Engineering', bio: 'Engineering', terminal: 'Engineering', ledger: 'Productivity',
-    achievements: 'Rewards',
-  };
-  LAUNCHPAD_APPS.forEach(app => {
-    const cat = appToCat[app.id] || 'Other';
-    if (!catMap[cat]) catMap[cat] = [];
-    catMap[cat].push(app);
-  });
-  catOrder.forEach(c => { if (catMap[c]?.length) cats.push({ label: c, apps: catMap[c] }); });
-  return cats;
-})();
-
 // -- Extracted styles (module constants — never re-created) ----------------
 const errorBoundaryContainer: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -772,8 +740,6 @@ export const AppManager: React.FC = () => {
   showAppMenuRef.current = showAppMenu;
   // Shared Spotlight search overlay (the dock Search button opens this). One
   // search surface, used everywhere -- real results, keyboard nav, categories.
-  const [appMenuSearch, setAppMenuSearch] = useState('');
-  const appMenuSearchRef = useRef<HTMLInputElement>(null);
   // Immersive focus: hide the top bar so an open
   // app gets the full DEX frame with zero chrome — "clear the screen to
   // concentrate". Toggled with Ctrl+Shift+F, exited with Escape or the pill.
@@ -1048,6 +1014,10 @@ export const AppManager: React.FC = () => {
     });
     return id;
   }, [detachedApps, minimizedApps]);
+
+  useEffect(() => {
+    setContextForegroundApp(focusedFloatingAppId ?? currentAppId);
+  }, [focusedFloatingAppId, currentAppId]);
 
   // No left strip is reserved (Stage Manager removed in 5.6); floating windows
   // use the full workspace width.
@@ -1776,7 +1746,7 @@ export const AppManager: React.FC = () => {
 
   // Close app menu when clicking outside (robust click-outside pattern)
   useEffect(() => {
-    if (!showAppMenu) { setAppMenuSearch(''); return; }
+    if (!showAppMenu) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       // Ignore clicks on the launchpad button itself (button toggles menu)
@@ -1873,6 +1843,7 @@ export const AppManager: React.FC = () => {
     const payload = request as Record<string, unknown>;
     const raw = String(payload.appId ?? payload.id ?? payload.appName ?? payload.name ?? '').trim().toLowerCase();
     if (!raw) return null;
+    if (raw !== baseAppId(raw) && APP_DEFINITIONS[raw]) return raw as AppId;
     const normalized = raw.replace(/[^a-z0-9]+/g, '');
     const entries = Object.entries(APP_DEFINITIONS) as Array<[AppId, typeof APP_DEFINITIONS[AppId]]>;
     let hit = entries.find(([id]) => id === raw || id.replace(/[^a-z0-9]+/g, '') === normalized);
@@ -1898,7 +1869,6 @@ export const AppManager: React.FC = () => {
       recentExternalOpenRef.current.set(appId, now);
       setCurrentApp(appId);
       setShowAppMenu(false);
-      setAppMenuSearch('');
     };
     const onClose = (event: Event) => {
       const appId = resolveRequestedAppId((event as CustomEvent).detail);
@@ -3111,7 +3081,6 @@ export const AppManager: React.FC = () => {
         case 'appMenu': setShowAppMenu(true); break;
         case 'clipboard': window.dispatchEvent(new CustomEvent('dex-open-clipboard')); break;
         case 'sendto': window.dispatchEvent(new CustomEvent('dex-flow-open')); break;
-        case 'context': window.dispatchEvent(new CustomEvent('dex-open-context')); break;
         case 'learn': window.dispatchEvent(new CustomEvent('dex-open-learn')); break;
         case 'quickActions': window.dispatchEvent(new CustomEvent('dex-open-quick-actions')); break;
         case 'navBack': goBack(); break;
@@ -3283,11 +3252,14 @@ export const AppManager: React.FC = () => {
           // Dispatch event for openAppInWindow (defined later, needs event bridge)
           window.dispatchEvent(new CustomEvent('dex-open-in-window', { detail: { appId } }));
         }
-        // Forward contextId (URL) to Browser when navigating to browser
-        if (appId === 'browser' && detail.contextId) {
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('dex-browser-navigate', { detail: { url: detail.contextId } }));
-          }, 80);
+        if (typeof detail.contextId === 'string' && appId === 'browser') {
+          dispatchAppIntent('browser', 'navigate-url', detail.contextId);
+        } else if (typeof detail.contextId === 'string' && appId === 'notes') {
+          dispatchAppIntent('notes', 'open-note', detail.contextId);
+        } else if (typeof detail.contextId === 'string' && appId === 'tasks') {
+          dispatchAppIntent('tasks', 'open-task', detail.contextId);
+        } else if (typeof detail.contextId === 'string' && appId === 'files') {
+          dispatchAppIntent('files', 'reveal-path', { path: detail.contextId, folder: detail.contextKind === 'folder' });
         } else if (appId === 'settings' && detail.contextId) {
           // Retry delivery — Settings may not be mounted yet (lazy-loaded)
           const deliverSection = (retries = 0) => {
@@ -5134,8 +5106,6 @@ export const AppManager: React.FC = () => {
   }, [mountedAppsSafeSnapshot.join(',')]);
 
 
-  // APP_MENU_CATEGORIES is computed once at module scope — no useMemo needed
-  const APP_MENU_CATEGORIES = MODULE_APP_MENU_CATEGORIES;
 
   const hasRunningNonHome = runningApps.some(a => a.id !== 'home');
 
@@ -5827,7 +5797,7 @@ export const AppManager: React.FC = () => {
         <>
           <div
             data-dex-overlay
-            onClick={() => { setShowAppMenu(false); setAppMenuSearch(''); }}
+            onClick={() => { setShowAppMenu(false); }}
             style={{
               position: 'fixed', inset: 0,
               background: 'rgba(0,0,0,0.18)',
@@ -5881,19 +5851,16 @@ export const AppManager: React.FC = () => {
             <style>{`
               @keyframes appMenuFade { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
-            {/* Smart App Menu: Search (apps + registered actions) · Pinned ·
-                Recent · All Apps. Pins come from the shared pinning service. */}
+            {/* Pinned apps and search share the same launcher. */}
             <AppMenuPanel
               apps={LAUNCHPAD_APPS.filter(a => useInstalledAppsStore.getState().isInstalled(a.id))}
-              categories={APP_MENU_CATEGORIES.map(c => ({ label: c.label, apps: c.apps.filter(a => useInstalledAppsStore.getState().isInstalled(a.id)) }))}
               currentApp={currentApp}
               runningIds={new Set(runningApps.map(a => a.id))}
-              history={sessionHistory}
               renderIcon={(id, size) => AppIconPngs[id]
                 ? <AppIconImg appId={id} size={Math.round(size * 1.6)} />
                 : (size >= 20 && Icons[id]) || <DexIcon name={APP_DEFINITIONS[id]?.icon || id} size={size} color="currentColor" />}
               onLaunch={(id) => { setCurrentApp(id as AppId); setShowAppMenu(false); }}
-              onClose={() => { setShowAppMenu(false); setAppMenuSearch(''); }}
+              onClose={() => { setShowAppMenu(false); }}
             />
           </div>
           </div>

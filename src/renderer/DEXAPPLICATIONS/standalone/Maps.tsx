@@ -25,7 +25,7 @@
  * Styling stays deliberately neutral (DEX tokens, hairline chrome, no brand
  * color noise) -- the map itself is the only saturated surface.
  */
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useId, memo } from 'react';
 import { urlAllowed } from '../../services/networkGate';
 import { SegmentedControl } from '../../components/controls';
 import { isReduceMotion } from '../../utils/MotionController';
@@ -245,6 +245,7 @@ const MAPS_STYLE = `
 .dex-maps-root .dex-maps-card-btn:hover { background: var(--color-bg-hover) !important; border-color: var(--color-border-strong, var(--color-border)) !important; }
 .dex-maps-root .dex-maps-iconbtn:hover { background: var(--color-bg-hover) !important; color: var(--color-text-primary) !important; border-radius: var(--radius-sm); }
 .dex-maps-root .dex-maps-result { transition: background 0.1s ease; }
+.dex-maps-search .dex-maps-result[aria-selected="true"] { background: var(--color-bg-active); }
 .dex-maps-pulse { animation: dexMapsPulse 1.4s ease-in-out infinite; }
 @keyframes dexMapsPulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
 .dex-maps-card-enter { animation: dexMapsCardIn 0.18s ease both; }
@@ -289,6 +290,8 @@ const DexMaps: React.FC = () => {
   const [bearing, setBearing] = useState(savedView?.bearing ?? 0);
   const [pitch, setPitch] = useState(savedView?.pitch ?? 0);
   const [query, setQuery] = useState('');
+  const [activeResult, setActiveResult] = useState(-1);
+  const placeResultsId = useId();
   const [settledSearch, setSettledSearch] = useState<(GeocodeOutcome & { query: string }) | null>(null);
   const searchQuery = query.trim();
   const currentSearch = settledSearch?.query === searchQuery ? settledSearch : null;
@@ -631,6 +634,8 @@ const DexMaps: React.FC = () => {
   const changeSearch = (value: string) => {
     if (value.trim() !== searchQuery) setSettledSearch(null);
     setQuery(value);
+    setActiveResult(-1);
+    setFocused(true);
   };
 
   const pick = useCallback((r: GeoResult) => {
@@ -638,6 +643,7 @@ const DexMaps: React.FC = () => {
     pushRecent(r);
     setQuery('');
     setSettledSearch(null);
+    setActiveResult(-1);
     setFocused(false);
   }, [goTo, pushRecent]);
 
@@ -703,6 +709,11 @@ const DexMaps: React.FC = () => {
   }, [pin]);
 
   const showRecentPanel = focused && !query.trim() && recent.length > 0;
+  const visiblePlaces = focused ? (showRecentPanel ? recent : results) : [];
+  const activePlaceId = visiblePlaces[activeResult] ? `${placeResultsId}-${activeResult}` : undefined;
+  useEffect(() => {
+    if (activePlaceId) document.getElementById(activePlaceId)?.scrollIntoView?.({ block: 'nearest' });
+  }, [activePlaceId]);
 
   const unified = useUnifiedChrome();
   if (failed) {
@@ -716,6 +727,27 @@ const DexMaps: React.FC = () => {
       value={query}
       onChange={(e) => changeSearch(e.target.value)}
       onClear={() => changeSearch('')}
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded={visiblePlaces.length > 0}
+      aria-controls={visiblePlaces.length ? placeResultsId : undefined}
+      aria-activedescendant={activePlaceId}
+      onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Escape' && focused) {
+          e.stopPropagation();
+          e.preventDefault();
+          changeSearch('');
+          setFocused(false);
+        } else if (visiblePlaces.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          e.preventDefault();
+          const step = e.key === 'ArrowDown' ? 1 : -1;
+          setActiveResult(i => i < 0 && step < 0 ? visiblePlaces.length - 1 : (i + step + visiblePlaces.length) % visiblePlaces.length);
+        } else if (visiblePlaces.length && e.key === 'Enter') {
+          e.preventDefault();
+          pick(visiblePlaces[activeResult] ?? visiblePlaces[0]);
+        }
+      }}
       loading={searching}
       style={unified
         ? { height: 28, borderRadius: 9999 }
@@ -828,10 +860,10 @@ const DexMaps: React.FC = () => {
         onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFocused(false); }}
       >
         {!unified && searchField}
-        {results.length > 0 && (
-          <div role="listbox" aria-label="Search results" className="dex-mat-opaque dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
+        {focused && results.length > 0 && (
+          <div id={placeResultsId} role="listbox" aria-label="Search results" className="dex-mat-opaque dex-maps-card-enter" style={{ ...panel, marginTop: 6, maxHeight: 'min(360px, 45dvh)', overflowY: 'auto' }}>
             {results.map((r, i) => (
-              <div key={`${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg dex-maps-result"
+              <div key={`${r.lat},${r.lon},${i}`} id={`${placeResultsId}-${i}`} role="option" aria-selected={i === activeResult} className="dex-hover-bg dex-maps-result"
                 style={{ display: 'flex', alignItems: 'center', borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
                 <button onClick={() => pick(r)}
                   style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, minWidth: 0, textAlign: 'left',
@@ -853,13 +885,13 @@ const DexMaps: React.FC = () => {
           </div>
         )}
         {showRecentPanel && (
-          <div role="listbox" aria-label="Recent searches" className="dex-mat-opaque dex-maps-card-enter" style={{ ...panel, marginTop: 6 }}>
+          <div id={placeResultsId} role="listbox" aria-label="Recent searches" className="dex-mat-opaque dex-maps-card-enter" style={{ ...panel, marginTop: 6, maxHeight: 'min(360px, 45dvh)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--color-border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'none', letterSpacing: 0.4 }}>Recent</span>
               <button onClick={() => setRecent([])} className="dex-maps-iconbtn" style={{ background: 'transparent', border: 'none', color: 'var(--color-text-tertiary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px' }}>Clear</button>
             </div>
             {recent.map((r, i) => (
-              <button key={`rec-${r.lat},${r.lon},${i}`} role="option" aria-selected={false} className="dex-hover-bg dex-maps-result"
+              <button key={`rec-${r.lat},${r.lon},${i}`} id={`${placeResultsId}-${i}`} role="option" aria-selected={i === activeResult} className="dex-hover-bg dex-maps-result"
                 onClick={() => pick(r)} style={{ ...rowBtn, borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
                 <DexIcon name="clock" size={14} color="var(--color-text-tertiary)" />
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
@@ -870,20 +902,20 @@ const DexMaps: React.FC = () => {
             ))}
           </div>
         )}
-        {query.trim() && searching && results.length === 0 && (
+        {focused && query.trim() && searching && results.length === 0 && (
           <div role="status" aria-label="Searching" className="dex-mat-opaque dex-maps-card-enter" style={{ marginTop: 6, padding: '10px 12px', ...panel, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
             <span className="dex-maps-pulse" style={{ display: 'flex' }}><DexIcon name="search" size={14} color="var(--color-text-tertiary)" /></span>
             Searching places…
           </div>
         )}
-        {query.trim() && !searching && results.length === 0 && searchError && (
+        {focused && query.trim() && !searching && results.length === 0 && searchError && (
           <div role="alert" className="dex-mat-opaque dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
             <DexIcon name="alert-triangle" size={20} color="var(--color-text-tertiary)" />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{searchError === 'offline' ? 'You are offline' : 'Place search is unavailable'}</span>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{searchError === 'offline' ? 'Connect to the internet to search for places.' : 'The search service did not respond. Try again in a moment.'}</span>
           </div>
         )}
-        {query.trim() && !searching && results.length === 0 && !searchError && (
+        {focused && query.trim() && !searching && results.length === 0 && !searchError && (
           <div role="status" className="dex-mat-opaque dex-maps-card-enter" style={{ marginTop: 6, padding: '14px 12px', ...panel, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
             <DexIcon name="map-pin" size={20} color="var(--color-text-tertiary)" />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)' }}>No places found</span>

@@ -12,6 +12,8 @@ import { calendarQrPayload, mailtoPayload } from '../../../shared/format/qrPaylo
 import { saveBlobAs } from '../../services/nativeSave';
 import { Button } from '../../ui/Button';
 import { useUtilityInput } from '../../services/utilityInput';
+import { resolveUkiContext } from '../../uki/appContextRegistry';
+import { useRunningApps } from '../../store/runningApps';
 
 type QRMode = 'text' | 'url' | 'wifi' | 'contact' | 'geo' | 'email' | 'event' | 'batch';
 type ECLevel = QrErrorLevel;
@@ -59,7 +61,7 @@ const QRCodeGenerator: React.FC = () => {
   const [mode, setMode] = useState<QRMode>('text');
   const [text, setText] = useState('');
   useUtilityInput('qrcode', value => { setMode('text'); setText(value); });
-  const [url, setUrl] = useState('https://');
+  const [url, setUrl] = useState('');
   const [wifiSSID, setWifiSSID] = useState('');
   const [wifiPass, setWifiPass] = useState('');
   const [wifiType, setWifiType] = useState<'WPA' | 'WEP' | 'nopass'>('WPA');
@@ -605,6 +607,10 @@ function escapeWifi(value: string): string {
 // Best-effort discovery of the active browser tab's URL exposed by the DEX
 // shell. Falls back to nothing so the caller can try the clipboard instead.
 function getActiveBrowserUrl(): string | null {
+  if (useRunningApps.getState().isAppRunning('browser')) {
+    const url = resolveUkiContext('browser')?.currentFile;
+    if (url && /^https?:\/\//i.test(url)) return url;
+  }
   try {
     const w = window as unknown as Record<string, any>;
     const candidates = [
@@ -640,7 +646,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease', fontFamily: 'var(--font-family)',
   },
   tabActive: {
-    background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+    background: 'var(--color-accent-soft)', color: 'var(--color-text-primary)',
   },
   body: {
     flex: 1, overflow: 'auto', padding: 'var(--space-4) var(--space-5)',
@@ -677,7 +683,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: 'var(--space-5)',
   },
   actions: {
-    display: 'flex', justifyContent: 'center', gap: 'var(--space-3)',
+    display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'var(--space-2)',
   },
   actionBtn: {
     display: 'flex', alignItems: 'center', gap: 6,

@@ -41,6 +41,28 @@ vi.mock('../../src/renderer/services/nativeSave', () => ({ saveBlobAs: vi.fn().m
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); map.handlers.clear(); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); takeCalendarDraft(); });
 
+it('opens the recorded note by ID and keeps legacy activity rows usable', async () => {
+  const navigate = vi.fn();
+  const open = vi.fn();
+  window.addEventListener('dex-spotlight-navigate', navigate);
+  window.addEventListener('dex-open-app', open);
+  const entry = { id: 1, app: 'notes', title: 'Design decisions', event_type: 'note',
+    source: 'DEX', details: JSON.stringify({ contextId: 'note-42' }), created_at: new Date().toISOString() };
+  vi.stubGlobal('dex', { invoke: vi.fn(async (channel: string) =>
+    channel === 'activity-feed:get' ? [entry, { ...entry, id: 2, title: 'Older note', details: 'plain text' }] : null) });
+  try {
+    render(<Activity />);
+    fireEvent.click(screen.getByRole('button', { name: 'App', exact: true }));
+    fireEvent.click(await screen.findByText('Design decisions'));
+    expect(navigate.mock.calls[0][0].detail).toEqual({ appId: 'notes', contextId: 'note-42' });
+    fireEvent.keyDown(screen.getByText('Older note').closest('[role="button"]')!, { key: 'Enter' });
+    expect(open.mock.calls[0][0].detail).toEqual({ appId: 'notes' });
+  } finally {
+    window.removeEventListener('dex-spotlight-navigate', navigate);
+    window.removeEventListener('dex-open-app', open);
+  }
+});
+
 /** The map starts once its tile worker URL is set (async): wait for it. */
 async function mapReady() {
   await waitFor(() => expect(map.handlers.has('click')).toBe(true));
@@ -83,7 +105,7 @@ it('chooses a basemap and recalls a saved place after reopening Maps', async () 
     ok: true, json: async () => ({ features: [{ geometry: { coordinates: [3.39, 6.45] }, properties: { name: 'Lagos', country: 'Nigeria' } }] }),
   })));
   const first = render(<Maps />);
-  const search = screen.getByRole('searchbox', { name: 'Search places' });
+  const search = screen.getByRole('combobox', { name: 'Search places' });
   fireEvent.focus(search);
   fireEvent.change(search, { target: { value: 'Lagos' } });
   const results = await screen.findByRole('listbox', { name: 'Search results' });
@@ -108,7 +130,7 @@ it('cancels an outdated place search and only shows results for the latest query
     .mockImplementationOnce(() => new Promise(resolve => { finishOldSearch = resolve; }));
   vi.stubGlobal('fetch', fetchPlaces);
   render(<Maps />);
-  const search = screen.getByRole('searchbox', { name: 'Search places' });
+  const search = screen.getByRole('combobox', { name: 'Search places' });
 
   fireEvent.change(search, { target: { value: 'London' } });
   await waitFor(() => expect(fetchPlaces).toHaveBeenCalledTimes(1));
@@ -120,6 +142,11 @@ it('cancels an outdated place search and only shows results for the latest query
   await act(async () => finishOldSearch(place('London')));
   expect(within(results).getByText('Lisbon')).toBeVisible();
   expect(within(results).queryByText('London')).toBeNull();
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  expect(within(results).getByRole('option')).toHaveAttribute('aria-selected', 'true');
+  fireEvent.keyDown(search, { key: 'Enter' });
+  expect(search).toHaveValue('');
+  expect(results).not.toBeInTheDocument();
 });
 
 it('counts new activity when the feed stays the same size and saves only the filtered rows', async () => {

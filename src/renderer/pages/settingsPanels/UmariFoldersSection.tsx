@@ -15,9 +15,11 @@
  * manifests declare, which is what UKI uses to "run the tests for my project".
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { umariFolders, umariAddFolder, umariRemoveFolder, umariProjects, type UmariFolder, type UmariProject } from '../../uki/umari';
 import { useToastHelpers } from '../../components/Toast';
+import { spotlightEngine } from '../../shell/SpotlightEngine';
+import { Button } from '../../ui/Button';
 
 interface Props {
   styles: Record<string, React.CSSProperties>;
@@ -27,32 +29,44 @@ export function UmariFoldersSection({ styles }: Props): React.ReactElement {
   const [defaults, setDefaults] = useState<string[]>([]);
   const [folders, setFolders] = useState<UmariFolder[]>([]);
   const [projects, setProjects] = useState<UmariProject[] | null>(null);
-  const [available, setAvailable] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState<'add' | 'remove' | null>(null);
+  const mutation = useRef(false);
+  const refreshId = useRef(0);
   const toast = useToastHelpers();
 
   const refresh = useCallback(async () => {
-    const f = await umariFolders();
+    const id = ++refreshId.current;
+    const [f, projects] = await Promise.all([umariFolders(), umariProjects()]);
+    if (id !== refreshId.current) return;
     setAvailable(f !== null);
     if (f) { setDefaults(f.defaults); setFolders(f.folders); }
-    setProjects(await umariProjects());
+    setProjects(projects);
+    if (projects) spotlightEngine.updateCodeProjects(projects);
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); return () => { ++refreshId.current; }; }, [refresh]);
 
   const add = async () => {
-    setBusy(true);
+    if (mutation.current) return;
+    mutation.current = true;
+    setBusy('add');
     try {
       const r = await umariAddFolder();
       if (r.ok) { toast.success(`Indexing ${r.folder?.name ?? 'the folder'} in the background`); await refresh(); }
       else if (!r.cancelled) toast.error(r.error || 'Could not add that folder');
-    } finally { setBusy(false); }
+    } finally { mutation.current = false; setBusy(null); }
   };
 
   const remove = async (path: string) => {
-    const r = await umariRemoveFolder(path);
-    if (r.ok) { toast.info('Folder removed; its files leave the index shortly'); await refresh(); }
-    else toast.error(r.error || 'Could not remove that folder');
+    if (mutation.current) return;
+    mutation.current = true;
+    setBusy('remove');
+    try {
+      const r = await umariRemoveFolder(path);
+      if (r.ok) { toast.info('Folder removed'); await refresh(); }
+      else toast.error(r.error || 'Could not remove that folder');
+    } finally { mutation.current = false; setBusy(null); }
   };
 
   return (
@@ -62,7 +76,9 @@ export function UmariFoldersSection({ styles }: Props): React.ReactElement {
         Search and UKI use DEX's local index. It always covers {defaults.length ? defaults.map(base).join(', ') : 'Documents, Desktop and Downloads'}.
         Add other folders here, such as a code workspace. Files that look like keys or credentials are found by name only, never by content.
       </p>
-      {!available ? (
+      {available === null ? (
+        <p role="status" style={note}>Loading indexed folders…</p>
+      ) : !available ? (
         <p style={note}>Folder indexing runs in the DEX desktop app.</p>
       ) : (
         <>
@@ -72,12 +88,12 @@ export function UmariFoldersSection({ styles }: Props): React.ReactElement {
                 <span style={name}>{f.name || base(f.path)}</span>
                 <span style={pathText}>{f.path}{f.exists ? '' : ' · missing'}</span>
               </span>
-              <button type="button" style={styles.secondaryBtn} onClick={() => remove(f.path)}>Remove</button>
+              <Button size="sm" variant="ghost" aria-label={`Remove ${f.name || base(f.path)} from the index`} disabled={!!busy} onClick={() => remove(f.path)}>Remove</Button>
             </div>
           ))}
-          <button type="button" style={{ ...styles.secondaryBtn, marginTop: 6 }} onClick={add} disabled={busy} data-testid="umari-add-folder">
-            {busy ? 'Choosing…' : 'Add folder…'}
-          </button>
+          <Button size="sm" style={{ marginTop: 6 }} onClick={add} disabled={!!busy} data-testid="umari-add-folder">
+            {busy === 'add' ? 'Adding folder…' : 'Add folder…'}
+          </Button>
           {projects && projects.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div style={subhead}>Projects found ({projects.length})</div>

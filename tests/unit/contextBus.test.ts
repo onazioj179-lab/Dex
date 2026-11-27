@@ -47,6 +47,15 @@ describe('ContextBus', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it('delivers every task completion in a burst', () => {
+    ContextBus._setThrottle(50);
+    const fn = vi.fn();
+    ContextBus.on('task:completed', fn);
+    ContextBus.emit('task:completed', { id: 'a', title: 'First task' });
+    ContextBus.emit('task:completed', { id: 'b', title: 'Second task' });
+    expect(fn.mock.calls).toEqual([[{ id: 'a', title: 'First task' }], [{ id: 'b', title: 'Second task' }]]);
+  });
+
   it('replay() returns recent events on a channel', () => {
     ContextBus.emit('app:opened', { appId: 'a', ts: 0 });
     ContextBus.emit('app:opened', { appId: 'b', ts: 1 });

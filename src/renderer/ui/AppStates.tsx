@@ -13,6 +13,7 @@
  */
 import React from 'react';
 import DexIcon from '../components/DexIcon';
+import { Button } from './Button';
 
 interface BaseProps {
   title?: string;
@@ -69,24 +70,7 @@ export const AppErrorState: React.FC<BaseProps & { onRetry?: () => void }> = ({
     {description && <div>{description}</div>}
     {action}
     {onRetry && (
-      <button
-        type="button"
-        onClick={onRetry}
-        style={{
-          marginTop: 6,
-          height: 'var(--ctl-h-sm, 28px)',
-          padding: '0 14px',
-          borderRadius: 6,
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}
-      >
-        Retry
-      </button>
+      <Button size="sm" onClick={onRetry} style={{ marginTop: 6 }}>Retry</Button>
     )}
   </div>
 );

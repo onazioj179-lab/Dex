@@ -86,6 +86,7 @@ function fmtDate(ts: number): string {
 
 /** App ids that are not user-captured workspace context (the shell home surface). */
 const HOME_APP_IDS = new Set(['home']);
+let restoreGeneration = 0;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -139,6 +140,7 @@ const WorkspaceSpaces: React.FC = () => {
 
   const restoreSpace = useCallback(
     (space: WorkspaceSpace) => {
+      const generation = ++restoreGeneration;
       // Re-select the captured Project Space (Stage) first so window restoration
       // and accent land in the right context. Silently skip if it's gone.
       if (space.projectId) {
@@ -168,6 +170,7 @@ const WorkspaceSpaces: React.FC = () => {
       // Open each captured app, staggered so the shell processes them in order.
       space.appIds.forEach((appId, i) => {
         window.setTimeout(() => {
+          if (generation !== restoreGeneration) return;
           try {
             window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appId } }));
           } catch {
