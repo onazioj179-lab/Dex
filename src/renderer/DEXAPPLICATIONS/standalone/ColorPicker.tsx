@@ -273,8 +273,10 @@ HSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
             {saved.map((c) => (
               <button key={c} onClick={() => pick(c)}
                 onContextMenu={(e) => { e.preventDefault(); removeColor(c); }}
+                onKeyDown={(e) => { if (e.key === 'Delete') { e.preventDefault(); e.stopPropagation(); removeColor(c); } }}
+                aria-keyshortcuts="Delete"
                 style={{ ...s.swatch, background: c, boxShadow: c === hex.toLowerCase() ? '0 0 0 2px var(--color-accent)' : 'none' }}
-                title={`${c.toUpperCase()} (right-click to remove)`} aria-label={`Use saved color ${c}`} />
+                title={`${c.toUpperCase()} · Delete or right-click to remove`} aria-label={`Use saved color ${c}`} />
             ))}
           </div>
         </div>

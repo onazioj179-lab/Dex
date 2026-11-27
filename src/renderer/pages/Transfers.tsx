@@ -616,6 +616,8 @@ const Transfers: React.FC = () => {
             stopHttpServer();
           }, httpExpiry * 60 * 1000);
         }
+      } else {
+        toast.error('Could not start file sharing. Check the desktop connection and try again.');
       }
     } catch (e) { console.error('[Transfers] HTTP start error:', e); toast.error('Failed to start HTTP server'); }
     finally { setBusy(false); }
@@ -653,14 +655,17 @@ const Transfers: React.FC = () => {
     } catch (e) { console.error('[Transfers] Accept upload error:', e); toast.error('Failed to process upload'); }
   }, []);
 
-  const copyUrl = useCallback(() => {
-    if (httpServerUrl) {
-      navigator.clipboard.writeText(httpServerUrl);
+  const copyUrl = useCallback(async () => {
+    if (!httpServerUrl) return;
+    try {
+      await navigator.clipboard.writeText(httpServerUrl);
       setCopied(true);
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy the sharing link');
     }
-  }, [httpServerUrl]);
+  }, [httpServerUrl, toast]);
 
   // --- Pro Feature Handlers ---
   const clearHistory = useCallback(() => {

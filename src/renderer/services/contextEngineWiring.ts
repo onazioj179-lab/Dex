@@ -4,64 +4,76 @@
 // Created by Onazi Treasure OJ <onazi75@gmail.com>
 // Licensed under the DEX Software License Agreement v1.0. See LICENSE.
 // =============================================================================
-/**
- * DEX Context Engine -- live wiring
- * -----------------------------------------------------------------------------
- * `shared/uki/contextEngine.ts` is a pure, stateful accumulator of "what the
- * user is working on" but nothing fed it -- it was orphaned. This wires it to
- * ContextBus so it tracks the active project, workspace, file, open apps, and a
- * recent-activity stream in real time, then exposes it on
- * `window.__dexContextEngine` for the Now panel (and UKI tools) to read.
- *
- * Renderer-only (ContextBus is in-renderer), so it is fully verifiable without
- * the native bridge.
- */
-
 import { contextEngine } from '../../shared/uki/contextEngine';
 import { ContextBus } from './ContextBus';
-import { useRunningApps, APP_DEFINITIONS } from '../store/runningApps';
+import { useRunningApps, APP_DEFINITIONS, type RunningApp } from '../store/runningApps';
 import { useStageStore } from '../store/stageStore';
 
 let started = false;
+let foregroundAppId = 'home';
+const filesByWindow = new Map<string, string>();
 
-function appName(appId: string): string {
-  return APP_DEFINITIONS[appId]?.name || appId;
+export function nowAppName(app: RunningApp): string {
+  return APP_DEFINITIONS[app.id]?.name ?? app.name;
 }
 
-function refreshOpenApps(): void {
-  try {
-    const apps = useRunningApps.getState().runningApps.map((a) => appName(a.id));
-    contextEngine.setOpenApps(apps);
-  } catch { /* store not ready */ }
+/** AppManager knows which floating window is actually in front. */
+export function setContextForegroundApp(appId: string): void {
+  foregroundAppId = appId;
+  contextEngine.setFile(filesByWindow.get(appId) ?? null, false);
 }
 
-function stageName(stageId: string): string {
-  try {
-    const st = useStageStore.getState() as unknown as { stages?: Array<{ id: string; name?: string }> };
-    return st.stages?.find((s) => s.id === stageId)?.name || stageId;
-  } catch { return stageId; }
+function trackFile({ appId, path }: { appId: string; path: string | null }): void {
+  if (path === (filesByWindow.get(appId) ?? null)) return;
+  if (path) filesByWindow.set(appId, path);
+  else filesByWindow.delete(appId);
+  if (appId === foregroundAppId) contextEngine.setFile(path, false);
 }
 
-/** Begin feeding the shared Context Engine from ContextBus. Idempotent. */
+/** Begin feeding the shared Context Engine from stores and work events. */
 export function startContextEngine(): void {
   if (started || typeof window === 'undefined') return;
   started = true;
   (window as unknown as { __dexContextEngine?: typeof contextEngine }).__dexContextEngine = contextEngine;
 
-  // Open-apps is driven by a DIRECT store subscription, not ContextBus: the bus
-  // throttles to one event per channel per ~frame, so two rapid app opens would
-  // drop the second event and leave the set stale. The store subscription always
-  // reflects the true running set. ContextBus app:opened is used only for the
-  // (best-effort) activity log.
-  useRunningApps.subscribe(() => refreshOpenApps());
-  ContextBus.on('app:opened', ({ appId }) => { contextEngine.recordActivity('app', appName(appId)); });
-  // setFile / setProject record their own activity entry on change.
-  ContextBus.on('file:opened', ({ path }) => { if (path) contextEngine.setFile(path); });
-  ContextBus.on('file:saved', ({ path }) => { if (path) contextEngine.setFile(path); });
+  const publishApps = (apps: readonly RunningApp[]) => {
+    contextEngine.setOpenApps(apps.filter((app) => app.id !== 'home').map(nowAppName));
+  };
+  useRunningApps.subscribe(({ runningApps }, { runningApps: previous }) => {
+    if (runningApps === previous || (runningApps.length === previous.length && runningApps.every(
+      (app, i) => app.id === previous[i].id && app.name === previous[i].name,
+    ))) return;
+
+    const oldIds = new Set(previous.map((app) => app.id));
+    const ids = new Set(runningApps.map((app) => app.id));
+    for (const appId of oldIds) {
+      if (!ids.has(appId)) filesByWindow.delete(appId);
+    }
+    setContextForegroundApp(foregroundAppId);
+    publishApps(runningApps);
+    for (const app of runningApps) {
+      if (app.id !== 'home' && !oldIds.has(app.id)) contextEngine.recordActivity('app', nowAppName(app));
+    }
+  });
+  publishApps(useRunningApps.getState().runningApps);
+
+  contextEngine.setWorkspace(useStageStore.getState().getActiveStage()?.name ?? null);
+  useStageStore.subscribe((state, previous) => {
+    if (state.stages === previous.stages && state.activeStageId === previous.activeStageId) return;
+    const name = state.getActiveStage()?.name ?? null;
+    contextEngine.setWorkspace(name);
+    if (name && state.activeStageId !== previous.activeStageId) contextEngine.recordActivity('workspace', name);
+  });
+
+  ContextBus.onWithReplay('file:focused', trackFile);
+  ContextBus.on('file:opened', ({ appId, path }) => {
+    if (!path) return;
+    trackFile({ appId, path });
+    contextEngine.recordActivity('file', path);
+  });
+  ContextBus.on('file:saved', ({ path }) => { if (path) contextEngine.recordActivity('save', path); });
   ContextBus.on('note:opened', ({ id, title }) => { contextEngine.recordActivity('note', title || id); });
   ContextBus.on('task:created', ({ title }) => { contextEngine.recordActivity('task', title); });
-  ContextBus.on('continuity:project', ({ projectId }) => { contextEngine.setProject(projectId); });
-  ContextBus.on('continuity:stage', ({ stageId }) => { contextEngine.setWorkspace(stageName(stageId)); });
-
-  refreshOpenApps();
+  ContextBus.on('task:completed', ({ title, id }) => { contextEngine.recordActivity('complete', title || id); });
+  ContextBus.onWithReplay('continuity:project', ({ name, projectId }) => { contextEngine.setProject(name || projectId); });
 }

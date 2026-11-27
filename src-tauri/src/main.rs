@@ -1374,40 +1374,67 @@ fn app_paths(app: &tauri::AppHandle) -> Value {
 // --- Wave 2: bounded filesystem walk powering search + recent --------------
 // Bounded (depth-first, capped) so a query can never hang the worker thread on
 // a huge tree. A native index (Tantivy) supersedes this in a later batch.
-fn walk_collect(root: &std::path::Path, max: usize) -> Vec<(PathBuf, std::fs::Metadata)> {
+fn walk_collect(
+    root: &std::path::Path,
+    scan_limit: usize,
+    result_limit: usize,
+    matches: impl Fn(&std::path::Path) -> bool,
+) -> Vec<(PathBuf, std::fs::Metadata)> {
     let mut out: Vec<(PathBuf, std::fs::Metadata)> = Vec::new();
     let mut stack = vec![root.to_path_buf()];
-    let cap_scan = max.saturating_mul(4);
-    let mut scanned = 0usize;
-    while let Some(dir) = stack.pop() {
-        if out.len() >= max || scanned >= cap_scan {
-            break;
-        }
+    let mut remaining = scan_limit;
+    'walk: while let Some(dir) = stack.pop() {
         let rd = match std::fs::read_dir(&dir) {
             Ok(r) => r,
             Err(_) => continue,
         };
-        for entry in rd.flatten() {
-            scanned += 1;
-            let meta = match entry.metadata() {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-            if meta.is_dir() {
+        for entry in rd {
+            if remaining == 0 || out.len() >= result_limit {
+                break 'walk;
+            }
+            remaining -= 1;
+            let Ok(entry) = entry else { continue };
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_dir() {
                 let name = entry.file_name().to_string_lossy().to_lowercase();
                 if name.starts_with('.') || name == "node_modules" || name == "$recycle.bin" {
                     continue;
                 }
                 stack.push(entry.path());
             } else {
-                out.push((entry.path(), meta));
-                if out.len() >= max {
-                    break;
+                let path = entry.path();
+                if matches(&path) {
+                    if let Ok(metadata) = entry.metadata() {
+                        out.push((path, metadata));
+                    }
                 }
             }
         }
     }
     out
+}
+
+#[cfg(test)]
+mod file_walk_tests {
+    use super::walk_collect;
+
+    #[test]
+    fn search_counts_matches_and_obeys_both_limits() {
+        let root = tempfile::tempdir().unwrap();
+        for name in ["notes.txt", "report-1.txt", "report-2.txt", "report-3.txt"] {
+            std::fs::write(root.path().join(name), "").unwrap();
+        }
+        let ignored = root.path().join("node_modules");
+        std::fs::create_dir(&ignored).unwrap();
+        std::fs::write(ignored.join("report-package.txt"), "").unwrap();
+
+        let matches = |path: &std::path::Path| {
+            path.file_name().unwrap().to_string_lossy().starts_with("report-")
+        };
+        assert_eq!(walk_collect(root.path(), 30, 10, matches).len(), 3);
+        assert_eq!(walk_collect(root.path(), 30, 1, matches).len(), 1);
+        assert!(walk_collect(root.path(), 1, 30, |_| true).len() <= 1);
+    }
 }
 
 fn file_entry_json(path: &std::path::Path, meta: &std::fs::Metadata) -> Value {
@@ -1432,23 +1459,16 @@ fn file_entry_json(path: &std::path::Path, meta: &std::fs::Metadata) -> Value {
     })
 }
 
-fn files_search(app: &tauri::AppHandle, query: &str, location: Option<String>) -> Value {
-    if query.trim().is_empty() {
-        return json!({ "success": true, "files": [] });
-    }
-    let root = resolve_path(app, &location.unwrap_or_else(|| "home".into()));
-    let q = query.to_lowercase();
-    let files = walk_collect(&root, 8000);
-    let matches: Vec<Value> = files
-        .iter()
-        .filter(|(p, _)| {
-            p.file_name()
-                .map(|n| n.to_string_lossy().to_lowercase().contains(&q))
-                .unwrap_or(false)
-        })
-        .take(200)
-        .map(|(p, m)| file_entry_json(p, m))
-        .collect();
+fn files_search(app: &tauri::AppHandle, query: &str, location: Option<&str>, limit: usize) -> Value {
+    let root = resolve_path(app, location.unwrap_or("home"));
+    let query = query.to_lowercase();
+    let matches: Vec<Value> = walk_collect(&root, 32_000, limit, |path| {
+        path.file_name()
+            .is_some_and(|name| name.to_string_lossy().to_lowercase().contains(&query))
+    })
+    .iter()
+    .map(|(path, metadata)| file_entry_json(path, metadata))
+    .collect();
     json!({ "success": true, "files": matches })
 }
 
@@ -1459,7 +1479,7 @@ fn files_recent(app: &tauri::AppHandle, limit: usize) -> Value {
         .into_iter()
         .flatten()
     {
-        files.extend(walk_collect(&dir, 3000));
+        files.extend(walk_collect(&dir, 12_000, 3000, |_| true));
     }
     files.sort_by_key(|b| std::cmp::Reverse(b.1.modified().ok()));
     let out: Vec<Value> = files
@@ -1653,32 +1673,7 @@ fn index_search(app: &tauri::AppHandle, query: &str, limit: usize) -> Option<Val
 
 /// Clear + rebuild the index from the user's document folders.
 fn index_rebuild(app: &tauri::AppHandle) -> Value {
-    report_index_task(app, "rebuild", || index_rebuild_inner(app))
-}
-
-fn index_rebuild_inner(app: &tauri::AppHandle) -> Value {
-    // Take a clone of the index handle, then DROP the lock before the multi-second
-    // clear + walk so searches stay responsive during a rebuild. The clone shares
-    // the same underlying Tantivy index (internally synchronized).
-    let state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
-    let idx = {
-        let guard = state.lock_safe();
-        match guard.as_ref() {
-            Some(i) => i.clone(),
-            None => return json!({ "success": false, "error": "index unavailable" }),
-        }
-    }; // lock released here
-
-    if let Err(e) = idx.clear() {
-        return json!({ "success": false, "error": e });
-    }
-    let mut total = 0usize;
-    for dir in index_dirs(app) {
-        if let Ok(n) = idx.index_path(&dir, 20000) {
-            total += n;
-        }
-    }
-    json!({ "success": true, "indexed": total })
+    report_index_task(app, "rebuild", || index_sync_inner(app, true))
 }
 
 fn index_stats(app: &tauri::AppHandle) -> Value {
@@ -1789,10 +1784,10 @@ fn index_dirs(app: &tauri::AppHandle) -> Vec<std::path::PathBuf> {
 }
 
 fn index_sync(app: &tauri::AppHandle) -> Value {
-    report_index_task(app, "sync", || index_sync_inner(app))
+    report_index_task(app, "sync", || index_sync_inner(app, false))
 }
 
-fn index_sync_inner(app: &tauri::AppHandle) -> Value {
+fn index_sync_inner(app: &tauri::AppHandle, force_rebuild: bool) -> Value {
     // Clone the (Arc-backed) index handle and release the search lock immediately.
     let search_state = app.state::<std::sync::Mutex<Option<dex_search::SearchIndex>>>();
     let idx = {
@@ -1803,12 +1798,11 @@ fn index_sync_inner(app: &tauri::AppHandle) -> Value {
         }
     };
 
-    let dirs: Vec<std::path::PathBuf> = index_dirs(app);
-
     // Hold the snapshot lock for the whole sync so two syncs can't interleave; it
     // is a different mutex from the search index, so queries stay responsive.
     let snap_state = app.state::<std::sync::Mutex<dex_scanner::Snapshot>>();
     let mut prev = snap_state.lock_safe();
+    let dirs = index_dirs(app);
 
     if prev.is_empty() {
         *prev = load_snapshot(app, Some(&idx));
@@ -1821,14 +1815,21 @@ fn index_sync_inner(app: &tauri::AppHandle) -> Value {
 
     const SYNC_UPSERT_LIMIT: usize = 500;
     let change_count = diff.added.len() + diff.modified.len();
-    if prev.is_empty() || change_count > SYNC_UPSERT_LIMIT {
+    if force_rebuild || prev.is_empty() || change_count > SYNC_UPSERT_LIMIT {
         // Initial build or too-large diff: a full rebuild is cheaper than thousands
         // of single-file commits. Reset the baseline to the freshly-scanned state.
-        let _ = idx.clear();
+        if let Err(error) = idx.clear() {
+            return json!({ "success": false, "error": error });
+        }
+        // The old snapshot can no longer describe the index after clearing it.
+        // A partial rebuild must restart on the next pass.
+        prev.clear();
+        save_snapshot(app, &prev);
         let mut total = 0usize;
         for dir in &dirs {
-            if let Ok(n) = idx.index_path(dir, 20000) {
-                total += n;
+            match idx.index_path(dir, 20000) {
+                Ok(n) => total += n,
+                Err(error) => return json!({ "success": false, "error": error }),
             }
         }
         *prev = new_snapshot;
@@ -1841,7 +1842,8 @@ fn index_sync_inner(app: &tauri::AppHandle) -> Value {
     let removals: Vec<std::path::PathBuf> = diff.removed.iter().map(std::path::PathBuf::from).collect();
     let (upserted, removed) = match idx.apply_file_changes(&upserts, &removals) {
         Ok(n) => (n, removals.len()),
-        Err(_) => (0, 0),
+        // Keep the previous baseline so a later sync can retry the same diff.
+        Err(error) => return json!({ "success": false, "error": error }),
     };
     let changed = !diff.is_empty();
     *prev = new_snapshot;
@@ -1874,6 +1876,25 @@ enum IndexWork {
     Full,
 }
 
+enum IndexChange {
+    Paths(Vec<std::path::PathBuf>),
+    Rescan,
+    RootsChanged,
+}
+
+static INDEX_CHANGES: std::sync::OnceLock<std::sync::mpsc::Sender<IndexChange>> =
+    std::sync::OnceLock::new();
+
+fn refresh_index_roots(app: &tauri::AppHandle) {
+    if let Some(sender) = INDEX_CHANGES.get() {
+        if sender.send(IndexChange::RootsChanged).is_ok() {
+            return;
+        }
+    }
+    let app = app.clone();
+    crate::util::spawn_named("umari-index", move || { let _ = index_sync(&app); });
+}
+
 /// Apply changed paths straight to the index. Returns false when the batch
 /// needs a full sync instead (a directory appeared/vanished: its children
 /// can't be known from the event alone).
@@ -1901,31 +1922,26 @@ fn index_apply_paths(app: &tauri::AppHandle, paths: &std::collections::HashSet<s
         }
     }
     // One commit for the whole burst (was one writer + commit per file).
-    let _ = idx.apply_file_changes(&upserts, &removals);
-    true
+    let snap_state = app.state::<std::sync::Mutex<dex_scanner::Snapshot>>();
+    let _sync = snap_state.lock_safe();
+    idx.apply_file_changes(&upserts, &removals).is_ok()
 }
 
 fn start_index_watcher(app: tauri::AppHandle) {
     use notify::Watcher;
-    let dirs: Vec<std::path::PathBuf> = index_dirs(&app);
-    if dirs.is_empty() {
-        return;
-    }
-    // None = the watcher lost events (overflow) and asks for a rescan.
-    let (tx, rx) = std::sync::mpsc::channel::<Option<Vec<std::path::PathBuf>>>();
-    let roots = dirs.clone();
+    let mut dirs = index_dirs(&app);
+    let (tx, rx) = std::sync::mpsc::channel::<IndexChange>();
+    let roots = std::sync::Arc::new(std::sync::Mutex::new(dirs.clone()));
+    let event_roots = roots.clone();
+    let file_events = tx.clone();
     // An event matters only if it can change the index: paths inside dirs the
     // scanner never walks (node_modules, target, .git, dist, ...) cannot. Without
     // this filter a build churning under Documents re-triggered a full walk of
     // all three folders every ~1.5 s (measured: up to ~70% of a core at "idle").
-    let relevant = move |p: &std::path::Path| match roots.iter().find(|r| p.starts_with(r)) {
-        Some(root) => !dex_scanner::is_ignored_under(root, p),
-        None => true,
-    };
     let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(event) = res {
             if event.need_rescan() {
-                let _ = tx.send(None);
+                let _ = file_events.send(IndexChange::Rescan);
                 return;
             }
             if matches!(
@@ -1938,13 +1954,17 @@ fn start_index_watcher(app: tauri::AppHandle) {
                 // children (which arrive as their own events); only a folder being
                 // created, removed or renamed needs the full sync it would trigger.
                 let echo = matches!(event.kind, notify::EventKind::Modify(k) if !matches!(k, notify::event::ModifyKind::Name(_)));
+                let roots = event_roots.lock_safe();
                 let paths: Vec<_> = event
                     .paths
                     .into_iter()
-                    .filter(|p| relevant(p) && !(echo && p.is_dir()))
+                    .filter(|p| {
+                        roots.iter().any(|root| p.starts_with(root) && !dex_scanner::is_ignored_under(root, p))
+                            && !(echo && p.is_dir())
+                    })
                     .collect();
                 if !paths.is_empty() {
-                    let _ = tx.send(Some(paths));
+                    let _ = file_events.send(IndexChange::Paths(paths));
                 }
             }
         }
@@ -1952,9 +1972,8 @@ fn start_index_watcher(app: tauri::AppHandle) {
         Ok(w) => w,
         Err(_) => return,
     };
-    for dir in &dirs {
-        let _ = watcher.watch(dir.as_path(), notify::RecursiveMode::Recursive);
-    }
+    dirs.retain(|dir| watcher.watch(dir, notify::RecursiveMode::Recursive).is_ok());
+    let _ = INDEX_CHANGES.set(tx);
     // Normal edits are applied per path (no walk). A FULL sync walks all three
     // folders — and with an empty in-memory snapshot (every launch) it rebuilds
     // the whole index, ~30+ CPU-seconds measured — so it is reserved for
@@ -1962,17 +1981,17 @@ fn start_index_watcher(app: tauri::AppHandle) {
     const MIN_FULL_GAP: std::time::Duration = std::time::Duration::from_secs(30);
     const MAX_BATCH: usize = 200;
     crate::util::spawn_named("main", move || {
-        let _keep_alive = watcher; // own the watcher so it stays active
         let mut last_full: Option<std::time::Instant> = None;
-        let add = |work: &mut IndexWork, msg: Option<Vec<std::path::PathBuf>>| match (msg, &mut *work) {
-            (Some(paths), IndexWork::Paths(set)) => {
+        let add = |work: &mut IndexWork, changed: &mut bool, msg: IndexChange| match (msg, &mut *work) {
+            (IndexChange::Paths(paths), IndexWork::Paths(set)) => {
                 set.extend(paths);
                 if set.len() > MAX_BATCH {
                     *work = IndexWork::Full;
                 }
             }
-            (None, _) => *work = IndexWork::Full,
-            (Some(_), IndexWork::Full) => {}
+            (IndexChange::Rescan, _) => *work = IndexWork::Full,
+            (IndexChange::RootsChanged, _) => { *changed = true; *work = IndexWork::Full; }
+            (IndexChange::Paths(_), IndexWork::Full) => {}
         };
         loop {
             // Block until the first change in a quiet period.
@@ -1981,11 +2000,12 @@ fn start_index_watcher(app: tauri::AppHandle) {
                 Err(_) => break,
             };
             let mut work = IndexWork::Paths(Default::default());
-            add(&mut work, first);
+            let mut roots_changed = false;
+            add(&mut work, &mut roots_changed, first);
             // Coalesce the burst: drain until ~1.5s of quiet.
             loop {
                 match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
-                    Ok(m) => add(&mut work, m),
+                    Ok(m) => add(&mut work, &mut roots_changed, m),
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
@@ -1995,9 +2015,25 @@ fn start_index_watcher(app: tauri::AppHandle) {
                 IndexWork::Full => true,
             };
             if full {
-                if let Some(wait) = last_full.and_then(|t| MIN_FULL_GAP.checked_sub(t.elapsed())) {
-                    std::thread::sleep(wait);
-                    while rx.try_recv().is_ok() {} // the full sync covers these too
+                while !roots_changed {
+                    let Some(wait) = last_full.and_then(|t| MIN_FULL_GAP.checked_sub(t.elapsed())) else { break };
+                    match rx.recv_timeout(wait) {
+                        Ok(IndexChange::RootsChanged) => roots_changed = true,
+                        Ok(_) => {}, // The full scan covers these paths.
+                        Err(_) => break,
+                    }
+                }
+                let desired = index_dirs(&app);
+                *roots.lock_safe() = desired.clone();
+                dirs.retain(|dir| {
+                    if desired.contains(dir) { return true; }
+                    let _ = watcher.unwatch(dir);
+                    false
+                });
+                for root in desired {
+                    if !dirs.contains(&root) && watcher.watch(&root, notify::RecursiveMode::Recursive).is_ok() {
+                        dirs.push(root);
+                    }
                 }
                 let _ = index_sync(&app);
                 last_full = Some(std::time::Instant::now());
@@ -2755,10 +2791,21 @@ fn dex_ipc_impl(app: tauri::AppHandle, window: tauri::Window, channel: String, a
                 .map(|s| s.to_string())
                 .or_else(|| a0.get("query").and_then(|v| v.as_str()).map(|s| s.to_string()))
                 .unwrap_or_default();
-            let location = a0.get("location").and_then(|v| v.as_str()).map(|s| s.to_string());
-            // Prefer the native Tantivy index; fall back to the bounded walk
-            // until the index has been built (search:rebuild).
-            index_search(&app, &query, 200).unwrap_or_else(|| files_search(&app, &query, location))
+            let query = query.trim();
+            let limit = a0.get("limit")
+                .or_else(|| args.get(1).and_then(|options| options.get("limit")))
+                .and_then(Value::as_u64).unwrap_or(200).min(200) as usize;
+            if query.is_empty() || limit == 0 {
+                return json!({ "success": true, "files": [] });
+            }
+            let location = a0.get("location").and_then(Value::as_str)
+                .filter(|path| !path.trim().is_empty());
+            if location.is_none() {
+                if let Some(indexed) = index_search(&app, query, limit) {
+                    return indexed;
+                }
+            }
+            files_search(&app, query, location, limit)
         }
         "files:rename" => file_mutations::rename_in_place(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),
         "files:move" => file_mutations::move_into(&arg_str(0).unwrap_or_default(), &arg_str(1).unwrap_or_default()),

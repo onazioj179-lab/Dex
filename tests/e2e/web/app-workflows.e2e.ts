@@ -64,6 +64,13 @@ test.describe('App workflows (web renderer)', () => {
       const title = notes.getByRole('textbox', { name: 'Note title' });
       await title.fill('Project log');
       await expect(title).toHaveCSS('outline-style', 'none');
+      const selectedNote = notes.getByRole('button', { name: 'Project log', exact: true });
+      await notes.getByRole('button', { name: 'Create new note', exact: true }).first().click();
+      await expect(selectedNote).not.toHaveAttribute('aria-current', 'true');
+      await selectedNote.press('Enter');
+      await expect(selectedNote).toHaveAttribute('aria-current', 'true');
+      await expect(title).toHaveValue('Project log');
+      await expect(notes.locator('.dn-note-item[data-selected]')).toHaveCSS('box-shadow', 'none');
       const format = notes.getByRole('toolbar', { name: 'Formatting' });
       await expect(format).toHaveCSS('box-shadow', 'none');
       await expect(format).toHaveCSS('position', 'static');

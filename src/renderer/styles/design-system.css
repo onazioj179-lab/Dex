@@ -1608,6 +1608,7 @@ html[data-darkroom="on"] {
   --color-warning-muted: rgba(201, 52, 0, 0.12);
   --color-error: #D70015;
   --color-error-muted: rgba(215, 0, 21, 0.12);
+  --state-error-fg: var(--color-error);
 
   /* Borders -- visible on light */
   --color-border: #D1D1D6;

@@ -98,13 +98,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: 36,
     height: 36,
     borderRadius: '50%',
-    background: 'var(--color-accent)',
+    background: 'var(--color-bg-active)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 14,
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--color-text-primary)',
   },
   collaboratorInfo: {
     flex: 1,
@@ -159,6 +159,9 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     width: 44,
     height: 24,
+    flexShrink: 0,
+    padding: 0,
+    border: 0,
     background: 'var(--color-border)',
     borderRadius: radius['2xl'],
     cursor: 'pointer',
@@ -225,8 +228,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 'var(--space-3)',
     padding: 'var(--space-3) 14px',
-    background: 'rgba(255,159,10,0.08)',
-    border: '1px solid rgba(255,159,10,0.2)',
+    background: 'var(--color-bg-base)',
+    border: '1px solid var(--color-border-subtle)',
     borderRadius: radius.xl,
     marginBottom: 'var(--space-2)',
   },
@@ -273,6 +276,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const copiedTimer = useRef<number>();
 
   const {
     projects,
@@ -290,6 +294,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => window.clearTimeout(copiedTimer.current);
   }, []);
 
   const handleInvite = useCallback(async () => {
@@ -330,6 +335,8 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
   }, [email, role, projectId, project, inviteCollaborator, createVisitorInvite]);
 
   const handleToggleLinkSharing = useCallback(() => {
+    window.clearTimeout(copiedTimer.current);
+    setCopied(false);
     if (project?.linkSharing.enabled) {
       disableLinkSharing(projectId);
     } else {
@@ -337,13 +344,21 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
     }
   }, [project, projectId, enableLinkSharing, disableLinkSharing]);
 
-  const handleCopyLink = useCallback(() => {
-    if (project?.linkSharing.link) {
-      navigator.clipboard.writeText(project.linkSharing.link);
+  const handleCopyLink = useCallback(async () => {
+    const link = project?.linkSharing.link;
+    if (!link) return;
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(link);
+      if (useCollaborationStore.getState().projects.get(projectId)?.linkSharing.link !== link) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setError('Could not copy the sharing link.');
     }
-  }, [project]);
+  }, [project, projectId]);
 
   if (!project) return null;
 
@@ -374,7 +389,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
     >
       {/* Error Banner */}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           padding: '10px 14px',
           marginBottom: 'var(--space-4)',
           background: 'var(--color-error-muted)',
@@ -507,6 +522,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
               {collab.role !== 'owner' && collab.id !== currentUser?.id && (
                 <>
                   <select
+                    aria-label={`Role for ${collab.name}`}
                     value={collab.role}
                     onChange={e => updateCollaboratorRole(projectId, collab.id, e.target.value as CollaboratorRole)}
                     style={styles.roleSelect}
@@ -540,21 +556,22 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
       <div style={styles.section}>
         <div style={styles.sectionTitle}>Link Sharing</div>
         <div style={styles.linkRow}>
-          <div
+          <button
+            type="button"
             style={{
               ...styles.linkToggle,
               ...(project.linkSharing.enabled ? styles.linkToggleOn : {}),
             }}
             onClick={handleToggleLinkSharing}
             role="switch"
+            aria-label="Link sharing"
             aria-checked={project.linkSharing.enabled}
-            tabIndex={0}
           >
             <div style={{
               ...styles.linkToggleKnob,
               ...(project.linkSharing.enabled ? styles.linkToggleKnobOn : {}),
             }} />
-          </div>
+          </button>
           <div style={styles.linkText}>
             {project.linkSharing.enabled
               ? 'Anyone with the link can view'
@@ -564,8 +581,6 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ projectId, projectName
             <button
               style={styles.copyBtn}
               onClick={handleCopyLink}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
             >
               {copied ? 'Copied' : 'Copy Link'}
             </button>

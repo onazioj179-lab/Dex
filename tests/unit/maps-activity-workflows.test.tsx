@@ -83,7 +83,7 @@ it('chooses a basemap and recalls a saved place after reopening Maps', async () 
     ok: true, json: async () => ({ features: [{ geometry: { coordinates: [3.39, 6.45] }, properties: { name: 'Lagos', country: 'Nigeria' } }] }),
   })));
   const first = render(<Maps />);
-  const search = screen.getByRole('searchbox', { name: 'Search places' });
+  const search = screen.getByRole('combobox', { name: 'Search places' });
   fireEvent.focus(search);
   fireEvent.change(search, { target: { value: 'Lagos' } });
   const results = await screen.findByRole('listbox', { name: 'Search results' });
@@ -108,7 +108,7 @@ it('cancels an outdated place search and only shows results for the latest query
     .mockImplementationOnce(() => new Promise(resolve => { finishOldSearch = resolve; }));
   vi.stubGlobal('fetch', fetchPlaces);
   render(<Maps />);
-  const search = screen.getByRole('searchbox', { name: 'Search places' });
+  const search = screen.getByRole('combobox', { name: 'Search places' });
 
   fireEvent.change(search, { target: { value: 'London' } });
   await waitFor(() => expect(fetchPlaces).toHaveBeenCalledTimes(1));
@@ -120,6 +120,11 @@ it('cancels an outdated place search and only shows results for the latest query
   await act(async () => finishOldSearch(place('London')));
   expect(within(results).getByText('Lisbon')).toBeVisible();
   expect(within(results).queryByText('London')).toBeNull();
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  expect(within(results).getByRole('option')).toHaveAttribute('aria-selected', 'true');
+  fireEvent.keyDown(search, { key: 'Enter' });
+  expect(search).toHaveValue('');
+  expect(results).not.toBeInTheDocument();
 });
 
 it('counts new activity when the feed stays the same size and saves only the filtered rows', async () => {

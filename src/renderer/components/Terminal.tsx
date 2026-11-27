@@ -733,27 +733,28 @@ export const Terminal: React.FC<TerminalProps> = ({ autoSpawn = true, cwd, shell
       {find && (
         <div
           style={{
-            position: 'absolute', top: 36, right: 10, zIndex: 3,
+            position: 'absolute', top: 36, right: 10, zIndex: 3, maxWidth: 'calc(100% - 20px)',
             display: 'flex', alignItems: 'center', gap: 2, padding: 4,
-            background: '#1c1e22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+            background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 10,
+            boxShadow: 'var(--glass-shadow)',
           }}
         >
           <input
             ref={findInputRef}
             aria-label="Find in terminal output"
+            aria-invalid={find.hit === false || undefined}
             placeholder="Find"
             value={find.q}
             onChange={(e) => runFind(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { e.preventDefault(); runFind(find.q, e.shiftKey); }
-              else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFind(); }
             }}
             style={{
-              width: 180, height: 24, padding: '0 10px', fontSize: 12, fontFamily: 'inherit',
-              background: '#0e0f11', color: THEME.foreground,
-              border: `1px solid ${find.hit === false ? 'rgba(255,107,107,0.6)' : 'transparent'}`,
-              borderRadius: 9999, outline: 'none',
+              width: 180, minWidth: 0, height: 26, padding: '0 10px', fontSize: 12, fontFamily: 'inherit',
+              background: 'var(--color-bg-inset)', color: 'var(--color-text-primary)',
+              border: `1px solid ${find.hit === false ? 'var(--color-error)' : 'var(--color-border-subtle)'}`,
+              borderRadius: 9999,
             }}
           />
           <button type="button" aria-label="Previous match" title="Previous" onClick={() => runFind(find.q, true)} style={iconBtn()}><Glyph name="up" /></button>

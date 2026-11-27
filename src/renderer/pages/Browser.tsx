@@ -10,6 +10,7 @@
  */
 
 import { useBackHandler } from '../services/backNavigation';
+import { openWithShell } from '../utils/openWithShell';
 import { useAppWindowId, isExtraWindow } from '../services/appWindows';
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAppTracking } from '../services/usePatternLearning';
@@ -1632,18 +1633,27 @@ ${text}
   createTabRef.current = createTab;
 
   // App Menu / search quick actions (registered in services/appRegistry.ts).
-  useEffect(() => registerAppIntentHandler('browser', (action) => {
-    if (action === 'new-tab') {
-      createTabRef.current?.();
-      setTimeout(() => urlInputRef.current?.focus(), 60);
-      return true;
-    }
-    if (action === 'open-url') {
-      setTimeout(() => { urlInputRef.current?.focus(); urlInputRef.current?.select(); }, 60);
-      return true;
-    }
-    return false;
-  }), []);
+  const navigateIntent = useRef<(url: string) => void>();
+  useEffect(() => {
+    if (isExtraWindow(winId)) return;
+    return registerAppIntentHandler('browser', (action, payload) => {
+      if (action === 'navigate-url' && typeof payload === 'string') {
+        navigateIntent.current?.(payload);
+        return true;
+      }
+      if (action === 'new-tab') {
+        createTabRef.current?.();
+        urlInputRef.current?.focus();
+        return true;
+      }
+      if (action === 'open-url') {
+        urlInputRef.current?.focus();
+        urlInputRef.current?.select();
+        return true;
+      }
+      return false;
+    });
+  }, [winId]);
 
   // Pin/unpin tab
   const pinTab = useCallback((id: string) => {
@@ -1858,6 +1868,7 @@ ${text}
       try { wv.loadURL(finalUrl); } catch (e) { console.error('[Browser] loadURL error:', e); }
     }
   }, [shouldBlock, upgradeToHttps, browserSettings.defaultSearchEngine, addToHistory]);
+  navigateIntent.current = navigate;
 
   // Pick up search query from Spotlight (via localStorage bridge)
   useEffect(() => {
@@ -1868,8 +1879,9 @@ ${text}
     }
   }, [navigate]);
 
-  // Listen for dex-browser-navigate events (from AppManager spotlight routing)
+  // Compatibility for callers that dispatch a navigation event directly.
   useEffect(() => {
+    if (isExtraWindow(winId)) return;
     const handler = (e: Event) => {
       const url = (e as CustomEvent).detail?.url;
       if (url && typeof url === 'string') {
@@ -1878,7 +1890,7 @@ ${text}
     };
     window.addEventListener('dex-browser-navigate', handler);
     return () => window.removeEventListener('dex-browser-navigate', handler);
-  }, [navigate]);
+  }, [navigate, winId]);
 
   // Listen for new-tab requests from main process (target="_blank" links, popups)
   useEffect(() => {
@@ -2598,8 +2610,8 @@ ${text}
                   )}
                   {d.status === 'completed' && d.path && (
                     <>
-                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:openPath', d.path); }} aria-label={`Open ${d.fileName}`}>Open</button>
-                      <button style={styles.downloadBtn} onClick={() => { void window.dex?.invoke?.('shell:showItemInFolder', d.path); }} aria-label={`Show ${d.fileName} in folder`}>Show</button>
+                      <button style={styles.downloadBtn} onClick={() => { void openWithShell('path', d.path!, d.fileName); }} aria-label={`Open ${d.fileName}`}>Open</button>
+                      <button style={styles.downloadBtn} onClick={() => { void openWithShell('reveal', d.path!, d.fileName); }} aria-label={`Show ${d.fileName} in folder`}>Show</button>
                     </>
                   )}
                   {(d.status === 'error' || d.status === 'cancelled') && (

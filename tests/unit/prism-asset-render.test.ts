@@ -9,11 +9,20 @@
 // insert was invisible. Items are now rendered to pixels (assetRender.ts).
 
 import { describe, it, expect } from 'vitest';
+import { blendExposurePixels } from '../../src/renderer/DEXAPPLICATIONS/prism/exposureBlend';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { shapePoints, ASSET_SHAPES, ASSET_GRADIENTS, GRADIENT_STOPS } from '../../src/renderer/DEXAPPLICATIONS/prism/assetRender';
 
 describe('PRISM asset rendering', () => {
+  it('gives midtones more weight than clipped highlights and skips transparent pixels', () => {
+    const dark = Uint8ClampedArray.of(0, 0, 0, 255, 255, 0, 0, 0);
+    const bright = Uint8ClampedArray.of(255, 255, 255, 255, 80, 100, 120, 255);
+    const middle = Uint8ClampedArray.of(120, 120, 120, 255, 0, 0, 0, 0);
+    const output = new Uint8ClampedArray(8);
+    blendExposurePixels([dark, bright, middle], output);
+    expect([...output]).toEqual([120, 120, 120, 255, 80, 100, 120, 255]);
+  });
   it('polygon shapes have the right corner count and stay inside the box', () => {
     expect(shapePoints('Triangle')).toHaveLength(3);
     expect(shapePoints('Diamond')).toHaveLength(4);

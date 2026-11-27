@@ -222,6 +222,7 @@ export function announceProjectFocus(manifest: DexProjectManifest, source: strin
   try {
     ContextBus.emit('continuity:project', {
       projectId: manifest.projectId,
+      name: manifest.name,
       manifestPath,
       source,
     });

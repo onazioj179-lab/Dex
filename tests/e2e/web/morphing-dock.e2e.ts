@@ -145,10 +145,12 @@ test.describe('Morphing Dock', () => {
     const field = await input.boundingBox();
     await input.fill('calculator');
     await expect(menu.getByRole('option').first()).toBeVisible();
+    await expect(menu.getByRole('option', { selected: true })).toHaveCSS('box-shadow', 'none');
     expect(await menu.boundingBox()).toEqual(start);
     expect(await input.boundingBox()).toEqual(field);
     await input.fill('qqqqzzzzxxxx');
-    await expect(menu.getByText(/Nothing matches/)).toBeVisible();
+    await expect(menu.getByRole('status')).toHaveText('No results');
+    await expect(menu.getByRole('option')).toHaveCount(0);
     expect(await menu.boundingBox()).toEqual(start);
     await input.press('Escape');
     await expect(input).toHaveValue('');

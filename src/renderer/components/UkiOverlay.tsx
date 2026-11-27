@@ -1122,11 +1122,7 @@ function trySearchCommand(text: string): string | null {
 
 function dispatchWebSearch(query: string): string {
   const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-  window.dispatchEvent(new CustomEvent('dex-open-app', { detail: { appName: 'Browser' } }));
-  // Allow Browser to mount before navigating
-  setTimeout(() => {
-    window.dispatchEvent(new CustomEvent('dex-browser-navigate', { detail: { url } }));
-  }, 300);
+  window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', { detail: { appId: 'browser', contextId: url } }));
   return `Searching the web for "${query}"...`;
 }
 

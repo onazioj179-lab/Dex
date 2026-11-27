@@ -34,6 +34,7 @@ const MAX_FOLDERS: usize = 16;
 const PROJECT_DEPTH: usize = 4;
 const MAX_PROJECTS: usize = 200;
 const SNIPPET_CHARS: usize = 360;
+static FOLDER_CHANGES: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn folders_file(app: &tauri::AppHandle) -> Option<PathBuf> { app.dex_data_dir().ok().map(|d| d.join("umari-folders.json")) }
 
@@ -291,11 +292,6 @@ fn retrieve(app: &tauri::AppHandle, query: &str, limit: usize, max_chars: usize,
     json!({ "ok": true, "query": q, "items": items, "chars": used, "budget": max_chars })
 }
 
-fn index_after_change(app: &tauri::AppHandle) {
-    let app = app.clone();
-    std::thread::Builder::new().name("umari-index".into()).spawn(move || { let _ = crate::index_sync(&app); }).ok();
-}
-
 pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
     let a = args.get(0).cloned().unwrap_or(Value::Null);
     let s = |k: &str| a.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -312,6 +308,7 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let Some(picked) = app.dialog().file().set_title("Choose a folder for DEX to index").blocking_pick_folder().and_then(|f| f.into_path().ok()) else {
                 return json!({ "ok": false, "cancelled": true });
             };
+            let _change = FOLDER_CHANGES.lock_safe();
             let mut entries = read_entries(app);
             if entries.len() >= MAX_FOLDERS { return json!({ "ok": false, "error": format!("at most {MAX_FOLDERS} folders") }); }
             let home = app.path().home_dir().ok();
@@ -321,17 +318,18 @@ pub fn dispatch(app: &tauri::AppHandle, channel: &str, args: &Value) -> Value {
             let entry = json!({ "path": plain(&dir), "name": dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(), "addedAt": crate::xack::now_ms() });
             entries.push(entry.clone());
             if !write_entries(app, &entries) { return json!({ "ok": false, "error": "couldn't save the folder list" }); }
-            index_after_change(app);
+            crate::refresh_index_roots(app);
             json!({ "ok": true, "folder": entry })
         }
         "umari:removeFolder" => {
             let target = s("path").to_ascii_lowercase();
+            let _change = FOLDER_CHANGES.lock_safe();
             let mut entries = read_entries(app);
             let before = entries.len();
             entries.retain(|e| e.get("path").and_then(|p| p.as_str()).map(|p| p.to_ascii_lowercase()) != Some(target.clone()));
             if entries.len() == before { return json!({ "ok": false, "error": "that folder is not in the list" }); }
             if !write_entries(app, &entries) { return json!({ "ok": false, "error": "couldn't save the folder list" }); }
-            index_after_change(app);
+            crate::refresh_index_roots(app);
             json!({ "ok": true })
         }
         "umari:projects" => {

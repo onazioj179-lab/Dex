@@ -469,7 +469,10 @@ const ControlCenter: React.FC = () => {
   }, []);
 
   const q = query.trim().toLowerCase();
-  const matches = useCallback((name: string) => !q || name.toLowerCase().includes(q), [q]);
+  const matches = useCallback((name: string) => {
+    const text = name.toLowerCase();
+    return q.split(/\s+/).every(term => text.includes(term));
+  }, [q]);
   // While filtering, sections force-expand so the matched control is visible.
   const isOpen = useCallback((id: SectionId) => (q ? true : !collapsed.has(id)), [q, collapsed]);
 

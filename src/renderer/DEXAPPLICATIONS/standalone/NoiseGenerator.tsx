@@ -11,6 +11,7 @@
  */
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import DexIcon from '../../components/DexIcon';
+import { useRunningApps } from '../../store/runningApps';
 import { formatClock } from '../../../shared/format/units';
 
 /** Line glyph per sound (was a two-letter code like "WN"). */
@@ -496,6 +497,11 @@ const NoiseGenerator: React.FC = () => {
     playingRef.current = false;
   }, [clearTimers, stopAllLayers, volume]);
 
+  useEffect(() => useRunningApps.subscribe((state, previous) => {
+    if (playingRef.current && previous.runningApps.some(app => app.id === 'noisegenerator') &&
+        !state.runningApps.some(app => app.id === 'noisegenerator')) hardStop();
+  }), [hardStop]);
+
   const start = useCallback(() => {
     const bundle = ensureContext();
     if (!bundle) return;
@@ -568,17 +574,12 @@ const NoiseGenerator: React.FC = () => {
   // -- cleanup on unmount -------------------------------------------------
   useEffect(() => () => {
     clearTimers();
-    Object.values(layersRef.current).forEach(layer => {
-      layer.timers.forEach(t => clearInterval(t));
-      layer.sources.forEach(s => { try { s.stop(); } catch { /* */ } try { s.disconnect(); } catch { /* */ } });
-      layer.extra.forEach(n => { try { n.disconnect(); } catch { /* */ } });
-      try { layer.gain.disconnect(); } catch { /* */ }
-    });
-    layersRef.current = {};
+    stopAllLayers();
     if (masterRef.current) { try { masterRef.current.disconnect(); } catch { /* */ } }
-    if (audioCtxRef.current) { try { void audioCtxRef.current.close(); } catch { /* */ } }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (audioCtxRef.current) void audioCtxRef.current.close().catch(() => {});
+    masterRef.current = null;
+    audioCtxRef.current = null;
+  }, [clearTimers, stopAllLayers]);
 
   // -----------------------------------------------------------------------
   // Layer mixing helpers
@@ -761,6 +762,7 @@ const NoiseGenerator: React.FC = () => {
                 if (playingRef.current) setTimeLeft(m > 0 ? m * 60 : 0);
               }}
               aria-label={m === 0 ? 'No timer' : `${m} minutes`}
+              aria-pressed={timer === m}
             >
               {m === 0 ? 'Off' : `${m}m`}
             </button>

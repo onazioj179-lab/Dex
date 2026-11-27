@@ -4252,10 +4252,9 @@ textarea {
   background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
 }
 
-/* List item hover with left accent (opt-in) */
+/* List item hover */
 :where(.dex-list-item, [data-list-item]):hover {
   background: var(--color-bg-hover, rgba(255, 255, 255, 0.05));
-  box-shadow: inset 3px 0 0 var(--color-accent, #0A84FF);
 }
 
 /* Toolbar button active indicator */

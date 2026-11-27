@@ -22,6 +22,7 @@ import { buildDexCommands } from '../../shared/commands/dexCommands';
 import { executeDexCommand } from '../services/dexCommandRunner';
 import { openWorkflowSpace, WORKFLOW_TEMPLATES } from '../services/projectSpaces';
 import { useSpatialStore } from '../store/spatialStore';
+import { umariProjects, type UmariProject } from '../uki/umari';
 
 export type SpotlightCategory =
   | 'top'
@@ -1238,7 +1239,7 @@ export class SpotlightEngine {
     // Refresh which project is currently active so ranking can boost its items.
     this._refreshActiveProject();
 
-    this._index = items;
+    this._index = [...items, ...this._codeProjectEntries];
     this._notifyRefresh();
   }
 
@@ -1287,31 +1288,43 @@ export class SpotlightEngine {
    * project it is and what its manifest declares for tests.
    */
   private async _fetchCodeProjects(): Promise<void> {
-    try {
-      const r = await (window as any).dex?.invoke?.('umari:projects');
-      if (!r?.ok || !Array.isArray(r.projects)) return;
-      const next: IndexedItem[] = [];
-      for (const p of r.projects as Array<{ name: string; root: string; kinds: string[]; testCommand: string | null; modified: number }>) {
-        const id = `codeproject-${p.root}`;
-        if (this._index.some((item) => item.id === id)) continue;
-        next.push({
-          id,
-          category: 'projects',
-          title: p.name,
-          subtitle: `${p.kinds.join(', ')} project · ${p.root}`,
-          searchText: `${p.name} ${p.kinds.join(' ')} project ${p.root}`.toLowerCase(),
-          icon: 'code',
-          color: '#0A84FF',
-          action: () => this._launchAppWithContext('files', p.root),
-          frequency: this._usageFrequency.get(id) || 0,
-          lastUsed: p.modified ? p.modified * 1000 : 0,
-        });
-      }
-      if (next.length) {
-        this._index = [...this._index, ...next];
-        this._notifyRefresh();
-      }
-    } catch { /* Umari unavailable (web preview) -> omit source */ }
+    const started = Date.now();
+    if (started - this._lastCodeProjectsRefresh < 60_000) return;
+    this._lastCodeProjectsRefresh = started;
+    const request = ++this._codeProjectsRequest;
+    const projects = await umariProjects();
+    if (request === this._codeProjectsRequest && projects) this.updateCodeProjects(projects);
+  }
+
+  private _codeProjectsRequest = 0;
+  private _lastCodeProjectsRefresh = -Infinity;
+  private _codeProjectEntries: IndexedItem[] = [];
+
+  /** Replace the index snapshot after an indexed-folder change. */
+  updateCodeProjects(projects: readonly UmariProject[]): void {
+    ++this._codeProjectsRequest;
+    this._lastCodeProjectsRefresh = Date.now();
+    const next = projects.map((p): IndexedItem => {
+      const id = `codeproject-${p.root}`;
+      return {
+        id,
+        category: 'projects',
+        title: p.name,
+        subtitle: `${p.kinds.join(', ')} project · ${p.root}`,
+        searchText: `${p.name} ${p.kinds.join(' ')} project ${p.root}`.toLowerCase(),
+        icon: 'code',
+        color: '#0A84FF',
+        action: () => this._launchAppWithContext('files', p.root, 'folder'),
+        frequency: this._usageFrequency.get(id) || 0,
+        lastUsed: p.modified ? p.modified * 1000 : 0,
+      };
+    });
+    this._codeProjectEntries = next;
+    const retained = this._index.filter(item => !item.id.startsWith('codeproject-'));
+    if (next.length || retained.length !== this._index.length) {
+      this._index = [...retained, ...next];
+      this._notifyRefresh();
+    }
   }
 
   /** Workflows from the native store (window.dex.workflows.getAll). */
@@ -1377,10 +1390,10 @@ export class SpotlightEngine {
     } catch { /* IPC not available */ }
   }
 
-  private _launchAppWithContext(appId: string, contextId?: string): void {
+  private _launchAppWithContext(appId: string, contextId?: string, contextKind?: 'folder'): void {
     if (contextId) {
       window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
-        detail: { appId, contextId },
+        detail: { appId, contextId, ...(contextKind && { contextKind }) },
       }));
     } else {
       window.dispatchEvent(new CustomEvent('dex-spotlight-navigate', {
@@ -1425,7 +1438,7 @@ export class SpotlightEngine {
 
   // -- Search --------------------------------------------------------------
 
-  search(query: string): SpotlightResult[] {
+  search(query: string, { markTop = true } = {}): SpotlightResult[] {
     if (!query || query.trim().length === 0) {
       return this._getRecentResults();
     }
@@ -1495,7 +1508,7 @@ export class SpotlightEngine {
     }
 
     // 9. Mark top result
-    if (deduped.length > 0 && deduped[0].category !== 'calculator') {
+    if (markTop && deduped.length > 0 && deduped[0].category !== 'calculator') {
       deduped[0] = { ...deduped[0], category: 'top' };
     }
 
@@ -1996,7 +2009,12 @@ export class SpotlightEngine {
   // -- Private helpers -----------------------------------------------------
 
   private _fileSearchSeq = 0;
+  private _lastFileSearch = { query: '', at: 0 };
   private async _searchFilesAsync(query: string): Promise<void> {
+    const at = Date.now();
+    // Re-rendering after a search source updates must not restart the same scan.
+    if (this._lastFileSearch.query === query && at - this._lastFileSearch.at < 1000) return;
+    this._lastFileSearch = { query, at };
     const seq = ++this._fileSearchSeq;
     try {
       const result = await (window as any).dex?.invoke?.('files:search', { query, limit: 10 });

@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { useAppWindowId, isExtraWindow } from '../../services/appWindows';
+import { ContextBus } from '../../services/ContextBus';
 import { useNotesStore, useNotesStoreApi, NotesStoreContext, createNotesStore, type NoteListItem, type NotesStoreApi } from '../../store/notesStore';
 import { registerUkiAppAction, unregisterUkiAppAction } from '../../uki/appActionRegistry';
 import { NotesEditor, injectEditorCSS } from './NotesEditor';
@@ -257,20 +258,6 @@ const DexNotesInner: React.FC = () => {
     return () => unregisterUkiAppAction('notes.createNote');
   }, [winId]);
 
-  // App Menu / search quick actions (registered in services/appRegistry.ts).
-  useEffect(() => registerAppIntentHandler('notes', (action) => {
-    const { store: s, selectedFolderId: folder } = notesCreateRef.current;
-    if (action === 'new-note') {
-      void s.createNote(folder || undefined).then(id => { if (id) s.selectNote(id); });
-      return true;
-    }
-    if (action === 'search-notes') {
-      setTimeout(() => document.querySelector<HTMLInputElement>('input[placeholder="Search notes..."]')?.focus(), 60);
-      return true;
-    }
-    return false;
-  }), []);
-
   // -- Refs -------------------------------------------------------------
 
   const editorAreaRef = useRef<HTMLDivElement>(null);
@@ -285,6 +272,9 @@ const DexNotesInner: React.FC = () => {
   const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const [rootWidth, setRootWidth] = useState(0);
   const [peek, setPeek] = useState<{ sidebar: boolean; list: boolean }>({ sidebar: false, list: false });
+  const listSearchRef = useRef<HTMLInputElement>(null);
+  const [focusSearch, setFocusSearch] = useState(false);
+  const openingNote = useRef(0);
   useEffect(() => {
     const el = rootEl;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -307,6 +297,35 @@ const DexNotesInner: React.FC = () => {
   }, [compactSidebar, compactList]);
   const sidebarHidden = sidebarCollapsed || (compactSidebar && !peek.sidebar);
   const listHidden = listCollapsed || (compactList && !peek.list);
+  useEffect(() => {
+    if (isExtraWindow(winId)) return;
+    return registerAppIntentHandler('notes', (action, payload) => {
+      const { store: s, selectedFolderId: folder } = notesCreateRef.current;
+      if (action === 'new-note') {
+        void s.createNote(folder || undefined).then(id => { if (id) s.selectNote(id); });
+        return true;
+      }
+      if (action === 'open-note' && typeof payload === 'string') {
+        ++openingNote.current;
+        void s.loadNote(payload).finally(() => { --openingNote.current; });
+        return true;
+      }
+      if (action === 'search-notes') {
+        if (s.focusMode) s.toggleFocusMode();
+        if (s.listCollapsed) s.toggleList();
+        setPeek(p => ({ ...p, list: true }));
+        setFocusSearch(true);
+        return true;
+      }
+      return false;
+    });
+  }, [winId]);
+
+  useEffect(() => {
+    if (!focusSearch || !listSearchRef.current) return;
+    listSearchRef.current.focus({ preventScroll: true });
+    setFocusSearch(false);
+  }, [focusSearch, listHidden, focusMode, loading, initialized]);
   const toggleSidebarPane = useCallback(() => {
     if (compactSidebar) {
       if (sidebarCollapsed) store.toggleSidebar();
@@ -395,7 +414,7 @@ const DexNotesInner: React.FC = () => {
   useEffect(() => {
     // Wait for the first real load: before it, `notes` is [] and `loading` is
     // still false, so this used to create a blank note on every first open.
-    if (loading || initFailed || !initialized) return;
+    if (loading || initFailed || !initialized || openingNote.current) return;
     if (!activeNote) {
       if (notes.length > 0) {
         store.selectNote(notes[0].id);
@@ -407,7 +426,7 @@ const DexNotesInner: React.FC = () => {
         });
       }
     }
-  }, [loading, activeNote, notes.length, initFailed]);
+  }, [loading, activeNote, notes.length, initFailed, initialized]);
 
   // -- Sync title -------------------------------------------------------
 
@@ -415,6 +434,14 @@ const DexNotesInner: React.FC = () => {
     if (activeNote) {
       setTitleValue(activeNote.title || '');
     }
+  }, [activeNote?.id, activeNote?.title]);
+
+  const lastOpenedNote = useRef<string | null>(null);
+  useEffect(() => {
+    const id = activeNote?.id ?? null;
+    if (id === lastOpenedNote.current) return;
+    lastOpenedNote.current = id;
+    if (id) ContextBus.emit('note:opened', { id, title: activeNote?.title || 'Untitled note' });
   }, [activeNote?.id, activeNote?.title]);
 
   // -- Auto-title: derive name from first line of content ----------------
@@ -912,7 +939,6 @@ const DexNotesInner: React.FC = () => {
           outline: none !important;
           border-bottom-color: var(--dex-focus-color) !important;
         }
-        .dexnotes-app .dn-note-item[data-selected] { box-shadow: inset 2px 0 var(--color-accent); }
         .dexnotes-app .dn-footer button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; color: var(--color-text-primary) !important; }
         .dexnotes-app .dn-tree-acts:hover { opacity: 1 !important; }
         .dexnotes-app .dn-tree-acts button:hover { background: var(--color-bg-hover, rgba(255,255,255,0.08)) !important; border-radius: 3px; }
@@ -922,7 +948,7 @@ const DexNotesInner: React.FC = () => {
         .dexnotes-app .dn-star { opacity: 0; transition: opacity 0.12s ease, transform 0.12s ease; }
         .dexnotes-app .dn-note-item:hover .dn-star { opacity: 0.55; }
         .dexnotes-app .dn-note-item:hover { background: var(--color-bg-hover); }
-        .dexnotes-app .dn-note-item[data-selected] { background: var(--color-accent-light); }
+        .dexnotes-app .dn-note-item[data-selected] { background: var(--color-bg-active); }
         .dexnotes-app .dn-star.dn-star-on { opacity: 1; }
         .dexnotes-app .dn-star:hover { opacity: 1 !important; }
         .dexnotes-app * { scrollbar-width: thin; scrollbar-color: var(--color-border-subtle) transparent; }
@@ -1173,6 +1199,7 @@ const DexNotesInner: React.FC = () => {
               onViewModeChange={store.setViewMode}
               searchQuery={searchQuery}
               onSearchChange={store.setSearchQuery}
+              searchRef={listSearchRef}
             />
           </div>
           {/* List resizer */}

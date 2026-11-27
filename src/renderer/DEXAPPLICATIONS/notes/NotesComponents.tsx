@@ -112,7 +112,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
             paddingLeft: 8 + depth * 16,
             borderRadius: 4,
             cursor: 'pointer',
-            background: isSelected ? 'var(--color-accent-light)' : 'transparent',
+            background: isSelected ? 'var(--color-bg-active)' : 'transparent',
             color: isSelected ? 'var(--color-text-primary)' : colors.text,
             fontSize: 13,
             transition: 'background 0.1s',
@@ -182,7 +182,7 @@ export const FolderTree: React.FC<FolderTreeProps> = memo(({
           padding: '6px var(--space-2)',
           borderRadius: 4,
           cursor: 'pointer',
-          background: selectedFolderId === null ? 'var(--color-accent-light)' : 'transparent',
+          background: selectedFolderId === null ? 'var(--color-bg-active)' : 'transparent',
           color: selectedFolderId === null ? 'var(--color-text-primary)' : colors.text,
           fontSize: 13,
           fontWeight: 500,
@@ -302,6 +302,7 @@ interface NoteListPanelProps {
   onViewModeChange?: (mode: ViewMode) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  searchRef?: React.Ref<HTMLInputElement>;
 }
 
 export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
@@ -324,6 +325,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   onViewModeChange,
   searchQuery,
   onSearchChange,
+  searchRef,
 }) => {
   const { menuState, show: showCtx, close: closeCtx } = useContextMenu();
   // "New from template" picker -- a small dropdown beside the New Note button.
@@ -402,8 +404,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
   const renderNoteItem = (note: NoteListItem) => {
     const isSelected = note.id === selectedNoteId;
     const preview = note.plain_text?.slice(0, 100) || '';
-    // Resolve the stored color label to a CSS color so a colored note shows a
-    // left border + dot in the list (set from the toolbar or row context menu).
+    // A small swatch identifies the color label chosen for the note.
     const swatch = resolveNoteColor(note.color_label);
     return (
       <div
@@ -411,7 +412,7 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
         className="dn-note-item"
         data-selected={isSelected || undefined}
         onContextMenu={e => {
-          onSelect(note.id);
+          if (!isSelected) onSelect(note.id);
           showCtx(e, buildNoteCtxItems(note));
         }}
         style={{
@@ -421,10 +422,11 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
           transition: 'background 0.1s',
           marginBottom: 2,
         }}
-        onClick={() => onSelect(note.id)}
+        onClick={() => { if (!isSelected) onSelect(note.id); }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-          <div style={{
+          <button type="button" aria-current={isSelected || undefined}
+            onClick={e => { e.stopPropagation(); if (!isSelected) onSelect(note.id); }} style={{
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -433,17 +435,23 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
             color: isSelected ? 'var(--color-text-primary)' : colors.text,
             overflow: 'hidden',
             flex: 1,
+            minWidth: 0,
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            textAlign: 'start',
+            cursor: 'pointer',
           }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {note.locked ? '[Locked] ' : ''}{note.title || 'Untitled'}
+            </span>
             {swatch && (
               <span
                 aria-hidden="true"
                 style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: swatch }}
               />
             )}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {note.locked ? '[Locked] ' : ''}{note.title || 'Untitled'}
-            </span>
-          </div>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             {onToggleFavorite && (
               <button
@@ -513,12 +521,14 @@ export const NoteListPanel: React.FC<NoteListPanelProps> = memo(({
       {/* Search */}
       <div style={{ padding: 'var(--space-2) var(--space-2) 4px', flexShrink: 0 }}>
         <DexSearchInput
+          ref={searchRef}
           size="sm"
           fullWidth
           value={searchQuery}
           onChange={e => onSearchChange(e.target.value)}
           onClear={() => onSearchChange('')}
-          placeholder="Search notes..."
+          placeholder="Search notes"
+          aria-label="Search notes"
         />
       </div>
 

@@ -31,6 +31,7 @@ import { openWithShell } from '../utils/openWithShell';
 import { useTimerStore } from '../store/timerStore';
 import { persistOrWarn } from '../utils/persistOrWarn';
 import { takeIncomingTasks, TASK_INTAKE_EVENT } from '../services/taskIntake';
+import { ContextBus } from '../services/ContextBus';
 
 // ===========================================================================
 // TYPES
@@ -658,6 +659,7 @@ export const Tasks: React.FC = () => {
         notes: '',
       };
       setTasks((prev) => [newTask, ...prev]);
+      ContextBus.emit('task:created', { id: newTask.id, title });
       return `Added task "${title}".`;
     });
     registerUkiAppAction('tasks', {
@@ -927,8 +929,9 @@ export const Tasks: React.FC = () => {
     setTasks(prev => task.completed
       ? prev.map(row => row.id === id ? { ...row, completed: false, completedAt: null } : row)
       : completeTaskRows(prev, new Set([id]), at));
-    if (task && !task.completed) {
+    if (!task.completed) {
       // Trigger the brief completion animation, then clear the flag so it can replay.
+      ContextBus.emit('task:completed', { id, title: task.title });
       setRecentlyCompleted(id);
       window.setTimeout(() => setRecentlyCompleted(prev => (prev === id ? null : prev)), 400);
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: 1 } }));
@@ -999,6 +1002,7 @@ export const Tasks: React.FC = () => {
       flagged: selectedList === 'flagged' ? true : undefined,
     };
     setTasks(previous => [newTask, ...previous]);
+    ContextBus.emit('task:created', { id: newTask.id, title });
     setNewTaskTitle('');
     setNewTaskDue('');
     window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCreated', amount: 1 } }));
@@ -1102,6 +1106,9 @@ export const Tasks: React.FC = () => {
     if (eligible.size) {
       const at = new Date().toISOString();
       setTasks(prev => completeTaskRows(prev, eligible, at));
+      for (const task of pending) {
+        if (eligible.has(task.id)) ContextBus.emit('task:completed', { id: task.id, title: task.title });
+      }
       window.dispatchEvent(new CustomEvent('dex-stat-bump', { detail: { key: 'tasksCompleted', amount: eligible.size } }));
     }
     const blocked = pending.filter(task => !eligible.has(task.id));
@@ -1521,6 +1528,7 @@ export const Tasks: React.FC = () => {
             size="sm"
             fullWidth
             placeholder="Search"
+            aria-label="Search tasks"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onClear={() => setSearchQuery('')}
@@ -1539,11 +1547,12 @@ export const Tasks: React.FC = () => {
               key={opt.id}
               onClick={() => setStatusFilter(opt.id)}
               aria-label={`Filter by status: ${opt.label}`}
+              aria-pressed={statusFilter === opt.id}
               style={{
                 padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                 border: '1px solid var(--color-border-subtle)',
-                background: statusFilter === opt.id ? 'var(--color-accent-light)' : 'var(--color-bg-hover)',
-                color: statusFilter === opt.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                background: statusFilter === opt.id ? 'var(--color-accent-soft)' : 'var(--color-bg-hover)',
+                color: statusFilter === opt.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 fontWeight: statusFilter === opt.id ? 600 : 400, fontFamily: 'inherit',
               }}
             >
@@ -1565,11 +1574,12 @@ export const Tasks: React.FC = () => {
                 key={opt.id}
                 onClick={() => setPriorityFilter(opt.id)}
                 aria-label={`Filter by priority: ${opt.label}`}
+                aria-pressed={active}
                 style={{
                   padding: '3px 10px', borderRadius: 'var(--radius-lg, 10px)', fontSize: 11, cursor: 'pointer',
                   border: `1px solid ${active ? accent : 'var(--color-border-subtle)'}`,
                   background: 'var(--color-bg-hover)',
-                  color: active ? accent : 'var(--color-text-secondary)',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   fontWeight: active ? 600 : 400, fontFamily: 'inherit',
                 }}
               >

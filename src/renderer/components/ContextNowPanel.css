@@ -1,0 +1,229 @@
+/*
+ * DEX Platform
+ * Copyright (c) 2026 Onazi Treasure OJ. All rights reserved.
+ * Created by Onazi Treasure OJ <onazi75@gmail.com>
+ * Licensed under the DEX Software License Agreement v1.0. See LICENSE.
+ */
+
+.dex-now {
+  --now-gutter: clamp(16px, 3vw, 32px);
+  --now-gap: clamp(14px, 2.2vw, 24px);
+  --now-card: var(--color-bg-surface-solid);
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  width: min(920px, calc(100% - 40px));
+  max-width: none;
+  max-height: min(720px, calc(100dvh - 48px));
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 32%);
+  overflow: hidden;
+  line-height: 1.45;
+}
+
+.dex-now[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.dex-now::backdrop {
+  background: rgb(12 13 17 / 54%);
+}
+
+.dex-now__header {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 14px;
+  padding: 20px var(--now-gutter);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.dex-now__mark,
+.dex-now__entry-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.dex-now__mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+}
+
+.dex-now__header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 660;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.dex-now__close {
+  margin-inline-start: auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--now-card);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.dex-now__body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  align-items: start;
+  gap: var(--now-gap);
+  min-height: 0;
+  padding: var(--now-gap) var(--now-gutter) var(--now-gutter);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.dex-now__sidebar {
+  display: grid;
+  gap: var(--now-gap);
+  min-width: 0;
+}
+
+.dex-now__section {
+  min-width: 0;
+  padding: clamp(14px, 2vw, 20px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--now-card);
+}
+
+.dex-now__section h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.dex-now__details,
+.dex-now__apps,
+.dex-now__activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dex-now__detail {
+  position: relative;
+  padding-block: 10px;
+  padding-inline-start: 30px;
+}
+
+.dex-now__detail:first-child { padding-block-start: 0; }
+.dex-now__detail:last-child { padding-block-end: 0; }
+.dex-now__detail + .dex-now__detail { border-top: 1px solid var(--color-border-subtle); }
+
+.dex-now__detail dt svg {
+  position: absolute;
+  inset-inline-start: 0;
+}
+
+.dex-now__detail dt,
+.dex-now__entry-kind {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.dex-now__detail dd,
+.dex-now__entry-target {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.dex-now__apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
+  gap: 8px;
+}
+
+.dex-now__apps button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+
+.dex-now__apps button span { flex: 1; overflow-wrap: anywhere; }
+.dex-now__apps button svg { flex: none; color: var(--color-text-secondary); }
+.dex-now__apps button:hover,
+.dex-now__close:hover { background: var(--color-bg-hover); }
+
+.dex-now__history {
+  align-self: stretch;
+}
+
+.dex-now__entry {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding-block: 8px 12px;
+}
+
+.dex-now__entry:last-child { padding-block-end: 0; }
+
+.dex-now__entry-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.dex-now__entry-text { display: grid; }
+
+.dex-now__entry time {
+  padding-block-start: 1px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.dex-now__empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 680px) {
+  .dex-now {
+    width: calc(100% - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 16px;
+  }
+
+  .dex-now__header { padding-block: 14px; }
+  .dex-now__header h1 { font-size: 24px; }
+  .dex-now__mark { width: 38px; height: 38px; }
+  .dex-now__body { grid-template-columns: minmax(0, 1fr); }
+  .dex-now__entry { gap: 8px; }
+}

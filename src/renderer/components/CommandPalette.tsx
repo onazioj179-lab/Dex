@@ -39,7 +39,7 @@ import { toggleWindowFullscreen } from '../shell/FullscreenExit';
 // source without duplicating commands. Each runs through the single executor.
 const DEX_PALETTE_ACTION_IDS = new Set([
   'window.tileLeft', 'window.tileRight', 'window.maximize',
-  'system.uki', 'system.compact', 'nav.back', 'nav.forward', 'window.close',
+  'system.uki', 'system.compact', 'system.context', 'nav.back', 'nav.forward', 'window.close',
 ]);
 
 const _M = platform.isMac ? '⌘' : 'Ctrl';
