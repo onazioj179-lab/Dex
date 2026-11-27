@@ -29,9 +29,11 @@ Remove-Variable __a -ErrorAction SilentlyContinue
     'touch'   = { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Paths) foreach ($p in $Paths) { if (Test-Path -LiteralPath $p) { (Get-Item -LiteralPath $p).LastWriteTime = Get-Date } else { New-Item -ItemType File -Path $p | Out-Null } } }
     'open'    = { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Targets) if (-not $Targets) { $Targets = @('.') }; foreach ($t in $Targets) { if ($t -match '^[a-z]+://') { Start-Process $t } else { Invoke-Item -LiteralPath $t } } }
     'which'   = { param([Parameter(Mandatory=$true)][string]$Name) $c = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $c) { Write-Error "$Name not found"; return }; if ($c.Source) { $c.Source } else { $c.Definition } }
-    'grep'    = { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Rest)
+    # These commands use PowerShell's simple-function argument binding so
+    # Unix flags and pipeline input reach the command unchanged.
+    'grep'    = {
                   $i = $false; $r = $false; $v = $false; $n = $false; $args2 = @()
-                  foreach ($a in $Rest) { if ($a -match '^-[a-zA-Z]+$') { if ($a -match 'i') { $i = $true }; if ($a -match 'r|R') { $r = $true }; if ($a -match 'v') { $v = $true }; if ($a -match 'n') { $n = $true } } else { $args2 += $a } }
+                  foreach ($a in $args) { if ($a -match '^-[a-zA-Z]+$') { if ($a -match 'i') { $i = $true }; if ($a -match 'r|R') { $r = $true }; if ($a -match 'v') { $v = $true }; if ($a -match 'n') { $n = $true } } else { $args2 += $a } }
                   if (-not $args2) { Write-Error 'usage: grep [-i -r -v -n] PATTERN [FILE...]'; return }
                   $pat = $args2[0]; $files = @($args2 | Select-Object -Skip 1)
                   $p = @{ Pattern = $pat; CaseSensitive = (-not $i); NotMatch = $v }
@@ -39,8 +41,8 @@ Remove-Variable __a -ErrorAction SilentlyContinue
                   if ($files.Count -eq 0) { $files = @('.') ; $r = $true }
                   $items = if ($r) { Get-ChildItem -Path $files -Recurse -File -ErrorAction SilentlyContinue } else { Get-Item -Path $files -ErrorAction SilentlyContinue }
                   $items | Select-String @p | ForEach-Object { if ($n) { '{0}:{1}:{2}' -f $_.Path, $_.LineNumber, $_.Line } else { '{0}:{1}' -f $_.Path, $_.Line } } }
-    'head'    = { param([Alias('n')][int]$Lines = 10, [Parameter(ValueFromRemainingArguments=$true)][string[]]$Paths) if ($Paths) { Get-Content -Path $Paths -TotalCount $Lines } else { $input | Select-Object -First $Lines } }
-    'tail'    = { param([Alias('n')][int]$Lines = 10, [switch]$f, [Parameter(ValueFromRemainingArguments=$true)][string[]]$Paths) if ($Paths) { if ($f) { Get-Content -Path $Paths -Tail $Lines -Wait } else { Get-Content -Path $Paths -Tail $Lines } } else { $input | Select-Object -Last $Lines } }
+    'head'    = { param([string[]]$Paths, [Alias('n')][int]$Lines = 10) $files = $Paths + $args; if ($files) { Get-Content -Path $files -TotalCount $Lines } else { $input | Select-Object -First $Lines } }
+    'tail'    = { param([string[]]$Paths, [Alias('n')][int]$Lines = 10, [switch]$f) $files = $Paths + $args; if ($files) { Get-Content -Path $files -Tail $Lines -Wait:$f } else { $input | Select-Object -Last $Lines } }
     'pbcopy'  = { $input | Out-String | Set-Clipboard }
     'pbpaste' = { Get-Clipboard }
     'll'      = { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Paths) Get-ChildItem -Force @Paths }
@@ -105,6 +107,7 @@ mod tests {
         let script = format!(
             "{POWERSHELL_COMPAT}\nSet-Location -LiteralPath '{d}'\nmkdir -p a/b\ntouch a/b/x.txt\nSet-Content a/b/x.txt 'hello TODO'\n\
              'GREP=' + ((grep -i todo a/b/x.txt) -join ',')\n'WHICH=' + [bool](which powershell)\n'HEAD=' + ((Get-Content a/b/x.txt | head -n 1))\n\
+             'HEAD_FILE=' + (head a/b/x.txt)\n'TAIL=' + (('first','last') | tail -n 1)\n'GREP_PIPE=' + (('ignore','MATCH') | grep -i match)\n\
              'LS=' + ((ls -la | Select-Object -ExpandProperty Name) -join ',')\nrm -rf a\n'GONE=' + (-not (Test-Path a))\n"
         );
         let enc = {
@@ -121,6 +124,9 @@ mod tests {
         assert!(text.contains("GREP=") && text.contains("hello TODO"), "stdout: {text}\nstderr: {err}");
         assert!(text.contains("WHICH=True"), "stdout: {text}\nstderr: {err}");
         assert!(text.contains("HEAD=hello TODO"), "stdout: {text}\nstderr: {err}");
+        assert!(text.contains("HEAD_FILE=hello TODO"), "stdout: {text}\nstderr: {err}");
+        assert!(text.contains("TAIL=last"), "stdout: {text}\nstderr: {err}");
+        assert!(text.contains("GREP_PIPE=MATCH"), "stdout: {text}\nstderr: {err}");
         assert!(text.contains("LS=a"), "stdout: {text}\nstderr: {err}");
         assert!(text.contains("GONE=True"), "stdout: {text}\nstderr: {err}");
     }
