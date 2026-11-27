@@ -3,13 +3,15 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const [tag, repository, assets] = process.argv.slice(2);
-if (!/^v\d+\.\d+\.\d+$/.test(tag ?? '') || !/^[\w.-]+\/[\w.-]+$/.test(repository ?? '') || !assets) {
+const parsed = /^v(\d+\.\d+\.\d+)(?:\((\d+[a-z])\))?$/.exec(tag ?? '');
+if (!parsed || !/^[\w.-]+\/[\w.-]+$/.test(repository ?? '') || !assets) {
   throw new Error('Expected a stable version tag, GitHub repository, and release assets directory.');
 }
-const version = tag.slice(1);
+const version = parsed[1];
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const config = JSON.parse(await readFile('src-tauri/tauri.conf.json', 'utf8'));
 if (pkg.version !== version || config.version !== version) throw new Error('The release tag does not match the packaged DEX version.');
+if (parsed[2] && pkg.dexBuild !== parsed[2]) throw new Error('The release tag does not match the packaged DEX build.');
 
 const names = await readdir(assets);
 const installers = names.filter(name => name.endsWith('-setup.exe'));
@@ -28,7 +30,7 @@ const manifest = {
   pub_date: new Date().toISOString(),
   platforms: {
     'windows-x86_64': {
-      url: `https://github.com/${repository}/releases/download/${tag}/${encodeURIComponent(installer)}`,
+      url: `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(installer)}`,
       signature,
     },
   },
